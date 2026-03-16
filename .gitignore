@@ -1,0 +1,7 @@
+frontend/node_modules/
+frontend/dist/
+api/database.sqlite
+api/database.sqlite-wal
+api/database.sqlite-shm
+.env
+*.log

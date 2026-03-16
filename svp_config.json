@@ -1,0 +1,23 @@
+{
+  "project_name": "Beaver",
+  "services": [
+    {
+      "name": "PHP Backend",
+      "command": "php",
+      "args": "-S localhost:8003 index.php",
+      "cwd": "api",
+      "port": 8003,
+      "health_check_url": "http://localhost:8003/health",
+      "is_primary": false
+    },
+    {
+      "name": "Vite Frontend",
+      "command": "npm.cmd",
+      "args": "run dev",
+      "cwd": "frontend",
+      "port": 5178,
+      "health_check_url": "http://localhost:5178/contents/Beaver/",
+      "is_primary": true
+    }
+  ]
+}
