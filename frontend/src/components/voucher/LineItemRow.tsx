@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useFormContext, useWatch } from 'react-hook-form';
 import { useCostCalcDynamic } from '../../hooks/useCostCalc';
 import { useAppSettings } from '../../contexts/AppSettingsContext';
+import { useUpdateLine } from '../../api/vouchers';
 import TateguSelector from './TateguSelector';
 import type { TateguItem } from '../../types/tateguItem';
 import type { LineCategoryValue } from '../../types/voucher';
@@ -16,6 +17,8 @@ type Props = {
   onSelect?: () => void;
   categories: AggregationCategoryMaster[];
   totalCols: number;
+  voucherId: number;
+  isNew: boolean;
 };
 
 export default function LineItemRow({
@@ -26,10 +29,13 @@ export default function LineItemRow({
   onSelect,
   categories,
   totalCols,
+  voucherId,
+  isNew,
 }: Props) {
   const [selectorOpen, setSelectorOpen] = useState(false);
-  const { register, setValue, control } = useFormContext<VoucherFormValues>();
+  const { register, setValue, getValues, control } = useFormContext<VoucherFormValues>();
   const { settings } = useAppSettings();
+  const updateLine = useUpdateLine(voucherId);
 
   const line = useWatch({ control, name: `lines.${index}` });
 
@@ -93,6 +99,27 @@ export default function LineItemRow({
     setValue(`lines.${index}.prices`, updated);
   }
 
+  const saveLineToDb = useCallback(() => {
+    if (isNew) return;
+    const cur = getValues(`lines.${index}`);
+    if (!cur?.id) return;
+    updateLine.mutate({
+      lineId: cur.id,
+      data: {
+        location_name:  cur.location_name,
+        item_name:       cur.item_name,
+        line_type:       cur.line_type,
+        quantity:        cur.quantity,
+        cost_labor_rate: cur.cost_labor_rate,
+        line_total:      cur.line_total,
+        tax_category:    cur.tax_category,
+        memo:            cur.memo,
+        costs:           cur.costs,
+        prices:          cur.prices,
+      } as any,
+    });
+  }, [isNew, getValues, index, updateLine]);
+
   function handleTateguSelect(item: TateguItem) {
     setValue(`lines.${index}.tategu_item_id`, item.id);
     setValue(`lines.${index}.item_name`, item.name);
@@ -113,6 +140,20 @@ export default function LineItemRow({
         sort_order: bd.sort_order,
       }));
       setValue(`lines.${index}.costs`, newCosts);
+    }
+    // 選択直後に保存（tategu_item_id はバックエンドが snapshot ロードするので別途送信）
+    if (!isNew) {
+      const cur = getValues(`lines.${index}`);
+      if (cur?.id) {
+        updateLine.mutate({
+          lineId: cur.id,
+          data: {
+            tategu_item_id: item.id,
+            item_name: item.name,
+            cost_labor_rate: item.cost_labor_rate,
+          } as any,
+        });
+      }
     }
   }
 
@@ -146,13 +187,15 @@ export default function LineItemRow({
         <td style={tdStyle}>
           {lineType === 'normal' && (
             <input {...register(`lines.${index}.location_name`)} placeholder="場所"
-              style={{ ...cellInputStyle, width: 72 }} disabled={readOnly} />
+              style={{ ...cellInputStyle, width: 72 }} disabled={readOnly}
+              onBlur={saveLineToDb} />
           )}
         </td>
         {/* 内容 */}
         <td style={tdStyle}>
           <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-            <select {...register(`lines.${index}.line_type`)} style={{ ...cellInputStyle, width: 58 }} disabled={readOnly}>
+            <select {...register(`lines.${index}.line_type`)} style={{ ...cellInputStyle, width: 58 }} disabled={readOnly}
+              onBlur={saveLineToDb}>
               <option value="normal">通常</option>
               <option value="discount">値引</option>
               <option value="subtotal">小計</option>
@@ -161,7 +204,8 @@ export default function LineItemRow({
               {line?.tategu_item_id && <span title="建具台帳から引用" style={{ fontSize: 12 }}>🔨</span>}
               {line?.source_catalog_item_id && <span title="カタログから引用" style={{ fontSize: 12 }}>📦</span>}
               <input {...register(`lines.${index}.item_name`)} placeholder="品名"
-                style={{ ...cellInputStyle, width: 120 }} disabled={readOnly} />
+                style={{ ...cellInputStyle, width: 120 }} disabled={readOnly}
+                onBlur={saveLineToDb} />
             </div>
             {!readOnly && lineType === 'normal' && (
               <button type="button" onClick={e => { e.stopPropagation(); setSelectorOpen(true); }} style={selectBtnStyle} title="建具台帳から選択">
@@ -176,7 +220,8 @@ export default function LineItemRow({
         {/* 数量 */}
         <td style={tdStyle}>
           <input type="number" {...register(`lines.${index}.quantity`, { valueAsNumber: true })}
-            style={{ ...cellInputStyle, width: 52 }} disabled={readOnly} />
+            style={{ ...cellInputStyle, width: 52 }} disabled={readOnly}
+            onBlur={saveLineToDb} />
         </td>
         {/* 売値 money型区分 */}
         {moneyCategories.map((cat, ci) => (
@@ -186,6 +231,7 @@ export default function LineItemRow({
                 type="number"
                 value={getPriceValue(cat.code)}
                 onChange={e => setPriceValue(cat.code, e.target.value)}
+                onBlur={saveLineToDb}
                 style={{ ...cellInputStyle, width: 72 }}
                 disabled={readOnly}
                 placeholder={cat.name}
@@ -203,7 +249,8 @@ export default function LineItemRow({
         <td style={{ ...tdStyle, textAlign: 'right' }}>
           {lineType === 'discount' ? (
             <input type="number" {...register(`lines.${index}.line_total`, { valueAsNumber: true })}
-              style={{ ...cellInputStyle, width: 88, textAlign: 'right' }} disabled={readOnly} />
+              style={{ ...cellInputStyle, width: 88, textAlign: 'right' }} disabled={readOnly}
+              onBlur={saveLineToDb} />
           ) : (
             <span style={{ fontSize: 13, fontWeight: lineType === 'normal' ? 'normal' : 'bold' }}>
               ¥{lineTotal.toLocaleString()}
@@ -213,7 +260,8 @@ export default function LineItemRow({
         {/* 課税 */}
         <td style={tdStyle}>
           {lineType === 'normal' && (
-            <select {...register(`lines.${index}.tax_category`)} style={{ ...cellInputStyle, width: 68 }} disabled={readOnly}>
+            <select {...register(`lines.${index}.tax_category`)} style={{ ...cellInputStyle, width: 68 }} disabled={readOnly}
+              onBlur={saveLineToDb}>
               <option value="taxable">課税</option>
               <option value="non_taxable">非課税</option>
             </select>
@@ -227,6 +275,7 @@ export default function LineItemRow({
                 type="number"
                 value={getCostValue(cat.code)}
                 onChange={e => setCostValue(cat.code, e.target.value)}
+                onBlur={saveLineToDb}
                 style={{ ...cellInputStyle, width: 72 }}
                 disabled={readOnly}
                 placeholder={cat.name}
@@ -242,6 +291,7 @@ export default function LineItemRow({
                 type="number"
                 value={getCostValue(cat.code)}
                 onChange={e => setCostValue(cat.code, e.target.value)}
+                onBlur={saveLineToDb}
                 style={{ ...cellInputStyle, width: 52 }}
                 step="0.5"
                 disabled={readOnly}
@@ -254,7 +304,8 @@ export default function LineItemRow({
         <td style={tdStyle}>
           {lineType === 'normal' && (
             <input type="number" {...register(`lines.${index}.cost_labor_rate`, { valueAsNumber: true })}
-              style={{ ...cellInputStyle, width: 64 }} disabled={readOnly} />
+              style={{ ...cellInputStyle, width: 64 }} disabled={readOnly}
+              onBlur={saveLineToDb} />
           )}
         </td>
         {/* 労務費 */}
@@ -321,6 +372,7 @@ export default function LineItemRow({
             placeholder="備考"
             style={{ ...cellInputStyle, width: '100%', fontSize: 12, color: '#64748b' }}
             disabled={readOnly}
+            onBlur={saveLineToDb}
           />
         </td>
       </tr>

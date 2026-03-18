@@ -443,6 +443,8 @@ export default function VoucherEdit() {
                     onSelect={() => setSelectedIdx(index)}
                     categories={categories}
                     totalCols={totalCols}
+                    voucherId={voucherId}
+                    isNew={isNew}
                   />
                 ))}
               </tbody>
