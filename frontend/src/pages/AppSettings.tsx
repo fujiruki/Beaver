@@ -2,12 +2,15 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppSettings } from '../contexts/AppSettingsContext';
 import { useAggregationCategories, useSyncAggregationCategories } from '../api/aggregationCategories';
+import { useMigrateFixedColumns } from '../api/vouchers';
 
 export default function AppSettings() {
   const navigate = useNavigate();
   const { settings, update } = useAppSettings();
   const { data: categories } = useAggregationCategories();
   const syncMutation = useSyncAggregationCategories();
+  const migrateMutation = useMigrateFixedColumns();
+  const [migrateResult, setMigrateResult] = useState<{ migrated_costs: number; migrated_prices: number } | null>(null);
 
   const [presetInput, setPresetInput] = useState(
     settings.profitRatePresets.map(r => Math.round(r * 100)).join(', '),
@@ -145,7 +148,29 @@ export default function AppSettings() {
         {allCategories.length > 0 && (
           <div className="border-t border-slate-100 pt-4">
             <h2 className="text-xs font-semibold text-slate-500 mb-1">旧データ移行マッピング</h2>
-            <p className="text-xs text-slate-400 mb-3">固定列と集計区分コードの対応を設定します。旧データの表示に使用されます。</p>
+            <p className="text-xs text-slate-400 mb-3">固定列と集計区分コードの対応を設定し、一括移行を実行します。</p>
+            <div className="flex items-center gap-3 mb-3">
+              <button
+                onClick={() => {
+                  setMigrateResult(null);
+                  migrateMutation.mutate(settings.columnMapping, {
+                    onSuccess: (res) => setMigrateResult(res),
+                  });
+                }}
+                disabled={migrateMutation.isPending}
+                className="px-3 py-1.5 bg-amber-600 text-white rounded text-xs hover:bg-amber-700 disabled:opacity-50"
+              >
+                {migrateMutation.isPending ? '移行中...' : '旧データを一括移行'}
+              </button>
+              {migrateResult && (
+                <span className="text-xs text-green-700">
+                  原価: {migrateResult.migrated_costs}件、売値: {migrateResult.migrated_prices}件 を移行しました
+                </span>
+              )}
+              {migrateMutation.isError && (
+                <span className="text-xs text-red-600">移行に失敗しました</span>
+              )}
+            </div>
             <table className="w-full text-xs">
               <thead>
                 <tr className="text-slate-400 border-b border-slate-200">

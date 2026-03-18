@@ -225,6 +225,97 @@ function attachLineSubtables(PDO $pdo, array &$line): void {
     $line['prices'] = !empty($prices) ? $prices : fallbackPrices($line);
 }
 
+// ---- POST /vouchers/migrate-fixed-columns ----
+// 固定列のデータを costs/prices サブテーブルへ一括移行する
+if ($method === 'POST' && !$resourceId && $path === '/vouchers/migrate-fixed-columns') {
+    $body = json_decode(file_get_contents('php://input'), true) ?? [];
+    // columnMapping: { cost_body: 'body', cost_hardware: 'hardware', ... }
+    $mapping = $body['columnMapping'] ?? [];
+    if (empty($mapping)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'columnMapping が必要です']);
+        exit;
+    }
+
+    // サブテーブルに未移行の明細行を全取得
+    $lineStmt = $pdo->query('SELECT * FROM voucher_lines');
+    $migratedCosts = 0;
+    $migratedPrices = 0;
+
+    $pdo->beginTransaction();
+    foreach ($lineStmt->fetchAll() as $line) {
+        $lineId = (int)$line['id'];
+
+        // costs が未移行の行のみ処理
+        $existsCosts = $pdo->prepare('SELECT COUNT(*) FROM voucher_line_costs WHERE voucher_line_id = ?');
+        $existsCosts->execute([$lineId]);
+        if ((int)$existsCosts->fetchColumn() === 0) {
+            $newCosts = [];
+            $sort = 0;
+            $costCols = ['cost_body', 'cost_hardware', 'cost_glass', 'cost_factory_hours', 'cost_site_hours'];
+            foreach ($costCols as $col) {
+                $val = (float)($line[$col] ?? 0);
+                if ($val == 0) { $sort++; continue; }
+                $code = $mapping[$col] ?? null;
+                if (!$code) { $sort++; continue; }
+                // カテゴリ名を aggregation_category_master から取得
+                $catStmt = $pdo->prepare('SELECT name, measure_type FROM aggregation_category_master WHERE code = ?');
+                $catStmt->execute([$code]);
+                $cat = $catStmt->fetch();
+                if ($cat) {
+                    $newCosts[] = [
+                        'category_code' => $code,
+                        'category_name' => $cat['name'],
+                        'measure_type'  => $cat['measure_type'],
+                        'value'         => $val,
+                        'sort_order'    => $sort,
+                    ];
+                }
+                $sort++;
+            }
+            if (!empty($newCosts)) {
+                saveLineCosts($pdo, $lineId, $newCosts);
+                $migratedCosts++;
+            }
+        }
+
+        // prices が未移行の行のみ処理
+        $existsPrices = $pdo->prepare('SELECT COUNT(*) FROM voucher_line_prices WHERE voucher_line_id = ?');
+        $existsPrices->execute([$lineId]);
+        if ((int)$existsPrices->fetchColumn() === 0) {
+            $newPrices = [];
+            $sort = 0;
+            $priceCols = ['price_body', 'price_hardware', 'price_glass'];
+            foreach ($priceCols as $col) {
+                $val = (float)($line[$col] ?? 0);
+                if ($val == 0) { $sort++; continue; }
+                $code = $mapping[$col] ?? null;
+                if (!$code) { $sort++; continue; }
+                $catStmt = $pdo->prepare('SELECT name, measure_type FROM aggregation_category_master WHERE code = ?');
+                $catStmt->execute([$code]);
+                $cat = $catStmt->fetch();
+                if ($cat) {
+                    $newPrices[] = [
+                        'category_code' => $code,
+                        'category_name' => $cat['name'],
+                        'measure_type'  => $cat['measure_type'],
+                        'value'         => $val,
+                        'sort_order'    => $sort,
+                    ];
+                }
+                $sort++;
+            }
+            if (!empty($newPrices)) {
+                saveLinePrices($pdo, $lineId, $newPrices);
+                $migratedPrices++;
+            }
+        }
+    }
+    $pdo->commit();
+    echo json_encode(['migrated_costs' => $migratedCosts, 'migrated_prices' => $migratedPrices]);
+    exit;
+}
+
 switch ($method) {
     case 'GET':
         if ($resourceId && $subAction === 'lines') {
