@@ -1,3 +1,10 @@
 # Beaver マイグレーション適用記録
 # 書式: NNN_説明  適用日  環境
 # 初回DBは schema.sql で自動生成されるためマイグレーション不要
+002_projects_columns      2026-03-17  dev
+003_project_images        2026-03-17  dev
+004_tategu_catalog_name   2026-03-17  dev
+005_sales_categories      2026-03-17  dev
+006_tategu_cost_breakdown 2026-03-18  dev
+007_aggregation_category_master 2026-03-18  dev
+008_voucher_line_dynamic        2026-03-18  dev

@@ -38,11 +38,9 @@ function recalcVoucher(PDO $pdo, int $voucherId): void {
     $stmt->execute([$voucherId]);
     $v = $stmt->fetch();
 
-    // 現在適用税率を取得
     $taxStmt = $pdo->query('SELECT rate FROM tax_rates ORDER BY valid_from DESC LIMIT 1');
     $taxRate = (float)$taxStmt->fetchColumn();
 
-    // 明細集計
     $lStmt = $pdo->prepare('SELECT line_type, line_total, tax_category FROM voucher_lines WHERE voucher_id = ?');
     $lStmt->execute([$voucherId]);
     $lines = $lStmt->fetchAll();
@@ -62,7 +60,6 @@ function recalcVoucher(PDO $pdo, int $voucherId): void {
         }
     }
 
-    // 税抜ベースに統一
     if ($v['tax_input_type'] === 'inclusive') {
         $taxable    = round($taxable    / (1 + $taxRate));
         $nontaxable = round($nontaxable / (1 + $taxRate));
@@ -99,19 +96,149 @@ function loadSnapshot(PDO $pdo, int $lineId): void {
             cost_labor_rate = :cost_labor_rate, snapshot_loaded_at = CURRENT_TIMESTAMP
         WHERE id = :id
     ')->execute(array_merge($costs, [':id' => $lineId]));
+
+    // cost_breakdown があれば voucher_line_costs へ同期
+    $bdStmt = $pdo->prepare('SELECT * FROM tategu_item_cost_breakdown WHERE tategu_item_id = ? ORDER BY sort_order');
+    $bdStmt->execute([$tId]);
+    $breakdown = $bdStmt->fetchAll();
+    if (!empty($breakdown)) {
+        $pdo->prepare('DELETE FROM voucher_line_costs WHERE voucher_line_id = ?')->execute([$lineId]);
+        $ins = $pdo->prepare('
+            INSERT INTO voucher_line_costs (voucher_line_id, category_code, category_name, measure_type, value, sort_order)
+            VALUES (:voucher_line_id, :category_code, :category_name, :measure_type, :value, :sort_order)
+        ');
+        foreach ($breakdown as $bd) {
+            $ins->execute([
+                ':voucher_line_id' => $lineId,
+                ':category_code'   => $bd['category_code'],
+                ':category_name'   => $bd['category_name'],
+                ':measure_type'    => $bd['measure_type'],
+                ':value'           => (float)$bd['value'],
+                ':sort_order'      => (int)$bd['sort_order'],
+            ]);
+        }
+    }
+}
+
+// --- costs/prices サブテーブルへの書き込み ---
+function saveLineCosts(PDO $pdo, int $lineId, array $costs): void {
+    $pdo->prepare('DELETE FROM voucher_line_costs WHERE voucher_line_id = ?')->execute([$lineId]);
+    $ins = $pdo->prepare('
+        INSERT INTO voucher_line_costs (voucher_line_id, category_code, category_name, measure_type, value, sort_order)
+        VALUES (:voucher_line_id, :category_code, :category_name, :measure_type, :value, :sort_order)
+    ');
+    foreach ($costs as $c) {
+        $ins->execute([
+            ':voucher_line_id' => $lineId,
+            ':category_code'   => $c['category_code'],
+            ':category_name'   => $c['category_name'] ?? '',
+            ':measure_type'    => $c['measure_type'],
+            ':value'           => (float)($c['value'] ?? 0),
+            ':sort_order'      => (int)($c['sort_order'] ?? 0),
+        ]);
+    }
+}
+
+function saveLinePrices(PDO $pdo, int $lineId, array $prices): void {
+    $pdo->prepare('DELETE FROM voucher_line_prices WHERE voucher_line_id = ?')->execute([$lineId]);
+    $ins = $pdo->prepare('
+        INSERT INTO voucher_line_prices (voucher_line_id, category_code, category_name, measure_type, value, sort_order)
+        VALUES (:voucher_line_id, :category_code, :category_name, :measure_type, :value, :sort_order)
+    ');
+    foreach ($prices as $p) {
+        $ins->execute([
+            ':voucher_line_id' => $lineId,
+            ':category_code'   => $p['category_code'],
+            ':category_name'   => $p['category_name'] ?? '',
+            ':measure_type'    => $p['measure_type'],
+            ':value'           => (float)($p['value'] ?? 0),
+            ':sort_order'      => (int)($p['sort_order'] ?? 0),
+        ]);
+    }
+}
+
+// --- 固定列からのフォールバック変換 ---
+function fallbackCosts(array $line): array {
+    $map = [
+        ['field' => 'cost_body',          'code' => 'body',          'name' => '本体',     'type' => 'money'],
+        ['field' => 'cost_hardware',      'code' => 'hardware',      'name' => '金物',     'type' => 'money'],
+        ['field' => 'cost_glass',         'code' => 'glass',         'name' => 'ガラス',   'type' => 'money'],
+        ['field' => 'cost_factory_hours', 'code' => 'factory_hours', 'name' => '工場時間', 'type' => 'time'],
+        ['field' => 'cost_site_hours',    'code' => 'site_hours',    'name' => '現場時間', 'type' => 'time'],
+    ];
+    $costs = [];
+    $sort = 0;
+    foreach ($map as $m) {
+        $val = (float)($line[$m['field']] ?? 0);
+        if ($val != 0) {
+            $costs[] = [
+                'id'              => null,
+                'voucher_line_id' => (int)$line['id'],
+                'category_code'   => $m['code'],
+                'category_name'   => $m['name'],
+                'measure_type'    => $m['type'],
+                'value'           => $val,
+                'sort_order'      => $sort,
+            ];
+        }
+        $sort++;
+    }
+    return $costs;
+}
+
+function fallbackPrices(array $line): array {
+    $map = [
+        ['field' => 'price_body',     'code' => 'body',     'name' => '本体',   'type' => 'money'],
+        ['field' => 'price_hardware', 'code' => 'hardware', 'name' => '金物',   'type' => 'money'],
+        ['field' => 'price_glass',    'code' => 'glass',    'name' => 'ガラス', 'type' => 'money'],
+    ];
+    $prices = [];
+    $sort = 0;
+    foreach ($map as $m) {
+        $val = (float)($line[$m['field']] ?? 0);
+        if ($val != 0) {
+            $prices[] = [
+                'id'              => null,
+                'voucher_line_id' => (int)$line['id'],
+                'category_code'   => $m['code'],
+                'category_name'   => $m['name'],
+                'measure_type'    => $m['type'],
+                'value'           => $val,
+                'sort_order'      => $sort,
+            ];
+        }
+        $sort++;
+    }
+    return $prices;
+}
+
+// --- サブテーブルを明細行に付加 ---
+function attachLineSubtables(PDO $pdo, array &$line): void {
+    $cStmt = $pdo->prepare('SELECT * FROM voucher_line_costs WHERE voucher_line_id = ? ORDER BY sort_order');
+    $cStmt->execute([$line['id']]);
+    $costs = $cStmt->fetchAll();
+    $line['costs'] = !empty($costs) ? $costs : fallbackCosts($line);
+
+    $pStmt = $pdo->prepare('SELECT * FROM voucher_line_prices WHERE voucher_line_id = ? ORDER BY sort_order');
+    $pStmt->execute([$line['id']]);
+    $prices = $pStmt->fetchAll();
+    $line['prices'] = !empty($prices) ? $prices : fallbackPrices($line);
 }
 
 switch ($method) {
     case 'GET':
-        // 明細一覧
         if ($resourceId && $subAction === 'lines') {
             $stmt = $pdo->prepare('SELECT * FROM voucher_lines WHERE voucher_id = ? ORDER BY line_no');
             $stmt->execute([$resourceId]);
-            echo json_encode($stmt->fetchAll());
+            $lines = $stmt->fetchAll();
+            foreach ($lines as &$line) {
+                attachLineSubtables($pdo, $line);
+            }
+            unset($line);
+            echo json_encode($lines);
             break;
         }
         if ($resourceId) {
-            // 伝票詳細
             $stmt = $pdo->prepare('
                 SELECT v.*, c.name AS customer_name, p.name AS project_name
                 FROM vouchers v
@@ -125,24 +252,49 @@ switch ($method) {
 
             $stmt2 = $pdo->prepare('SELECT * FROM voucher_lines WHERE voucher_id = ? ORDER BY line_no');
             $stmt2->execute([$resourceId]);
-            $row['lines'] = $stmt2->fetchAll();
+            $lines = $stmt2->fetchAll();
+            foreach ($lines as &$line) {
+                attachLineSubtables($pdo, $line);
+            }
+            unset($line);
+            $row['lines'] = $lines;
             echo json_encode($row);
         } else {
-            // 一覧
             $where = 'WHERE 1=1'; $params = [];
             if (!empty($_GET['voucher_type'])) { $where .= ' AND v.voucher_type = ?'; $params[] = $_GET['voucher_type']; }
             if (!empty($_GET['customer_id'])) { $where .= ' AND v.customer_id = ?'; $params[] = (int)$_GET['customer_id']; }
             if (!empty($_GET['project_id']))  { $where .= ' AND v.project_id = ?';  $params[] = (int)$_GET['project_id']; }
             if (!empty($_GET['status']))      { $where .= ' AND v.status = ?';      $params[] = $_GET['status']; }
-            $stmt = $pdo->prepare("
-                SELECT v.*, c.name AS customer_name, p.name AS project_name
-                FROM vouchers v
-                LEFT JOIN customers c ON c.id = v.customer_id
-                LEFT JOIN projects  p ON p.id = v.project_id
-                $where ORDER BY v.voucher_date DESC
-            ");
-            $stmt->execute($params);
-            echo json_encode($stmt->fetchAll());
+            if (isset($_GET['page'])) {
+                $page    = max(1, (int)$_GET['page']);
+                $perPage = min(200, max(10, (int)($_GET['per_page'] ?? 50)));
+                $offset  = ($page - 1) * $perPage;
+                $cntStmt = $pdo->prepare("SELECT COUNT(*) FROM vouchers v $where");
+                $cntStmt->execute($params);
+                $total = (int)$cntStmt->fetchColumn();
+                $stmt  = $pdo->prepare("
+                    SELECT v.*, c.name AS customer_name, p.name AS project_name
+                    FROM vouchers v
+                    LEFT JOIN customers c ON c.id = v.customer_id
+                    LEFT JOIN projects  p ON p.id = v.project_id
+                    $where ORDER BY v.voucher_date DESC LIMIT $perPage OFFSET $offset
+                ");
+                $stmt->execute($params);
+                echo json_encode([
+                    'data' => $stmt->fetchAll(),
+                    'meta' => ['total' => $total, 'page' => $page, 'per_page' => $perPage, 'last_page' => (int)ceil($total / $perPage)],
+                ]);
+            } else {
+                $stmt = $pdo->prepare("
+                    SELECT v.*, c.name AS customer_name, p.name AS project_name
+                    FROM vouchers v
+                    LEFT JOIN customers c ON c.id = v.customer_id
+                    LEFT JOIN projects  p ON p.id = v.project_id
+                    $where ORDER BY v.voucher_date DESC
+                ");
+                $stmt->execute($params);
+                echo json_encode($stmt->fetchAll());
+            }
         }
         break;
 
@@ -201,46 +353,61 @@ switch ($method) {
             ]);
             $newId = (int)$pdo->lastInsertId();
 
-            // 明細をディープコピー
             $lines = $pdo->prepare('SELECT * FROM voucher_lines WHERE voucher_id = ? ORDER BY line_no');
             $lines->execute([$resourceId]);
             foreach ($lines->fetchAll() as $line) {
                 $pdo->prepare('
                     INSERT INTO voucher_lines
                         (voucher_id, line_no, line_type, location_no, location_name,
-                         tategu_item_id, item_name, quantity,
+                         tategu_item_id, source_catalog_item_id, item_name, quantity,
                          cost_body, cost_hardware, cost_glass, cost_factory_hours, cost_site_hours, cost_labor_rate,
                          snapshot_loaded_at, price_body, price_hardware, price_glass, line_total,
                          tax_category, memo)
                     VALUES
                         (:voucher_id, :line_no, :line_type, :location_no, :location_name,
-                         :tategu_item_id, :item_name, :quantity,
+                         :tategu_item_id, :source_catalog_item_id, :item_name, :quantity,
                          :cost_body, :cost_hardware, :cost_glass, :cost_factory_hours, :cost_site_hours, :cost_labor_rate,
                          :snapshot_loaded_at, :price_body, :price_hardware, :price_glass, :line_total,
                          :tax_category, :memo)
                 ')->execute([
-                    ':voucher_id'          => $newId,
-                    ':line_no'             => $line['line_no'],
-                    ':line_type'           => $line['line_type'],
-                    ':location_no'         => $line['location_no'],
-                    ':location_name'       => $line['location_name'],
-                    ':tategu_item_id'      => $line['tategu_item_id'],
-                    ':item_name'           => $line['item_name'],
-                    ':quantity'            => $line['quantity'],
-                    ':cost_body'           => $line['cost_body'],
-                    ':cost_hardware'       => $line['cost_hardware'],
-                    ':cost_glass'          => $line['cost_glass'],
-                    ':cost_factory_hours'  => $line['cost_factory_hours'],
-                    ':cost_site_hours'     => $line['cost_site_hours'],
-                    ':cost_labor_rate'     => $line['cost_labor_rate'],
-                    ':snapshot_loaded_at'  => $line['snapshot_loaded_at'],
-                    ':price_body'          => $line['price_body'],
-                    ':price_hardware'      => $line['price_hardware'],
-                    ':price_glass'         => $line['price_glass'],
-                    ':line_total'          => $line['line_total'],
-                    ':tax_category'        => $line['tax_category'],
-                    ':memo'                => $line['memo'],
+                    ':voucher_id'             => $newId,
+                    ':line_no'                => $line['line_no'],
+                    ':line_type'              => $line['line_type'],
+                    ':location_no'            => $line['location_no'],
+                    ':location_name'          => $line['location_name'],
+                    ':tategu_item_id'         => $line['tategu_item_id'],
+                    ':source_catalog_item_id' => $line['source_catalog_item_id'] ?? null,
+                    ':item_name'              => $line['item_name'],
+                    ':quantity'               => $line['quantity'],
+                    ':cost_body'              => $line['cost_body'],
+                    ':cost_hardware'          => $line['cost_hardware'],
+                    ':cost_glass'             => $line['cost_glass'],
+                    ':cost_factory_hours'     => $line['cost_factory_hours'],
+                    ':cost_site_hours'        => $line['cost_site_hours'],
+                    ':cost_labor_rate'        => $line['cost_labor_rate'],
+                    ':snapshot_loaded_at'     => $line['snapshot_loaded_at'],
+                    ':price_body'             => $line['price_body'],
+                    ':price_hardware'         => $line['price_hardware'],
+                    ':price_glass'            => $line['price_glass'],
+                    ':line_total'             => $line['line_total'],
+                    ':tax_category'           => $line['tax_category'],
+                    ':memo'                   => $line['memo'],
                 ]);
+                $newLineId = (int)$pdo->lastInsertId();
+
+                // costs/prices もコピー
+                $cStmt = $pdo->prepare('SELECT * FROM voucher_line_costs WHERE voucher_line_id = ? ORDER BY sort_order');
+                $cStmt->execute([$line['id']]);
+                $srcCosts = $cStmt->fetchAll();
+                if (!empty($srcCosts)) {
+                    saveLineCosts($pdo, $newLineId, $srcCosts);
+                }
+                $pStmt = $pdo->prepare('SELECT * FROM voucher_line_prices WHERE voucher_line_id = ? ORDER BY sort_order');
+                $pStmt->execute([$line['id']]);
+                $srcPrices = $pStmt->fetchAll();
+                if (!empty($srcPrices)) {
+                    saveLinePrices($pdo, $newLineId, $srcPrices);
+                }
             }
             http_response_code(201);
             $s = $pdo->prepare('SELECT * FROM vouchers WHERE id = ?');
@@ -256,7 +423,6 @@ switch ($method) {
             foreach ($lines->fetchAll() as $line) {
                 loadSnapshot($pdo, (int)$line['id']);
             }
-            // 合計再計算
             recalcVoucher($pdo, $resourceId);
             echo json_encode(['reloaded' => true]);
             break;
@@ -271,47 +437,57 @@ switch ($method) {
             $stmt = $pdo->prepare('
                 INSERT INTO voucher_lines
                     (voucher_id, line_no, line_type, location_no, location_name,
-                     tategu_item_id, item_name, quantity,
+                     tategu_item_id, source_catalog_item_id, item_name, quantity,
                      cost_body, cost_hardware, cost_glass, cost_factory_hours, cost_site_hours, cost_labor_rate,
                      price_body, price_hardware, price_glass, line_total, tax_category, memo)
                 VALUES
                     (:voucher_id, :line_no, :line_type, :location_no, :location_name,
-                     :tategu_item_id, :item_name, :quantity,
+                     :tategu_item_id, :source_catalog_item_id, :item_name, :quantity,
                      :cost_body, :cost_hardware, :cost_glass, :cost_factory_hours, :cost_site_hours, :cost_labor_rate,
                      :price_body, :price_hardware, :price_glass, :line_total, :tax_category, :memo)
             ');
             $stmt->execute([
-                ':voucher_id'          => $resourceId,
-                ':line_no'             => $lineNo,
-                ':line_type'           => $data['line_type'] ?? 'normal',
-                ':location_no'         => $data['location_no'] ?? null,
-                ':location_name'       => $data['location_name'] ?? null,
-                ':tategu_item_id'      => $data['tategu_item_id'] ?? null,
-                ':item_name'           => $data['item_name'] ?? null,
-                ':quantity'            => $data['quantity'] ?? 1,
-                ':cost_body'           => $data['cost_body'] ?? 0,
-                ':cost_hardware'       => $data['cost_hardware'] ?? 0,
-                ':cost_glass'          => $data['cost_glass'] ?? 0,
-                ':cost_factory_hours'  => $data['cost_factory_hours'] ?? 0,
-                ':cost_site_hours'     => $data['cost_site_hours'] ?? 0,
-                ':cost_labor_rate'     => $data['cost_labor_rate'] ?? 0,
-                ':price_body'          => $data['price_body'] ?? 0,
-                ':price_hardware'      => $data['price_hardware'] ?? 0,
-                ':price_glass'         => $data['price_glass'] ?? 0,
-                ':line_total'          => $data['line_total'] ?? 0,
-                ':tax_category'        => $data['tax_category'] ?? '課税',
-                ':memo'                => $data['memo'] ?? null,
+                ':voucher_id'             => $resourceId,
+                ':line_no'                => $lineNo,
+                ':line_type'              => $data['line_type'] ?? 'normal',
+                ':location_no'            => $data['location_no'] ?? null,
+                ':location_name'          => $data['location_name'] ?? null,
+                ':tategu_item_id'         => $data['tategu_item_id'] ?? null,
+                ':source_catalog_item_id' => $data['source_catalog_item_id'] ?? null,
+                ':item_name'              => $data['item_name'] ?? null,
+                ':quantity'               => $data['quantity'] ?? 1,
+                ':cost_body'              => $data['cost_body'] ?? 0,
+                ':cost_hardware'          => $data['cost_hardware'] ?? 0,
+                ':cost_glass'             => $data['cost_glass'] ?? 0,
+                ':cost_factory_hours'     => $data['cost_factory_hours'] ?? 0,
+                ':cost_site_hours'        => $data['cost_site_hours'] ?? 0,
+                ':cost_labor_rate'        => $data['cost_labor_rate'] ?? 0,
+                ':price_body'             => $data['price_body'] ?? 0,
+                ':price_hardware'         => $data['price_hardware'] ?? 0,
+                ':price_glass'            => $data['price_glass'] ?? 0,
+                ':line_total'             => $data['line_total'] ?? 0,
+                ':tax_category'           => $data['tax_category'] ?? '課税',
+                ':memo'                   => $data['memo'] ?? null,
             ]);
             $lineId = (int)$pdo->lastInsertId();
-            // 建具台帳が指定されていればスナップショットをロード
+
             if (!empty($data['tategu_item_id'])) {
                 loadSnapshot($pdo, $lineId);
             }
+            if (!empty($data['costs']) && is_array($data['costs'])) {
+                saveLineCosts($pdo, $lineId, $data['costs']);
+            }
+            if (!empty($data['prices']) && is_array($data['prices'])) {
+                saveLinePrices($pdo, $lineId, $data['prices']);
+            }
+
             recalcVoucher($pdo, $resourceId);
             http_response_code(201);
             $s = $pdo->prepare('SELECT * FROM voucher_lines WHERE id = ?');
             $s->execute([$lineId]);
-            echo json_encode($s->fetch());
+            $newLine = $s->fetch();
+            attachLineSubtables($pdo, $newLine);
+            echo json_encode($newLine);
             break;
         }
 
@@ -364,7 +540,8 @@ switch ($method) {
         // ---- 明細更新 ----
         if ($resourceId && $subAction === 'lines' && $subId) {
             $data = json_decode(file_get_contents('php://input'), true) ?? [];
-            $fields = ['line_type','location_no','location_name','tategu_item_id','item_name','quantity',
+            $fields = ['line_type','location_no','location_name','tategu_item_id','source_catalog_item_id',
+                       'item_name','quantity',
                        'cost_body','cost_hardware','cost_glass','cost_factory_hours','cost_site_hours','cost_labor_rate',
                        'price_body','price_hardware','price_glass','line_total','tax_category','memo'];
             $sets = []; $params = [];
@@ -374,15 +551,23 @@ switch ($method) {
             if (!empty($sets)) {
                 $params[':id'] = $subId;
                 $pdo->prepare('UPDATE voucher_lines SET ' . implode(', ', $sets) . ' WHERE id = :id')->execute($params);
-                // 建具台帳が変わったらスナップショット再ロード
                 if (array_key_exists('tategu_item_id', $data)) {
                     loadSnapshot($pdo, $subId);
                 }
                 recalcVoucher($pdo, $resourceId);
             }
+            if (!empty($data['costs']) && is_array($data['costs'])) {
+                saveLineCosts($pdo, $subId, $data['costs']);
+            }
+            if (!empty($data['prices']) && is_array($data['prices'])) {
+                saveLinePrices($pdo, $subId, $data['prices']);
+            }
+
             $s = $pdo->prepare('SELECT * FROM voucher_lines WHERE id = ?');
             $s->execute([$subId]);
-            echo json_encode($s->fetch());
+            $updatedLine = $s->fetch();
+            attachLineSubtables($pdo, $updatedLine);
+            echo json_encode($updatedLine);
             break;
         }
         // ---- 伝票ヘッダー更新 ----
@@ -400,7 +585,6 @@ switch ($method) {
         $sets[] = 'updated_at = CURRENT_TIMESTAMP';
         $params[':id'] = $resourceId;
         $pdo->prepare('UPDATE vouchers SET ' . implode(', ', $sets) . ' WHERE id = :id')->execute($params);
-        // 税設定が変わった可能性があるので再集計
         recalcVoucher($pdo, $resourceId);
         $s = $pdo->prepare('SELECT * FROM vouchers WHERE id = ?');
         $s->execute([$resourceId]);
