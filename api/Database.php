@@ -26,6 +26,9 @@ class Database {
                 ]);
                 self::$instance->exec('PRAGMA journal_mode=WAL');
                 self::$instance->exec('PRAGMA foreign_keys=ON');
+                self::$instance->exec('PRAGMA cache_size=8000');
+                self::$instance->exec('PRAGMA synchronous=NORMAL');
+                self::$instance->exec('PRAGMA temp_store=MEMORY');
                 if ($isNew) {
                     self::initSchema(self::$instance);
                 }

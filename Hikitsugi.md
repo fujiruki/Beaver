@@ -1,6 +1,6 @@
 # 引き継ぎ資料 — Beaver
 
-**最終更新**: 2026-03-17
+**最終更新**: 2026-03-19（Phase 7 設計完了・未実装）
 
 ---
 
@@ -17,7 +17,7 @@
 
 ---
 
-## 現在の状態（2026-03-17時点）
+## 現在の状態（2026-03-18時点）
 
 ### 完了済み
 
@@ -25,81 +25,122 @@
 |---|---|---|
 | Phase 1 | 設計ドキュメント確定 | ✅ 完了 |
 | Phase 2 | プロジェクト作成・DBスキーマ・API基盤 | ✅ 完了 |
+| Phase 3 | フロントエンド全画面実装 | ✅ 完了 |
+| Phase 4 | 伝票改修・売上種別マスタ・カタログ連携UI | ✅ 完了 |
+| Phase 5 | 集計区分マスター同期 + CostBreakdownPanel | ✅ 完了 |
+| Phase 6 | 伝票明細行 — 集計区分動的対応 + 入力画面刷新 | ✅ 完了 |
+| Phase 7 | AccessTategu連携（Beaver見積→Access取込） | 🔲 未着手（設計済み）|
 
-**Phase 2 で作成したもの:**
-- `api/schema.sql` — 全テーブル定義（company_settings, customers, projects, tategu_items, tategu_item_additions, vouchers, voucher_lines, invoices, invoice_vouchers, payments, sequences）
-- `api/Database.php` — SQLite/MySQL切替可能なDBラッパー
-- `api/index.php` — ルーター
-- `api/routes/customers.php` — CRUD実装済み
-- `api/routes/projects.php` — CRUD + 業務時間集計
-- `api/routes/tategu_items.php` — CRUD + 追加工程 + 使用履歴
-- `api/routes/vouchers.php` — CRUD + 明細管理 + 見積→売上変換 + スナップショット
-- `api/routes/invoices.php` — 請求書管理
-- `api/routes/payments.php` — 入金管理（繰越残高自動更新）
-- `api/routes/settings.php` — 自社情報
-- `frontend/` — Vite + React + TypeScript 雛形（`npm install` 済み）
-
-### 次にやること（Phase 3 開始）
-
-**フロントエンド実装**（`docs/20260317_Beaver_05_フロントエンド設計.md` を参照）
-
-1. パッケージインストール:
-   ```
-   npm install @tanstack/react-query zustand react-hook-form react-router-dom
-   npm install -D tailwindcss @types/node
-   ```
-2. `api/client.ts`, `types/` — APIクライアントと型定義
-3. `api/*.ts` — TanStack Query フック群
-4. `AppLayout` + ルーティング（App.tsx）
-5. 得意先一覧・詳細（CRUDパターン確立）
-6. 建具台帳一覧・詳細
-7. **VoucherEdit**（見積・売上編集。リアクティブの中核）
-8. 案件詳細
-9. 請求管理・入金
-10. ダッシュボード
+**Phase 6 で実装したもの（commit: fe5052b）:**
+- `voucher_line_costs` / `voucher_line_prices` テーブル追加（008マイグレーション適用済み）
+- `voucher_lines` に `source_catalog_item_id` 列追加
+- `aggregation_category_master` に `merge_into_price_code` 列追加（time型原価のmerge先指定）
+- バックエンド: costs[]/prices[] サブテーブルの読み書き・固定列フォールバック
+- フロント: `LineCategoryValue` 型、動的計算関数群（voucherCalc.ts）
+- フロント: `LineItemRow` 全面刷新（動的列・備考2段目・引用アイコン・旧UI フォールバック）
+- フロント: `VoucherEdit` 動的列ヘッダー生成
+- フロント: `TotalSummary` に粗利率・日割粗利追加
+- フロント: `ProfitRateBar` AppSettingsプリセット参照・time型原価のmerge対応
+- フロント: `AppSettings` 利益率プリセット設定UI・旧データ移行マッピングUI
+- テスト: 動的計算関数テスト追加（25件全通過）
 
 ---
 
-## 開発サーバー起動方法
+## 残タスク
 
-### バックエンド（PHP）
-```bash
-cd C:\Fujiruki\Projects\Beaver\api
-php -S localhost:8003 index.php
-```
+### Phase 7: AccessTategu連携（設計済み・未着手）🔲
 
-### フロントエンド（Vite）
-```bash
-cd C:\Fujiruki\Projects\Beaver\frontend
-npm run dev
-```
-→ `http://localhost:5178/contents/Beaver/` でアクセス
+**概要**: BeaverのVBA（AccessTategu）から見積伝票を取り込む機能。
+Accessの`frm見積`に「Beaver見積取込」ボタンを置き、HTTP GETでBeaverの本番APIから
+見積データを取得して`tbl見積`/`tbl見積明細`に書き込む。
+
+**Beaver側の変更（3ファイル）:**
+
+1. **`api/migrations/009_customer_access_no.sql`** — 新規作成
+   ```sql
+   ALTER TABLE customers ADD COLUMN access_customer_no INTEGER DEFAULT NULL;
+   ```
+   適用方法: PHP PDOでSQLite実行（`php -r "..."`）、または開発サーバー起動後に自動適用。
+
+2. **`api/routes/customers.php`** — 修正
+   - `PUT /customers/{id}` の更新フィールド配列（`$fields`）に `access_customer_no` を追加するだけ。
+   - 該当箇所: `$fields = ['code','name','name_kana',...,'is_active'];` の末尾に追記。
+
+3. **`frontend/src/types/customer.ts`** — 修正
+   - `Customer` インターフェースに `access_customer_no?: number | null;` を追加。
+
+4. **`frontend/src/pages/CustomerDetail.tsx`** — 修正
+   - 「AccessTategu得意先№」ラベルで数値入力欄を追加（セクション: 基本情報の末尾）。
+   - `useUpdateCustomer`フックで保存。
+
+**接続設定:**
+- 本番API: `https://door-fujita.com/contents/Beaver/api`
+- 使用エンドポイント: `GET /vouchers/{id}` と `GET /customers/{id}`
+
+**フィールドマッピング（VBA側参照用）:**
+
+| Beaver フィールド | Access `tbl見積` / `tbl見積明細` |
+|---|---|
+| `voucher.voucher_date` | `見積日` |
+| `customer.access_customer_no` | `得意先№` |
+| `voucher.memo` | `摘要` |
+| `voucher.voucher_no` | `Beaver伝票No`（新列） |
+| `line.item_name` | `取付建具` |
+| `line.location_name` | `取付場所` |
+| `line.quantity` | `数量` |
+| `prices[code="MAIN"].value` | `本体金額` |
+| `prices[code="HARDWARE"].value` | `金物金額` |
+| `prices[code="GLASS"].value` | `ガラス金額` |
+| `line.line_total` | `明細金額` |
+| `costs[code="MAIN"].value` | `原価_本体材料` |
+| `costs[code="HARDWARE"].value` | `原価_金物` |
+| `costs[code="GLASS"].value` | `原価_ガラス` |
+| `costs[measure_type="time"]` 合計 | `作業時間` |
+| `line.cost_labor_rate` | `原価_労務単価` |
+
+※ カテゴリコードはcatalog-systemから同期したもの（`CatalogApiClient.bas`の定数と同じ: MAIN/HARDWARE/GLASS/FACTORY_TIME/SITE_TIME）
+
+**完了後の検証:**
+1. Beaverの得意先詳細画面で `access_customer_no` を設定できること
+2. AccessTategu の `frm見積` 上の「Beaver見積取込」ボタンをクリック → ID入力 → レコード挿入
+3. `tbl見積.Beaver伝票No` にBeaverの伝票番号が入ること
+
+---
+
+### その他の残タスク（設計不要）
+
+| タスク | 概要 |
+|---|---|
+| **本番デプロイ設定** | `api/config.php` の DB_TYPE 切替、`.htaccess` 作成、本番サーバー配置手順 |
+| **ダッシュボード充実** | 現状は空。月次売上・未請求伝票数などのKPIカード追加 |
+| **catalog-system 本格連携** | catalog-proxy は実装済み。catalog-system 側の API が整備されたら連携 |
 
 ---
 
 ## アーキテクチャ概要
 
-### 3層データ構造
+### データフロー
 ```
-catalog-system（別プロジェクト）
-    ↓ base_catalog_item_id で参照（Phase 6以降）
-tategu_items（建具台帳）
-    ↓ tategu_item_id で参照
-voucher_lines（見積・売上明細）
+得意先 → 案件 → 伝票（見積/売上）→ 請求書 → 入金
+                  ↑
+              建具台帳（品番マスタ・原価スナップショット）
+                  ↑
+            catalog-system（別プロジェクト、Phase 6以降）
 ```
 
 ### 重要な設計決定
 - 見積と売上は `vouchers` テーブルに統合（`voucher_type='estimate'|'sales'`）
 - 見積→売上は完全ディープコピー（`POST /vouchers/{id}/convert-to-sales`）
 - 税計算は伝票単位（`tax_input_type='exclusive'|'inclusive'`）
-- 指定請求日: `vouchers.override_billing_date`（NULLなら通常締め日）
-- 原価スナップショット: 建具台帳選択時に自動ロード、`reload-snapshots`で一括再取得
+- 原価スナップショット: 建具台帳選択時に自動ロード、`reload-snapshots` で一括再取得
+- 伝票ステータス: `draft` → `submitted` → `approved` → `billed` / `void`
+  - `billed` と `void` は編集不可（readonly時に「編集できません」表示）
 
 ---
 
 ## 設計ドキュメント一覧
 
-すべて `docs/` フォルダに格納。日付は作成日。
+すべて `docs/` フォルダに格納。
 
 | ファイル | 内容 |
 |---|---|
@@ -118,12 +159,3 @@ voucher_lines（見積・売上明細）
 - 日本語でのやり取りを希望
 - 建具製造業の実務知識が豊富
 - 開発の技術的判断は Claude に委任するスタイル
-
----
-
-## 未決事項
-
-- catalog-system との API連携（Phase 6）: `tategu_items.base_catalog_item_id` で連携予定
-- Access 印刷連携（Phase 6）: Beaver→Access へのデータ push 方式は未設計
-- 既存 Access データの移行: `docs/20260316_Beaver_04_Accessデータ移行マッピング.md` に方針あり
-- 本番デプロイ設定（`api/config.php` の DB_TYPE 切替、.htaccess）: Phase 3 完了後に設計

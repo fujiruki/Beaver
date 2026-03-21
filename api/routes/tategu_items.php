@@ -9,6 +9,7 @@
  * POST   /tategu-items/{id}/additions     追加工程追加
  * PUT    /tategu-items/{id}/additions/{addId}   追加工程更新
  * DELETE /tategu-items/{id}/additions/{addId}   追加工程削除
+ * PUT    /tategu-items/{id}/cost-breakdown      集計区分別内訳の全件入れ替え
  */
 
 $segments = explode('/', trim($path, '/'));
@@ -66,6 +67,11 @@ switch ($method) {
                     + ((float)$a['cost_factory_hours'] + (float)$a['cost_site_hours']) * (float)$a['cost_labor_rate'];
             }
 
+            // 集計区分別内訳
+            $stmt_bd = $pdo->prepare('SELECT * FROM tategu_item_cost_breakdown WHERE tategu_item_id = ? ORDER BY sort_order, id');
+            $stmt_bd->execute([$resourceId]);
+            $row['cost_breakdown'] = $stmt_bd->fetchAll();
+
             // 使用履歴
             $stmt3 = $pdo->prepare('
                 SELECT vl.id, v.voucher_no, v.voucher_type, v.voucher_date, v.status,
@@ -94,15 +100,34 @@ switch ($method) {
             if (!isset($_GET['include_archived'])) {
                 $where .= ' AND status = "active"';
             }
-            $stmt = $pdo->prepare("SELECT * FROM tategu_items $where ORDER BY code DESC");
-            $stmt->execute($params);
-            $rows = $stmt->fetchAll();
-            // 各行に原価合計を付加
-            foreach ($rows as &$row) {
-                $row['total_cost'] = (float)$row['cost_body'] + (float)$row['cost_hardware'] + (float)$row['cost_glass']
-                    + ((float)$row['cost_factory_hours'] + (float)$row['cost_site_hours']) * (float)$row['cost_labor_rate'];
+            if (isset($_GET['page'])) {
+                $page    = max(1, (int)$_GET['page']);
+                $perPage = min(200, max(10, (int)($_GET['per_page'] ?? 50)));
+                $offset  = ($page - 1) * $perPage;
+                $cntStmt = $pdo->prepare("SELECT COUNT(*) FROM tategu_items $where");
+                $cntStmt->execute($params);
+                $total = (int)$cntStmt->fetchColumn();
+                $stmt  = $pdo->prepare("SELECT * FROM tategu_items $where ORDER BY code DESC LIMIT $perPage OFFSET $offset");
+                $stmt->execute($params);
+                $rows = $stmt->fetchAll();
+                foreach ($rows as &$row) {
+                    $row['total_cost'] = (float)$row['cost_body'] + (float)$row['cost_hardware'] + (float)$row['cost_glass']
+                        + ((float)$row['cost_factory_hours'] + (float)$row['cost_site_hours']) * (float)$row['cost_labor_rate'];
+                }
+                echo json_encode([
+                    'data' => $rows,
+                    'meta' => ['total' => $total, 'page' => $page, 'per_page' => $perPage, 'last_page' => (int)ceil($total / $perPage)],
+                ]);
+            } else {
+                $stmt = $pdo->prepare("SELECT * FROM tategu_items $where ORDER BY code DESC");
+                $stmt->execute($params);
+                $rows = $stmt->fetchAll();
+                foreach ($rows as &$row) {
+                    $row['total_cost'] = (float)$row['cost_body'] + (float)$row['cost_hardware'] + (float)$row['cost_glass']
+                        + ((float)$row['cost_factory_hours'] + (float)$row['cost_site_hours']) * (float)$row['cost_labor_rate'];
+                }
+                echo json_encode($rows);
             }
-            echo json_encode($rows);
         }
         break;
 
@@ -184,6 +209,29 @@ switch ($method) {
         break;
 
     case 'PUT':
+        if ($resourceId && $subAction === 'cost-breakdown') {
+            $data = json_decode(file_get_contents('php://input'), true) ?? [];
+            $lines = $data['lines'] ?? [];
+            $pdo->prepare('DELETE FROM tategu_item_cost_breakdown WHERE tategu_item_id = ?')->execute([$resourceId]);
+            $ins = $pdo->prepare('
+                INSERT INTO tategu_item_cost_breakdown
+                    (tategu_item_id, category_code, category_name, measure_type, value, sort_order)
+                VALUES
+                    (:tategu_item_id, :category_code, :category_name, :measure_type, :value, :sort_order)
+            ');
+            foreach ($lines as $i => $line) {
+                $ins->execute([
+                    ':tategu_item_id' => $resourceId,
+                    ':category_code'  => $line['category_code'] ?? '',
+                    ':category_name'  => $line['category_name'] ?? '',
+                    ':measure_type'   => $line['measure_type'] ?? 'money',
+                    ':value'          => $line['value'] ?? 0,
+                    ':sort_order'     => $line['sort_order'] ?? $i,
+                ]);
+            }
+            echo json_encode(['ok' => true]);
+            break;
+        }
         if ($resourceId && $subAction === 'additions' && $subId) {
             // 追加工程更新
             $data = json_decode(file_get_contents('php://input'), true) ?? [];
@@ -206,7 +254,7 @@ switch ($method) {
         }
         if (!$resourceId) { http_response_code(400); echo json_encode(['error' => 'ID required']); exit; }
         $data = json_decode(file_get_contents('php://input'), true) ?? [];
-        $fields = ['code','name','description','base_catalog_item_id','status',
+        $fields = ['code','name','description','base_catalog_item_id','base_catalog_item_name','status',
                    'cost_body','cost_hardware','cost_glass',
                    'cost_factory_hours','cost_site_hours','cost_labor_rate'];
         $sets = []; $params = [];

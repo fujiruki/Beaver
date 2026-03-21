@@ -1,20 +1,78 @@
 <?php
 /**
  * /projects エンドポイント
- * GET    /projects               一覧
- * GET    /projects/{id}          詳細（案件に紐づく伝票一覧・業務時間合計含む）
- * POST   /projects               新規作成
- * PUT    /projects/{id}          更新
- * DELETE /projects/{id}          削除（キャンセル扱い）
+ * GET    /projects                    一覧
+ * GET    /projects/{id}               詳細（案件に紐づく伝票一覧・業務時間合計・画像含む）
+ * POST   /projects                    新規作成（project_code 自動採番）
+ * PUT    /projects/{id}               更新
+ * DELETE /projects/{id}               削除（キャンセル扱い）
+ * GET    /projects/{id}/images        画像一覧
+ * POST   /projects/{id}/images        画像アップロード（multipart/form-data）
+ * DELETE /projects/{id}/images/{imgId} 画像削除
  */
 
 $segments = explode('/', trim($path, '/'));
-$resourceId = isset($segments[1]) && is_numeric($segments[1]) ? (int)$segments[1] : null;
+$resourceId  = isset($segments[1]) && is_numeric($segments[1]) ? (int)$segments[1] : null;
+$subResource = $segments[2] ?? null;
+$subId       = isset($segments[3]) && is_numeric($segments[3]) ? (int)$segments[3] : null;
+
+function nextProjectCode(PDO $pdo): string {
+    $pdo->prepare('UPDATE sequences SET last_no = last_no + 1 WHERE key = "project"')->execute();
+    $row = $pdo->query('SELECT last_no FROM sequences WHERE key = "project"')->fetch();
+    return 'P' . str_pad($row['last_no'], 5, '0', STR_PAD_LEFT);
+}
+
+// --- 画像サブリソース ---
+if ($resourceId && $subResource === 'images') {
+    $uploadDir = __DIR__ . '/../uploads/projects/' . $resourceId . '/';
+    switch ($method) {
+        case 'GET':
+            $stmt = $pdo->prepare('SELECT * FROM project_images WHERE project_id = ? ORDER BY display_order, id');
+            $stmt->execute([$resourceId]);
+            echo json_encode($stmt->fetchAll());
+            exit;
+
+        case 'POST':
+            if (empty($_FILES['image'])) {
+                http_response_code(400);
+                echo json_encode(['error' => 'image file required']);
+                exit;
+            }
+            if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
+            $file     = $_FILES['image'];
+            $ext      = pathinfo($file['name'], PATHINFO_EXTENSION);
+            $uuid     = bin2hex(random_bytes(8));
+            $fileName = $uuid . '_' . basename($file['name']);
+            $filePath = 'uploads/projects/' . $resourceId . '/' . $fileName;
+            move_uploaded_file($file['tmp_name'], $uploadDir . $fileName);
+            $maxOrder = $pdo->query("SELECT COALESCE(MAX(display_order),0) FROM project_images WHERE project_id = $resourceId")->fetchColumn();
+            $stmt = $pdo->prepare('INSERT INTO project_images (project_id, file_name, file_path, display_order) VALUES (?,?,?,?)');
+            $stmt->execute([$resourceId, $fileName, $filePath, $maxOrder + 1]);
+            $imgId = $pdo->lastInsertId();
+            http_response_code(201);
+            $stmt2 = $pdo->prepare('SELECT * FROM project_images WHERE id = ?');
+            $stmt2->execute([$imgId]);
+            echo json_encode($stmt2->fetch());
+            exit;
+
+        case 'DELETE':
+            if (!$subId) { http_response_code(400); echo json_encode(['error' => 'image id required']); exit; }
+            $stmt = $pdo->prepare('SELECT * FROM project_images WHERE id = ? AND project_id = ?');
+            $stmt->execute([$subId, $resourceId]);
+            $img = $stmt->fetch();
+            if ($img) {
+                $fullPath = __DIR__ . '/../' . $img['file_path'];
+                if (file_exists($fullPath)) unlink($fullPath);
+                $pdo->prepare('DELETE FROM project_images WHERE id = ?')->execute([$subId]);
+            }
+            echo json_encode(['deleted' => true]);
+            exit;
+    }
+}
 
 switch ($method) {
     case 'GET':
         if ($resourceId) {
-            // 詳細
             $stmt = $pdo->prepare('
                 SELECT p.*, c.name AS customer_name
                 FROM projects p
@@ -25,15 +83,13 @@ switch ($method) {
             $row = $stmt->fetch();
             if (!$row) { http_response_code(404); echo json_encode(['error' => 'Not found']); exit; }
 
-            // 紐づく伝票
             $stmt2 = $pdo->prepare('
-                SELECT id, voucher_no, voucher_type, status, voucher_date, total_amount
+                SELECT id, voucher_no, voucher_type, status, voucher_date, total_amount, description
                 FROM vouchers WHERE project_id = ? ORDER BY voucher_date DESC
             ');
             $stmt2->execute([$resourceId]);
             $row['vouchers'] = $stmt2->fetchAll();
 
-            // 有効見積の業務時間合計
             $stmt3 = $pdo->prepare('
                 SELECT
                     COALESCE(SUM(vl.cost_factory_hours * vl.quantity), 0) AS total_factory_hours,
@@ -47,10 +103,13 @@ switch ($method) {
             $row['estimated_factory_hours'] = round((float)$hours['total_factory_hours'], 2);
             $row['estimated_site_hours']    = round((float)$hours['total_site_hours'], 2);
 
+            $stmt4 = $pdo->prepare('SELECT * FROM project_images WHERE project_id = ? ORDER BY display_order, id');
+            $stmt4->execute([$resourceId]);
+            $row['images'] = $stmt4->fetchAll();
+
             echo json_encode($row);
         } else {
-            // 一覧
-            $where = 'WHERE 1=1';
+            $where = 'WHERE p.status != "cancelled"';
             $params = [];
             if (!empty($_GET['customer_id'])) {
                 $where .= ' AND p.customer_id = ?';
@@ -64,31 +123,59 @@ switch ($method) {
                 $where .= ' AND p.name LIKE ?';
                 $params[] = '%' . $_GET['q'] . '%';
             }
-            $stmt = $pdo->prepare("
-                SELECT p.*, c.name AS customer_name
-                FROM projects p
-                LEFT JOIN customers c ON c.id = p.customer_id
-                $where
-                ORDER BY p.updated_at DESC
-            ");
-            $stmt->execute($params);
-            echo json_encode($stmt->fetchAll());
+            if (isset($_GET['page'])) {
+                $page    = max(1, (int)$_GET['page']);
+                $perPage = min(200, max(10, (int)($_GET['per_page'] ?? 50)));
+                $offset  = ($page - 1) * $perPage;
+                $cntStmt = $pdo->prepare("SELECT COUNT(*) FROM projects p $where");
+                $cntStmt->execute($params);
+                $total = (int)$cntStmt->fetchColumn();
+                $stmt  = $pdo->prepare("
+                    SELECT p.*, c.name AS customer_name
+                    FROM projects p
+                    LEFT JOIN customers c ON c.id = p.customer_id
+                    $where ORDER BY p.updated_at DESC LIMIT $perPage OFFSET $offset
+                ");
+                $stmt->execute($params);
+                echo json_encode([
+                    'data' => $stmt->fetchAll(),
+                    'meta' => ['total' => $total, 'page' => $page, 'per_page' => $perPage, 'last_page' => (int)ceil($total / $perPage)],
+                ]);
+            } else {
+                $stmt = $pdo->prepare("
+                    SELECT p.*, c.name AS customer_name
+                    FROM projects p
+                    LEFT JOIN customers c ON c.id = p.customer_id
+                    $where ORDER BY p.updated_at DESC
+                ");
+                $stmt->execute($params);
+                echo json_encode($stmt->fetchAll());
+            }
         }
         break;
 
     case 'POST':
         $data = json_decode(file_get_contents('php://input'), true) ?? [];
+        $code = nextProjectCode($pdo);
         $stmt = $pdo->prepare('
-            INSERT INTO projects (customer_id, name, description, status, start_date, end_date)
-            VALUES (:customer_id, :name, :description, :status, :start_date, :end_date)
+            INSERT INTO projects (project_code, customer_id, name, description, status, start_date, end_date, delivery_date, address, memo, order_date, owner_name, general_contractor_name, site_contact)
+            VALUES (:project_code, :customer_id, :name, :description, :status, :start_date, :end_date, :delivery_date, :address, :memo, :order_date, :owner_name, :general_contractor_name, :site_contact)
         ');
         $stmt->execute([
-            ':customer_id' => $data['customer_id'] ?? null,
-            ':name'        => $data['name'] ?? '',
-            ':description' => $data['description'] ?? null,
-            ':status'      => $data['status'] ?? 'active',
-            ':start_date'  => $data['start_date'] ?? null,
-            ':end_date'    => $data['end_date'] ?? null,
+            ':project_code'              => $code,
+            ':customer_id'               => $data['customer_id'] ?? null,
+            ':name'                      => $data['name'] ?? '',
+            ':description'               => $data['description'] ?? null,
+            ':status'                    => $data['status'] ?? '問い合わせ',
+            ':start_date'                => $data['start_date'] ?? null,
+            ':end_date'                  => $data['end_date'] ?? null,
+            ':delivery_date'             => $data['delivery_date'] ?? null,
+            ':address'                   => $data['address'] ?? null,
+            ':memo'                      => $data['memo'] ?? null,
+            ':order_date'                => $data['order_date'] ?? null,
+            ':owner_name'                => $data['owner_name'] ?? null,
+            ':general_contractor_name'   => $data['general_contractor_name'] ?? null,
+            ':site_contact'              => $data['site_contact'] ?? null,
         ]);
         $id = $pdo->lastInsertId();
         http_response_code(201);
@@ -100,7 +187,7 @@ switch ($method) {
     case 'PUT':
         if (!$resourceId) { http_response_code(400); echo json_encode(['error' => 'ID required']); exit; }
         $data = json_decode(file_get_contents('php://input'), true) ?? [];
-        $fields = ['customer_id','name','description','status','start_date','end_date'];
+        $fields = ['customer_id','name','description','status','start_date','end_date','delivery_date','address','memo','order_date','owner_name','general_contractor_name','site_contact'];
         $sets = []; $params = [];
         foreach ($fields as $f) {
             if (array_key_exists($f, $data)) { $sets[] = "$f = :$f"; $params[":$f"] = $data[$f]; }

@@ -8,9 +8,29 @@
  * DELETE /customers/{id}    削除（論理削除）
  */
 
-// IDを取り出す
+// IDとサブリソースを取り出す
 $segments = explode('/', trim($path, '/'));
 $resourceId = isset($segments[1]) && is_numeric($segments[1]) ? (int)$segments[1] : null;
+$subResource = isset($segments[2]) ? $segments[2] : null;
+
+// PATCH /customers/{id}/carry-forward — 繰越残高例外修正
+if ($method === 'PATCH' && $resourceId && $subResource === 'carry-forward') {
+    $data = json_decode(file_get_contents('php://input'), true) ?? [];
+    if (!isset($data['carry_forward_balance'])) {
+        http_response_code(400);
+        echo json_encode(['error' => 'carry_forward_balance is required']);
+        exit;
+    }
+    $pdo->prepare('
+        UPDATE customers
+        SET carry_forward_balance = :bal, updated_at = CURRENT_TIMESTAMP
+        WHERE id = :id
+    ')->execute([':bal' => (float)$data['carry_forward_balance'], ':id' => $resourceId]);
+    $stmt = $pdo->prepare('SELECT * FROM customers WHERE id = ?');
+    $stmt->execute([$resourceId]);
+    echo json_encode($stmt->fetch());
+    exit;
+}
 
 switch ($method) {
     case 'GET':
@@ -38,9 +58,24 @@ switch ($method) {
             if (!isset($_GET['include_inactive'])) {
                 $where .= ' AND is_active = 1';
             }
-            $stmt = $pdo->prepare("SELECT * FROM customers $where ORDER BY code");
-            $stmt->execute($params);
-            echo json_encode($stmt->fetchAll());
+            if (isset($_GET['page'])) {
+                $page    = max(1, (int)$_GET['page']);
+                $perPage = min(200, max(10, (int)($_GET['per_page'] ?? 50)));
+                $offset  = ($page - 1) * $perPage;
+                $cntStmt = $pdo->prepare("SELECT COUNT(*) FROM customers $where");
+                $cntStmt->execute($params);
+                $total = (int)$cntStmt->fetchColumn();
+                $stmt  = $pdo->prepare("SELECT * FROM customers $where ORDER BY code LIMIT $perPage OFFSET $offset");
+                $stmt->execute($params);
+                echo json_encode([
+                    'data' => $stmt->fetchAll(),
+                    'meta' => ['total' => $total, 'page' => $page, 'per_page' => $perPage, 'last_page' => (int)ceil($total / $perPage)],
+                ]);
+            } else {
+                $stmt = $pdo->prepare("SELECT * FROM customers $where ORDER BY code");
+                $stmt->execute($params);
+                echo json_encode($stmt->fetchAll());
+            }
         }
         break;
 
@@ -91,11 +126,11 @@ switch ($method) {
     case 'PUT':
         if (!$resourceId) { http_response_code(400); echo json_encode(['error' => 'ID required']); exit; }
         $data = json_decode(file_get_contents('php://input'), true) ?? [];
+        // carry_forward_balance は PATCH /carry-forward 専用。通常更新では変更不可
         $fields = ['code','name','name_kana','honorific_type','gender',
                    'postal_code','address1','address2','tel','mobile','fax','email',
                    'memo','billing_name','billing_date_print',
-                   'cutoff_day','billing_offset_days','payment_due_days',
-                   'carry_forward_balance','is_active'];
+                   'cutoff_day','billing_offset_days','payment_due_days','is_active'];
         $sets = [];
         $params = [];
         foreach ($fields as $f) {

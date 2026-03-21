@@ -4,7 +4,7 @@
  */
 
 header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+header('Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, X-HTTP-Method-Override');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
@@ -52,7 +52,10 @@ try {
         'vouchers'      => __DIR__ . '/routes/vouchers.php',
         'invoices'      => __DIR__ . '/routes/invoices.php',
         'payments'      => __DIR__ . '/routes/payments.php',
-        'settings'      => __DIR__ . '/routes/settings.php',
+        'settings'          => __DIR__ . '/routes/settings.php',
+        'sales-categories'  => __DIR__ . '/routes/sales_categories.php',
+        'catalog-proxy'            => __DIR__ . '/routes/catalog_proxy.php',
+        'aggregation-categories'   => __DIR__ . '/routes/aggregation_categories.php',
     ];
 
     $matched = false;
