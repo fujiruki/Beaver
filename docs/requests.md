@@ -26,14 +26,29 @@
 - `api/routes/customers.php` — 更新フィールド配列に追加
 - `frontend/src/types/customer.ts` + `pages/CustomerDetail.tsx` — 入力 UI 追加
 
-詳細仕様: `Projects/AccessTategu/docs/handover/20260605_R022PhaseC_R025BA連携.md` の 3 節を参照。
+詳細仕様: `Projects/AccessTategu/docs/R-025_BA連携_詳細設計.md`（grill 反映済み）。
 
 ### 着手タイミング
-AccessTategu の R-022（請求書発送済管理）完了後。
+AccessTategu の R-022（請求書発送済管理）完了済み（2026-06-06、HEAD: fe479fe）。R-025 設計確定（grill 反映済み）→ Step A から実装開始可能。
 
 ---
 
-## 2. TateguDesignStudioとの連携
+## 2. R-027: Beaver の定時バックアップ機能（2026-06-06 R-025 grill で発案）
+
+R-025 BA連携で AccessTategu からのデータ流入が増えるため、エラー時のリカバリ手段として定時バックアップを整備する。
+
+### 仕様
+- Windows タスクスケジューラで毎日定時に `api/database.sqlite` をコピー
+- 保存先: `api/backups/database_yyyymmdd.sqlite`
+- 30 日ローテーション（古いものを自動削除）
+- 起動時の異常検出（前日比でサイズ激減等）でアラート
+
+### 優先順位
+R-025 完了後に着手。Beaver は SQLite 単一ファイルで運用しているため、cron 的なバックアップで十分。
+
+---
+
+## 3. TateguDesignStudioとの連携
 
 TateguDesignStudio（建具設計・積算ツール）で設計・積算した建具データを、Beaverの伝票明細に取り込めるようにする。
 
