@@ -2,6 +2,7 @@
 /**
  * /projects エンドポイント
  * GET    /projects                    一覧
+ * GET    /projects/sync               AccessTategu 連携用 軽量同期 API（R-025 Step A）
  * GET    /projects/{id}               詳細（案件に紐づく伝票一覧・業務時間合計・画像含む）
  * POST   /projects                    新規作成（project_code 自動採番）
  * PUT    /projects/{id}               更新
@@ -20,6 +21,52 @@ function nextProjectCode(PDO $pdo): string {
     $pdo->prepare('UPDATE sequences SET last_no = last_no + 1 WHERE key = "project"')->execute();
     $row = $pdo->query('SELECT last_no FROM sequences WHERE key = "project"')->fetch();
     return 'P' . str_pad($row['last_no'], 5, '0', STR_PAD_LEFT);
+}
+
+// --- R-025 Step A: AccessTategu 連携用 軽量同期 API ---
+// GET /projects/sync[?updated_after=ISO8601][&include_cancelled=true]
+if ($method === 'GET' && isset($segments[1]) && $segments[1] === 'sync') {
+    $updatedAfterRaw = $_GET['updated_after'] ?? null;
+    $updatedAfterSql = null;
+    if ($updatedAfterRaw !== null && $updatedAfterRaw !== '') {
+        $ts = strtotime($updatedAfterRaw);
+        if ($ts === false) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Invalid updated_after format']);
+            exit;
+        }
+        $updatedAfterSql = gmdate('Y-m-d H:i:s', $ts);
+    }
+    $includeCancelled = isset($_GET['include_cancelled'])
+        && in_array(strtolower((string)$_GET['include_cancelled']), ['1', 'true', 'yes'], true);
+
+    $sql = 'SELECT p.id, p.project_code, p.name,
+                   c.access_customer_no AS customer_access_no,
+                   p.status, p.delivery_date, p.address, p.updated_at
+            FROM projects p
+            LEFT JOIN customers c ON c.id = p.customer_id
+            WHERE 1=1';
+    $params = [];
+    if ($updatedAfterSql !== null) {
+        $sql .= ' AND p.updated_at > :updated_after';
+        $params[':updated_after'] = $updatedAfterSql;
+    }
+    if (!$includeCancelled) {
+        $sql .= " AND p.status != 'cancelled'";
+    }
+    $sql .= ' ORDER BY p.updated_at DESC';
+
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($params);
+    $rows = $stmt->fetchAll();
+
+    $now = new DateTime('now', new DateTimeZone('Asia/Tokyo'));
+    echo json_encode([
+        'synced_at' => $now->format('c'),
+        'projects'  => $rows,
+        'total'     => count($rows),
+    ]);
+    exit;
 }
 
 // --- 画像サブリソース ---
