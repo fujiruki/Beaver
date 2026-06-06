@@ -33,18 +33,16 @@ AccessTategu の R-022（請求書発送済管理）完了済み（2026-06-06、
 
 ---
 
-## 2. R-027: Beaver の定時バックアップ機能（2026-06-06 R-025 grill で発案）
+## 2. ~~R-027: Beaver の定時バックアップ機能~~ ✅ 完了（2026-06-07）
 
-R-025 BA連携で AccessTategu からのデータ流入が増えるため、エラー時のリカバリ手段として定時バックアップを整備する。
+ConoHa の本番 Beaver に `backup.sh` 設置 + crontab 毎日 03:00 登録済み:
+- スクリプト: `public_html/door-fujita.com/contents/Beaver/backup.sh`
+- 出力先: `api/backups/database_yyyymmdd_HHMM.sqlite`
+- 30 日ローテーション（find -mtime +30 -delete）
+- ログ: `api/backup.log`
+- crontab: `0 3 * * * /home/c6924945/.../Beaver/backup.sh`
 
-### 仕様
-- Windows タスクスケジューラで毎日定時に `api/database.sqlite` をコピー
-- 保存先: `api/backups/database_yyyymmdd.sqlite`
-- 30 日ローテーション（古いものを自動削除）
-- 起動時の異常検出（前日比でサイズ激減等）でアラート
-
-### 優先順位
-R-025 完了後に着手。Beaver は SQLite 単一ファイルで運用しているため、cron 的なバックアップで十分。
+異常検出（前日比サイズ激減等）は未実装。必要なら R-027b として別途。
 
 ---
 
