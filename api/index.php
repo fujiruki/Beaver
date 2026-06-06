@@ -74,7 +74,13 @@ try {
         echo json_encode(['error' => 'Not found', 'path' => $path]);
     }
 
-} catch (Exception $e) {
+} catch (Throwable $e) {
+    error_log(sprintf(
+        '[Beaver index] %s in %s:%d',
+        $e->getMessage(),
+        $e->getFile(),
+        $e->getLine()
+    ));
     http_response_code(500);
-    echo json_encode(['error' => $e->getMessage()]);
+    echo json_encode(['error' => 'internal_error']);
 }
