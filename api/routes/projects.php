@@ -23,6 +23,34 @@ function nextProjectCode(PDO $pdo): string {
     return 'P' . str_pad($row['last_no'], 5, '0', STR_PAD_LEFT);
 }
 
+require_once __DIR__ . '/sync_helpers.php';
+
+// --- R-025 Step E-Beaver: AccessTategu からの伝票 push 受信 ---
+// POST  /projects/{id}/vouchers/sync                    新規/upsert
+// PUT   /projects/{id}/vouchers/{voucher_no}            既存伝票更新
+// PATCH /projects/{id}/vouchers/{voucher_no}/shipped    発送済フラグ
+// PATCH /projects/{id}/customer                          案件マスタの得意先変更
+if ($resourceId && $subResource === 'vouchers') {
+    $voucherNo = $segments[3] ?? null;
+    $subAction = $segments[4] ?? null;
+    if ($method === 'POST' && $voucherNo === 'sync') {
+        syncVoucherUpsert($pdo, $resourceId);
+        exit;
+    }
+    if ($method === 'PUT' && $voucherNo) {
+        syncVoucherUpdate($pdo, $resourceId, $voucherNo);
+        exit;
+    }
+    if ($method === 'PATCH' && $voucherNo && $subAction === 'shipped') {
+        syncVoucherShipped($pdo, $resourceId, $voucherNo);
+        exit;
+    }
+}
+if ($resourceId && $subResource === 'customer' && $method === 'PATCH') {
+    syncProjectCustomer($pdo, $resourceId);
+    exit;
+}
+
 // --- R-025 Step A: AccessTategu 連携用 軽量同期 API ---
 // GET /projects/sync[?updated_after=ISO8601][&include_cancelled=true]
 if ($method === 'GET' && isset($segments[1]) && $segments[1] === 'sync') {

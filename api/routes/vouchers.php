@@ -19,6 +19,15 @@ $resourceId = isset($segments[1]) && is_numeric($segments[1]) ? (int)$segments[1
 $subAction  = $segments[2] ?? null;
 $subId      = isset($segments[3]) && is_numeric($segments[3]) ? (int)$segments[3] : null;
 
+require_once __DIR__ . '/sync_helpers.php';
+
+// --- R-025 Step E-Beaver: 案件番号なしの過去伝票 push 受信 ---
+// POST /vouchers/sync
+if ($method === 'POST' && isset($segments[1]) && $segments[1] === 'sync' && !$resourceId) {
+    syncVoucherUpsert($pdo, null);
+    exit;
+}
+
 // --- 伝票番号採番 ---
 function nextVoucherNo(PDO $pdo, string $type): string {
     $pdo->beginTransaction();
