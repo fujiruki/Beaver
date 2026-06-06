@@ -153,7 +153,7 @@ export default function AppSettings() {
               <button
                 onClick={() => {
                   setMigrateResult(null);
-                  migrateMutation.mutate(settings.columnMapping, {
+                  migrateMutation.mutate(settings.columnMapping as unknown as Record<string, string>, {
                     onSuccess: (res) => setMigrateResult(res),
                   });
                 }}

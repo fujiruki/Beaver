@@ -76,7 +76,28 @@ R-025 完了後・実運用で問題顕在化したら着手。
 
 ---
 
-## 5. TateguDesignStudioとの連携
+## 5. R-036: frontend ビルドエラー（型エラー）
+
+R-025 デプロイ作業中に発覚（2026-06-07）。`npm run build` (`tsc -b && vite build`) で型エラー:
+
+```
+src/pages/AppSettings.tsx(156,42): error TS2345:
+  Argument of type 'ColumnMapping' is not assignable to parameter of type 'Record<string, string>'.
+  Index signature for type 'string' is missing in type 'ColumnMapping'.
+```
+
+R-025 とは無関係（既存コードの型整合性問題）。frontend ビルドが通らないため、本番には backend (api/) のみデプロイした状態。frontend の R-025 対応 UI（案件詳細などに `access_customer_no` 連携表示等）は未デプロイ。
+
+### 対応
+- `src/pages/AppSettings.tsx:156` の `ColumnMapping` 型に index signature を追加するか、呼び出し側を `Record<string, string>` に明示変換
+- ビルド成功確認後、frontend をデプロイ（Youkan の deploy パターン参照）
+
+### 優先順位
+中。frontend 機能の本番反映には必須だが、AccessTategu↔Beaver の R-025 同期機能には影響しない。
+
+---
+
+## 6. TateguDesignStudioとの連携
 
 TateguDesignStudio（建具設計・積算ツール）で設計・積算した建具データを、Beaverの伝票明細に取り込めるようにする。
 
