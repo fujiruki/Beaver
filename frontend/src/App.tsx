@@ -18,6 +18,7 @@ const InvoiceList          = lazy(() => import('./pages/InvoiceList'));
 const InvoiceDetail        = lazy(() => import('./pages/InvoiceDetail'));
 const SalesCategorySettings = lazy(() => import('./pages/SalesCategorySettings'));
 const AppSettings          = lazy(() => import('./pages/AppSettings'));
+const Help                 = lazy(() => import('./pages/Help'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -55,6 +56,7 @@ export default function App() {
                 <Route path="invoices/:id" element={<InvoiceDetail />} />
                 <Route path="settings/sales-categories" element={<SalesCategorySettings />} />
                 <Route path="settings/app" element={<AppSettings />} />
+                <Route path="help" element={<Help />} />
               </Route>
             </Routes>
           </Suspense>

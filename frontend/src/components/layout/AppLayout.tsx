@@ -9,6 +9,7 @@ const navItems = [
   { to: '/tategu',     label: '建具台帳' },
   { to: '/invoices',   label: '請求' },
   { to: '/settings/app', label: 'アプリ設定' },
+  { to: '/help',       label: '? ヘルプ' },
 ];
 
 export default function AppLayout() {
