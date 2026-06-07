@@ -128,9 +128,13 @@ export default function Help() {
           </ul>
 
           <h3 className="text-base font-semibold text-slate-700 mt-4 mb-2">手動同期</h3>
+          <p className="text-sm text-slate-600 mb-2">
+            ボタン配置: <strong>frmMAIN（メインメニュー）の <span className="bg-yellow-100 px-1 rounded">ミニサマリ枠の下、画面左下</span></strong>
+            に 2 つ並んでいます。隣に「Beaver: ✓ 同期 6/6 12:34」状態表示。
+          </p>
           <ul className="list-disc list-inside space-y-1 text-sm">
             <li><strong>「Beaver 案件取込」ボタン</strong>: Beaver → Access の案件マスタ同期</li>
-            <li><strong>「Beaver へ同期」ボタン</strong>: Access → Beaver の見積/売上 push back</li>
+            <li><strong>「Beaver へ同期」ボタン</strong>: Access → Beaver の見積/売上/請求書 push back（未送信キューを即時処理）</li>
           </ul>
 
           <h3 className="text-base font-semibold text-slate-700 mt-4 mb-2">Beaver サーバが停止しているとき</h3>

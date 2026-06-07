@@ -95,7 +95,27 @@ R-025 とは無関係（既存コードの型整合性問題）。frontend ビ�
 
 ---
 
-## 6. TateguDesignStudioとの連携
+## 6. R-038: 得意先マスタの双方向同期（2026-06-07 R-025 デプロイ後の追加要望）
+
+R-025 では案件マスタのみ同期、得意先（customers ↔ tbl得意先M）は未同期。R-025 と同じパターンで実装する。
+
+### Beaver 側のスコープ
+- `GET /customers/sync` API 追加（R-025 Step A の `/projects/sync` 模倣）
+  - クエリ: `updated_after` / `include_inactive`
+  - レスポンス: 得意先 ID, 名前, アドレス, アクセス番号, 更新日時 等
+- 必要なら `POST /customers/{id}/sync` でPush back 受信（双方向の場合）
+
+### 設計判断要点（grill 必要）
+- (a) tbl得意先M（既存 AccessTategu 権威）と tbl得意先_cache（Beaver ミラー）を分離
+- (b) Beaver 権威に統一して tbl得意先M を tbl得意先_cache 化（影響範囲大）
+- (c) 双方向同期、両側で編集可能
+
+### 着手タイミング
+R-037（案件管理 UI）と並行 or その後。
+
+---
+
+## 7. TateguDesignStudioとの連携
 
 TateguDesignStudio（建具設計・積算ツール）で設計・積算した建具データを、Beaverの伝票明細に取り込めるようにする。
 
