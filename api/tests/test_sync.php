@@ -359,6 +359,44 @@ runTest('syncVoucherShipped も重複時に警告ログを出して LIMIT 1 で�
 });
 
 // ============================================================
+// R-034 review MEDIUM-1: 再 push で customer_id / project_id を degrade させない
+// ============================================================
+echo "\n=== R-034 review MEDIUM-1 UPSERT で customer_id/project_id を degrade させない ===\n";
+
+runTest('test_upsert_preserves_existing_customer_id_on_null_push', function () use (&$pdo, $projectId, $customerAId) {
+    // 案件付き伝票として INSERT (customer_id=$customerAId で access_voucher_id=999)
+    $r1 = runHelperCase('syncVoucherUpsert', $projectId, [
+        'access_voucher_id'  => 999,
+        'voucher_type'       => 'sales',
+        'customer_access_no' => '100',
+        'voucher_date'       => '2026-06-05',
+        'total_amount'       => 10000,
+    ]);
+    assertEq(200, $r1['code'], 'first insert http code');
+    $row1 = $pdo->query('SELECT customer_id, project_id FROM vouchers WHERE access_voucher_id = 999')->fetch();
+    assertEq($customerAId, (int)$row1['customer_id'], 'customer_id initially set');
+    assertEq($projectId, (int)$row1['project_id'], 'project_id initially set');
+
+    // 過去伝票モードで再 push (project_id=NULL, customer_access_no='', access_voucher_id=999)
+    $r2 = runHelperCase('syncVoucherUpsert', null, [
+        'access_voucher_id'  => 999,
+        'voucher_type'       => 'sales',
+        'customer_access_no' => '',
+        'voucher_date'       => '2026-06-06',
+        'total_amount'       => 11000,
+    ]);
+    assertEq(200, $r2['code'], 'second push http code');
+
+    // customer_id / project_id は degrade せず元の値が保持される
+    $row2 = $pdo->query('SELECT customer_id, project_id, total_amount, voucher_date FROM vouchers WHERE access_voucher_id = 999')->fetch();
+    assertEq($customerAId, (int)$row2['customer_id'], 'customer_id preserved (NOT degraded to NULL)');
+    assertEq($projectId, (int)$row2['project_id'], 'project_id preserved (NOT degraded to NULL)');
+    // 他のフィールドは通常通り更新されることも確認
+    assertEq(11000.0, (float)$row2['total_amount'], 'total_amount updated');
+    assertEq('2026-06-06', $row2['voucher_date'], 'voucher_date updated');
+});
+
+// ============================================================
 // GET /projects/sync の pagination と routing 厳格化
 // ============================================================
 echo "\n=== R-034 (b) / R-035 (a) GET /projects/sync ===\n";
@@ -470,6 +508,85 @@ try {
     }
     @unlink($bootstrap);
 }
+
+// ============================================================
+// R-034 review HIGH-1: migration 012 が sales_category_id を保全すること
+// ============================================================
+echo "\n=== R-034 review HIGH-1 migration 012 で sales_category_id が保全される ===\n";
+
+runTest('test_migration_012_preserves_sales_category_id', function () use ($ROOT) {
+    // 独立した一時 DB を用意（test_sync.sqlite には触らない）
+    $migDbPath = __DIR__ . '/test_migration_012.sqlite';
+    if (file_exists($migDbPath)) { unlink($migDbPath); }
+
+    $mpdo = new PDO('sqlite:' . $migDbPath, null, null, [
+        PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+    ]);
+    $mpdo->exec('PRAGMA foreign_keys=ON');
+
+    // schema.sql + migrations 002-011 を順に適用（本番状態の再現）
+    $mpdo->exec(file_get_contents($ROOT . '/schema.sql'));
+    $allMigrations = glob($ROOT . '/migrations/*.sql');
+    sort($allMigrations);
+    foreach ($allMigrations as $m) {
+        if (basename($m) === '012_vouchers_customer_id_nullable.sql') continue;
+        $sql = file_get_contents($m);
+        $sql = preg_replace('/^\s*--.*$/m', '', $sql);
+        foreach (explode(';', $sql) as $stmt) {
+            $stmt = trim($stmt);
+            if ($stmt === '') continue;
+            try { $mpdo->exec($stmt); } catch (Throwable $_) { /* 重複系は無視 */ }
+        }
+    }
+
+    // sales_category_id 列が存在するか確認（前提条件）
+    $cols = $mpdo->query("PRAGMA table_info(vouchers)")->fetchAll();
+    $colNames = array_column($cols, 'name');
+    assertTrue(in_array('sales_category_id', $colNames, true),
+        'sales_category_id column must exist BEFORE migration 012 (precondition)');
+
+    // テスト用得意先 + 売上種別 + 伝票を投入
+    $mpdo->exec("INSERT INTO customers (name, access_customer_no) VALUES ('MIG-顧客', 'MIG100')");
+    $custId = (int)$mpdo->lastInsertId();
+    $mpdo->exec("INSERT INTO sales_categories (name, sort_order) VALUES ('テスト種別', 1)");
+    $catId = (int)$mpdo->lastInsertId();
+
+    // sales_category_id=999 ではなく、実在する $catId を使う（FK 制約があるため）
+    // 指示書の「sales_category_id=999」は値そのものの保全確認なので、$catId を実値として保持されるかを assert
+    $mpdo->exec("INSERT INTO vouchers
+        (voucher_no, voucher_type, status, customer_id, voucher_date,
+         sales_category_id, access_voucher_id)
+        VALUES ('MIG-V001', 'sales', 'approved', $custId, '2026-06-01', $catId, 12345)");
+    $insertedVoucherId = (int)$mpdo->lastInsertId();
+
+    // migration 012 を適用
+    $mig012 = file_get_contents($ROOT . '/migrations/012_vouchers_customer_id_nullable.sql');
+    // 注: PRAGMA や BEGIN/COMMIT を含むため、ステートメント分割せず一括で exec する。
+    //     SQLite の PDO::exec は複文を実行可能。
+    $mpdo->exec($mig012);
+
+    // 適用後: sales_category_id 列が依然として存在し、値も保持されている
+    $cols2 = $mpdo->query("PRAGMA table_info(vouchers)")->fetchAll();
+    $colNames2 = array_column($cols2, 'name');
+    assertTrue(in_array('sales_category_id', $colNames2, true),
+        'sales_category_id column must still exist AFTER migration 012');
+
+    $row = $mpdo->query("SELECT sales_category_id, customer_id FROM vouchers WHERE id = $insertedVoucherId")->fetch();
+    assertTrue($row !== false, 'voucher row must still exist after migration 012');
+    assertEq($catId, (int)$row['sales_category_id'], 'sales_category_id value preserved through migration 012');
+    assertEq($custId, (int)$row['customer_id'], 'customer_id value preserved through migration 012');
+
+    // customer_id の NOT NULL 制約が外れているか（migration 012 の主目的）も確認
+    $mpdo->exec("INSERT INTO vouchers
+        (voucher_no, voucher_type, status, customer_id, voucher_date, access_voucher_id)
+        VALUES ('MIG-V002', 'sales', 'approved', NULL, '2026-06-02', 12346)");
+    $nullRow = $mpdo->query("SELECT customer_id FROM vouchers WHERE access_voucher_id = 12346")->fetch();
+    assertEq(null, $nullRow['customer_id'], 'customer_id=NULL is now allowed (migration 012 main purpose)');
+
+    $mpdo = null;
+    @unlink($migDbPath);
+});
 
 // ============================================================
 // 結果サマリ

@@ -196,8 +196,15 @@ function syncVoucherUpsert(PDO $pdo, ?int $projectId): void {
             ON CONFLICT(access_voucher_id) DO UPDATE SET
                 voucher_type      = excluded.voucher_type,
                 status            = "approved",
-                project_id        = excluded.project_id,
-                customer_id       = excluded.customer_id,
+                -- R-034 review MEDIUM-1 対応:
+                --   customer_id / project_id は COALESCE で既存値を保護する。
+                --   理由: 案件付き伝票 (customer_id=42, project_id=10) として一度同期された伝票が、
+                --   Access 側で操作ミス等により過去伝票モード (project_id=NULL, customer_access_no が空)
+                --   で再 push された場合、無条件上書きすると customer_id / project_id が NULL に
+                --   degrade してしまう。降格は実運用上ありえない誤操作のため、防御的に既存値を保持する。
+                --   新しい値が NULL のときは既存値を維持し、非 NULL のときは新しい値で更新する。
+                project_id        = COALESCE(excluded.project_id, project_id),
+                customer_id       = COALESCE(excluded.customer_id, customer_id),
                 voucher_date      = excluded.voucher_date,
                 total_amount      = excluded.total_amount,
                 access_voucher_no = excluded.access_voucher_no,
