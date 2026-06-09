@@ -3,5 +3,7 @@ frontend/dist/
 api/database.sqlite
 api/database.sqlite-wal
 api/database.sqlite-shm
+api/tests/test_sync.sqlite
+api/tests/_server_bootstrap.php
 .env
 *.log

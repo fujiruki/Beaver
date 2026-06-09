@@ -154,8 +154,14 @@ function syncVoucherUpsert(PDO $pdo, ?int $projectId): void {
         $totalAmount = 0.0;
     }
 
-    if ($customerId === null) {
-        respond(400, ['error' => 'customer_access_no は必須です（customers.customer_id が NOT NULL のため）']);
+    // R-034 (a): customer_id 必須化の分岐
+    //   - 案件付き伝票（project_id != null）: customer_access_no 必須
+    //   - 過去伝票モード（project_id === null）: customer_access_no 空文字/NULL のときに限り
+    //     customer_id=NULL で許容（履歴インポート用途）。
+    //   ※ accessCustomerNo に値が入っているが解決できない場合は上の分岐で 400 を返している。
+    //     ここに到達するのは accessCustomerNo が空のときだけ。
+    if ($customerId === null && $projectId !== null) {
+        respond(400, ['error' => 'customer_access_no は必須です（案件付き伝票のため）']);
         return;
     }
 
@@ -219,8 +225,16 @@ function syncVoucherUpsert(PDO $pdo, ?int $projectId): void {
 
         // 明細行は AccessTategu 側スキーマと Beaver の voucher_lines の差異が大きいため、
         // 今回の Step E スコープでは lines は INSERT 時のみ取り込み、UPDATE 時は触らない。
+        // R-034 (d): UPDATE 経路では voucher_lines を再構築しない。Access 側で発行後に
+        // 明細だけを変更した場合は Beaver には反映されない仕様（業務影響最小化を優先）。
+        // 反映が必要になったら DELETE → INSERT のフル置換に切り替える。
         if (!$existing && !empty($data['lines']) && is_array($data['lines'])) {
-            insertSyncedLines($pdo, $voucherId, $data['lines']);
+            $lineError = insertSyncedLines($pdo, $voucherId, $data['lines']);
+            if ($lineError !== null) {
+                $pdo->rollBack();
+                respond(422, $lineError);
+                return;
+            }
         }
 
         $pdo->commit();
@@ -240,8 +254,17 @@ function syncVoucherUpsert(PDO $pdo, ?int $projectId): void {
 /**
  * lines を最小フィールドで INSERT する。
  * AccessTategu からの行は item_name / quantity / line_total を最低限持つ想定。
+ *
+ * R-034 (c): line_type / tax_category / quantity / line_total を厳格に検証。
+ * 不正値が見つかった場合は INSERT を中断し、422 のレスポンスボディ用配列を返す。
+ * 正常系（不正なし）は null を返す。
  */
-function insertSyncedLines(PDO $pdo, int $voucherId, array $lines): void {
+function insertSyncedLines(PDO $pdo, int $voucherId, array $lines): ?array {
+    // schema.sql: line_type は normal / discount / subtotal、tax_category は '課税' を既定。
+    // Access 側からの push では subtotal は来ない想定だが、スキーマ準拠で許容する。
+    $allowedLineTypes    = ['normal', 'discount', 'subtotal'];
+    $allowedTaxCategories = ['課税', '非課税'];
+
     $lineNo = 1;
     $ins = $pdo->prepare('
         INSERT INTO voucher_lines
@@ -251,20 +274,70 @@ function insertSyncedLines(PDO $pdo, int $voucherId, array $lines): void {
     ');
     foreach ($lines as $line) {
         if (!is_array($line)) continue;
-        $quantity  = isset($line['quantity'])   && is_numeric($line['quantity'])   ? (float)$line['quantity']   : 1;
-        $lineTotal = isset($line['line_total']) && is_numeric($line['line_total']) ? (float)$line['line_total'] : 0;
+
+        $lineType = $line['line_type'] ?? 'normal';
+        if (!in_array($lineType, $allowedLineTypes, true)) {
+            return [
+                'error'   => 'invalid_line',
+                'field'   => 'line_type',
+                'value'   => $lineType,
+                'line_no' => $lineNo,
+            ];
+        }
+
+        $taxCategory = $line['tax_category'] ?? '課税';
+        if (!in_array($taxCategory, $allowedTaxCategories, true)) {
+            return [
+                'error'   => 'invalid_line',
+                'field'   => 'tax_category',
+                'value'   => $taxCategory,
+                'line_no' => $lineNo,
+            ];
+        }
+
+        $quantityRaw = $line['quantity'] ?? 1;
+        if (!is_numeric($quantityRaw)) {
+            return [
+                'error'   => 'invalid_line',
+                'field'   => 'quantity',
+                'value'   => $quantityRaw,
+                'line_no' => $lineNo,
+            ];
+        }
+        $quantity = (float)$quantityRaw;
+        if ($quantity < 0) {
+            return [
+                'error'   => 'invalid_line',
+                'field'   => 'quantity',
+                'value'   => $quantityRaw,
+                'line_no' => $lineNo,
+            ];
+        }
+
+        $lineTotalRaw = $line['line_total'] ?? 0;
+        if (!is_numeric($lineTotalRaw)) {
+            return [
+                'error'   => 'invalid_line',
+                'field'   => 'line_total',
+                'value'   => $lineTotalRaw,
+                'line_no' => $lineNo,
+            ];
+        }
+        $lineTotal = (float)$lineTotalRaw;
+
         $ins->execute([
             ':voucher_id'   => $voucherId,
             ':line_no'      => $lineNo,
-            ':line_type'    => $line['line_type']    ?? 'normal',
-            ':item_name'    => $line['item_name']    ?? null,
+            ':line_type'    => $lineType,
+            ':item_name'    => $line['item_name'] ?? null,
             ':quantity'     => $quantity,
             ':line_total'   => $lineTotal,
-            ':tax_category' => $line['tax_category'] ?? '課税',
-            ':memo'         => $line['memo']         ?? null,
+            ':tax_category' => $taxCategory,
+            ':memo'         => $line['memo'] ?? null,
         ]);
         $lineNo++;
     }
+    return null;
 }
 
 /**
@@ -279,7 +352,22 @@ function syncVoucherUpdate(PDO $pdo, int $projectId, string $accessVoucherNo): v
         return;
     }
 
-    $stmt = $pdo->prepare('SELECT id, voucher_no FROM vouchers WHERE access_voucher_no = ?');
+    // R-035 (b): access_voucher_no 重複時の防御。
+    // R-029 の access_voucher_id UNIQUE 制約で根本対処されるが、防御的に LIMIT 1 を明示し、
+    // 2 件以上ヒットした場合は警告ログを残す。業務影響を抑えるため処理自体は継続する。
+    $dupStmt = $pdo->prepare('SELECT id FROM vouchers WHERE access_voucher_no = ? ORDER BY id ASC');
+    $dupStmt->execute([$accessVoucherNo]);
+    $dupIds = $dupStmt->fetchAll(PDO::FETCH_COLUMN);
+    if (count($dupIds) > 1) {
+        error_log(sprintf(
+            '[Beaver sync] syncVoucherUpdate: access_voucher_no=%s が %d 件ヒット (ids=%s)。先頭を更新します。',
+            $accessVoucherNo,
+            count($dupIds),
+            implode(',', $dupIds)
+        ));
+    }
+
+    $stmt = $pdo->prepare('SELECT id, voucher_no FROM vouchers WHERE access_voucher_no = ? ORDER BY id ASC LIMIT 1');
     $stmt->execute([$accessVoucherNo]);
     $target = $stmt->fetch();
     if (!$target) {
@@ -363,7 +451,20 @@ function syncVoucherShipped(PDO $pdo, int $projectId, string $accessVoucherNo): 
         return;
     }
 
-    $stmt = $pdo->prepare('SELECT id FROM vouchers WHERE access_voucher_no = ?');
+    // R-035 (b): access_voucher_no 重複時の防御（syncVoucherShipped でも同様）
+    $dupStmt = $pdo->prepare('SELECT id FROM vouchers WHERE access_voucher_no = ? ORDER BY id ASC');
+    $dupStmt->execute([$accessVoucherNo]);
+    $dupIds = $dupStmt->fetchAll(PDO::FETCH_COLUMN);
+    if (count($dupIds) > 1) {
+        error_log(sprintf(
+            '[Beaver sync] syncVoucherShipped: access_voucher_no=%s が %d 件ヒット (ids=%s)。先頭を更新します。',
+            $accessVoucherNo,
+            count($dupIds),
+            implode(',', $dupIds)
+        ));
+    }
+
+    $stmt = $pdo->prepare('SELECT id FROM vouchers WHERE access_voucher_no = ? ORDER BY id ASC LIMIT 1');
     $stmt->execute([$accessVoucherNo]);
     $id = $stmt->fetchColumn();
     if (!$id) {

@@ -52,8 +52,14 @@ if ($resourceId && $subResource === 'customer' && $method === 'PATCH') {
 }
 
 // --- R-025 Step A: AccessTategu 連携用 軽量同期 API ---
-// GET /projects/sync[?updated_after=ISO8601][&include_cancelled=true]
-if ($method === 'GET' && isset($segments[1]) && $segments[1] === 'sync') {
+// GET /projects/sync[?updated_after=ISO8601][&include_cancelled=true][&limit=N][&cursor=ID]
+// R-034 (b): 完全一致チェック。`/projects/sync/anything` を全件返却で誤通過させない。
+if ($method === 'GET' && isset($segments[1]) && $segments[1] === 'sync' && isset($segments[2])) {
+    http_response_code(404);
+    echo json_encode(['error' => 'Not found', 'path' => $path]);
+    exit;
+}
+if ($method === 'GET' && isset($segments[1]) && $segments[1] === 'sync' && !isset($segments[2])) {
     $updatedAfterRaw = $_GET['updated_after'] ?? null;
     $updatedAfterSql = null;
     if ($updatedAfterRaw !== null && $updatedAfterRaw !== '') {
@@ -68,6 +74,22 @@ if ($method === 'GET' && isset($segments[1]) && $segments[1] === 'sync') {
     $includeCancelled = isset($_GET['include_cancelled'])
         && in_array(strtolower((string)$_GET['include_cancelled']), ['1', 'true', 'yes'], true);
 
+    // R-035 (a): pagination。デフォルト limit=1000、最大 5000。
+    // cursor は since_id 方式（id > cursor の昇順）で、安定したページング順序を確保する。
+    $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 1000;
+    if ($limit < 1)   $limit = 1000;
+    if ($limit > 5000) $limit = 5000;
+
+    $cursor = null;
+    if (isset($_GET['cursor']) && $_GET['cursor'] !== '') {
+        if (!is_numeric($_GET['cursor'])) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Invalid cursor (numeric id required)']);
+            exit;
+        }
+        $cursor = (int)$_GET['cursor'];
+    }
+
     $sql = 'SELECT p.id, p.project_code, p.name,
                    c.access_customer_no AS customer_access_no,
                    p.status, p.delivery_date, p.address, p.updated_at
@@ -79,21 +101,47 @@ if ($method === 'GET' && isset($segments[1]) && $segments[1] === 'sync') {
         $sql .= ' AND p.updated_at > :updated_after';
         $params[':updated_after'] = $updatedAfterSql;
     }
+    if ($cursor !== null) {
+        $sql .= ' AND p.id > :cursor';
+        $params[':cursor'] = $cursor;
+    }
     if (!$includeCancelled) {
         $sql .= " AND p.status != 'cancelled'";
     }
-    $sql .= ' ORDER BY p.updated_at DESC';
+    // cursor pagination の安定性のため id ASC で並べる（updated_at DESC ではページング順が崩れる）
+    $sql .= ' ORDER BY p.id ASC LIMIT :limit_plus_one';
+    $params[':limit_plus_one'] = $limit + 1; // next_cursor 検出のため +1 件取得
 
     $stmt = $pdo->prepare($sql);
-    $stmt->execute($params);
+    foreach ($params as $k => $v) {
+        $type = ($k === ':limit_plus_one' || $k === ':cursor') ? PDO::PARAM_INT : PDO::PARAM_STR;
+        $stmt->bindValue($k, $v, $type);
+    }
+    $stmt->execute();
     $rows = $stmt->fetchAll();
 
+    $nextCursor = null;
+    if (count($rows) > $limit) {
+        // limit+1 件目があった場合は次ページが存在する。limit 件のみ返し、最後の id を next_cursor に。
+        $rows = array_slice($rows, 0, $limit);
+        $lastRow = end($rows);
+        if (is_array($lastRow) && isset($lastRow['id'])) {
+            $nextCursor = (int)$lastRow['id'];
+        }
+        reset($rows);
+    }
+
     $now = new DateTime('now', new DateTimeZone('Asia/Tokyo'));
-    echo json_encode([
+    $response = [
         'synced_at' => $now->format('c'),
         'projects'  => $rows,
         'total'     => count($rows),
-    ]);
+        'limit'     => $limit,
+    ];
+    if ($nextCursor !== null) {
+        $response['next_cursor'] = $nextCursor;
+    }
+    echo json_encode($response);
     exit;
 }
 
