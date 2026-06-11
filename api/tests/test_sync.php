@@ -499,6 +499,45 @@ try {
         assertTrue(str_contains($statusLine, '400'), 'expected 400 got: ' . $statusLine);
     });
 
+    // ============================================================
+    // R-047: GET /projects/sync レスポンスに customer_access_no が含まれること
+    // ============================================================
+    echo "
+=== R-047 GET /projects/sync に customer_access_no が含まれること ===
+";
+
+    runTest('得意先紐付き案件の customer_access_no が正しく返る', function () use ($port) {
+        $body = file_get_contents("http://127.0.0.1:$port/contents/Beaver/api/projects/sync");
+        $data = json_decode($body, true);
+        assertTrue(isset($data['projects']), 'projects key exists');
+        $found = null;
+        foreach ($data['projects'] as $p) {
+            if ($p['project_code'] === 'P00001') { $found = $p; break; }
+        }
+        assertTrue($found !== null, 'P00001 が見つかること');
+        assertTrue(array_key_exists('customer_access_no', $found), 'customer_access_no キーが存在すること');
+        assertEq('100', $found['customer_access_no'], 'customer_access_no の値が得意先の access_customer_no と一致すること');
+    });
+
+    runTest('access_customer_no が未設定の得意先に紐づく案件は customer_access_no = null', function () use ($port, $testDbPath) {
+        // access_customer_no が NULL の得意先と案件を投入（projects.customer_id は NOT NULL のため得意先は必須）
+        $tmpPdo = new PDO('sqlite:' . $testDbPath, null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+        $tmpPdo->exec("INSERT INTO customers (name) VALUES ('access_no未設定得意先')");
+        $noAccNoCustomerId = (int)$tmpPdo->lastInsertId();
+        $tmpPdo->exec("INSERT INTO projects (project_code, customer_id, name, status) VALUES ('P99999', $noAccNoCustomerId, 'access_no未設定案件', '進行中')");
+        $tmpPdo = null;
+
+        $body = file_get_contents("http://127.0.0.1:$port/contents/Beaver/api/projects/sync");
+        $data = json_decode($body, true);
+        $found = null;
+        foreach ($data['projects'] as $p) {
+            if ($p['project_code'] === 'P99999') { $found = $p; break; }
+        }
+        assertTrue($found !== null, 'P99999 が見つかること');
+        assertTrue(array_key_exists('customer_access_no', $found), 'customer_access_no キーが存在すること');
+        assertEq(null, $found['customer_access_no'], 'access_customer_no 未設定得意先の案件は customer_access_no = null');
+    });
+
 } finally {
     // サーバ停止
     if (is_resource($serverProc)) {
