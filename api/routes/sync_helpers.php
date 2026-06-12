@@ -83,6 +83,52 @@ function projectExists(PDO $pdo, int $projectId): bool {
 }
 
 /**
+ * project_access_no（= projects.project_code）から project_id を解決。存在しなければ null。
+ */
+function resolveProjectIdByCode(PDO $pdo, ?string $projectAccessNo): ?int {
+    if ($projectAccessNo === null || $projectAccessNo === '') return null;
+    $stmt = $pdo->prepare('SELECT id FROM projects WHERE project_code = ?');
+    $stmt->execute([$projectAccessNo]);
+    $id = $stmt->fetchColumn();
+    return $id ? (int)$id : null;
+}
+
+/**
+ * R-050: 売上受信時に projects.customer_id を連動更新する。
+ *
+ * - customer_access_no が null/空 → 何もしない（現状維持）
+ * - project_access_no が null/空 → 何もしない
+ * - project_access_no が見つからない → WARNING ログのみ、何もしない
+ * - customer_access_no で lookup した customer が見つからない → WARNING ログのみ、何もしない
+ * - 上記をすべて通過したら projects.customer_id を UPDATE
+ */
+function updateProjectCustomerFromSales(PDO $pdo, ?string $projectAccessNo, ?string $customerAccessNo): void {
+    if ($customerAccessNo === null || $customerAccessNo === '') return;
+    if ($projectAccessNo === null || $projectAccessNo === '') return;
+
+    $projectId = resolveProjectIdByCode($pdo, $projectAccessNo);
+    if ($projectId === null) {
+        error_log(sprintf(
+            '[Beaver R-050] updateProjectCustomerFromSales: project_access_no=%s が projects.project_code に存在しません',
+            $projectAccessNo
+        ));
+        return;
+    }
+
+    $customerId = resolveCustomerId($pdo, $customerAccessNo);
+    if ($customerId === null) {
+        error_log(sprintf(
+            '[Beaver R-050] updateProjectCustomerFromSales: customer_access_no=%s が customers.access_customer_no に存在しません',
+            $customerAccessNo
+        ));
+        return;
+    }
+
+    $pdo->prepare('UPDATE projects SET customer_id = :customer_id, updated_at = CURRENT_TIMESTAMP WHERE id = :id')
+        ->execute([':customer_id' => $customerId, ':id' => $projectId]);
+}
+
+/**
  * AccessTategu の伝票番号と Beaver の voucher_no を分離して保存するため、
  * INSERT 時は Beaver 内部 voucher_no を sequences から採番し、access_voucher_no は別列に格納。
  *
@@ -242,6 +288,17 @@ function syncVoucherUpsert(PDO $pdo, ?int $projectId): void {
                 respond(422, $lineError);
                 return;
             }
+        }
+
+
+        // R-050: 売上受信時に projects.customer_id を連動更新する。
+        // payload の project_access_no (= project_code) と customer_access_no を使って
+        // projects テーブルの customer_id を最新の紐付けで上書きする。
+        // ガード条件は updateProjectCustomerFromSales 内で処理される。
+        if ($voucherType === 'sales') {
+            $projectAccessNo  = isset($data['project_access_no'])  ? (string)$data['project_access_no']  : null;
+            $customerAccessNoForProject = $accessCustomerNo !== '' ? $accessCustomerNo : null;
+            updateProjectCustomerFromSales($pdo, $projectAccessNo, $customerAccessNoForProject);
         }
 
         $pdo->commit();

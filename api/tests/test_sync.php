@@ -628,6 +628,61 @@ runTest('test_migration_012_preserves_sales_category_id', function () use ($ROOT
 });
 
 // ============================================================
+// R-050: 売上受信時に projects.customer_id が連動更新されること
+// ============================================================
+echo "
+=== R-050 売上受信時の projects.customer_id 連動更新 ===
+";
+
+runTest('R-050-1: 売上受信時 project_access_no と customer_access_no があれば projects.customer_id が更新される', function () use (&$pdo, $projectId) {
+    // P00001 の customer_id を一旦 NULL に近い状態にするため、新しい得意先Cを用意して
+    // projects.customer_id を得意先Cに書き換えておく（テスト前の状態を設定）
+    $pdo->exec("INSERT INTO customers (name, access_customer_no) VALUES ('テスト得意先C', '300')");
+    $customerCId = (int)$pdo->lastInsertId();
+    $pdo->prepare('UPDATE projects SET customer_id = :cid WHERE id = :pid')
+        ->execute([':cid' => $customerCId, ':pid' => $projectId]);
+
+    // 売上 sync: project_access_no=P00001, customer_access_no=100 (テスト得意先A)
+    $r = runHelperCase('syncVoucherUpsert', $projectId, [
+        'access_voucher_id'  => 8001,
+        'voucher_type'       => 'sales',
+        'customer_access_no' => '100',
+        'project_access_no'  => 'P00001',
+        'voucher_date'       => '2026-06-10',
+        'total_amount'       => 50000,
+    ]);
+    assertEq(200, $r['code'], 'http code');
+
+    // projects.customer_id が得意先A (access_customer_no=100) に更新されていること
+    $row = $pdo->query("SELECT customer_id FROM projects WHERE id = $projectId")->fetch();
+    $expected = $pdo->query("SELECT id FROM customers WHERE access_customer_no = '100'")->fetchColumn();
+    assertEq((int)$expected, (int)$row['customer_id'], 'projects.customer_id が得意先A に更新されること');
+});
+
+runTest('R-050-2: customer_access_no が null なら projects.customer_id は変更されない', function () use (&$pdo, $projectId) {
+    // 現在の customer_id を記録
+    $beforeRow = $pdo->query("SELECT customer_id FROM projects WHERE id = $projectId")->fetch();
+    $beforeCustomerId = (int)$beforeRow['customer_id'];
+
+    // 売上 sync: customer_access_no を空にして送る（過去伝票モードと同等）
+    // ただし project_id 付きの場合 customer_access_no 空は 400 になるため、
+    // project_id=null（過去伝票モード）で実施する
+    $r = runHelperCase('syncVoucherUpsert', null, [
+        'access_voucher_id'  => 8002,
+        'voucher_type'       => 'sales',
+        'customer_access_no' => '',
+        'project_access_no'  => 'P00001',
+        'voucher_date'       => '2026-06-10',
+        'total_amount'       => 30000,
+    ]);
+    assertEq(200, $r['code'], 'http code');
+
+    // projects.customer_id は変更されていないこと
+    $afterRow = $pdo->query("SELECT customer_id FROM projects WHERE id = $projectId")->fetch();
+    assertEq($beforeCustomerId, (int)$afterRow['customer_id'], 'projects.customer_id が変更されないこと');
+});
+
+// ============================================================
 // 結果サマリ
 // ============================================================
 echo "\n========================================\n";
