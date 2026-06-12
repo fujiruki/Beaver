@@ -635,19 +635,19 @@ echo "
 ";
 
 runTest('R-050-1: 売上受信時 project_access_no と customer_access_no があれば projects.customer_id が更新される', function () use (&$pdo, $projectId) {
-    // P00001 の customer_id を一旦 NULL に近い状態にするため、新しい得意先Cを用意して
+    // customer_id を一旦 NULL に近い状態にするため、新しい得意先Cを用意して
     // projects.customer_id を得意先Cに書き換えておく（テスト前の状態を設定）
     $pdo->exec("INSERT INTO customers (name, access_customer_no) VALUES ('テスト得意先C', '300')");
     $customerCId = (int)$pdo->lastInsertId();
     $pdo->prepare('UPDATE projects SET customer_id = :cid WHERE id = :pid')
         ->execute([':cid' => $customerCId, ':pid' => $projectId]);
 
-    // 売上 sync: project_access_no=P00001, customer_access_no=100 (テスト得意先A)
+    // 売上 sync: project_access_no = projects.id の文字列化, customer_access_no=100 (テスト得意先A)
     $r = runHelperCase('syncVoucherUpsert', $projectId, [
         'access_voucher_id'  => 8001,
         'voucher_type'       => 'sales',
         'customer_access_no' => '100',
-        'project_access_no'  => 'P00001',
+        'project_access_no'  => (string)$projectId,
         'voucher_date'       => '2026-06-10',
         'total_amount'       => 50000,
     ]);
@@ -671,7 +671,7 @@ runTest('R-050-2: customer_access_no が null なら projects.customer_id は変
         'access_voucher_id'  => 8002,
         'voucher_type'       => 'sales',
         'customer_access_no' => '',
-        'project_access_no'  => 'P00001',
+        'project_access_no'  => (string)$projectId,
         'voucher_date'       => '2026-06-10',
         'total_amount'       => 30000,
     ]);

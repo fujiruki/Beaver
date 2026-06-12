@@ -83,12 +83,12 @@ function projectExists(PDO $pdo, int $projectId): bool {
 }
 
 /**
- * project_access_no（= projects.project_code）から project_id を解決。存在しなければ null。
+ * project_access_no（= projects.id の文字列化）から project_id を解決。存在しなければ null。
  */
-function resolveProjectIdByCode(PDO $pdo, ?string $projectAccessNo): ?int {
+function resolveProjectIdById(PDO $pdo, ?string $projectAccessNo): ?int {
     if ($projectAccessNo === null || $projectAccessNo === '') return null;
-    $stmt = $pdo->prepare('SELECT id FROM projects WHERE project_code = ?');
-    $stmt->execute([$projectAccessNo]);
+    $stmt = $pdo->prepare('SELECT id FROM projects WHERE id = ?');
+    $stmt->execute([(int)$projectAccessNo]);
     $id = $stmt->fetchColumn();
     return $id ? (int)$id : null;
 }
@@ -106,10 +106,10 @@ function updateProjectCustomerFromSales(PDO $pdo, ?string $projectAccessNo, ?str
     if ($customerAccessNo === null || $customerAccessNo === '') return;
     if ($projectAccessNo === null || $projectAccessNo === '') return;
 
-    $projectId = resolveProjectIdByCode($pdo, $projectAccessNo);
+    $projectId = resolveProjectIdById($pdo, $projectAccessNo);
     if ($projectId === null) {
         error_log(sprintf(
-            '[Beaver R-050] updateProjectCustomerFromSales: project_access_no=%s が projects.project_code に存在しません',
+            '[Beaver R-050] updateProjectCustomerFromSales: project_access_no=%s が projects.id に存在しません',
             $projectAccessNo
         ));
         return;
