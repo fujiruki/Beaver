@@ -407,35 +407,15 @@ function insertSyncedLines(PDO $pdo, int $voucherId, array $lines): ?array {
 /**
  * PUT /projects/{id}/vouchers/{voucher_no}
  * voucher_no は AccessTategu 側の access_voucher_no で検索する仕様（設計書 §8.5）。
+ *
+ * R-055: access_voucher_no が未登録の場合は 404 ではなく新規 INSERT (upsert) する。
+ * AccessTategu の既存売上が Beaver に未登録でも push が成功するようにする。
  */
 function syncVoucherUpdate(PDO $pdo, int $projectId, string $accessVoucherNo): void {
     $data = readJsonBody();
 
     if (!projectExists($pdo, $projectId)) {
         respond(404, ['error' => 'project_id が Beaver に存在しません']);
-        return;
-    }
-
-    // R-035 (b): access_voucher_no 重複時の防御。
-    // R-029 の access_voucher_id UNIQUE 制約で根本対処されるが、防御的に LIMIT 1 を明示し、
-    // 2 件以上ヒットした場合は警告ログを残す。業務影響を抑えるため処理自体は継続する。
-    $dupStmt = $pdo->prepare('SELECT id FROM vouchers WHERE access_voucher_no = ? ORDER BY id ASC');
-    $dupStmt->execute([$accessVoucherNo]);
-    $dupIds = $dupStmt->fetchAll(PDO::FETCH_COLUMN);
-    if (count($dupIds) > 1) {
-        error_log(sprintf(
-            '[Beaver sync] syncVoucherUpdate: access_voucher_no=%s が %d 件ヒット (ids=%s)。先頭を更新します。',
-            $accessVoucherNo,
-            count($dupIds),
-            implode(',', $dupIds)
-        ));
-    }
-
-    $stmt = $pdo->prepare('SELECT id, voucher_no FROM vouchers WHERE access_voucher_no = ? ORDER BY id ASC LIMIT 1');
-    $stmt->execute([$accessVoucherNo]);
-    $target = $stmt->fetch();
-    if (!$target) {
-        respond(404, ['error' => '指定された access_voucher_no の伝票が見つかりません']);
         return;
     }
 
@@ -479,34 +459,97 @@ function syncVoucherUpdate(PDO $pdo, int $projectId, string $accessVoucherNo): v
         }
     }
 
+    // R-035 (b): access_voucher_no 重複時の防御。
+    // R-029 の access_voucher_id UNIQUE 制約で根本対処されるが、防御的に LIMIT 1 を明示し、
+    // 2 件以上ヒットした場合は警告ログを残す。業務影響を抑えるため処理自体は継続する。
+    $dupStmt = $pdo->prepare('SELECT id FROM vouchers WHERE access_voucher_no = ? ORDER BY id ASC');
+    $dupStmt->execute([$accessVoucherNo]);
+    $dupIds = $dupStmt->fetchAll(PDO::FETCH_COLUMN);
+    if (count($dupIds) > 1) {
+        error_log(sprintf(
+            '[Beaver sync] syncVoucherUpdate: access_voucher_no=%s が %d 件ヒット (ids=%s)。先頭を更新します。',
+            $accessVoucherNo,
+            count($dupIds),
+            implode(',', $dupIds)
+        ));
+    }
+
+    $stmt = $pdo->prepare('SELECT id, voucher_no FROM vouchers WHERE access_voucher_no = ? ORDER BY id ASC LIMIT 1');
+    $stmt->execute([$accessVoucherNo]);
+    $target = $stmt->fetch();
+
     try {
-        $sets = [];
-        $params = [':id' => (int)$target['id']];
-        if ($voucherType !== null)  { $sets[] = 'voucher_type = :voucher_type'; $params[':voucher_type'] = $voucherType; }
-        if ($customerId !== null)   { $sets[] = 'customer_id = :customer_id';   $params[':customer_id']  = $customerId; }
-        if ($voucherDate !== null)  { $sets[] = 'voucher_date = :voucher_date'; $params[':voucher_date'] = $voucherDate; }
-        if ($totalAmount !== null)  { $sets[] = 'total_amount = :total_amount'; $params[':total_amount'] = $totalAmount; }
-        if (isset($data['memo']))   { $sets[] = 'memo = :memo';                 $params[':memo']         = $data['memo']; }
-        if (isset($data['description'])) { $sets[] = 'description = :description'; $params[':description'] = $data['description']; }
-        $sets[] = 'project_id = :project_id';
-        $params[':project_id'] = $projectId;
-        $sets[] = 'updated_at = CURRENT_TIMESTAMP';
+        if ($target) {
+            // 既存レコードあり → UPDATE
+            $sets = [];
+            $params = [':id' => (int)$target['id']];
+            if ($voucherType !== null)  { $sets[] = 'voucher_type = :voucher_type'; $params[':voucher_type'] = $voucherType; }
+            if ($customerId !== null)   { $sets[] = 'customer_id = :customer_id';   $params[':customer_id']  = $customerId; }
+            if ($voucherDate !== null)  { $sets[] = 'voucher_date = :voucher_date'; $params[':voucher_date'] = $voucherDate; }
+            if ($totalAmount !== null)  { $sets[] = 'total_amount = :total_amount'; $params[':total_amount'] = $totalAmount; }
+            if (isset($data['memo']))   { $sets[] = 'memo = :memo';                 $params[':memo']         = $data['memo']; }
+            if (isset($data['description'])) { $sets[] = 'description = :description'; $params[':description'] = $data['description']; }
+            $sets[] = 'project_id = :project_id';
+            $params[':project_id'] = $projectId;
+            $sets[] = 'updated_at = CURRENT_TIMESTAMP';
 
-        $pdo->prepare('UPDATE vouchers SET ' . implode(', ', $sets) . ' WHERE id = :id')->execute($params);
+            $pdo->prepare('UPDATE vouchers SET ' . implode(', ', $sets) . ' WHERE id = :id')->execute($params);
 
-        $s = $pdo->prepare('SELECT * FROM vouchers WHERE id = ?');
-        $s->execute([(int)$target['id']]);
-        respond(200, $s->fetch() ?: []);
+            $voucherId = (int)$target['id'];
+            $s = $pdo->prepare('SELECT * FROM vouchers WHERE id = ?');
+            $s->execute([$voucherId]);
+            respond(200, $s->fetch() ?: []);
+        } else {
+            // R-055: 未登録 access_voucher_no → INSERT (upsert)
+            $insertType = $voucherType ?? 'sales';
+            $insertVoucherNo = nextVoucherNoForSync($pdo, $insertType);
+            $insertDate = $voucherDate ?? date('Y-m-d');
+            $insertTotal = $totalAmount ?? 0.0;
+            $insertMemo = $data['memo'] ?? null;
+            $insertDescription = $data['description'] ?? null;
+
+            $accessVoucherIdFromPayload = isset($data['access_voucher_id']) ? (int)$data['access_voucher_id'] : null;
+
+            $pdo->prepare('
+                INSERT INTO vouchers
+                    (voucher_no, voucher_type, status, project_id, customer_id,
+                     voucher_date, total_amount, access_voucher_no, access_voucher_id,
+                     memo, description)
+                VALUES
+                    (:voucher_no, :voucher_type, "approved", :project_id, :customer_id,
+                     :voucher_date, :total_amount, :access_voucher_no, :access_voucher_id,
+                     :memo, :description)
+            ')->execute([
+                ':voucher_no'        => $insertVoucherNo,
+                ':voucher_type'      => $insertType,
+                ':project_id'        => $projectId,
+                ':customer_id'       => $customerId,
+                ':voucher_date'      => $insertDate,
+                ':total_amount'      => $insertTotal,
+                ':access_voucher_no' => $accessVoucherNo,
+                ':access_voucher_id' => $accessVoucherIdFromPayload,
+                ':memo'              => $insertMemo,
+                ':description'       => $insertDescription,
+            ]);
+            $voucherId = (int)$pdo->lastInsertId();
+
+            // R-050 連動: 売上受信時に projects.customer_id を更新する
+            if ($insertType === 'sales') {
+                $projectAccessNo = isset($data['project_access_no']) ? (string)$data['project_access_no'] : (string)$projectId;
+                $customerAccessNoForProject = $accessCustomerNo !== null && $accessCustomerNo !== '' ? $accessCustomerNo : null;
+                updateProjectCustomerFromSales($pdo, $projectAccessNo, $customerAccessNoForProject);
+            }
+
+            $s = $pdo->prepare('SELECT * FROM vouchers WHERE id = ?');
+            $s->execute([$voucherId]);
+            respond(201, $s->fetch() ?: []);
+        }
     } catch (Throwable $e) {
         respondInternalError($e, 'syncVoucherUpdate');
         return;
     }
 }
 
-/**
- * PATCH /projects/{id}/vouchers/{voucher_no}/shipped
- * 発送済フラグ更新。Body: {shipped: bool, shipped_at: ISO8601}
- */
 function syncVoucherShipped(PDO $pdo, int $projectId, string $accessVoucherNo): void {
     $data = readJsonBody();
 

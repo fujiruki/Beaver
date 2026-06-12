@@ -682,6 +682,50 @@ runTest('R-050-2: customer_access_no が null なら projects.customer_id は変
     assertEq($beforeCustomerId, (int)$afterRow['customer_id'], 'projects.customer_id が変更されないこと');
 });
 
+
+// ============================================================
+// R-055: voucher_update で access_voucher_no 未登録なら新規 INSERT (upsert)
+// ============================================================
+echo "
+=== R-055 syncVoucherUpdate upsert (未登録→INSERT / 登録済→UPDATE) ===
+";
+
+runTest('R-055-1: voucher_update で未登録 access_voucher_no を送ると新規 INSERT される', function () use (&$pdo, $projectId) {
+    // 存在しない access_voucher_no で syncVoucherUpdate を呼ぶ
+    $r = runHelperCase('syncVoucherUpdate', ['project_id' => $projectId, 'voucher_no' => 'AC-9999-NEW'], [
+        'voucher_type'       => 'sales',
+        'customer_access_no' => '100',
+        'voucher_date'       => '2026-06-11',
+        'total_amount'       => 75000,
+        'access_voucher_id'  => 9999,
+    ]);
+    assertEq(201, $r['code'], 'http code: 未登録は 201 Created');
+    assertTrue(isset($r['body']['id']), 'id が返る');
+    $row = $pdo->query("SELECT * FROM vouchers WHERE access_voucher_no = 'AC-9999-NEW'")->fetch();
+    assertTrue($row !== false, 'DB に行が作成されている');
+    assertEq('approved', $row['status'], 'status=approved');
+    assertEq('sales', $row['voucher_type'], 'voucher_type=sales');
+    assertEq(75000.0, (float)$row['total_amount'], 'total_amount');
+    assertEq($projectId, (int)$row['project_id'], 'project_id');
+});
+
+runTest('R-055-2: voucher_update で登録済 access_voucher_no を送ると UPDATE される（既存挙動維持）', function () use (&$pdo, $projectId) {
+    // R-055-1 で INSERT されたレコードを UPDATE する
+    $r = runHelperCase('syncVoucherUpdate', ['project_id' => $projectId, 'voucher_no' => 'AC-9999-NEW'], [
+        'voucher_type'       => 'sales',
+        'customer_access_no' => '100',
+        'voucher_date'       => '2026-06-12',
+        'total_amount'       => 80000,
+    ]);
+    assertEq(200, $r['code'], 'http code: 登録済は 200 OK');
+    $row = $pdo->query("SELECT * FROM vouchers WHERE access_voucher_no = 'AC-9999-NEW'")->fetch();
+    assertEq(80000.0, (float)$row['total_amount'], 'total_amount が更新されている');
+    assertEq('2026-06-12', $row['voucher_date'], 'voucher_date が更新されている');
+    // 件数は変わらない（新たにINSERTされていない）
+    $cnt = $pdo->query("SELECT COUNT(*) FROM vouchers WHERE access_voucher_no = 'AC-9999-NEW'")->fetchColumn();
+    assertEq('1', (string)$cnt, 'レコードが重複していない');
+});
+
 // ============================================================
 // 結果サマリ
 // ============================================================
