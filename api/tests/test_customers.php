@@ -91,6 +91,14 @@ function customerPost(PDO $pdo, array $data): array {
         $checkStmt = $pdo->prepare('SELECT id FROM customers WHERE access_customer_no = ?');
         $checkStmt->execute([$accessCustomerNo]);
         $existingId = $checkStmt->fetchColumn();
+
+        // access_customer_no で見つからなければ code でフォールバック照合
+        if (!$existingId && isset($data['code']) && $data['code'] !== null && $data['code'] !== '') {
+            $codeStmt = $pdo->prepare('SELECT id FROM customers WHERE code = ?');
+            $codeStmt->execute([(string)$data['code']]);
+            $existingId = $codeStmt->fetchColumn();
+        }
+
         if ($existingId) {
             $fields = ['code','name','name_kana','honorific_type','gender',
                        'postal_code','address1','address2','tel','mobile','fax','email',
@@ -104,11 +112,11 @@ function customerPost(PDO $pdo, array $data): array {
                     $params[":$f"] = $data[$f];
                 }
             }
+            $sets[] = 'access_customer_no = :access_customer_no';
+            $params[':access_customer_no'] = $accessCustomerNo;
             $sets[] = 'updated_at = CURRENT_TIMESTAMP';
             $params[':id'] = (int)$existingId;
-            if (count($sets) > 1) {
-                $pdo->prepare('UPDATE customers SET ' . implode(', ', $sets) . ' WHERE id = :id')->execute($params);
-            }
+            $pdo->prepare('UPDATE customers SET ' . implode(', ', $sets) . ' WHERE id = :id')->execute($params);
             $stmt2 = $pdo->prepare('SELECT * FROM customers WHERE id = ?');
             $stmt2->execute([(int)$existingId]);
             return ['code' => 200, 'body' => $stmt2->fetch()];
@@ -258,6 +266,43 @@ runTest('T-04: UNIQUE 制約 - 別レコードに同じ access_customer_no → 4
 
     $res3 = customerPut($pdo, $otherId, ['access_customer_no' => '1001']);
     assertEq(409, $res3['code'], '別レコードへの重複 access_customer_no 設定は 409');
+});
+
+// T-05: code 一致 + access_customer_no NULL の既存レコードに POST → 200 UPDATE で access_customer_no がセットされる
+runTest('T-05: code 照合 upsert - access_customer_no NULL レコードに POST → 200 + access_customer_no セット', function () use ($pdo) {
+    // code=110 で access_customer_no NULL のレコードを事前作成（シード状態の再現）
+    $pdo->prepare('INSERT INTO customers (code, name, is_active) VALUES (?, ?, 1)')
+        ->execute(['110', '徳山住宅']);
+
+    $res = customerPost($pdo, [
+        'code'               => '110',
+        'name'               => '徳山住宅（Access連携後）',
+        'access_customer_no' => 'ACN-110',
+    ]);
+    assertEq(200, $res['code'], 'HTTP status は 200 UPDATE');
+    assertEq('ACN-110', $res['body']['access_customer_no'], 'access_customer_no がセットされた');
+    assertEq('徳山住宅（Access連携後）', $res['body']['name'], 'name が更新された');
+});
+
+// T-06: access_customer_no 一致の既存レコードに POST → access_customer_no が維持される（回帰防止）
+runTest('T-06: access_customer_no 照合 upsert の回帰防止 - access_customer_no が維持される', function () use ($pdo) {
+    $res1 = customerPost($pdo, [
+        'name'               => '回帰テスト得意先',
+        'code'               => '999',
+        'access_customer_no' => 'ACN-999',
+    ]);
+    assertEq(201, $res1['code'], '事前 INSERT');
+    assertEq('ACN-999', $res1['body']['access_customer_no'], '初期 access_customer_no');
+
+    $res2 = customerPost($pdo, [
+        'name'               => '回帰テスト得意先（更新）',
+        'code'               => '999',
+        'access_customer_no' => 'ACN-999',
+        'tel'                => '06-1111-2222',
+    ]);
+    assertEq(200, $res2['code'], '2回目 POST は 200 UPDATE');
+    assertEq('ACN-999', $res2['body']['access_customer_no'], 'access_customer_no が維持されている');
+    assertEq('06-1111-2222', $res2['body']['tel'], 'tel が更新されている');
 });
 
 // ============================================================

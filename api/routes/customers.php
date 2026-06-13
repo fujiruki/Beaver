@@ -90,6 +90,14 @@ switch ($method) {
             $checkStmt = $pdo->prepare('SELECT id FROM customers WHERE access_customer_no = ?');
             $checkStmt->execute([$accessCustomerNo]);
             $existingId = $checkStmt->fetchColumn();
+
+            // access_customer_no で見つからなければ code でフォールバック照合
+            if (!$existingId && isset($data['code']) && $data['code'] !== null && $data['code'] !== '') {
+                $codeStmt = $pdo->prepare('SELECT id FROM customers WHERE code = ?');
+                $codeStmt->execute([(string)$data['code']]);
+                $existingId = $codeStmt->fetchColumn();
+            }
+
             if ($existingId) {
                 // 既存レコードを UPDATE して 200 返却
                 $fields = ['code','name','name_kana','honorific_type','gender',
@@ -104,11 +112,11 @@ switch ($method) {
                         $params[":$f"] = $data[$f];
                     }
                 }
+                $sets[] = 'access_customer_no = :access_customer_no';
+                $params[':access_customer_no'] = $accessCustomerNo;
                 $sets[] = 'updated_at = CURRENT_TIMESTAMP';
                 $params[':id'] = (int)$existingId;
-                if (count($sets) > 1) {
-                    $pdo->prepare('UPDATE customers SET ' . implode(', ', $sets) . ' WHERE id = :id')->execute($params);
-                }
+                $pdo->prepare('UPDATE customers SET ' . implode(', ', $sets) . ' WHERE id = :id')->execute($params);
                 $stmt2 = $pdo->prepare('SELECT * FROM customers WHERE id = ?');
                 $stmt2->execute([(int)$existingId]);
                 http_response_code(200);
