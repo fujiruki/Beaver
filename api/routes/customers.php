@@ -81,41 +81,88 @@ switch ($method) {
 
     case 'POST':
         $data = json_decode(file_get_contents('php://input'), true) ?? [];
-        $stmt = $pdo->prepare('
-            INSERT INTO customers
-                (code, name, name_kana, honorific_type, gender,
-                 postal_code, address1, address2, tel, mobile, fax, email,
-                 memo, billing_name, billing_date_print,
-                 cutoff_day, billing_offset_days, payment_due_days,
-                 carry_forward_balance, is_active)
-            VALUES
-                (:code, :name, :name_kana, :honorific_type, :gender,
-                 :postal_code, :address1, :address2, :tel, :mobile, :fax, :email,
-                 :memo, :billing_name, :billing_date_print,
-                 :cutoff_day, :billing_offset_days, :payment_due_days,
-                 :carry_forward_balance, 1)
-        ');
-        $stmt->execute([
-            ':code'                 => $data['code'] ?? null,
-            ':name'                 => $data['name'] ?? '',
-            ':name_kana'            => $data['name_kana'] ?? null,
-            ':honorific_type'       => $data['honorific_type'] ?? '御中',
-            ':gender'               => $data['gender'] ?? null,
-            ':postal_code'          => $data['postal_code'] ?? null,
-            ':address1'             => $data['address1'] ?? null,
-            ':address2'             => $data['address2'] ?? null,
-            ':tel'                  => $data['tel'] ?? null,
-            ':mobile'               => $data['mobile'] ?? null,
-            ':fax'                  => $data['fax'] ?? null,
-            ':email'                => $data['email'] ?? null,
-            ':memo'                 => $data['memo'] ?? null,
-            ':billing_name'         => $data['billing_name'] ?? null,
-            ':billing_date_print'   => $data['billing_date_print'] ?? 0,
-            ':cutoff_day'           => $data['cutoff_day'] ?? 31,
-            ':billing_offset_days'  => $data['billing_offset_days'] ?? 15,
-            ':payment_due_days'     => $data['payment_due_days'] ?? 30,
-            ':carry_forward_balance'=> $data['carry_forward_balance'] ?? 0,
-        ]);
+        $accessCustomerNo = isset($data['access_customer_no']) && $data['access_customer_no'] !== null
+            ? (string)$data['access_customer_no']
+            : null;
+
+        // access_customer_no が指定されていれば既存レコードを検索して upsert
+        if ($accessCustomerNo !== null) {
+            $checkStmt = $pdo->prepare('SELECT id FROM customers WHERE access_customer_no = ?');
+            $checkStmt->execute([$accessCustomerNo]);
+            $existingId = $checkStmt->fetchColumn();
+            if ($existingId) {
+                // 既存レコードを UPDATE して 200 返却
+                $fields = ['code','name','name_kana','honorific_type','gender',
+                           'postal_code','address1','address2','tel','mobile','fax','email',
+                           'memo','billing_name','billing_date_print',
+                           'cutoff_day','billing_offset_days','payment_due_days','is_active'];
+                $sets = [];
+                $params = [];
+                foreach ($fields as $f) {
+                    if (array_key_exists($f, $data)) {
+                        $sets[] = "$f = :$f";
+                        $params[":$f"] = $data[$f];
+                    }
+                }
+                $sets[] = 'updated_at = CURRENT_TIMESTAMP';
+                $params[':id'] = (int)$existingId;
+                if (count($sets) > 1) {
+                    $pdo->prepare('UPDATE customers SET ' . implode(', ', $sets) . ' WHERE id = :id')->execute($params);
+                }
+                $stmt2 = $pdo->prepare('SELECT * FROM customers WHERE id = ?');
+                $stmt2->execute([(int)$existingId]);
+                http_response_code(200);
+                echo json_encode($stmt2->fetch());
+                break;
+            }
+        }
+
+        // UNIQUE 制約違反（別 access_customer_no 競合）は PDOException で 409 返却
+        try {
+            $stmt = $pdo->prepare('
+                INSERT INTO customers
+                    (code, name, name_kana, honorific_type, gender,
+                     postal_code, address1, address2, tel, mobile, fax, email,
+                     memo, billing_name, billing_date_print,
+                     cutoff_day, billing_offset_days, payment_due_days,
+                     carry_forward_balance, is_active, access_customer_no)
+                VALUES
+                    (:code, :name, :name_kana, :honorific_type, :gender,
+                     :postal_code, :address1, :address2, :tel, :mobile, :fax, :email,
+                     :memo, :billing_name, :billing_date_print,
+                     :cutoff_day, :billing_offset_days, :payment_due_days,
+                     :carry_forward_balance, 1, :access_customer_no)
+            ');
+            $stmt->execute([
+                ':code'                 => $data['code'] ?? null,
+                ':name'                 => $data['name'] ?? '',
+                ':name_kana'            => $data['name_kana'] ?? null,
+                ':honorific_type'       => $data['honorific_type'] ?? '御中',
+                ':gender'               => $data['gender'] ?? null,
+                ':postal_code'          => $data['postal_code'] ?? null,
+                ':address1'             => $data['address1'] ?? null,
+                ':address2'             => $data['address2'] ?? null,
+                ':tel'                  => $data['tel'] ?? null,
+                ':mobile'               => $data['mobile'] ?? null,
+                ':fax'                  => $data['fax'] ?? null,
+                ':email'                => $data['email'] ?? null,
+                ':memo'                 => $data['memo'] ?? null,
+                ':billing_name'         => $data['billing_name'] ?? null,
+                ':billing_date_print'   => $data['billing_date_print'] ?? 0,
+                ':cutoff_day'           => $data['cutoff_day'] ?? 31,
+                ':billing_offset_days'  => $data['billing_offset_days'] ?? 15,
+                ':payment_due_days'     => $data['payment_due_days'] ?? 30,
+                ':carry_forward_balance'=> $data['carry_forward_balance'] ?? 0,
+                ':access_customer_no'   => $accessCustomerNo,
+            ]);
+        } catch (PDOException $e) {
+            if (str_contains($e->getMessage(), 'UNIQUE constraint failed')) {
+                http_response_code(409);
+                echo json_encode(['error' => 'access_customer_no が既に存在します', 'access_customer_no' => $accessCustomerNo]);
+                break;
+            }
+            throw $e;
+        }
         $id = $pdo->lastInsertId();
         http_response_code(201);
         $stmt2 = $pdo->prepare('SELECT * FROM customers WHERE id = ?');
@@ -130,7 +177,8 @@ switch ($method) {
         $fields = ['code','name','name_kana','honorific_type','gender',
                    'postal_code','address1','address2','tel','mobile','fax','email',
                    'memo','billing_name','billing_date_print',
-                   'cutoff_day','billing_offset_days','payment_due_days','is_active'];
+                   'cutoff_day','billing_offset_days','payment_due_days','is_active',
+                   'access_customer_no'];
         $sets = [];
         $params = [];
         foreach ($fields as $f) {
