@@ -4,7 +4,7 @@
  *
  * - access_voucher_id を冪等性キーとした upsert
  * - 厳格 validation（customer_access_no / project_id 検証）
- * - INSERT 時は status = 'approved' 固定（Access 側で発行済み＝確定）
+ * - INSERT 時は payload の status を使用し、未送信時は 'approved' にフォールバック
  * - 重複時は最新で上書きし、200 OK を黙って返す（Access に「重複」とは返さない）
  */
 
@@ -211,6 +211,11 @@ function syncVoucherUpsert(PDO $pdo, ?int $projectId): void {
         return;
     }
 
+    $allowedStatuses = ['draft', 'submitted', 'approved', 'billed', 'void'];
+    $status = (isset($data['status']) && in_array($data['status'], $allowedStatuses, true))
+        ? $data['status']
+        : 'approved';
+
     $accessVoucherNo = isset($data['access_voucher_no']) ? (string)$data['access_voucher_no'] : null;
     $memo            = $data['memo']        ?? null;
     $description     = $data['description'] ?? null;
@@ -236,12 +241,12 @@ function syncVoucherUpsert(PDO $pdo, ?int $projectId): void {
                  voucher_date, total_amount, access_voucher_id, access_voucher_no,
                  memo, description)
             VALUES
-                (:voucher_no, :voucher_type, "approved", :project_id, :customer_id,
+                (:voucher_no, :voucher_type, :status, :project_id, :customer_id,
                  :voucher_date, :total_amount, :access_voucher_id, :access_voucher_no,
                  :memo, :description)
             ON CONFLICT(access_voucher_id) DO UPDATE SET
                 voucher_type      = excluded.voucher_type,
-                status            = "approved",
+                status            = excluded.status,
                 -- R-034 review MEDIUM-1 対応:
                 --   customer_id / project_id は COALESCE で既存値を保護する。
                 --   理由: 案件付き伝票 (customer_id=42, project_id=10) として一度同期された伝票が、
@@ -260,6 +265,7 @@ function syncVoucherUpsert(PDO $pdo, ?int $projectId): void {
         ')->execute([
             ':voucher_no'        => $voucherNo,
             ':voucher_type'      => $voucherType,
+            ':status'            => $status,
             ':project_id'        => $projectId,
             ':customer_id'       => $customerId,
             ':voucher_date'      => $voucherDate,
@@ -483,7 +489,12 @@ function syncVoucherUpdate(PDO $pdo, int $projectId, string $accessVoucherNo): v
             // 既存レコードあり → UPDATE
             $sets = [];
             $params = [':id' => (int)$target['id']];
+            $allowedStatuses = ['draft', 'submitted', 'approved', 'billed', 'void'];
             if ($voucherType !== null)  { $sets[] = 'voucher_type = :voucher_type'; $params[':voucher_type'] = $voucherType; }
+            if (isset($data['status']) && in_array($data['status'], $allowedStatuses, true)) {
+                $sets[] = 'status = :status';
+                $params[':status'] = $data['status'];
+            }
             if ($customerId !== null)   { $sets[] = 'customer_id = :customer_id';   $params[':customer_id']  = $customerId; }
             if ($voucherDate !== null)  { $sets[] = 'voucher_date = :voucher_date'; $params[':voucher_date'] = $voucherDate; }
             if ($totalAmount !== null)  { $sets[] = 'total_amount = :total_amount'; $params[':total_amount'] = $totalAmount; }
@@ -508,6 +519,11 @@ function syncVoucherUpdate(PDO $pdo, int $projectId, string $accessVoucherNo): v
             $insertMemo = $data['memo'] ?? null;
             $insertDescription = $data['description'] ?? null;
 
+            $allowedStatuses = ['draft', 'submitted', 'approved', 'billed', 'void'];
+            $insertStatus = (isset($data['status']) && in_array($data['status'], $allowedStatuses, true))
+                ? $data['status']
+                : 'approved';
+
             $accessVoucherIdFromPayload = isset($data['access_voucher_id']) ? (int)$data['access_voucher_id'] : null;
 
             $pdo->prepare('
@@ -516,12 +532,13 @@ function syncVoucherUpdate(PDO $pdo, int $projectId, string $accessVoucherNo): v
                      voucher_date, total_amount, access_voucher_no, access_voucher_id,
                      memo, description)
                 VALUES
-                    (:voucher_no, :voucher_type, "approved", :project_id, :customer_id,
+                    (:voucher_no, :voucher_type, :status, :project_id, :customer_id,
                      :voucher_date, :total_amount, :access_voucher_no, :access_voucher_id,
                      :memo, :description)
             ')->execute([
                 ':voucher_no'        => $insertVoucherNo,
                 ':voucher_type'      => $insertType,
+                ':status'            => $insertStatus,
                 ':project_id'        => $projectId,
                 ':customer_id'       => $customerId,
                 ':voucher_date'      => $insertDate,
