@@ -136,6 +136,7 @@ Phase 7（Access連携）完了後に着手。
 - フロント `frontend/src/lib/voucherCalc.ts`: `課税ベース = 課税合計 − 割引合計`（割引後に課税）
 - バックエンド `api/routes/vouchers.php` `recalcVoucher`: 割引を引かず gross の課税合計に課税（`total` でのみ割引を減算）
 - 例（税抜・課税10万/割引1万）: フロント 税額9,000/合計99,000 vs バックエンド 税額10,000/合計100,000（1,000円差）
+- 注: A修正（内税丸め一本化, 2026-06-24）でinclusive分岐はFE/BEとも「割引後に課税」へ揃えた。**残るBの不一致はexclusive分岐のみ**。
 
 ### 現状の実害
 - Access同期伝票（本番5,777件中の割引付き887件）は `tax_amount=0` で `recalcVoucher` を通っておらず、Access値を保持＝**現状は無傷**。

@@ -96,8 +96,8 @@ export function calcVoucherTotal(
       .filter(l => l.tax_category !== 'taxable')
       .reduce((sum, l) => sum + (l.line_total || 0), 0);
     const netTaxableInclusive = taxableInclusive - discountAmount;
-    const taxableExclusive = Math.round(netTaxableInclusive / (1 + taxRate));
-    const taxAmount = netTaxableInclusive - taxableExclusive;
+    const taxAmount = Math.floor(netTaxableInclusive * taxRate / (1 + taxRate));
+    const taxableExclusive = netTaxableInclusive - taxAmount;
     return {
       subtotal_taxable: taxableExclusive,
       tax_amount: taxAmount,

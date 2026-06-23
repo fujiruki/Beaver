@@ -70,12 +70,20 @@ function recalcVoucher(PDO $pdo, int $voucherId): void {
     }
 
     if ($v['tax_input_type'] === 'inclusive') {
-        $taxable    = round($taxable    / (1 + $taxRate));
-        $nontaxable = round($nontaxable / (1 + $taxRate));
-        $discount   = round($discount   / (1 + $taxRate));
+        $netTaxableInclusive = $taxable - $discount;
+        $taxAmount           = (int)floor($netTaxableInclusive * $taxRate / (1 + $taxRate));
+        $subtotalTaxable     = $netTaxableInclusive - $taxAmount;
+        $total               = $netTaxableInclusive + $nontaxable;
+        $pdo->prepare('
+            UPDATE vouchers SET
+                subtotal_taxable = ?, subtotal_nontaxable = ?, subtotal_discount = ?,
+                tax_amount = ?, total_amount = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        ')->execute([$subtotalTaxable, $nontaxable, $discount, $taxAmount, $total, $voucherId]);
+        return;
     }
 
-    $taxAmount = floor($taxable * $taxRate);
+    $taxAmount = (int)floor($taxable * $taxRate);
     $total     = $taxable + $nontaxable - $discount + $taxAmount;
 
     $pdo->prepare('

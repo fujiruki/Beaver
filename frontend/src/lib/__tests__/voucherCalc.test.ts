@@ -116,15 +116,37 @@ describe('calcVoucherTotal - 税込入力 (inclusive)', () => {
     expect(result.total).toBe(110000);
   });
 
-  it('端数あり → Math.roundで逆算', () => {
+  it('端数あり → floor(税込×10/110)で税額導出', () => {
     const result = calcVoucherTotal(
       [{ line_type: 'normal', line_total: 110010, tax_category: 'taxable' }],
       'inclusive',
       0.10,
     );
-    expect(result.subtotal_taxable).toBe(100009);
-    expect(result.tax_amount).toBe(10001);
+    expect(result.subtotal_taxable).toBe(100010);
+    expect(result.tax_amount).toBe(10000);
     expect(result.total).toBe(110010);
+  });
+
+  it('税込10005 → tax=909, taxable=9096', () => {
+    const result = calcVoucherTotal(
+      [{ line_type: 'normal', line_total: 10005, tax_category: 'taxable' }],
+      'inclusive',
+      0.10,
+    );
+    expect(result.subtotal_taxable).toBe(9096);
+    expect(result.tax_amount).toBe(909);
+    expect(result.total).toBe(10005);
+  });
+
+  it('税込100000 → tax=9090, taxable=90910', () => {
+    const result = calcVoucherTotal(
+      [{ line_type: 'normal', line_total: 100000, tax_category: 'taxable' }],
+      'inclusive',
+      0.10,
+    );
+    expect(result.subtotal_taxable).toBe(90910);
+    expect(result.tax_amount).toBe(9090);
+    expect(result.total).toBe(100000);
   });
 });
 
