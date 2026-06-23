@@ -136,9 +136,9 @@ export default function VoucherList() {
                 <Th>伝票番号</Th>
                 <Th>種別</Th>
                 <Th>ステータス</Th>
-                <Th>得意先</Th>
-                <Th>案件</Th>
+                <Th width="10em">得意先</Th>
                 <Th>摘要</Th>
+                <Th>案件</Th>
                 <Th>伝票日付</Th>
                 <Th right>合計金額</Th>
               </tr>
@@ -165,9 +165,9 @@ export default function VoucherList() {
                         {STATUS_LABELS[v.status]}
                       </span>
                     </Td>
-                    <Td>{v.customer_name ?? '-'}</Td>
-                    <Td>{v.project_name ?? '-'}</Td>
+                    <Td width="10em">{v.customer_name ?? '-'}</Td>
                     <Td>{v.description ?? '-'}</Td>
+                    <Td>{v.project_name ?? '-'}</Td>
                     <Td>{v.voucher_date}</Td>
                     <Td right>¥{v.total_amount.toLocaleString()}</Td>
                   </tr>
@@ -190,18 +190,18 @@ export default function VoucherList() {
   );
 }
 
-function Th({ children, right }: { children: React.ReactNode; right?: boolean }) {
+function Th({ children, right, width }: { children: React.ReactNode; right?: boolean; width?: string }) {
   return (
     <th style={{ padding: '10px 14px', textAlign: right ? 'right' : 'left', fontSize: 12,
-      color: '#64748b', fontWeight: 'bold', borderBottom: '1px solid #e2e8f0' }}>
+      color: '#64748b', fontWeight: 'bold', borderBottom: '1px solid #e2e8f0', width }}>
       {children}
     </th>
   );
 }
 
-function Td({ children, right }: { children: React.ReactNode; right?: boolean }) {
+function Td({ children, right, width }: { children: React.ReactNode; right?: boolean; width?: string }) {
   return (
-    <td style={{ padding: '10px 14px', textAlign: right ? 'right' : 'left', color: '#1e293b' }}>
+    <td style={{ padding: '10px 14px', textAlign: right ? 'right' : 'left', color: '#1e293b', width }}>
       {children}
     </td>
   );
