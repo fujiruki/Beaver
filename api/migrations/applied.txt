@@ -11,3 +11,13 @@
 009_customers_access_customer_no 2026-06-06  dev
 010_access_voucher_id            2026-06-06  dev
 011_access_voucher_id_unique     2026-06-06  dev
+012_vouchers_customer_id_nullable  2026-06-23  dev
+013_customers_access_customer_no_unique  2026-06-23  dev
+014_seed_sales_categories        2026-06-23  dev
+006_tategu_cost_breakdown      2026-06-07  prod
+007_aggregation_category_master      2026-06-07  prod
+008_voucher_line_dynamic      2026-06-07  prod
+009_customers_access_customer_no      2026-06-07  prod
+010_access_voucher_id      2026-06-07  prod
+011_access_voucher_id_unique      2026-06-07  prod
+012_vouchers_customer_id_nullable      2026-06-09  prod

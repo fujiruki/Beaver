@@ -220,6 +220,28 @@ function syncVoucherUpsert(PDO $pdo, ?int $projectId): void {
     $memo            = $data['memo']        ?? null;
     $description     = $data['description'] ?? null;
 
+    // R-066(a): 未同期フィールドを受信して保存する。
+    $tradeType          = isset($data['trade_type'])           ? (string)$data['trade_type']           : null;
+    $consumptionTaxType = isset($data['consumption_tax_type']) ? (string)$data['consumption_tax_type'] : null;
+    $printDateFlag      = isset($data['print_date_flag'])      ? ($data['print_date_flag'] ? 1 : 0)    : null;
+    $printTaxExclFlag   = isset($data['print_tax_excl_flag'])  ? ($data['print_tax_excl_flag'] ? 1 : 0) : null;
+    $printCompanySeal   = isset($data['print_company_seal'])   ? ($data['print_company_seal'] ? 1 : 0) : null;
+    // sales_category_id: Access の tbl売上種別.ID を Beaver の sales_categories.id に直接マッピング。
+    // 両テーブルとも AUTOINCREMENT 整数 PK。初期データは手動で値が一致している前提。
+    // 値域の完全一致は運用レベルの確認が必要（未確認の場合は NULL が入る場合あり）。
+    $salesCategoryId    = isset($data['sales_category_id']) && is_numeric($data['sales_category_id'])
+        ? (int)$data['sales_category_id']
+        : null;
+    $deliveryDate       = ($voucherType === 'sales' && isset($data['delivery_date']))
+        ? validateVoucherDate((string)$data['delivery_date'])
+        : null;
+    $billingDate        = ($voucherType === 'sales' && isset($data['billing_date']))
+        ? validateVoucherDate((string)$data['billing_date'])
+        : null;
+    $sourceEstimateNo   = ($voucherType === 'sales' && isset($data['source_estimate_no']))
+        ? (string)$data['source_estimate_no']
+        : null;
+
     $pdo->beginTransaction();
     try {
         // race condition 回避: INSERT...ON CONFLICT(access_voucher_id) DO UPDATE で原子的に upsert する。
@@ -239,14 +261,20 @@ function syncVoucherUpsert(PDO $pdo, ?int $projectId): void {
             INSERT INTO vouchers
                 (voucher_no, voucher_type, status, project_id, customer_id,
                  voucher_date, total_amount, access_voucher_id, access_voucher_no,
-                 memo, description)
+                 memo, description,
+                 trade_type, consumption_tax_type,
+                 print_date_flag, print_tax_excl_flag, print_company_seal,
+                 sales_category_id, delivery_date, billing_date, source_estimate_no)
             VALUES
                 (:voucher_no, :voucher_type, :status, :project_id, :customer_id,
                  :voucher_date, :total_amount, :access_voucher_id, :access_voucher_no,
-                 :memo, :description)
+                 :memo, :description,
+                 :trade_type, :consumption_tax_type,
+                 :print_date_flag, :print_tax_excl_flag, :print_company_seal,
+                 :sales_category_id, :delivery_date, :billing_date, :source_estimate_no)
             ON CONFLICT(access_voucher_id) DO UPDATE SET
-                voucher_type      = excluded.voucher_type,
-                status            = excluded.status,
+                voucher_type        = excluded.voucher_type,
+                status              = excluded.status,
                 -- R-034 review MEDIUM-1 対応:
                 --   customer_id / project_id は COALESCE で既存値を保護する。
                 --   理由: 案件付き伝票 (customer_id=42, project_id=10) として一度同期された伝票が、
@@ -254,26 +282,44 @@ function syncVoucherUpsert(PDO $pdo, ?int $projectId): void {
                 --   で再 push された場合、無条件上書きすると customer_id / project_id が NULL に
                 --   degrade してしまう。降格は実運用上ありえない誤操作のため、防御的に既存値を保持する。
                 --   新しい値が NULL のときは既存値を維持し、非 NULL のときは新しい値で更新する。
-                project_id        = COALESCE(excluded.project_id, project_id),
-                customer_id       = COALESCE(excluded.customer_id, customer_id),
-                voucher_date      = excluded.voucher_date,
-                total_amount      = excluded.total_amount,
-                access_voucher_no = excluded.access_voucher_no,
-                memo              = excluded.memo,
-                description       = excluded.description,
-                updated_at        = CURRENT_TIMESTAMP
+                project_id          = COALESCE(excluded.project_id, project_id),
+                customer_id         = COALESCE(excluded.customer_id, customer_id),
+                voucher_date        = excluded.voucher_date,
+                total_amount        = excluded.total_amount,
+                access_voucher_no   = excluded.access_voucher_no,
+                memo                = excluded.memo,
+                description         = excluded.description,
+                trade_type          = COALESCE(excluded.trade_type, trade_type),
+                consumption_tax_type = COALESCE(excluded.consumption_tax_type, consumption_tax_type),
+                print_date_flag     = COALESCE(excluded.print_date_flag, print_date_flag),
+                print_tax_excl_flag = COALESCE(excluded.print_tax_excl_flag, print_tax_excl_flag),
+                print_company_seal  = COALESCE(excluded.print_company_seal, print_company_seal),
+                sales_category_id   = COALESCE(excluded.sales_category_id, sales_category_id),
+                delivery_date       = COALESCE(excluded.delivery_date, delivery_date),
+                billing_date        = COALESCE(excluded.billing_date, billing_date),
+                source_estimate_no  = COALESCE(excluded.source_estimate_no, source_estimate_no),
+                updated_at          = CURRENT_TIMESTAMP
         ')->execute([
-            ':voucher_no'        => $voucherNo,
-            ':voucher_type'      => $voucherType,
-            ':status'            => $status,
-            ':project_id'        => $projectId,
-            ':customer_id'       => $customerId,
-            ':voucher_date'      => $voucherDate,
-            ':total_amount'      => $totalAmount,
-            ':access_voucher_id' => $accessVoucherId,
-            ':access_voucher_no' => $accessVoucherNo,
-            ':memo'              => $memo,
-            ':description'       => $description,
+            ':voucher_no'          => $voucherNo,
+            ':voucher_type'        => $voucherType,
+            ':status'              => $status,
+            ':project_id'          => $projectId,
+            ':customer_id'         => $customerId,
+            ':voucher_date'        => $voucherDate,
+            ':total_amount'        => $totalAmount,
+            ':access_voucher_id'   => $accessVoucherId,
+            ':access_voucher_no'   => $accessVoucherNo,
+            ':memo'                => $memo,
+            ':description'         => $description,
+            ':trade_type'          => $tradeType,
+            ':consumption_tax_type' => $consumptionTaxType,
+            ':print_date_flag'     => $printDateFlag,
+            ':print_tax_excl_flag' => $printTaxExclFlag,
+            ':print_company_seal'  => $printCompanySeal,
+            ':sales_category_id'   => $salesCategoryId,
+            ':delivery_date'       => $deliveryDate,
+            ':billing_date'        => $billingDate,
+            ':source_estimate_no'  => $sourceEstimateNo,
         ]);
 
         if ($existing) {
@@ -484,6 +530,25 @@ function syncVoucherUpdate(PDO $pdo, int $projectId, string $accessVoucherNo): v
     $stmt->execute([$accessVoucherNo]);
     $target = $stmt->fetch();
 
+    // R-066(a): 未同期フィールドをここで受信して保存する（syncVoucherUpsert と同様）。
+    $tradeType          = isset($data['trade_type'])           ? (string)$data['trade_type']           : null;
+    $consumptionTaxType = isset($data['consumption_tax_type']) ? (string)$data['consumption_tax_type'] : null;
+    $printDateFlag      = isset($data['print_date_flag'])      ? ($data['print_date_flag'] ? 1 : 0)    : null;
+    $printTaxExclFlag   = isset($data['print_tax_excl_flag'])  ? ($data['print_tax_excl_flag'] ? 1 : 0) : null;
+    $printCompanySeal   = isset($data['print_company_seal'])   ? ($data['print_company_seal'] ? 1 : 0) : null;
+    $salesCategoryId    = isset($data['sales_category_id']) && is_numeric($data['sales_category_id'])
+        ? (int)$data['sales_category_id']
+        : null;
+    $deliveryDate       = ($voucherType === 'sales' && isset($data['delivery_date']))
+        ? validateVoucherDate((string)$data['delivery_date'])
+        : null;
+    $billingDateUpd     = ($voucherType === 'sales' && isset($data['billing_date']))
+        ? validateVoucherDate((string)$data['billing_date'])
+        : null;
+    $sourceEstimateNo   = ($voucherType === 'sales' && isset($data['source_estimate_no']))
+        ? (string)$data['source_estimate_no']
+        : null;
+
     try {
         if ($target) {
             // 既存レコードあり → UPDATE
@@ -495,11 +560,20 @@ function syncVoucherUpdate(PDO $pdo, int $projectId, string $accessVoucherNo): v
                 $sets[] = 'status = :status';
                 $params[':status'] = $data['status'];
             }
-            if ($customerId !== null)   { $sets[] = 'customer_id = :customer_id';   $params[':customer_id']  = $customerId; }
-            if ($voucherDate !== null)  { $sets[] = 'voucher_date = :voucher_date'; $params[':voucher_date'] = $voucherDate; }
-            if ($totalAmount !== null)  { $sets[] = 'total_amount = :total_amount'; $params[':total_amount'] = $totalAmount; }
-            if (isset($data['memo']))   { $sets[] = 'memo = :memo';                 $params[':memo']         = $data['memo']; }
-            if (isset($data['description'])) { $sets[] = 'description = :description'; $params[':description'] = $data['description']; }
+            if ($customerId !== null)      { $sets[] = 'customer_id = :customer_id';       $params[':customer_id']         = $customerId; }
+            if ($voucherDate !== null)     { $sets[] = 'voucher_date = :voucher_date';      $params[':voucher_date']        = $voucherDate; }
+            if ($totalAmount !== null)     { $sets[] = 'total_amount = :total_amount';      $params[':total_amount']        = $totalAmount; }
+            if (isset($data['memo']))      { $sets[] = 'memo = :memo';                      $params[':memo']                = $data['memo']; }
+            if (isset($data['description'])) { $sets[] = 'description = :description';     $params[':description']         = $data['description']; }
+            if ($tradeType !== null)       { $sets[] = 'trade_type = :trade_type';          $params[':trade_type']          = $tradeType; }
+            if ($consumptionTaxType !== null) { $sets[] = 'consumption_tax_type = :consumption_tax_type'; $params[':consumption_tax_type'] = $consumptionTaxType; }
+            if ($printDateFlag !== null)   { $sets[] = 'print_date_flag = :print_date_flag'; $params[':print_date_flag']   = $printDateFlag; }
+            if ($printTaxExclFlag !== null) { $sets[] = 'print_tax_excl_flag = :print_tax_excl_flag'; $params[':print_tax_excl_flag'] = $printTaxExclFlag; }
+            if ($printCompanySeal !== null) { $sets[] = 'print_company_seal = :print_company_seal'; $params[':print_company_seal'] = $printCompanySeal; }
+            if ($salesCategoryId !== null) { $sets[] = 'sales_category_id = :sales_category_id'; $params[':sales_category_id'] = $salesCategoryId; }
+            if ($deliveryDate !== null)    { $sets[] = 'delivery_date = :delivery_date';    $params[':delivery_date']       = $deliveryDate; }
+            if ($billingDateUpd !== null)  { $sets[] = 'billing_date = :billing_date';      $params[':billing_date']        = $billingDateUpd; }
+            if ($sourceEstimateNo !== null) { $sets[] = 'source_estimate_no = :source_estimate_no'; $params[':source_estimate_no'] = $sourceEstimateNo; }
             $sets[] = 'project_id = :project_id';
             $params[':project_id'] = $projectId;
             $sets[] = 'updated_at = CURRENT_TIMESTAMP';
@@ -530,23 +604,38 @@ function syncVoucherUpdate(PDO $pdo, int $projectId, string $accessVoucherNo): v
                 INSERT INTO vouchers
                     (voucher_no, voucher_type, status, project_id, customer_id,
                      voucher_date, total_amount, access_voucher_no, access_voucher_id,
-                     memo, description)
+                     memo, description,
+                     trade_type, consumption_tax_type,
+                     print_date_flag, print_tax_excl_flag, print_company_seal,
+                     sales_category_id, delivery_date, billing_date, source_estimate_no)
                 VALUES
                     (:voucher_no, :voucher_type, :status, :project_id, :customer_id,
                      :voucher_date, :total_amount, :access_voucher_no, :access_voucher_id,
-                     :memo, :description)
+                     :memo, :description,
+                     :trade_type, :consumption_tax_type,
+                     :print_date_flag, :print_tax_excl_flag, :print_company_seal,
+                     :sales_category_id, :delivery_date, :billing_date, :source_estimate_no)
             ')->execute([
-                ':voucher_no'        => $insertVoucherNo,
-                ':voucher_type'      => $insertType,
-                ':status'            => $insertStatus,
-                ':project_id'        => $projectId,
-                ':customer_id'       => $customerId,
-                ':voucher_date'      => $insertDate,
-                ':total_amount'      => $insertTotal,
-                ':access_voucher_no' => $accessVoucherNo,
-                ':access_voucher_id' => $accessVoucherIdFromPayload,
-                ':memo'              => $insertMemo,
-                ':description'       => $insertDescription,
+                ':voucher_no'           => $insertVoucherNo,
+                ':voucher_type'         => $insertType,
+                ':status'               => $insertStatus,
+                ':project_id'           => $projectId,
+                ':customer_id'          => $customerId,
+                ':voucher_date'         => $insertDate,
+                ':total_amount'         => $insertTotal,
+                ':access_voucher_no'    => $accessVoucherNo,
+                ':access_voucher_id'    => $accessVoucherIdFromPayload,
+                ':memo'                 => $insertMemo,
+                ':description'          => $insertDescription,
+                ':trade_type'           => $tradeType,
+                ':consumption_tax_type' => $consumptionTaxType,
+                ':print_date_flag'      => $printDateFlag,
+                ':print_tax_excl_flag'  => $printTaxExclFlag,
+                ':print_company_seal'   => $printCompanySeal,
+                ':sales_category_id'    => $salesCategoryId,
+                ':delivery_date'        => $deliveryDate,
+                ':billing_date'         => $billingDateUpd,
+                ':source_estimate_no'   => $sourceEstimateNo,
             ]);
             $voucherId = (int)$pdo->lastInsertId();
 
