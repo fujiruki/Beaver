@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/regression-gate.sh",
+            "timeout": 120,
+            "statusMessage": "ループ回帰ゲート(黒/青)実行中..."
+          }
+        ]
+      }
+    ]
+  }
+}
