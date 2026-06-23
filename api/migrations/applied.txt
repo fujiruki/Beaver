@@ -27,3 +27,6 @@
 014_seed_sales_categories      2026-06-23  prod
 015_vouchers_validity_period      2026-06-23  prod
 016_voucher_lines_sync_columns      2026-06-23  prod
+# 013 は本番に索引(uq_customers_access_customer_no)の実在を確認し記録漏れを補正(2026-06-24)
+013_customers_access_customer_no_unique      2026-06-24  prod
+017_vouchers_quoted_at      2026-06-24  prod
