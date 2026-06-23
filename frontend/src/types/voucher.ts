@@ -12,6 +12,15 @@ export interface LineCategoryValue {
   sort_order: number;
 }
 
+/** 見積から引用された売上の簡易情報（双方向トレース用） */
+export interface ConvertedSalesSummary {
+  id: number;
+  voucher_no: string;
+  status: VoucherStatus;
+  voucher_date: string;
+  quoted_at: string | null;
+}
+
 export interface Voucher {
   id: number;
   voucher_no: string;
@@ -28,6 +37,12 @@ export interface Voucher {
   description: string | null;
   memo: string | null;
   validity_period?: string | null;
+  /** 引用元の見積伝票ID（売上伝票のみ） */
+  source_voucher_id?: number | null;
+  /** 引用元の見積伝票番号（売上伝票のみ） */
+  source_estimate_no?: string | null;
+  /** 引用日（売上伝票のみ） */
+  quoted_at?: string | null;
   subtotal_taxable: number;
   tax_amount: number;
   total_amount: number;
@@ -35,6 +50,8 @@ export interface Voucher {
   // JOINされる
   customer_name?: string;
   project_name?: string;
+  /** 引用先売上の一覧（見積伝票のみ、詳細取得時に付加） */
+  converted_sales?: ConvertedSalesSummary[];
 }
 
 export interface VoucherLine {

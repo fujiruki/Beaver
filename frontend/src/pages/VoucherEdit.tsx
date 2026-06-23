@@ -344,10 +344,13 @@ export default function VoucherEdit() {
                 編集できません（{editBlockReason}）
               </span>
             )}
-            {!isReadOnly && !isNew && voucher?.voucher_type === 'estimate' && voucher.status === 'approved' && (
-              <button type="button" onClick={() => convertMutation.mutate()} style={convertBtnStyle}
-                disabled={convertMutation.isPending}>
-                {convertMutation.isPending ? '変換中...' : '→ 売上に変換'}
+            {!isReadOnly && !isNew && voucher?.voucher_type === 'estimate' && voucher.status !== 'void' && (
+              <button type="button" onClick={async () => {
+                if (!confirm('この見積を引用して売上伝票を新規作成します。よろしいですか？')) return;
+                const created = await convertMutation.mutateAsync();
+                navigate(`/vouchers/${created.id}`);
+              }} style={convertBtnStyle} disabled={convertMutation.isPending}>
+                {convertMutation.isPending ? '作成中...' : '引用して売上'}
               </button>
             )}
             {!isReadOnly && !isNew && (
@@ -356,10 +359,6 @@ export default function VoucherEdit() {
                 {reloadMutation.isPending ? '更新中...' : '原価再取得'}
               </button>
             )}
-            <button type="button" style={subBtnStyle}
-              onClick={() => alert('引用機能は未実装です')}>
-              引用
-            </button>
             <button type="button" style={subBtnStyle}
               onClick={() => window.print()}>
               プレビュー
@@ -374,6 +373,39 @@ export default function VoucherEdit() {
           <div style={{ marginBottom: 12, padding: '10px 14px', background: '#fee2e2',
             color: '#dc2626', borderRadius: 6, fontSize: 14 }}>
             保存に失敗しました: {String(mutError)}
+          </div>
+        )}
+
+        {/* 双方向トレース表示 */}
+        {!isNew && voucher?.voucher_type === 'estimate' && (voucher.converted_sales?.length ?? 0) > 0 && (
+          <div style={{ marginBottom: 12, padding: '8px 14px', background: '#f0fdf4',
+            color: '#166534', borderRadius: 6, fontSize: 13, border: '1px solid #bbf7d0' }}>
+            この見積は以下の売上伝票に引用されています：
+            {voucher.converted_sales!.map(s => (
+              <span key={s.id} style={{ marginLeft: 8 }}>
+                <button type="button" onClick={() => navigate(`/vouchers/${s.id}`)}
+                  style={{ background: 'none', border: 'none', color: '#15803d', cursor: 'pointer',
+                    textDecoration: 'underline', fontSize: 13, padding: 0 }}>
+                  売上 {s.voucher_no}
+                </button>
+                {s.quoted_at && <span style={{ color: '#4ade80', marginLeft: 4 }}>（引用日: {s.quoted_at}）</span>}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {!isNew && voucher?.voucher_type === 'sales' && voucher.source_estimate_no && (
+          <div style={{ marginBottom: 12, padding: '8px 14px', background: '#eff6ff',
+            color: '#1e40af', borderRadius: 6, fontSize: 13, border: '1px solid #bfdbfe' }}>
+            この売上は見積 {voucher.source_estimate_no} から引用されました
+            {voucher.quoted_at && <span style={{ marginLeft: 8, color: '#3b82f6' }}>（引用日: {voucher.quoted_at}）</span>}
+            {voucher.source_voucher_id && (
+              <button type="button" onClick={() => navigate(`/vouchers/${voucher.source_voucher_id}`)}
+                style={{ marginLeft: 8, background: 'none', border: 'none', color: '#2563eb', cursor: 'pointer',
+                  textDecoration: 'underline', fontSize: 13, padding: 0 }}>
+                見積を表示
+              </button>
+            )}
           </div>
         )}
 

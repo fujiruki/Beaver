@@ -1,6 +1,6 @@
 # 引き継ぎ資料 — Beaver
 
-**最終更新**: 2026-03-19（Phase 7 設計完了・未実装）
+**最終更新**: 2026-06-23（R-065「引用して売上」実装完了）
 
 ---
 
@@ -30,6 +30,14 @@
 | Phase 5 | 集計区分マスター同期 + CostBreakdownPanel | ✅ 完了 |
 | Phase 6 | 伝票明細行 — 集計区分動的対応 + 入力画面刷新 | ✅ 完了 |
 | Phase 7 | AccessTategu連携（Beaver見積→Access取込） | 🔲 未着手（設計済み）|
+| R-065  | 「引用して売上」機能 | ✅ 完了（dev のみ）|
+
+**R-065 で実装したもの（2026-06-23, dev）:**
+- `api/migrations/017_vouchers_quoted_at.sql` — vouchers に `quoted_at DATE` カラム追加
+- `api/routes/vouchers.php` — convert-to-sales に `quoted_at` 付加 + 明細コピーを `source="beaver"/edited_in_beaver=1` に修正 + 見積詳細GET時に `converted_sales[]` 逆引きを付加
+- `frontend/src/types/voucher.ts` — `source_voucher_id`, `source_estimate_no`, `quoted_at`, `converted_sales` フィールドを Voucher 型に追加
+- `frontend/src/pages/VoucherEdit.tsx` — 「引用して売上」ボタン実装（void以外の見積で有効）、双方向トレースバナー追加
+- `frontend/src/pages/VoucherList.tsx` — 一覧に「引用」列追加（売上の引用元見積番号バッジ表示）
 
 **Phase 6 で実装したもの（commit: fe5052b）:**
 - `voucher_line_costs` / `voucher_line_prices` テーブル追加（008マイグレーション適用済み）

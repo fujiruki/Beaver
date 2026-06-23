@@ -1,0 +1,1 @@
+ALTER TABLE vouchers ADD COLUMN quoted_at DATE DEFAULT NULL;

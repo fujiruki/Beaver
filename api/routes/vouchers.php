@@ -358,6 +358,16 @@ switch ($method) {
             }
             unset($line);
             $row['lines'] = $lines;
+
+            // 双方向トレース: 見積の場合は引用先売上を逆引きして付加
+            if ($row['voucher_type'] === 'estimate') {
+                $csStmt = $pdo->prepare(
+                    'SELECT id, voucher_no, status, voucher_date, quoted_at FROM vouchers WHERE source_estimate_no = ? AND voucher_type = "sales" ORDER BY id'
+                );
+                $csStmt->execute([$row['voucher_no']]);
+                $row['converted_sales'] = $csStmt->fetchAll();
+            }
+
             echo json_encode($row);
         } else {
             $where = 'WHERE 1=1'; $params = [];
@@ -399,7 +409,7 @@ switch ($method) {
         break;
 
     case 'POST':
-        // ---- 見積→売上変換 ----
+        // ---- 見積→売上変換（引用して売上） ----
         if ($resourceId && $subAction === 'convert-to-sales') {
             $src = $pdo->prepare('SELECT * FROM vouchers WHERE id = ?');
             $src->execute([$resourceId]);
@@ -407,13 +417,17 @@ switch ($method) {
             if (!$orig || $orig['voucher_type'] !== 'estimate') {
                 http_response_code(400); echo json_encode(['error' => '見積伝票のみ変換可']); exit;
             }
+            $today = date('Y-m-d');
+            // nextVoucherNo は内部で独自トランザクションを完結させるため、外側 beginTransaction の前に呼ぶ
             $newNo = nextVoucherNo($pdo, 'sales');
+            try {
+            $pdo->beginTransaction();
             $pdo->prepare('
                 INSERT INTO vouchers
                     (voucher_no, voucher_type, status, project_id, customer_id,
                      voucher_date, delivery_date, tax_input_type, consumption_tax_type,
                      cutoff_date, billing_date, override_billing_date,
-                     source_voucher_id, source_estimate_no,
+                     source_voucher_id, source_estimate_no, quoted_at,
                      print_date_flag, print_tax_excl_flag, print_company_seal,
                      trade_type, profit_rate, memo, description,
                      subtotal_taxable, subtotal_nontaxable, subtotal_discount, tax_amount, total_amount)
@@ -421,7 +435,7 @@ switch ($method) {
                     (:voucher_no, "sales", "draft", :project_id, :customer_id,
                      :voucher_date, :delivery_date, :tax_input_type, :consumption_tax_type,
                      :cutoff_date, :billing_date, :override_billing_date,
-                     :source_voucher_id, :source_estimate_no,
+                     :source_voucher_id, :source_estimate_no, :quoted_at,
                      :print_date_flag, :print_tax_excl_flag, :print_company_seal,
                      :trade_type, :profit_rate, :memo, :description,
                      :subtotal_taxable, :subtotal_nontaxable, :subtotal_discount, :tax_amount, :total_amount)
@@ -429,7 +443,7 @@ switch ($method) {
                 ':voucher_no'           => $newNo,
                 ':project_id'           => $orig['project_id'],
                 ':customer_id'          => $orig['customer_id'],
-                ':voucher_date'         => date('Y-m-d'),
+                ':voucher_date'         => $today,
                 ':delivery_date'        => $orig['delivery_date'],
                 ':tax_input_type'       => $orig['tax_input_type'],
                 ':consumption_tax_type' => $orig['consumption_tax_type'],
@@ -438,6 +452,7 @@ switch ($method) {
                 ':override_billing_date'=> $orig['override_billing_date'],
                 ':source_voucher_id'    => $resourceId,
                 ':source_estimate_no'   => $orig['voucher_no'],
+                ':quoted_at'            => $today,
                 ':print_date_flag'      => $orig['print_date_flag'],
                 ':print_tax_excl_flag'  => $orig['print_tax_excl_flag'],
                 ':print_company_seal'   => $orig['print_company_seal'],
@@ -462,13 +477,13 @@ switch ($method) {
                          tategu_item_id, source_catalog_item_id, item_name, quantity,
                          cost_body, cost_hardware, cost_glass, cost_factory_hours, cost_site_hours, cost_labor_rate,
                          snapshot_loaded_at, price_body, price_hardware, price_glass, line_total,
-                         tax_category, memo)
+                         tax_category, memo, source, edited_in_beaver)
                     VALUES
                         (:voucher_id, :line_no, :line_type, :location_no, :location_name,
                          :tategu_item_id, :source_catalog_item_id, :item_name, :quantity,
                          :cost_body, :cost_hardware, :cost_glass, :cost_factory_hours, :cost_site_hours, :cost_labor_rate,
                          :snapshot_loaded_at, :price_body, :price_hardware, :price_glass, :line_total,
-                         :tax_category, :memo)
+                         :tax_category, :memo, "beaver", 1)
                 ')->execute([
                     ':voucher_id'             => $newId,
                     ':line_no'                => $line['line_no'],
@@ -509,10 +524,17 @@ switch ($method) {
                     saveLinePrices($pdo, $newLineId, $srcPrices);
                 }
             }
+            $pdo->commit();
             http_response_code(201);
             $s = $pdo->prepare('SELECT * FROM vouchers WHERE id = ?');
             $s->execute([$newId]);
             echo json_encode($s->fetch());
+            } catch (Throwable $e) {
+                if ($pdo->inTransaction()) { $pdo->rollBack(); }
+                error_log('[convert-to-sales] ' . $e->getMessage());
+                http_response_code(500);
+                echo json_encode(['error' => '変換処理に失敗しました']);
+            }
             break;
         }
 
