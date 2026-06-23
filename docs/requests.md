@@ -148,3 +148,10 @@ Phase 7（Access連携）完了後に着手。
 
 ### 関連
 - R-065 と同時調査した内税丸めバグ（A: 910 vs 909）は別途修正。本件はその派生。
+
+## 9. test_sync.php が全ケース500（既存破損）
+
+`api/tests/test_sync.php` が全アサーション 500。原因は `vouchers.consumption_tax_type` の NOT NULL 制約違反（`api/routes/sync_helpers.php:309`、テストDB由来）。
+
+- 2026-06-24 確認。内税修正(A)前のコミット `bfebca2` でも同一に失敗＝A修正とは無関係の既存破損。
+- 本番 `vouchers.consumption_tax_type` は DEFAULT '外税/伝票計' があるため本番実害なし。テスト/同期INSERT経路で `consumption_tax_type` を明示セットするか、テストDB初期化を見直す。
