@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Beaver 回帰スイート本体（ハードゲート）。exit 0=🔵青 / 非0=⚫黒。
+# git/未コミット判定は持たない（呼び出し側＝親ディスパッチャ or Beaver自己ゲートが担う）。
+# 自分の位置からプロジェクトルートを解決するので、どの CWD から呼ばれてもよい。
+set -uo pipefail
+
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"   # .../Beaver
+
+fail() { echo "$1" >&2; rm -f "$root"/api/tests/*.sqlite 2>/dev/null; exit 1; }
+
+# フロント: vitest
+( cd "$root/frontend" && npx vitest run --silent ) >/tmp/bv_vitest.log 2>&1 \
+  || fail "[vitest] $(tail -n 8 /tmp/bv_vitest.log)"
+
+# バックエンド: PHP テスト3本（いずれも失敗時 exit 1）
+php "$root/api/tests/test_sync.php"             >/tmp/bv_sync.log   2>&1 || fail "[test_sync] $(tail -n 8 /tmp/bv_sync.log)"
+php "$root/api/tests/test_recalc_inclusive.php" >/tmp/bv_recalc.log 2>&1 || fail "[test_recalc_inclusive] $(tail -n 8 /tmp/bv_recalc.log)"
+php "$root/api/tests/test_customers.php"         >/tmp/bv_cust.log  2>&1 || fail "[test_customers] $(tail -n 8 /tmp/bv_cust.log)"
+
+rm -f "$root"/api/tests/*.sqlite 2>/dev/null
+exit 0
