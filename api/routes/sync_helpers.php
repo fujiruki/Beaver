@@ -336,13 +336,11 @@ function syncVoucherUpsert(PDO $pdo, ?int $projectId): void {
             $voucherId = (int)$pdo->lastInsertId();
         }
 
-        // 明細行は AccessTategu 側スキーマと Beaver の voucher_lines の差異が大きいため、
-        // 今回の Step E スコープでは lines は INSERT 時のみ取り込み、UPDATE 時は触らない。
-        // R-034 (d): UPDATE 経路では voucher_lines を再構築しない。Access 側で発行後に
-        // 明細だけを変更した場合は Beaver には反映されない仕様（業務影響最小化を優先）。
-        // 反映が必要になったら DELETE → INSERT のフル置換に切り替える。
-        if (!$existing && !empty($data['lines']) && is_array($data['lines'])) {
-            $lineError = insertSyncedLines($pdo, $voucherId, $data['lines']);
+        // R-066(c) Phase1: payload に lines がある場合、当該伝票の voucher_lines が
+        // 0件のときのみ Access 明細を INSERT する（Beaver 編集済み明細を保護）。
+        // INSERT 経路（新規伝票）も UPDATE 経路（既存伝票）も同じ条件でガードする。
+        if (!empty($data['lines']) && is_array($data['lines'])) {
+            $lineError = insertSyncedLinesIfEmpty($pdo, $voucherId, $data['lines']);
             if ($lineError !== null) {
                 $pdo->rollBack();
                 respond(422, $lineError);
@@ -376,25 +374,44 @@ function syncVoucherUpsert(PDO $pdo, ?int $projectId): void {
 }
 
 /**
+ * R-066(c) Phase1: 当該 voucher_id の voucher_lines が 0 件のときのみ
+ * Access 明細を INSERT する。既に 1 件でも明細がある場合は何もしない（保護）。
+ * 戻り値は insertSyncedLines と同じ: 不正値があれば配列、正常系は null。
+ */
+function insertSyncedLinesIfEmpty(PDO $pdo, int $voucherId, array $lines): ?array {
+    $countStmt = $pdo->prepare('SELECT COUNT(*) FROM voucher_lines WHERE voucher_id = ?');
+    $countStmt->execute([$voucherId]);
+    if ((int)$countStmt->fetchColumn() > 0) {
+        return null;
+    }
+    return insertSyncedLines($pdo, $voucherId, $lines);
+}
+
+/**
  * lines を最小フィールドで INSERT する。
- * AccessTategu からの行は item_name / quantity / line_total を最低限持つ想定。
+ * R-066(c): source / access_line_id / edited_in_beaver / price_body /
+ *           price_hardware / price_glass を追加。
  *
  * R-034 (c): line_type / tax_category / quantity / line_total を厳格に検証。
  * 不正値が見つかった場合は INSERT を中断し、422 のレスポンスボディ用配列を返す。
  * 正常系（不正なし）は null を返す。
  */
 function insertSyncedLines(PDO $pdo, int $voucherId, array $lines): ?array {
-    // schema.sql: line_type は normal / discount / subtotal、tax_category は '課税' を既定。
-    // Access 側からの push では subtotal は来ない想定だが、スキーマ準拠で許容する。
     $allowedLineTypes    = ['normal', 'discount', 'subtotal'];
     $allowedTaxCategories = ['課税', '非課税'];
 
     $lineNo = 1;
     $ins = $pdo->prepare('
         INSERT INTO voucher_lines
-            (voucher_id, line_no, line_type, item_name, quantity, line_total, tax_category, memo)
+            (voucher_id, line_no, line_type, item_name, quantity,
+             price_body, price_hardware, price_glass,
+             line_total, tax_category, memo,
+             source, access_line_id, edited_in_beaver)
         VALUES
-            (:voucher_id, :line_no, :line_type, :item_name, :quantity, :line_total, :tax_category, :memo)
+            (:voucher_id, :line_no, :line_type, :item_name, :quantity,
+             :price_body, :price_hardware, :price_glass,
+             :line_total, :tax_category, :memo,
+             :source, :access_line_id, 0)
     ');
     foreach ($lines as $line) {
         if (!is_array($line)) continue;
@@ -450,14 +467,19 @@ function insertSyncedLines(PDO $pdo, int $voucherId, array $lines): ?array {
         $lineTotal = (float)$lineTotalRaw;
 
         $ins->execute([
-            ':voucher_id'   => $voucherId,
-            ':line_no'      => $lineNo,
-            ':line_type'    => $lineType,
-            ':item_name'    => $line['item_name'] ?? null,
-            ':quantity'     => $quantity,
-            ':line_total'   => $lineTotal,
-            ':tax_category' => $taxCategory,
-            ':memo'         => $line['memo'] ?? null,
+            ':voucher_id'    => $voucherId,
+            ':line_no'       => isset($line['line_no']) ? (int)$line['line_no'] : $lineNo,
+            ':line_type'     => $lineType,
+            ':item_name'     => $line['item_name'] ?? null,
+            ':quantity'      => $quantity,
+            ':price_body'    => isset($line['price_body'])     ? (float)$line['price_body']     : 0.0,
+            ':price_hardware' => isset($line['price_hardware']) ? (float)$line['price_hardware'] : 0.0,
+            ':price_glass'   => isset($line['price_glass'])    ? (float)$line['price_glass']    : 0.0,
+            ':line_total'    => $lineTotal,
+            ':tax_category'  => $taxCategory,
+            ':memo'          => $line['memo'] ?? null,
+            ':source'        => 'access',
+            ':access_line_id' => isset($line['access_line_id']) ? (int)$line['access_line_id'] : null,
         ]);
         $lineNo++;
     }
