@@ -221,6 +221,8 @@ function syncVoucherUpsert(PDO $pdo, ?int $projectId): void {
     $description     = $data['description'] ?? null;
 
     // R-066(a): 未同期フィールドを受信して保存する。
+    // NOT NULL 列も未送信時は null のままにし、INSERT/UPDATE の SQL 側で既定値補完・既存値保持を行う。
+    // （変数を DEFAULT 値で埋めると再同期時に既存値を上書きしてしまうため）
     $tradeType          = isset($data['trade_type'])           ? (string)$data['trade_type']           : null;
     $consumptionTaxType = isset($data['consumption_tax_type']) ? (string)$data['consumption_tax_type'] : null;
     $printDateFlag      = isset($data['print_date_flag'])      ? ($data['print_date_flag'] ? 1 : 0)    : null;
@@ -274,8 +276,10 @@ function syncVoucherUpsert(PDO $pdo, ?int $projectId): void {
                 (:voucher_no, :voucher_type, :status, :project_id, :customer_id,
                  :voucher_date, :total_amount, :access_voucher_id, :access_voucher_no,
                  :memo, :description,
-                 :trade_type, :consumption_tax_type,
-                 :print_date_flag, :print_tax_excl_flag, :print_company_seal,
+                 :trade_type,
+                 -- NOT NULL 列: fresh INSERT で未送信(null)ならスキーマ既定値を補完する。
+                 COALESCE(:consumption_tax_type, ' . "'外税/伝票計'" . '),
+                 COALESCE(:print_date_flag, 1), COALESCE(:print_tax_excl_flag, 0), COALESCE(:print_company_seal, 0),
                  :sales_category_id, :delivery_date, :billing_date, :source_estimate_no,
                  :validity_period)
             ON CONFLICT(access_voucher_id) DO UPDATE SET
@@ -296,10 +300,13 @@ function syncVoucherUpsert(PDO $pdo, ?int $projectId): void {
                 memo                = excluded.memo,
                 description         = excluded.description,
                 trade_type          = COALESCE(excluded.trade_type, trade_type),
-                consumption_tax_type = COALESCE(excluded.consumption_tax_type, consumption_tax_type),
-                print_date_flag     = COALESCE(excluded.print_date_flag, print_date_flag),
-                print_tax_excl_flag = COALESCE(excluded.print_tax_excl_flag, print_tax_excl_flag),
-                print_company_seal  = COALESCE(excluded.print_company_seal, print_company_seal),
+                -- R-066 回帰対応: NOT NULL 列は excluded(=VALUES句で既定値補完済み)ではなく
+                --   生バインド :x を参照する。再同期で未送信(null)なら既存値を保持し、
+                --   送信ありなら新しい値で更新する。VALUES句の COALESCE は fresh INSERT 専用。
+                consumption_tax_type = COALESCE(:consumption_tax_type, consumption_tax_type),
+                print_date_flag     = COALESCE(:print_date_flag, print_date_flag),
+                print_tax_excl_flag = COALESCE(:print_tax_excl_flag, print_tax_excl_flag),
+                print_company_seal  = COALESCE(:print_company_seal, print_company_seal),
                 sales_category_id   = COALESCE(excluded.sales_category_id, sales_category_id),
                 delivery_date       = COALESCE(excluded.delivery_date, delivery_date),
                 billing_date        = COALESCE(excluded.billing_date, billing_date),
@@ -561,6 +568,8 @@ function syncVoucherUpdate(PDO $pdo, int $projectId, string $accessVoucherNo): v
     $target = $stmt->fetch();
 
     // R-066(a): 未同期フィールドをここで受信して保存する（syncVoucherUpsert と同様）。
+    // NOT NULL 列も未送信時は null のままにし、UPDATE 分岐の null ガードで既存値を保持、
+    // else（fresh INSERT）分岐の VALUES 句で既定値補完を行う。
     $tradeType          = isset($data['trade_type'])           ? (string)$data['trade_type']           : null;
     $consumptionTaxType = isset($data['consumption_tax_type']) ? (string)$data['consumption_tax_type'] : null;
     $printDateFlag      = isset($data['print_date_flag'])      ? ($data['print_date_flag'] ? 1 : 0)    : null;
@@ -648,8 +657,10 @@ function syncVoucherUpdate(PDO $pdo, int $projectId, string $accessVoucherNo): v
                     (:voucher_no, :voucher_type, :status, :project_id, :customer_id,
                      :voucher_date, :total_amount, :access_voucher_no, :access_voucher_id,
                      :memo, :description,
-                     :trade_type, :consumption_tax_type,
-                     :print_date_flag, :print_tax_excl_flag, :print_company_seal,
+                     :trade_type,
+                     -- NOT NULL 列: fresh INSERT で未送信(null)ならスキーマ既定値を補完する。
+                     COALESCE(:consumption_tax_type, ' . "'外税/伝票計'" . '),
+                     COALESCE(:print_date_flag, 1), COALESCE(:print_tax_excl_flag, 0), COALESCE(:print_company_seal, 0),
                      :sales_category_id, :delivery_date, :billing_date, :source_estimate_no,
                      :validity_period)
             ')->execute([

@@ -727,6 +727,75 @@ runTest('R-055-2: voucher_update で登録済 access_voucher_no を送ると UPD
 });
 
 // ============================================================
+// R-066 回帰: 再同期で未送信フィールド（consumption_tax_type 等）が既存値を保持すること
+// ============================================================
+echo "
+=== R-066 回帰 再同期で未送信の NOT NULL フィールドが既存値を保持する ===
+";
+
+runTest('R-066-保持-update: syncVoucherUpdate の UPDATE 経路で未送信フィールドが既存値を保持する', function () use (&$pdo, $projectId) {
+    // 非DEFAULT値で既存伝票を直接用意（consumption_tax_type='内税/明細計', print_company_seal=1）
+    $pdo->exec("INSERT INTO vouchers
+        (voucher_no, voucher_type, status, project_id,
+         voucher_date, total_amount, access_voucher_no, access_voucher_id,
+         consumption_tax_type, print_date_flag, print_tax_excl_flag, print_company_seal)
+        VALUES
+        ('AC-HOLD-001', 'sales', 'approved', $projectId,
+         '2026-06-01', 50000, 'AC-HOLD-001', 8801,
+         '内税/明細計', 0, 1, 1)");
+
+    // consumption_tax_type / print_company_seal 等を送らずに voucher_update を push
+    $r = runHelperCase('syncVoucherUpdate', ['project_id' => $projectId, 'voucher_no' => 'AC-HOLD-001'], [
+        'voucher_type'       => 'sales',
+        'customer_access_no' => '100',
+        'voucher_date'       => '2026-06-15',
+        'total_amount'       => 99000,
+    ]);
+    assertEq(200, $r['code'], 'http code: 登録済は 200 OK', ['stderr' => $r['stderr'] ?? '', 'body' => $r['body'] ?? null]);
+    // 送った値は更新される
+    assertEq(99000.0, (float)$r['body']['total_amount'], 'total_amount が更新されている');
+    // 送っていない NOT NULL フィールドは既存値が保持される
+    assertEq('内税/明細計', $r['body']['consumption_tax_type'], 'consumption_tax_type が既存値を保持');
+    assertEq('1', (string)$r['body']['print_company_seal'], 'print_company_seal が既存値を保持');
+    assertEq('0', (string)$r['body']['print_date_flag'], 'print_date_flag が既存値を保持');
+    assertEq('1', (string)$r['body']['print_tax_excl_flag'], 'print_tax_excl_flag が既存値を保持');
+    // DB でも確認
+    $row = $pdo->query("SELECT * FROM vouchers WHERE access_voucher_no = 'AC-HOLD-001'")->fetch();
+    assertEq('内税/明細計', $row['consumption_tax_type'], 'DB: consumption_tax_type 保持');
+    assertEq('1', (string)$row['print_company_seal'], 'DB: print_company_seal 保持');
+});
+
+runTest('R-066-保持-upsert: syncVoucherUpsert の ON CONFLICT 経路で未送信フィールドが既存値を保持する', function () use (&$pdo) {
+    // 非DEFAULT値で既存伝票を直接用意
+    $pdo->exec("INSERT INTO vouchers
+        (voucher_no, voucher_type, status,
+         voucher_date, total_amount, access_voucher_no, access_voucher_id,
+         consumption_tax_type, print_date_flag, print_tax_excl_flag, print_company_seal)
+        VALUES
+        ('AC-HOLD-002', 'estimate', 'approved',
+         '2026-06-01', 30000, 'AC-HOLD-002', 8802,
+         '内税/明細計', 0, 1, 1)");
+
+    // consumption_tax_type 等を送らずに再 upsert（同一 access_voucher_id で CONFLICT）
+    $r = runHelperCase('syncVoucherUpsert', null, [
+        'access_voucher_id'  => 8802,
+        'voucher_type'       => 'estimate',
+        'customer_access_no' => '',
+        'voucher_date'       => '2026-06-20',
+        'total_amount'       => 45000,
+    ]);
+    assertEq(200, $r['code'], 'http code: upsert は 200 OK', ['stderr' => $r['stderr'] ?? '', 'body' => $r['body'] ?? null]);
+    // 送った値は更新される
+    $row = $pdo->query("SELECT * FROM vouchers WHERE access_voucher_id = 8802")->fetch();
+    assertEq(45000.0, (float)$row['total_amount'], 'total_amount が更新されている');
+    // 送っていない NOT NULL フィールドは既存値が保持される
+    assertEq('内税/明細計', $row['consumption_tax_type'], 'DB: consumption_tax_type 保持');
+    assertEq('1', (string)$row['print_company_seal'], 'DB: print_company_seal 保持');
+    assertEq('0', (string)$row['print_date_flag'], 'DB: print_date_flag 保持');
+    assertEq('1', (string)$row['print_tax_excl_flag'], 'DB: print_tax_excl_flag 保持');
+});
+
+// ============================================================
 // 結果サマリ
 // ============================================================
 echo "\n========================================\n";

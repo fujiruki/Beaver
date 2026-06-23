@@ -74,7 +74,9 @@ R-025 完了後・実運用で問題顕在化したら着手。
 
 ---
 
-## 5. R-036: frontend ビルドエラー（型エラー）
+## 5. ~~R-036: frontend ビルドエラー（型エラー）~~ ✅ 解決済み（2026-06-24）
+
+`AppSettings.tsx:156` は `as unknown as Record<string, string>` キャストで解消済み。`tsc -b` exit=0、R-065/A修正のデプロイ時に `npm run build`（tsc込み）成功で確認。
 
 R-025 デプロイ作業中に発覚（2026-06-07）。`npm run build` (`tsc -b && vite build`) で型エラー:
 
@@ -149,9 +151,9 @@ Phase 7（Access連携）完了後に着手。
 ### 関連
 - R-065 と同時調査した内税丸めバグ（A: 910 vs 909）は別途修正。本件はその派生。
 
-## 9. test_sync.php が全ケース500（既存破損）
+## 9. ~~test_sync.php が全ケース500（既存破損）~~ ✅ 解決済み（2026-06-24）
 
-`api/tests/test_sync.php` が全アサーション 500。原因は `vouchers.consumption_tax_type` の NOT NULL 制約違反（`api/routes/sync_helpers.php:309`、テストDB由来）。
+`api/tests/test_sync.php` が全アサーション500（`vouchers.consumption_tax_type` 等 NOT NULL列への明示NULLバインド）。
 
-- 2026-06-24 確認。内税修正(A)前のコミット `bfebca2` でも同一に失敗＝A修正とは無関係の既存破損。
-- 本番 `vouchers.consumption_tax_type` は DEFAULT '外税/伝票計' があるため本番実害なし。テスト/同期INSERT経路で `consumption_tax_type` を明示セットするか、テストDB初期化を見直す。
+- 修正: `sync_helpers.php` で変数はnull維持、INSERTのVALUES句で `COALESCE(:x, 既定値)`、upsertのDO UPDATEは生バインド `:x` 参照（`COALESCE(:x, x)`）に分離。再同期で未送信列が既存値を保持するよう設計。
+- 初回修正で「再同期時に既存値をDEFAULTで上書き」する**本番データ破壊の回帰**を一度混入→指揮役が実コード精査で検出→回帰テスト2件(R-066-保持)を赤→緑で固定。test_sync 28/0。
