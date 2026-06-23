@@ -138,6 +138,7 @@ export default function VoucherList() {
                 <Th>ステータス</Th>
                 <Th>得意先</Th>
                 <Th>案件</Th>
+                <Th>摘要</Th>
                 <Th>伝票日付</Th>
                 <Th right>合計金額</Th>
               </tr>
@@ -145,7 +146,7 @@ export default function VoucherList() {
             <tbody>
               {vouchers.length === 0 ? (
                 <tr>
-                  <td colSpan={7} style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>
+                  <td colSpan={8} style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>
                     伝票がありません
                   </td>
                 </tr>
@@ -166,6 +167,7 @@ export default function VoucherList() {
                     </Td>
                     <Td>{v.customer_name ?? '-'}</Td>
                     <Td>{v.project_name ?? '-'}</Td>
+                    <Td>{v.description ?? '-'}</Td>
                     <Td>{v.voucher_date}</Td>
                     <Td right>¥{v.total_amount.toLocaleString()}</Td>
                   </tr>

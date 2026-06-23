@@ -25,6 +25,7 @@ export interface Voucher {
   consumption_tax_type: string;
   override_billing_date: string | null;
   profit_rate: number;
+  description: string | null;
   memo: string | null;
   subtotal_taxable: number;
   tax_amount: number;
