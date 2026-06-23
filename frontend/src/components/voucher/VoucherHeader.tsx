@@ -21,6 +21,7 @@ const STATUS_OPTIONS = [
 export default function VoucherHeader({ customers, projects, readOnly = false }: Props) {
   const { register, watch, setValue, formState: { errors } } = useFormContext<VoucherFormValues>();
   const taxInputType = watch('tax_input_type');
+  const voucherType = watch('voucher_type');
   const { data: salesCategories = [] } = useSalesCategories();
 
   return (
@@ -84,9 +85,9 @@ export default function VoucherHeader({ customers, projects, readOnly = false }:
         </Field>
       </div>
 
-      {/* 行2: 摘要 / 売上種別 / 納期 / 税入力切替 */}
+      {/* 行2: 摘要 / 売上種別 / 納期 / 有効期限(見積のみ) / 税入力切替 */}
       <div style={{
-        display: 'grid', gridTemplateColumns: '3fr 1fr 1fr auto',
+        display: 'grid', gridTemplateColumns: voucherType === 'estimate' ? '3fr 1fr 1fr 1fr auto' : '3fr 1fr 1fr auto',
         gap: 12, padding: '12px 16px', alignItems: 'end',
       }}>
         <Field label="摘要">
@@ -115,6 +116,17 @@ export default function VoucherHeader({ customers, projects, readOnly = false }:
             disabled={readOnly}
           />
         </Field>
+
+        {voucherType === 'estimate' && (
+          <Field label="有効期限">
+            <input
+              {...register('validity_period')}
+              placeholder="例: 見積後30日間"
+              style={inpStyle}
+              disabled={readOnly}
+            />
+          </Field>
+        )}
 
         {/* 税込/税抜 トグル */}
         <div>

@@ -241,6 +241,10 @@ function syncVoucherUpsert(PDO $pdo, ?int $projectId): void {
     $sourceEstimateNo   = ($voucherType === 'sales' && isset($data['source_estimate_no']))
         ? (string)$data['source_estimate_no']
         : null;
+    // R-066(b): 有効期限は見積のみ。売上には存在しない。
+    $validityPeriod     = ($voucherType === 'estimate' && isset($data['validity_period']))
+        ? (string)$data['validity_period']
+        : null;
 
     $pdo->beginTransaction();
     try {
@@ -264,14 +268,16 @@ function syncVoucherUpsert(PDO $pdo, ?int $projectId): void {
                  memo, description,
                  trade_type, consumption_tax_type,
                  print_date_flag, print_tax_excl_flag, print_company_seal,
-                 sales_category_id, delivery_date, billing_date, source_estimate_no)
+                 sales_category_id, delivery_date, billing_date, source_estimate_no,
+                 validity_period)
             VALUES
                 (:voucher_no, :voucher_type, :status, :project_id, :customer_id,
                  :voucher_date, :total_amount, :access_voucher_id, :access_voucher_no,
                  :memo, :description,
                  :trade_type, :consumption_tax_type,
                  :print_date_flag, :print_tax_excl_flag, :print_company_seal,
-                 :sales_category_id, :delivery_date, :billing_date, :source_estimate_no)
+                 :sales_category_id, :delivery_date, :billing_date, :source_estimate_no,
+                 :validity_period)
             ON CONFLICT(access_voucher_id) DO UPDATE SET
                 voucher_type        = excluded.voucher_type,
                 status              = excluded.status,
@@ -298,6 +304,7 @@ function syncVoucherUpsert(PDO $pdo, ?int $projectId): void {
                 delivery_date       = COALESCE(excluded.delivery_date, delivery_date),
                 billing_date        = COALESCE(excluded.billing_date, billing_date),
                 source_estimate_no  = COALESCE(excluded.source_estimate_no, source_estimate_no),
+                validity_period     = COALESCE(excluded.validity_period, validity_period),
                 updated_at          = CURRENT_TIMESTAMP
         ')->execute([
             ':voucher_no'          => $voucherNo,
@@ -320,6 +327,7 @@ function syncVoucherUpsert(PDO $pdo, ?int $projectId): void {
             ':delivery_date'       => $deliveryDate,
             ':billing_date'        => $billingDate,
             ':source_estimate_no'  => $sourceEstimateNo,
+            ':validity_period'     => $validityPeriod,
         ]);
 
         if ($existing) {
@@ -548,6 +556,10 @@ function syncVoucherUpdate(PDO $pdo, int $projectId, string $accessVoucherNo): v
     $sourceEstimateNo   = ($voucherType === 'sales' && isset($data['source_estimate_no']))
         ? (string)$data['source_estimate_no']
         : null;
+    // R-066(b): 有効期限は見積のみ。売上には存在しない。
+    $validityPeriodUpd  = ($voucherType === 'estimate' && isset($data['validity_period']))
+        ? (string)$data['validity_period']
+        : null;
 
     try {
         if ($target) {
@@ -574,6 +586,7 @@ function syncVoucherUpdate(PDO $pdo, int $projectId, string $accessVoucherNo): v
             if ($deliveryDate !== null)    { $sets[] = 'delivery_date = :delivery_date';    $params[':delivery_date']       = $deliveryDate; }
             if ($billingDateUpd !== null)  { $sets[] = 'billing_date = :billing_date';      $params[':billing_date']        = $billingDateUpd; }
             if ($sourceEstimateNo !== null) { $sets[] = 'source_estimate_no = :source_estimate_no'; $params[':source_estimate_no'] = $sourceEstimateNo; }
+            if ($validityPeriodUpd !== null) { $sets[] = 'validity_period = :validity_period'; $params[':validity_period'] = $validityPeriodUpd; }
             $sets[] = 'project_id = :project_id';
             $params[':project_id'] = $projectId;
             $sets[] = 'updated_at = CURRENT_TIMESTAMP';
@@ -607,14 +620,16 @@ function syncVoucherUpdate(PDO $pdo, int $projectId, string $accessVoucherNo): v
                      memo, description,
                      trade_type, consumption_tax_type,
                      print_date_flag, print_tax_excl_flag, print_company_seal,
-                     sales_category_id, delivery_date, billing_date, source_estimate_no)
+                     sales_category_id, delivery_date, billing_date, source_estimate_no,
+                     validity_period)
                 VALUES
                     (:voucher_no, :voucher_type, :status, :project_id, :customer_id,
                      :voucher_date, :total_amount, :access_voucher_no, :access_voucher_id,
                      :memo, :description,
                      :trade_type, :consumption_tax_type,
                      :print_date_flag, :print_tax_excl_flag, :print_company_seal,
-                     :sales_category_id, :delivery_date, :billing_date, :source_estimate_no)
+                     :sales_category_id, :delivery_date, :billing_date, :source_estimate_no,
+                     :validity_period)
             ')->execute([
                 ':voucher_no'           => $insertVoucherNo,
                 ':voucher_type'         => $insertType,
@@ -636,6 +651,7 @@ function syncVoucherUpdate(PDO $pdo, int $projectId, string $accessVoucherNo): v
                 ':delivery_date'        => $deliveryDate,
                 ':billing_date'         => $billingDateUpd,
                 ':source_estimate_no'   => $sourceEstimateNo,
+                ':validity_period'      => $validityPeriodUpd,
             ]);
             $voucherId = (int)$pdo->lastInsertId();
 

@@ -601,13 +601,15 @@ switch ($method) {
                  voucher_date, delivery_date, tax_input_type, consumption_tax_type,
                  cutoff_date, billing_date, override_billing_date,
                  trade_type, profit_rate, memo, description,
-                 print_date_flag, print_tax_excl_flag, print_company_seal)
+                 print_date_flag, print_tax_excl_flag, print_company_seal,
+                 validity_period)
             VALUES
                 (:voucher_no, :voucher_type, "draft", :project_id, :customer_id,
                  :voucher_date, :delivery_date, :tax_input_type, :consumption_tax_type,
                  :cutoff_date, :billing_date, :override_billing_date,
                  :trade_type, :profit_rate, :memo, :description,
-                 :print_date_flag, :print_tax_excl_flag, :print_company_seal)
+                 :print_date_flag, :print_tax_excl_flag, :print_company_seal,
+                 :validity_period)
         ');
         $stmt->execute([
             ':voucher_no'           => $no,
@@ -628,6 +630,7 @@ switch ($method) {
             ':print_date_flag'      => $data['print_date_flag'] ?? 1,
             ':print_tax_excl_flag'  => $data['print_tax_excl_flag'] ?? 0,
             ':print_company_seal'   => $data['print_company_seal'] ?? 0,
+            ':validity_period'      => $data['validity_period'] ?? null,
         ]);
         $id = (int)$pdo->lastInsertId();
         http_response_code(201);
@@ -676,7 +679,8 @@ switch ($method) {
         $fields = ['status','project_id','customer_id','voucher_date','delivery_date',
                    'tax_input_type','consumption_tax_type','cutoff_date','billing_date','override_billing_date',
                    'trade_type','profit_rate','memo','description',
-                   'print_date_flag','print_tax_excl_flag','print_company_seal'];
+                   'print_date_flag','print_tax_excl_flag','print_company_seal',
+                   'validity_period'];
         $sets = []; $params = [];
         foreach ($fields as $f) {
             if (array_key_exists($f, $data)) { $sets[] = "$f = :$f"; $params[":$f"] = $data[$f]; }

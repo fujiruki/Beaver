@@ -27,6 +27,7 @@ export interface Voucher {
   profit_rate: number;
   description: string | null;
   memo: string | null;
+  validity_period?: string | null;
   subtotal_taxable: number;
   tax_amount: number;
   total_amount: number;

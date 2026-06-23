@@ -29,6 +29,7 @@ export type VoucherFormValues = {
   profit_rate: number;
   memo: string | null;
   sales_category_id: number | null;
+  validity_period: string | null;
   lines: LineFormValues[];
 };
 
@@ -103,6 +104,7 @@ const defaultValues: VoucherFormValues = {
   profit_rate: 0.3,
   memo: null,
   sales_category_id: null,
+  validity_period: null,
   lines: [{ ...defaultLine }],
 };
 
@@ -160,6 +162,7 @@ export default function VoucherEdit() {
         profit_rate: voucher.profit_rate,
         memo: voucher.memo,
         sales_category_id: (voucher as any).sales_category_id ?? null,
+        validity_period: voucher.validity_period ?? null,
         lines: voucher.lines.map(l => ({
           id: l.id,
           line_no: l.line_no,
@@ -230,6 +233,7 @@ export default function VoucherEdit() {
       profit_rate: data.profit_rate,
       memo: data.memo,
       sales_category_id: data.sales_category_id,
+      validity_period: data.validity_period,
     };
     if (isNew) {
       const created = await createMutation.mutateAsync(header);
