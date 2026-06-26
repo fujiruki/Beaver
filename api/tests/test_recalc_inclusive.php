@@ -67,10 +67,9 @@ function recalcVoucherTest(PDO $pdo, int $voucherId): void {
     }
 
     if ($v['tax_input_type'] === 'inclusive') {
-        $netTaxableInclusive = $taxable - $discount;
-        $taxAmount           = (int)floor($netTaxableInclusive * $taxRate / (1 + $taxRate));
-        $subtotalTaxable     = $netTaxableInclusive - $taxAmount;
-        $total               = $netTaxableInclusive + $nontaxable;
+        $taxAmount       = (int)floor($taxable * $taxRate / (1 + $taxRate));
+        $subtotalTaxable = $taxable - $taxAmount;
+        $total           = $taxable + $nontaxable - $discount;
         $pdo->prepare('
             UPDATE vouchers SET
                 subtotal_taxable = ?, subtotal_nontaxable = ?, subtotal_discount = ?,
@@ -204,16 +203,16 @@ runTest('T-04: 税込100000 → tax=9090, subtotal_taxable=90910, total=100000',
     assertEq(100000, (int)$v['total_amount'], 'total_amount');
 });
 
-// T-05: 割引あり 課税行110000 - 割引5500 = 課税ネット104500 → tax=floor(104500*10/110)=9500, taxable=95000, total=104500
-runTest('T-05: 割引あり 税込110000-5500 → tax=9500, taxable=95000, total=104500', function () use ($pdo) {
+// T-05: 割引あり（正本=割引前の税込課税110000に課税、値引は合計でのみ減算）
+//   tax=floor(110000*10/110)=10000, taxable=100000, total=110000-5500=104500
+runTest('T-05: 割引あり 税込110000-5500 → tax=10000, taxable=100000, total=104500', function () use ($pdo) {
     $id = createTestVoucher($pdo, 'inclusive');
     addLine($pdo, $id, 'normal',   110000.0, '課税');
     addLine($pdo, $id, 'discount',   5500.0, '課税');
     recalcVoucherTest($pdo, $id);
     $v = fetchVoucher($pdo, $id);
-    // floor(104500 * 10 / 110) = floor(9500.0) = 9500
-    assertEq(9500, (int)$v['tax_amount'], 'tax_amount');
-    assertEq(95000, (int)$v['subtotal_taxable'], 'subtotal_taxable');
+    assertEq(10000, (int)$v['tax_amount'], 'tax_amount');
+    assertEq(100000, (int)$v['subtotal_taxable'], 'subtotal_taxable');
     assertEq(104500, (int)$v['total_amount'], 'total_amount');
 });
 
@@ -226,6 +225,18 @@ runTest('T-06: exclusive 分岐回帰防止 → tax=10000, total=110000', functi
     assertEq(10000, (int)$v['tax_amount'], 'tax_amount');
     assertEq(100000, (int)$v['subtotal_taxable'], 'subtotal_taxable');
     assertEq(110000, (int)$v['total_amount'], 'total_amount');
+});
+
+// T-07: exclusive 割引あり（正本=割引前100000に課税、値引は合計でのみ減算）→ tax=10000, taxable=100000, total=100000
+runTest('T-07: exclusive 割引あり 課税100000-割引10000 → tax=10000, taxable=100000, total=100000', function () use ($pdo) {
+    $id = createTestVoucher($pdo, 'exclusive');
+    addLine($pdo, $id, 'normal',   100000.0, '課税');
+    addLine($pdo, $id, 'discount',  10000.0, '課税');
+    recalcVoucherTest($pdo, $id);
+    $v = fetchVoucher($pdo, $id);
+    assertEq(10000, (int)$v['tax_amount'], 'tax_amount');
+    assertEq(100000, (int)$v['subtotal_taxable'], 'subtotal_taxable');
+    assertEq(100000, (int)$v['total_amount'], 'total_amount');
 });
 
 echo "\n";

@@ -67,7 +67,7 @@ describe('calcVoucherTotal - 税抜入力 (exclusive)', () => {
     expect(result.total).toBe(50000);
   });
 
-  it('割引行 → totalから減算', () => {
+  it('割引 → 税は割引前課税に課し、値引は合計でのみ減算', () => {
     const result = calcVoucherTotal(
       [
         { line_type: 'normal', line_total: 100000, tax_category: 'taxable' },
@@ -76,9 +76,9 @@ describe('calcVoucherTotal - 税抜入力 (exclusive)', () => {
       'exclusive',
       0.10,
     );
-    expect(result.subtotal_taxable).toBe(90000);
-    expect(result.tax_amount).toBe(9000);
-    expect(result.total).toBe(99000);
+    expect(result.subtotal_taxable).toBe(100000);
+    expect(result.tax_amount).toBe(10000);
+    expect(result.total).toBe(100000);
   });
 
   it('消費税端数切り捨て（¥3,333 → tax=333）', () => {
@@ -125,6 +125,20 @@ describe('calcVoucherTotal - 税込入力 (inclusive)', () => {
     expect(result.subtotal_taxable).toBe(100010);
     expect(result.tax_amount).toBe(10000);
     expect(result.total).toBe(110010);
+  });
+
+  it('割引あり → 税は割引前の税込課税に課し、値引は合計でのみ減算', () => {
+    const result = calcVoucherTotal(
+      [
+        { line_type: 'normal', line_total: 110000, tax_category: 'taxable' },
+        { line_type: 'discount', line_total: 5500, tax_category: 'taxable' },
+      ],
+      'inclusive',
+      0.10,
+    );
+    expect(result.tax_amount).toBe(10000);
+    expect(result.subtotal_taxable).toBe(100000);
+    expect(result.total).toBe(104500);
   });
 
   it('税込10005 → tax=909, taxable=9096', () => {

@@ -81,12 +81,11 @@ export function calcVoucherTotal(
     const nonTaxable = normalLines
       .filter(l => l.tax_category !== 'taxable')
       .reduce((sum, l) => sum + (l.line_total || 0), 0);
-    const netTaxable = taxable - discountAmount;
-    const taxAmount = Math.floor(netTaxable * taxRate);
+    const taxAmount = Math.floor(taxable * taxRate);
     return {
-      subtotal_taxable: netTaxable,
+      subtotal_taxable: taxable,
       tax_amount: taxAmount,
-      total: netTaxable + taxAmount + nonTaxable,
+      total: taxable + taxAmount + nonTaxable - discountAmount,
     };
   } else {
     const taxableInclusive = normalLines
@@ -95,13 +94,12 @@ export function calcVoucherTotal(
     const nonTaxable = normalLines
       .filter(l => l.tax_category !== 'taxable')
       .reduce((sum, l) => sum + (l.line_total || 0), 0);
-    const netTaxableInclusive = taxableInclusive - discountAmount;
-    const taxAmount = Math.floor(netTaxableInclusive * taxRate / (1 + taxRate));
-    const taxableExclusive = netTaxableInclusive - taxAmount;
+    const taxAmount = Math.floor(taxableInclusive * taxRate / (1 + taxRate));
+    const taxableExclusive = taxableInclusive - taxAmount;
     return {
       subtotal_taxable: taxableExclusive,
       tax_amount: taxAmount,
-      total: netTaxableInclusive + nonTaxable,
+      total: taxableInclusive + nonTaxable - discountAmount,
     };
   }
 }

@@ -130,7 +130,7 @@ TateguDesignStudio（建具設計・積算ツール）で設計・積算した�
 ### 優先順位
 Phase 7（Access連携）完了後に着手。
 
-## 8. 割引明細の消費税ベース不一致（B）— 要仕様確認
+## 8. ~~割引明細の消費税ベース不一致（B）~~ ✅ 解決済み（2026-06-24）
 
 伝票合計計算で「割引を税の課税ベースから引くか」がフロントとバックエンドで食い違っている。
 
@@ -144,9 +144,11 @@ Phase 7（Access連携）完了後に着手。
 - Access同期伝票（本番5,777件中の割引付き887件）は `tax_amount=0` で `recalcVoucher` を通っておらず、Access値を保持＝**現状は無傷**。
 - Beaver内で新規作成・編集した伝票でのみ表面化する潜在バグ。
 
-### 確認すべき仕様
-- Access 正本の伝票単位の割引・消費税集計仕様（割引は税抜段階か税込段階か、課税ベースに含めるか）。`AccessTategu/src` の伝票/請求集計ロジックを調査。
-- 確定後、フロント・バックエンドを正本に一本化し、必要なら既存Beaver作成伝票を再計算。
+### 確定した正本（Access実コードで確認）→ 一本化済み
+- **税額は割引前の課税小計に課税、値引は合計でのみ減算**（外税: `floor(課税小計×税率)`／内税: `floor(課税小計税込×税率/(1+税率))`）。出典 `AccessTategu/src/forms/fsub売上.frm:2648`・`frm売上.frm:1600`。詳細 `AccessTategu/docs/wiki/knowledge/tax_calculation.md`。
+- ⇒ **BEが正・FEが誤**だった。FE `voucherCalc.ts`(exclusive/inclusive)と BE `vouchers.php`(inclusive; A修正で割引後にしていた分を是正)を正本へ一本化。exclusive BE は元から正。
+- 同期伝票（割引付き887件）は `recalcVoucher` 未通過(tax_amount=0)で無傷＝データ移行不要。Beaver内で作成・編集した伝票でのみ影響。
+- テスト: `frontend/.../voucherCalc.test.ts`（割引 exclusive/inclusive）、`api/tests/test_recalc_inclusive.php`（T-05改・T-07追加）。
 
 ### 関連
 - R-065 と同時調査した内税丸めバグ（A: 910 vs 909）は別途修正。本件はその派生。
