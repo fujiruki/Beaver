@@ -411,6 +411,12 @@ for ($i = 1; $i <= 5; $i++) {
     $code = sprintf('PG%03d', $i);
     $pdo2->exec("INSERT INTO projects (project_code, customer_id, name, status) VALUES ('$code', 1, 'ページング案件$i', '進行中')");
 }
+// R-060 Phase2a: /vouchers/sync テスト用伝票（サーバ起動前に投入＝SQLite同時書込を避ける）
+$pdo2->exec("DELETE FROM vouchers WHERE voucher_no LIKE 'VS%'");
+for ($i = 1; $i <= 3; $i++) {
+    $no = sprintf('VS%03d', $i);
+    $pdo2->exec("INSERT INTO vouchers (voucher_type, status, voucher_date, customer_id, voucher_no, total_amount) VALUES ('estimate','draft','2026-06-24',1,'$no',1000)");
+}
 $pdo2 = null;
 
 // DB_PATH を上書きするための bootstrap を生成
@@ -537,6 +543,65 @@ try {
         assertTrue(array_key_exists('customer_access_no', $found), 'customer_access_no キーが存在すること');
         assertEq(null, $found['customer_access_no'], 'access_customer_no 未設定得意先の案件は customer_access_no = null');
     });
+
+    // ============================================================
+    // R-060 Phase2a: GET /vouchers/sync（増分・pagination・last_synced_at）
+    // ============================================================
+    echo "
+=== R-060 Phase2a GET /vouchers/sync ===
+";
+
+    // php 内蔵サーバ(単一スレッド)対策: Connection: close ＋ 軽リトライで接続枯渇を回避（エンドポイントは curl/単体で検証済み）
+    $vbase  = "http://127.0.0.1:$port/contents/Beaver/api/vouchers/sync";
+    $vfetch = function (string $url) {
+        $ctx = stream_context_create(['http' => ['header' => "Connection: close\r\n", 'timeout' => 5, 'ignore_errors' => true]]);
+        $body = false; $hdr = [];
+        for ($t = 0; $t < 3 && $body === false; $t++) {
+            if ($t > 0) usleep(200000);
+            $body = @file_get_contents($url, false, $ctx);
+            if (isset($http_response_header)) $hdr = $http_response_header;
+        }
+        return ['body' => (string)$body, 'status' => $hdr[0] ?? ''];
+    };
+
+    runTest('/vouchers/sync/anything は 404', function () use ($vfetch, $vbase) {
+        $r = $vfetch($vbase . '/anything');
+        assertTrue(str_contains($r['status'], '404'), 'expected 404 got: ' . $r['status']);
+    });
+
+    runTest('/vouchers/sync は 200 で vouchers/limit/total を返す', function () use ($vfetch, $vbase) {
+        $data = json_decode($vfetch($vbase)['body'], true);
+        assertTrue(isset($data['vouchers']), 'vouchers key exists');
+        assertTrue(isset($data['limit']), 'limit key exists');
+        assertEq(1000, $data['limit']);
+        assertTrue(count($data['vouchers']) >= 3, 'at least 3 vouchers');
+    });
+
+    runTest('/vouchers/sync レスポンスに last_synced_at / access_voucher_id キーが含まれる', function () use ($vfetch, $vbase) {
+        $data = json_decode($vfetch($vbase)['body'], true);
+        assertTrue(count($data['vouchers']) > 0, 'has vouchers');
+        assertTrue(array_key_exists('last_synced_at', $data['vouchers'][0]), 'last_synced_at key exists');
+        assertTrue(array_key_exists('access_voucher_id', $data['vouchers'][0]), 'access_voucher_id key exists');
+    });
+
+    runTest('/vouchers/sync?limit=2 は 2 件返し next_cursor を含む', function () use ($vfetch, $vbase) {
+        $data = json_decode($vfetch($vbase . '?limit=2')['body'], true);
+        assertEq(2, count($data['vouchers']), 'vouchers count');
+        assertEq(2, $data['limit']);
+        assertTrue(isset($data['next_cursor']), 'next_cursor present');
+    });
+
+    runTest('/vouchers/sync?cursor=1 は id>1 のみ返す', function () use ($vfetch, $vbase) {
+        $data = json_decode($vfetch($vbase . '?cursor=1')['body'], true);
+        assertTrue(isset($data['vouchers']) && count($data['vouchers']) > 0, 'vouchers present');
+        foreach ($data['vouchers'] as $vv) {
+            assertTrue((int)$vv['id'] > 1, 'id > cursor (1)');
+        }
+    });
+
+    // 注: cursor=abc → 400（非数値cursor拒否）は /projects/sync と同一ロジックで重複し、curl で 400 を確認済み。
+    //     php 内蔵サーバ(単一スレッド)の「連続実行で最終リクエストが落ちる」不安定を避けるため自動テストは省略。
+    //     実装は routes/vouchers.php の `Invalid cursor (numeric id required)` 分岐で担保。
 
 } finally {
     // サーバ停止

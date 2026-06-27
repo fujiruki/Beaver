@@ -1,0 +1,1 @@
+ALTER TABLE vouchers ADD COLUMN last_synced_at DATETIME DEFAULT NULL;

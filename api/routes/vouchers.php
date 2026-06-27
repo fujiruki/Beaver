@@ -28,6 +28,91 @@ if ($method === 'POST' && isset($segments[1]) && $segments[1] === 'sync' && !$re
     exit;
 }
 
+// --- R-060 Phase2a: Beaver→Access 伝票同期用 軽量増分API ---
+// GET /vouchers/sync[?updated_after=ISO8601][&limit=N][&cursor=ID]
+// 完全一致チェック（/vouchers/sync/anything を全件返却で誤通過させない）
+if ($method === 'GET' && isset($segments[1]) && $segments[1] === 'sync' && isset($segments[2])) {
+    http_response_code(404);
+    echo json_encode(['error' => 'Not found', 'path' => $path]);
+    exit;
+}
+if ($method === 'GET' && isset($segments[1]) && $segments[1] === 'sync' && !isset($segments[2])) {
+    $updatedAfterRaw = $_GET['updated_after'] ?? null;
+    $updatedAfterSql = null;
+    if ($updatedAfterRaw !== null && $updatedAfterRaw !== '') {
+        $ts = strtotime($updatedAfterRaw);
+        if ($ts === false) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Invalid updated_after format']);
+            exit;
+        }
+        $updatedAfterSql = gmdate('Y-m-d H:i:s', $ts);
+    }
+
+    // pagination: デフォルト limit=1000、最大 5000、cursor は since_id 方式（id > cursor 昇順）
+    $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 1000;
+    if ($limit < 1)    $limit = 1000;
+    if ($limit > 5000) $limit = 5000;
+
+    $cursor = null;
+    if (isset($_GET['cursor']) && $_GET['cursor'] !== '') {
+        if (!is_numeric($_GET['cursor'])) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Invalid cursor (numeric id required)']);
+            exit;
+        }
+        $cursor = (int)$_GET['cursor'];
+    }
+
+    $sql = 'SELECT v.id, v.voucher_no, v.voucher_type, v.status, v.voucher_date,
+                   v.access_voucher_id, v.access_voucher_no, v.customer_id, v.project_id,
+                   v.total_amount, v.updated_at, v.last_synced_at
+            FROM vouchers v
+            WHERE 1=1';
+    $params = [];
+    if ($updatedAfterSql !== null) {
+        $sql .= ' AND v.updated_at > :updated_after';
+        $params[':updated_after'] = $updatedAfterSql;
+    }
+    if ($cursor !== null) {
+        $sql .= ' AND v.id > :cursor';
+        $params[':cursor'] = $cursor;
+    }
+    $sql .= ' ORDER BY v.id ASC LIMIT :limit_plus_one';
+    $params[':limit_plus_one'] = $limit + 1; // next_cursor 検出のため +1 件取得
+
+    $stmt = $pdo->prepare($sql);
+    foreach ($params as $k => $val) {
+        $type = ($k === ':limit_plus_one' || $k === ':cursor') ? PDO::PARAM_INT : PDO::PARAM_STR;
+        $stmt->bindValue($k, $val, $type);
+    }
+    $stmt->execute();
+    $rows = $stmt->fetchAll();
+
+    $nextCursor = null;
+    if (count($rows) > $limit) {
+        $rows = array_slice($rows, 0, $limit);
+        $lastRow = end($rows);
+        if (is_array($lastRow) && isset($lastRow['id'])) {
+            $nextCursor = (int)$lastRow['id'];
+        }
+        reset($rows);
+    }
+
+    $now = new DateTime('now', new DateTimeZone('Asia/Tokyo'));
+    $response = [
+        'synced_at' => $now->format('c'),
+        'vouchers'  => $rows,
+        'total'     => count($rows),
+        'limit'     => $limit,
+    ];
+    if ($nextCursor !== null) {
+        $response['next_cursor'] = $nextCursor;
+    }
+    echo json_encode($response);
+    exit;
+}
+
 // --- 伝票番号採番 ---
 function nextVoucherNo(PDO $pdo, string $type): string {
     $pdo->beginTransaction();

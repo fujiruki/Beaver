@@ -17,6 +17,7 @@
 015_vouchers_validity_period     2026-06-23  dev
 016_voucher_lines_sync_columns   2026-06-23  dev
 017_vouchers_quoted_at           2026-06-23  dev
+018_vouchers_last_synced_at      2026-06-24  dev
 006_tategu_cost_breakdown      2026-06-07  prod
 007_aggregation_category_master      2026-06-07  prod
 008_voucher_line_dynamic      2026-06-07  prod
