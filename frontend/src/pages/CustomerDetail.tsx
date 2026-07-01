@@ -80,7 +80,7 @@ export default function CustomerDetail() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit(onSubmit)} style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <form onSubmit={handleSubmit(onSubmit)} noValidate style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
         <Section title="基本情報">
           <div style={grid2}>
             <Field label="得意先コード" error={errors.code?.message}>
