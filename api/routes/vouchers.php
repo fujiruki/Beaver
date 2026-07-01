@@ -766,6 +766,10 @@ switch ($method) {
                 if (array_key_exists($f, $data)) { $sets[] = "$f = :$f"; $params[":$f"] = $data[$f]; }
             }
             if (!empty($sets)) {
+                // R-066(c) Phase2: Beaver 側でユーザーが明細を編集したことを示すフラグを立てる。
+                // Access 側は edited_in_beaver=1 の行を上書きせず保護するため、
+                // ここで自動セットしないと保護機構が機能しない（冪等: 既に1でも1のまま）。
+                $sets[] = 'edited_in_beaver = 1';
                 $params[':id'] = $subId;
                 $pdo->prepare('UPDATE voucher_lines SET ' . implode(', ', $sets) . ' WHERE id = :id')->execute($params);
                 if (array_key_exists('tategu_item_id', $data)) {
