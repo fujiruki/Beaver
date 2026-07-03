@@ -99,6 +99,34 @@ if ($method === 'GET' && isset($segments[1]) && $segments[1] === 'sync' && !isse
         reset($rows);
     }
 
+    // R-060 Phase2b/2c Stage2: 各伝票に明細行単位の状態（access_line_id/updated_at/edited_in_beaver等）を含める。
+    // 明細行競合の検知・解決は Access 側に一本化するため、Beaver は現状を正直に返すだけでよい（§7.4）。
+    $voucherIds = array_column($rows, 'id');
+    $linesByVoucherId = [];
+    if (!empty($voucherIds)) {
+        $placeholders = implode(',', array_fill(0, count($voucherIds), '?'));
+        $lineStmt = $pdo->prepare("
+            SELECT voucher_id, access_line_id, line_no, item_name, quantity,
+                   price_body, price_hardware, price_glass, line_total,
+                   tax_category, memo, updated_at, edited_in_beaver
+            FROM voucher_lines
+            WHERE voucher_id IN ($placeholders)
+            ORDER BY voucher_id ASC, line_no ASC
+        ");
+        $lineStmt->execute($voucherIds);
+        foreach ($lineStmt->fetchAll() as $lineRow) {
+            $vid = (int)$lineRow['voucher_id'];
+            unset($lineRow['voucher_id']);
+            $lineRow['access_line_id']   = $lineRow['access_line_id'] !== null ? (int)$lineRow['access_line_id'] : null;
+            $lineRow['edited_in_beaver'] = (int)$lineRow['edited_in_beaver'];
+            $linesByVoucherId[$vid][] = $lineRow;
+        }
+    }
+    foreach ($rows as &$row) {
+        $row['lines'] = $linesByVoucherId[(int)$row['id']] ?? [];
+    }
+    unset($row);
+
     $now = new DateTime('now', new DateTimeZone('Asia/Tokyo'));
     $response = [
         'synced_at' => $now->format('c'),
@@ -770,6 +798,8 @@ switch ($method) {
                 // Access 側は edited_in_beaver=1 の行を上書きせず保護するため、
                 // ここで自動セットしないと保護機構が機能しない（冪等: 既に1でも1のまま）。
                 $sets[] = 'edited_in_beaver = 1';
+                // R-060 Phase2b/2c Stage2: 行単位競合検知のため編集時刻を記録する。
+                $sets[] = 'updated_at = CURRENT_TIMESTAMP';
                 $params[':id'] = $subId;
                 $pdo->prepare('UPDATE voucher_lines SET ' . implode(', ', $sets) . ' WHERE id = :id')->execute($params);
                 if (array_key_exists('tategu_item_id', $data)) {

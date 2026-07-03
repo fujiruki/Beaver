@@ -433,7 +433,9 @@ $serverProc = proc_open(
         '-t', $ROOT,
         $ROOT . '/index.php',
     ],
-    [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+    // 標準出力/エラー出力を pipe のまま放置するとOSバッファが満杯になり
+    // サーバプロセスが書き込みでブロックしてハングするため、NULデバイスに捨てる。
+    [0 => ['pipe', 'r'], 1 => ['file', 'NUL', 'w'], 2 => ['file', 'NUL', 'w']],
     $serverPipes,
     $ROOT
 );
