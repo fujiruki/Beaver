@@ -208,6 +208,27 @@ try {
         assertEq(0, (int)$row['edited_in_beaver'], 'DB: edited_in_beaver=0のまま（未変更）');
     });
 
+    echo "\n=== R-060 Phase2b/2c Stage2 PUT /vouchers/{id}/lines/{lineId} で updated_at が自動更新されること ===\n";
+
+    runTest('明細編集の PUT 実行後に updated_at が PUT 前より新しくなる', function () use (&$pdo, $port, $customerId) {
+        $voucherId = createVoucher($pdo, $customerId, 'E-TEST-005');
+        $lineId    = createLine($pdo, $voucherId, 1);
+
+        $before = $pdo->query("SELECT updated_at FROM voucher_lines WHERE id = $lineId")->fetch();
+        assertTrue($before !== false && $before['updated_at'] !== null, 'updated_at 列が存在し初期値が設定されている');
+
+        sleep(1);
+
+        $r = putJson($port, "/vouchers/$voucherId/lines/$lineId", ['item_name' => '編集後2']);
+        assertTrue(str_contains($r['status'], '200'), 'HTTP 200: ' . $r['status']);
+
+        $after = $pdo->query("SELECT updated_at FROM voucher_lines WHERE id = $lineId")->fetch();
+        assertTrue(
+            $after['updated_at'] > $before['updated_at'],
+            'updated_at がPUT後に新しくなっている: before=' . $before['updated_at'] . ' after=' . $after['updated_at']
+        );
+    });
+
 } finally {
     if (is_resource($serverProc)) {
         foreach ($serverPipes as $p) { if (is_resource($p)) fclose($p); }

@@ -603,6 +603,57 @@ try {
     //     php 内蔵サーバ(単一スレッド)の「連続実行で最終リクエストが落ちる」不安定を避けるため自動テストは省略。
     //     実装は routes/vouchers.php の `Invalid cursor (numeric id required)` 分岐で担保。
 
+    // ============================================================
+    // R-060 Phase2b/2c Stage2: GET /vouchers/sync レスポンスに明細配列(lines)が含まれること
+    // ============================================================
+    echo "
+=== R-060 Phase2b/2c Stage2 GET /vouchers/sync に lines 配列が含まれること ===
+";
+
+    runTest('/vouchers/sync レスポンスに lines 配列が含まれ、正しい構造を持つ', function () use ($vfetch, $vbase, $testDbPath) {
+        $tmpPdo = new PDO('sqlite:' . $testDbPath, null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+        $voucherRow = $tmpPdo->query("SELECT id FROM vouchers WHERE voucher_no = 'VS001'")->fetch(PDO::FETCH_ASSOC);
+        $voucherId = (int)$voucherRow['id'];
+        $tmpPdo->exec("DELETE FROM voucher_lines WHERE voucher_id = $voucherId");
+        $tmpPdo->prepare("
+            INSERT INTO voucher_lines
+                (voucher_id, line_no, line_type, item_name, quantity, price_body, price_hardware, price_glass, line_total, tax_category, memo, source, access_line_id, edited_in_beaver)
+            VALUES
+                (?, 1, 'normal', 'テスト明細A', 2, 1000, 200, 0, 2400, '課税', '', 'access', 555, 0)
+        ")->execute([$voucherId]);
+        $tmpPdo->prepare("
+            INSERT INTO voucher_lines
+                (voucher_id, line_no, line_type, item_name, quantity, price_body, price_hardware, price_glass, line_total, tax_category, memo, source, access_line_id, edited_in_beaver)
+            VALUES
+                (?, 2, 'normal', 'テスト明細B(Beaver新規)', 1, 500, 0, 0, 500, '課税', '', 'beaver', NULL, 1)
+        ")->execute([$voucherId]);
+        $tmpPdo = null;
+
+        $data = json_decode($vfetch($vbase)['body'], true);
+        $found = null;
+        foreach ($data['vouchers'] as $v) {
+            if ((int)$v['id'] === $voucherId) { $found = $v; break; }
+        }
+        assertTrue($found !== null, 'VS001 が見つかること');
+        assertTrue(array_key_exists('lines', $found), 'lines キーが存在すること');
+        assertEq(2, count($found['lines']), '明細2件');
+
+        $lineA = null;
+        foreach ($found['lines'] as $l) { if ($l['access_line_id'] === 555) { $lineA = $l; break; } }
+        assertTrue($lineA !== null, 'access_line_id=555 の明細が見つかる');
+        foreach (['access_line_id','line_no','item_name','quantity','price_body','price_hardware','price_glass','line_total','tax_category','memo','updated_at','edited_in_beaver'] as $key) {
+            assertTrue(array_key_exists($key, $lineA), "lines[].$key キーが存在すること");
+        }
+        assertEq('テスト明細A', $lineA['item_name'], 'item_name一致');
+        assertEq(0, (int)$lineA['edited_in_beaver'], 'edited_in_beaver=0');
+
+        $lineB = null;
+        foreach ($found['lines'] as $l) { if ($l['item_name'] === 'テスト明細B(Beaver新規)') { $lineB = $l; break; } }
+        assertTrue($lineB !== null, 'Beaver新規明細が見つかる');
+        assertEq(null, $lineB['access_line_id'], 'access_line_id=null（Beaver新規行）');
+        assertEq(1, (int)$lineB['edited_in_beaver'], 'edited_in_beaver=1');
+    });
+
 } finally {
     // サーバ停止
     if (is_resource($serverProc)) {
