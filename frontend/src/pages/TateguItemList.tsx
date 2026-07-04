@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTateguItemsPaged, useDeleteTateguItem } from '../api/tateguItems';
 import Pagination from '../components/Pagination';
@@ -6,16 +6,33 @@ import Pagination from '../components/Pagination';
 export default function TateguItemList() {
   const navigate = useNavigate();
   const [page, setPage] = useState(1);
+  const [inputValue, setInputValue] = useState('');
   const [search, setSearch] = useState('');
+  const isComposingRef = useRef(false);
   const { data, isLoading, error } = useTateguItemsPaged(page, search);
   const deleteMutation = useDeleteTateguItem();
 
   const items = data?.data ?? [];
   const meta = data?.meta;
 
-  function handleSearch(q: string) {
+  function commitSearch(q: string) {
     setSearch(q);
     setPage(1);
+  }
+
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const value = e.target.value;
+    setInputValue(value);
+    if (!isComposingRef.current) commitSearch(value);
+  }
+
+  function handleCompositionStart() {
+    isComposingRef.current = true;
+  }
+
+  function handleCompositionEnd(e: React.CompositionEvent<HTMLInputElement>) {
+    isComposingRef.current = false;
+    commitSearch(e.currentTarget.value);
   }
 
   function handleDelete(id: number, name: string) {
@@ -42,8 +59,10 @@ export default function TateguItemList() {
         <input
           type="text"
           placeholder="品名・コードで検索"
-          value={search}
-          onChange={e => handleSearch(e.target.value)}
+          value={inputValue}
+          onChange={handleChange}
+          onCompositionStart={handleCompositionStart}
+          onCompositionEnd={handleCompositionEnd}
           className="px-3 py-1.5 border border-slate-300 rounded-md text-sm w-60"
         />
       </div>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useProjectsPaged, useDeleteProject } from '../api/projects';
 import { useCustomers } from '../api/customers';
@@ -29,7 +29,9 @@ export default function ProjectList() {
   const [searchParams] = useSearchParams();
   const initCustomerId = searchParams.get('customer_id') ? Number(searchParams.get('customer_id')) : undefined;
   const [page, setPage] = useState(1);
+  const [inputValue, setInputValue] = useState('');
   const [search, setSearch] = useState('');
+  const isComposingRef = useRef(false);
   const [customerFilter] = useState<number | undefined>(initCustomerId);
   const { data: customers = [] } = useCustomers();
   const filters = { ...(search ? { q: search } : {}), ...(customerFilter ? { customer_id: customerFilter } : {}) };
@@ -40,9 +42,24 @@ export default function ProjectList() {
   const projects = data?.data ?? [];
   const meta = data?.meta;
 
-  function handleSearch(q: string) {
+  function commitSearch(q: string) {
     setSearch(q);
     setPage(1);
+  }
+
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const value = e.target.value;
+    setInputValue(value);
+    if (!isComposingRef.current) commitSearch(value);
+  }
+
+  function handleCompositionStart() {
+    isComposingRef.current = true;
+  }
+
+  function handleCompositionEnd(e: React.CompositionEvent<HTMLInputElement>) {
+    isComposingRef.current = false;
+    commitSearch(e.currentTarget.value);
   }
 
   function handleDelete(id: number, name: string) {
@@ -81,8 +98,10 @@ export default function ProjectList() {
         <input
           type="text"
           placeholder="案件名で検索"
-          value={search}
-          onChange={e => handleSearch(e.target.value)}
+          value={inputValue}
+          onChange={handleChange}
+          onCompositionStart={handleCompositionStart}
+          onCompositionEnd={handleCompositionEnd}
           className="px-3 py-1.5 border border-slate-300 rounded-md text-sm w-60"
         />
       </div>

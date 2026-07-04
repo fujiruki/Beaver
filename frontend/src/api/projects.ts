@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { api } from './client';
 import type { Project, ProjectInput, ProjectImage } from '../types/project';
 import type { PaginatedResponse } from '../types/pagination';
@@ -28,6 +28,7 @@ export function useProjectsPaged(page: number, filters?: { status?: string; q?: 
       if (filters?.customer_id) params.set('customer_id', String(filters.customer_id));
       return api.get<PaginatedResponse<Project>>(`/projects?${params}`);
     },
+    placeholderData: keepPreviousData,
   });
 }
 

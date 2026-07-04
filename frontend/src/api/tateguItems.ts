@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { api } from './client';
 import type { TateguItem, TateguItemInput, CostBreakdownLine } from '../types/tateguItem';
 import type { PaginatedResponse } from '../types/pagination';
@@ -21,6 +21,7 @@ export function useTateguItemsPaged(page: number, search = '') {
       if (search) params.set('q', search);
       return api.get<PaginatedResponse<TateguItem>>(`/tategu-items?${params}`);
     },
+    placeholderData: keepPreviousData,
   });
 }
 
