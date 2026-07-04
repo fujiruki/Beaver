@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { api } from './client';
 import type { Customer, CustomerInput } from '../types/customer';
 import type { PaginatedResponse } from '../types/pagination';
@@ -22,6 +22,7 @@ export function useCustomersPaged(page: number, search = '') {
       if (search) params.set('q', search);
       return api.get<PaginatedResponse<Customer>>(`/customers?${params}`);
     },
+    placeholderData: keepPreviousData,
   });
 }
 

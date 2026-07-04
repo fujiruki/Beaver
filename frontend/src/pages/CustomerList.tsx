@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCustomersPaged, useDeleteCustomer } from '../api/customers';
 import Pagination from '../components/Pagination';
@@ -6,16 +6,33 @@ import Pagination from '../components/Pagination';
 export default function CustomerList() {
   const navigate = useNavigate();
   const [page, setPage] = useState(1);
+  const [inputValue, setInputValue] = useState('');
   const [search, setSearch] = useState('');
+  const isComposingRef = useRef(false);
   const { data, isLoading, error } = useCustomersPaged(page, search);
   const deleteMutation = useDeleteCustomer();
 
   const customers = data?.data ?? [];
   const meta = data?.meta;
 
-  function handleSearch(q: string) {
+  function commitSearch(q: string) {
     setSearch(q);
     setPage(1);
+  }
+
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const value = e.target.value;
+    setInputValue(value);
+    if (!isComposingRef.current) commitSearch(value);
+  }
+
+  function handleCompositionStart() {
+    isComposingRef.current = true;
+  }
+
+  function handleCompositionEnd(e: React.CompositionEvent<HTMLInputElement>) {
+    isComposingRef.current = false;
+    commitSearch(e.currentTarget.value);
   }
 
   function handleDelete(id: number, name: string) {
@@ -42,8 +59,10 @@ export default function CustomerList() {
         <input
           type="text"
           placeholder="得意先名・コードで検索"
-          value={search}
-          onChange={e => handleSearch(e.target.value)}
+          value={inputValue}
+          onChange={handleChange}
+          onCompositionStart={handleCompositionStart}
+          onCompositionEnd={handleCompositionEnd}
           style={{ padding: '6px 10px', border: '1px solid #cbd5e1', borderRadius: 6, fontSize: 13, width: 240 }}
         />
       </div>
