@@ -159,3 +159,16 @@ Phase 7（Access連携）完了後に着手。
 
 - 修正: `sync_helpers.php` で変数はnull維持、INSERTのVALUES句で `COALESCE(:x, 既定値)`、upsertのDO UPDATEは生バインド `:x` 参照（`COALESCE(:x, x)`）に分離。再同期で未送信列が既存値を保持するよう設計。
 - 初回修正で「再同期時に既存値をDEFAULTで上書き」する**本番データ破壊の回帰**を一度混入→指揮役が実コード精査で検出→回帰テスト2件(R-066-保持)を赤→緑で固定。test_sync 28/0。
+
+---
+
+## 11. R-070: 案件一覧・建具台帳一覧の検索でもIMEフォーカス喪失（R-068の同罪画面）
+
+R-068 の真因調査（2026-07-04）で発覚。`ProjectList.tsx`（案件一覧、53行目付近）と `TateguItemList.tsx`（建具台帳一覧、26行目付近）が R-068 と同一パターン:
+- `useProjectsPaged` / `useTateguItemsPaged` に `placeholderData: keepPreviousData` なし
+- `if (isLoading) return` の早期リターンで検索input含む画面全体が再マウント
+- 素の `onChange` で検索発火（composition ガードなし）
+
+IME変換中に同じフォーカス喪失が起きる可能性が高い。対処は R-068 の確定パターン（`placeholderData: keepPreviousData` + `onCompositionStart/End` ガード）をそのまま適用する。
+
+参考: `ComboSelect.tsx` はクライアント側フィルタで API 発火がないため対象外と判断済み（R-068 調査時）。
