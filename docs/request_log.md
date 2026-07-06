@@ -11,3 +11,4 @@
 | 2026-07-04 | R-070: 案件一覧・建具台帳一覧の検索でもIMEフォーカス喪失（R-068同罪画面） | 完了 | R-068確定パターン（placeholderData: keepPreviousData + onCompositionStart/Endガード）をProjectList/TateguItemListへ横展開（eaa8d70赤→e6e6c86緑）。指揮役が vitest 40/40・build exit 0 を再実行確認 |
 | 2026-07-06 | R-071: 案件の保存ボタンが機能しない | 完了 | 真因はnoValidateでなくprojectsテーブルの4カラム欠落（order_date等、実装当初からスキーマ定義漏れ）。migration 020追加＋PHPテストで赤緑固定（19f9a02赤→1218189緑）。本番は4列既存で充足と確認 |
 | 2026-07-06 | デプロイ列車（Beaver側） | 完了 | migration 018/019をprod適用（019はSQLiteのADD COLUMN制約でDEFAULT句なしに修正）、6/24以降の全コード（税計算修正・R-060 Stage2 API・R-067〜071）を本番反映。updated_atは全INSERT経路で明示セットに統一（d02c389）。事前バックアップ database_20260706_pre_train.sqlite |
+| 2026-07-06 | R-073: 案件のステータス変更が保存されない（P00008） | 完了 | 真因はProjectDetailフォームのnoValidate欠落（R-067と同一パターンの取りこぼし）。不正な日付値を持つ案件のみネイティブHTML5検証がsubmitを黙殺。noValidate付与＋属性回帰テスト（55136c9赤→1c9068e緑）、本番デプロイ済み。指揮役が直接修正（担当エージェント利用枠上限のため、1語修正の例外対応） |
