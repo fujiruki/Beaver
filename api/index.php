@@ -34,6 +34,10 @@ if ($method === 'POST') {
 }
 
 header('Content-Type: application/json; charset=utf-8');
+// R-074: nginxのコンテンツキャッシュがAPI応答（GET含む）を保持し、DB更新後も古いJSONを
+// 返し続ける事故が発生したため、全APIエンドポイント一律でキャッシュを抑止する。
+header('Cache-Control: no-store, no-cache, must-revalidate');
+header('Pragma: no-cache');
 
 try {
     $pdo = Database::connect();
