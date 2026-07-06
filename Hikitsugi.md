@@ -1,6 +1,6 @@
 # 引き継ぎ資料 — Beaver
 
-**最終更新**: 2026-07-04
+**最終更新**: 2026-07-06
 
 ---
 
@@ -17,70 +17,57 @@
 
 ---
 
-## 本日の作業（2026-07-04）: R-067〜R-070
+## 本日の作業（2026-07-06）: デプロイ列車完了 + R-071
 
-得意先まわりのバグ修正・改善を4件、TDD（赤→緑）で実施。全てローカルのみ、**本番未反映**。
+### デプロイ列車 ✅ 完了
+- Access側: 本番BE migration 015-018 適用 + FE deploy + 事後検証
+- Beaver側: migration 018・019 を本番適用、020相当は本番に手動追加済みで既存充足と判明。6/24以降の全コード（税計算修正・R-060 Stage2 API・R-066(c)・R-067〜R-071）を本番反映済み
+- 本番バックアップ（巻き戻し用）: `api/backups/database_20260706_pre_train.sqlite`
 
-### R-067: 得意先詳細の保存ボタンが機能しない ✅ 完了
-- 赤 2c55c60 / 緑 b8354b3
-- 原因: `CustomerDetail.tsx` のフォームに `noValidate` がなく、メール欄など不正値がある得意先でネイティブ検証がsubmitを黙ってブロックしていた。
+### R-071: 案件の保存ボタンが機能しない ✅ 完了
+- 赤 19f9a02 / 緑 1218189
+- 真因: R-067とは別種。`projects` テーブルに `order_date`/`owner_name`/`general_contractor_name`/`site_contact` の4カラムが一度も追加されていなかった（migration漏れ、commit af9750d以来）のに、フロントエンド・APIは常時これらを参照してINSERT/UPDATEするため毎回SQLエラー（`no such column: order_date`）で保存が全滅していた。migration 020で追加して修正。
+- 本番では該当4カラムが既に手動追加済みだったため、migration 020は本番未適用のまま充足（詳細はR-072-B参照）。
 
-### R-068: 得意先検索のIME変換中フォーカス喪失 ✅ 完了
-- 赤 a6af90c / 緑 5b44a8e
-- 真因: `CustomerList.tsx` の `if (isLoading) return <div>読み込み中...</div>;` が、検索文字列変更のたびに `useCustomersPaged` の isLoading が true に倒れて画面全体（検索input含む）を再マウントしていた。IME変換1文字目確定時にinputごと消えてフォーカス喪失→変換強制打ち切り。
-- 対処: `useCustomersPaged` に `placeholderData: keepPreviousData` を追加 + `onCompositionStart/End` で変換中フラグ管理、変換確定時のみ検索発火。
+### voucher_lines.updated_at の挙動統一 ✅ 完了
+- コミット d02c389
+- migration 019からDEFAULT句を除去した際（SQLiteのALTER TABLE ADD COLUMNは非定数DEFAULT不可のため）、「フレッシュDB（DEFAULTが効く）」と「migrate適用DB＝本番/dev実態（DEFAULTなし）」で `updated_at` の初期値挙動が割れ、回帰テストが検出。
+- 統一方針: カラムDEFAULTに依存せず、全INSERT経路（明細追加・convert-to-sales・insertSyncedLines）でアプリコードが `updated_at = CURRENT_TIMESTAMP` を明示セットするよう修正。
 
-### R-069: 「＋新規得意先」ダイアログのフル項目化 ✅ 完了
-- 赤 e693c2e / 緑 8239dcb（改善点1）、3123145（改善点2の回帰テスト）
-- `CustomerDetail.tsx` のフォーム部分を `components/CustomerFormFields.tsx` に抽出し、`CustomerDetail.tsx` と `NewCustomerModal.tsx` の両方から共有。ダイアログが得意先詳細と同等の全項目（郵便番号・住所・請求情報等）を入力可能に。
-- 改善点2（登録後の得意先検索候補への即時反映）は調査の結果、`ProjectDetail.tsx` の `handleCustomerCreated`（`refetchCustomers()` 呼び出し）で既に実装済みと判明。新規実装はせず、回帰テストのみ追加して固定。
-
-### R-070: 案件一覧・建具台帳一覧の同一パターン修正 ✅完了
-- 赤 eaa8d70 / 緑 e6e6c86
-- R-068の真因調査で発覚した同罪画面。`ProjectList.tsx`・`TateguItemList.tsx` にもR-068と全く同じ構造（`useProjectsPaged`/`useTateguItemsPaged` に placeholderData なし + isLoading早期return + compositionガードなしonChange）があったため、確定済みパターンをそのまま横展開。
-
-要望管理: R-067/068/069/070 とも `docs/requests.md` から `docs/request_log.md` へ移動済み（dcfd553, 9830ba2）。
+要望管理: R-071 は `docs/requests.md` から `docs/request_log.md` へ移動済み。
 
 ---
 
-## 現在の状態（2026-07-04）
+## 現在の状態（2026-07-06）
 
-### 実装済み
+### 実装済み（本番反映済み）
 
 | フェーズ / R番号 | 内容 | 状態 |
 |---|---|---|
 | Phase 1〜6 | 設計〜UI刷新・原価管理まで全フェーズ | ✅ 完了 |
 | R-025 | BA連携 Phase1（案件番号橋渡し） | ✅ 完了 |
-| R-027 | 定時バックアップ | ✅ 完了 |
-| R-060 | 明細行updated_at配線・sync API拡張（Stage2まで） | ✅ dev 実装済み（本番未デプロイ） |
-| R-065 | 「引用して売上」機能 | ✅ dev 実装済み（本番未デプロイ） |
-| R-066 | AccessTategu ↔ Beaver 双方向同期（Phase1〜2まで） | ✅ dev 実装済み |
-| R-067 | 得意先詳細の保存ボタンが機能しない | ✅ 完了（本番未デプロイ） |
-| R-068 | 得意先検索のIMEインクリメンタルサーチ問題 | ✅ 完了（本番未デプロイ） |
-| R-069 | 「＋新規得意先」ダイアログのフル画面化＋即時反映 | ✅ 完了（本番未デプロイ） |
-| R-070 | 案件一覧・建具台帳一覧のIMEフォーカス喪失 | ✅ 完了（本番未デプロイ） |
+| R-027 | 定時バックアップ | ⚠️ 本番で停止疑い（R-027b参照） |
+| R-060 | 明細行updated_at配線・sync API拡張（Stage2まで） | ✅ 本番反映済み |
+| R-065 | 「引用して売上」機能 | ✅ 本番反映済み |
+| R-066 | AccessTategu ↔ Beaver 双方向同期（Phase1〜2まで） | ✅ 本番反映済み |
+| R-067 | 得意先詳細の保存ボタンが機能しない | ✅ 本番反映済み |
+| R-068 | 得意先検索のIMEインクリメンタルサーチ問題 | ✅ 本番反映済み |
+| R-069 | 「＋新規得意先」ダイアログのフル画面化＋即時反映 | ✅ 本番反映済み |
+| R-070 | 案件一覧・建具台帳一覧のIMEフォーカス喪失 | ✅ 本番反映済み |
+| R-071 | 案件の保存ボタンが機能しない | ✅ 本番反映済み |
 
-### 検証状況（2026-07-04時点）
+### 検証状況（2026-07-06時点）
 
-- `cd frontend && npx vitest run` → 全7ファイル **40/40** 通過
+- `cd frontend && npx vitest run` → 全通過
+- `bash .claude/regression-suite.sh`（vitest + PHPテスト5本）→ exit 0
 - `cd frontend && npm run build`（tsc -b && vite build）→ exit 0
 
 ### migration 適用状況
 
 | 環境 | 最新適用 |
 |---|---|
-| dev（ローカル） | 019（`voucher_lines_updated_at`）まで |
-| prod（本番） | 017（`quoted_at`）まで ← **018・019 が未適用（2世代遅れ）** |
-
----
-
-## 未デプロイ事項（重要）
-
-**本日コミットした内容を含め、直近の実装は全てローカルのみで、本番（ConoHa）には一切反映していない。**
-
-- migration 018（`last_synced_at`）・019（`voucher_lines_updated_at`）が prod 未適用
-- R-060 Stage2・R-065・R-066・R-067・R-068・R-069・R-070 は dev 実装済みだが本番未反映
-- 本番デプロイは指揮役管理の**デプロイ列車**でまとめて実施する方針（AccessTategu 側 R-060 Stage1 完了後に着手予定）。個別デプロイはしない。
+| dev（ローカル） | 020（`projects_owner_contractor_contact`）まで |
+| prod（本番） | 019（`voucher_lines_updated_at`）まで。020相当のカラムは本番に手動追加済みで充足（migration自体は未適用、詳細はR-072-B） |
 
 ---
 
@@ -90,6 +77,8 @@
 
 | R番号 | タイトル | 種別 | 優先 |
 |---|---|---|---|
+| R-027b | 本番の日次バックアップが停止している疑い（backup.sh不在、api/backups/最新が6/16で停止） | バグ・要調査 | **高** |
+| R-072-B | projectsテーブルのdev/prodスキーマ乖離の棚卸し（本番手動追加分がmigration履歴に記録されていなかった） | 品質改善 | 中 |
 | R-034 | validation 強化（silent NULL 許容など） | 品質改善 | 低（実運用での顕在化待ち） |
 | R-035 | /projects/sync pagination + 重複対策 | 品質改善 | 低（実運用での顕在化待ち） |
 | R-038 | 得意先マスタ双方向同期（未設計） | 機能追加 | 低 |
@@ -98,15 +87,19 @@
 
 ## 次タスク候補（優先順）
 
-### 優先1: デプロイ列車（dev/prod乖離解消）
+### 優先1: R-027b（本番日次バックアップ停止の調査・復旧）
 
-migration 018・019 の本番適用と、R-060・R-065〜R-070 の本番反映。AccessTategu側 R-060 Stage1 完了後にまとめて実施予定（指揮役管理）。
+backup.sh不在・crontab確認・直近バックアップの動作確認まで実施。障害時のデータ復旧リスクに直結するため優先度高。
 
-### 優先2: R-034/R-035（品質改善、低優先）
+### 優先2: R-072-B（projectsスキーマ乖離の棚卸し）
+
+本番`projects`テーブルの`PRAGMA table_info`とdevの`schema.sql`＋全migration適用後のスキーマを突合し、他に記録漏れがないか棚卸し。
+
+### 優先3: R-034/R-035（品質改善、低優先）
 
 実運用で問題が顕在化してから着手する想定。`docs/requests.md` に詳細あり。
 
-### 優先3: R-038（得意先マスタ双方向同期）
+### 優先4: R-038（得意先マスタ双方向同期）
 
 未設計。着手前に設計から必要。
 
@@ -133,6 +126,10 @@ migration 018・019 の本番適用と、R-060・R-065〜R-070 の本番反映�
 - 一覧画面のページネーション検索（`useCustomersPaged`/`useProjectsPaged`/`useTateguItemsPaged`）は
   `placeholderData: keepPreviousData` ＋ 検索inputの `onCompositionStart/End` ガードが必須パターン（R-068/R-070）。
   新規に同種の一覧検索を作る場合はこのパターンに揃えること。
+- `ALTER TABLE ADD COLUMN` で後付け追加した列（本番/devとも）は非定数DEFAULTを持てないため、
+  カラムDEFAULTに依存せず、アプリコードの全INSERT経路で明示的に値をセットすること（voucher_lines.updated_at統一で確定）。
+- 本番SQLiteは3.7.17と古く、部分インデックス（WHERE句付きCREATE INDEX）等3.8.0+機能に非対応。
+  migrationは単純な`ALTER TABLE ADD COLUMN`等の3.7.17互換構文に限定すること。
 
 ---
 
