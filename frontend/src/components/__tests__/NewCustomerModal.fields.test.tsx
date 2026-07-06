@@ -16,8 +16,9 @@ function renderModal() {
   );
 }
 
+// R-075: codeはユーザー入力不可（自動採番）のため入力要素の一覧からは除外
 const EXPECTED_FIELD_NAMES = [
-  'code', 'name', 'name_kana', 'postal_code', 'address1', 'address2',
+  'name', 'name_kana', 'postal_code', 'address1', 'address2',
   'tel', 'mobile', 'fax', 'email', 'billing_name', 'cutoff_day',
   'billing_offset_days', 'payment_due_days', 'billing_date_print', 'is_active', 'memo',
 ];
