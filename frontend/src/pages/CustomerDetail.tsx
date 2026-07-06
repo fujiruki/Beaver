@@ -70,6 +70,7 @@ export default function CustomerDetail() {
           errors={errors}
           setValue={setValue}
           watch={watch}
+          code={customer?.code}
           carryForwardBalance={customer?.carry_forward_balance}
           carryForwardEditLink={!isNew && id ? `/customers/${id}/carry-forward` : undefined}
         />

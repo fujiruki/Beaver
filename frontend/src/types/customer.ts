@@ -24,4 +24,5 @@ export interface Customer {
   updated_at: string;
 }
 
-export type CustomerInput = Omit<Customer, 'id' | 'created_at' | 'updated_at' | 'carry_forward_balance'>;
+// R-075: codeはサーバー側で自動採番するため、クライアントからは送信不可（型からも除外）
+export type CustomerInput = Omit<Customer, 'id' | 'created_at' | 'updated_at' | 'carry_forward_balance' | 'code'>;

@@ -17,11 +17,12 @@ interface Props {
   errors: FieldErrors<CustomerInput>;
   setValue: UseFormSetValue<CustomerInput>;
   watch: UseFormWatch<CustomerInput>;
+  code?: string | null;
   carryForwardBalance?: number;
   carryForwardEditLink?: string;
 }
 
-export default function CustomerFormFields({ register, errors, setValue, watch, carryForwardBalance, carryForwardEditLink }: Props) {
+export default function CustomerFormFields({ register, errors, setValue, watch, code, carryForwardBalance, carryForwardEditLink }: Props) {
   const kanaRef = useRef('');
   const [kanaLocked, setKanaLocked] = useState(false);
 
@@ -34,8 +35,10 @@ export default function CustomerFormFields({ register, errors, setValue, watch, 
     <>
       <Section title="基本情報">
         <div style={grid2}>
-          <Field label="得意先コード" error={errors.code?.message}>
-            <input {...register('code')} style={inputStyle} />
+          <Field label="得意先コード">
+            <div style={{ ...inputStyle, background: '#f1f5f9', color: '#64748b' }}>
+              {code ?? '自動採番'}
+            </div>
           </Field>
           <Field label="得意先名 *" error={errors.name?.message}>
             <input
