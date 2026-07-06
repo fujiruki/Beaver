@@ -33,3 +33,6 @@
 # 013 は本番に索引(uq_customers_access_customer_no)の実在を確認し記録漏れを補正(2026-06-24)
 013_customers_access_customer_no_unique      2026-06-24  prod
 017_vouchers_quoted_at      2026-06-24  prod
+018_vouchers_last_synced_at      2026-07-06  prod
+019_voucher_lines_updated_at     2026-07-06  prod (DEFAULT句なしで適用。SQLiteはADD COLUMNに非定数DEFAULT不可、dev実態と同一定義)
+020_projects_owner_contractor_contact  2026-07-06  prod (適用不要: 本番に4列とも既存。手動追加されていた模様)
