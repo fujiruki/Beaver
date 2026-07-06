@@ -597,13 +597,13 @@ switch ($method) {
                          tategu_item_id, source_catalog_item_id, item_name, quantity,
                          cost_body, cost_hardware, cost_glass, cost_factory_hours, cost_site_hours, cost_labor_rate,
                          snapshot_loaded_at, price_body, price_hardware, price_glass, line_total,
-                         tax_category, memo, source, edited_in_beaver)
+                         tax_category, memo, source, edited_in_beaver, updated_at)
                     VALUES
                         (:voucher_id, :line_no, :line_type, :location_no, :location_name,
                          :tategu_item_id, :source_catalog_item_id, :item_name, :quantity,
                          :cost_body, :cost_hardware, :cost_glass, :cost_factory_hours, :cost_site_hours, :cost_labor_rate,
                          :snapshot_loaded_at, :price_body, :price_hardware, :price_glass, :line_total,
-                         :tax_category, :memo, "beaver", 1)
+                         :tax_category, :memo, "beaver", 1, CURRENT_TIMESTAMP)
                 ')->execute([
                     ':voucher_id'             => $newId,
                     ':line_no'                => $line['line_no'],
@@ -681,12 +681,12 @@ switch ($method) {
                     (voucher_id, line_no, line_type, location_no, location_name,
                      tategu_item_id, source_catalog_item_id, item_name, quantity,
                      cost_body, cost_hardware, cost_glass, cost_factory_hours, cost_site_hours, cost_labor_rate,
-                     price_body, price_hardware, price_glass, line_total, tax_category, memo)
+                     price_body, price_hardware, price_glass, line_total, tax_category, memo, updated_at)
                 VALUES
                     (:voucher_id, :line_no, :line_type, :location_no, :location_name,
                      :tategu_item_id, :source_catalog_item_id, :item_name, :quantity,
                      :cost_body, :cost_hardware, :cost_glass, :cost_factory_hours, :cost_site_hours, :cost_labor_rate,
-                     :price_body, :price_hardware, :price_glass, :line_total, :tax_category, :memo)
+                     :price_body, :price_hardware, :price_glass, :line_total, :tax_category, :memo, CURRENT_TIMESTAMP)
             ');
             $stmt->execute([
                 ':voucher_id'             => $resourceId,

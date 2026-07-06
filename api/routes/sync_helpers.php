@@ -408,17 +408,18 @@ function insertSyncedLines(PDO $pdo, int $voucherId, array $lines): ?array {
     $allowedTaxCategories = ['課税', '非課税'];
 
     $lineNo = 1;
+    // Access側のpayloadに明細単位の更新日時は含まれないため、Beaverが受信した時刻をCURRENT_TIMESTAMPで明示セットする。
     $ins = $pdo->prepare('
         INSERT INTO voucher_lines
             (voucher_id, line_no, line_type, item_name, quantity,
              price_body, price_hardware, price_glass,
              line_total, tax_category, memo,
-             source, access_line_id, edited_in_beaver)
+             source, access_line_id, edited_in_beaver, updated_at)
         VALUES
             (:voucher_id, :line_no, :line_type, :item_name, :quantity,
              :price_body, :price_hardware, :price_glass,
              :line_total, :tax_category, :memo,
-             :source, :access_line_id, 0)
+             :source, :access_line_id, 0, CURRENT_TIMESTAMP)
     ');
     foreach ($lines as $line) {
         if (!is_array($line)) continue;

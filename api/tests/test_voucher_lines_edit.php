@@ -95,11 +95,13 @@ function createVoucher(PDO $pdo, int $customerId, string $voucherNo): int {
 }
 
 function createLine(PDO $pdo, int $voucherId, int $lineNo, string $source = 'beaver', int $editedInBeaver = 0): int {
+    // updated_atはカラムDEFAULTに依存せずアプリ側で明示セットする方針（本番=ALTER適用でDEFAULT不可）のため、
+    // 実INSERT経路と同じ前提でCURRENT_TIMESTAMPを明示する。
     $pdo->prepare("
         INSERT INTO voucher_lines
-            (voucher_id, line_no, line_type, item_name, quantity, price_body, line_total, tax_category, source, edited_in_beaver)
+            (voucher_id, line_no, line_type, item_name, quantity, price_body, line_total, tax_category, source, edited_in_beaver, updated_at)
         VALUES
-            (?, ?, 'normal', '編集前', 1, 1000, 1000, '課税', ?, ?)
+            (?, ?, 'normal', '編集前', 1, 1000, 1000, '課税', ?, ?, CURRENT_TIMESTAMP)
     ")->execute([$voucherId, $lineNo, $source, $editedInBeaver]);
     return (int)$pdo->lastInsertId();
 }
