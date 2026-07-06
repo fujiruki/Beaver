@@ -79,20 +79,14 @@ function assertTrue(bool $cond, string $label = ''): void {
 // ============================================================
 
 /**
- * R-075: routes/customers.php の nextCustomerCode() と同一ロジック。
+ * R-075: routes/customers.php の nextCustomerCode() と同一ロジック（90001域予約方式）。
  */
 function nextCustomerCode(PDO $pdo): string {
     $row = $pdo->query("
-        SELECT MAX(CAST(v AS INTEGER)) AS max_no FROM (
-            SELECT code AS v FROM customers
-                WHERE code IS NOT NULL AND code != '' AND code GLOB '[0-9]*' AND code NOT GLOB '*[^0-9]*'
-            UNION ALL
-            SELECT access_customer_no AS v FROM customers
-                WHERE access_customer_no IS NOT NULL AND access_customer_no != ''
-                    AND access_customer_no GLOB '[0-9]*' AND access_customer_no NOT GLOB '*[^0-9]*'
-        )
+        SELECT MAX(CAST(code AS INTEGER)) AS max_no FROM customers
+            WHERE CAST(code AS INTEGER) >= 90001
     ")->fetch();
-    $maxNo = ($row && $row['max_no'] !== null) ? (int)$row['max_no'] : 0;
+    $maxNo = ($row && $row['max_no'] !== null) ? (int)$row['max_no'] : 90000;
     return (string)($maxNo + 1);
 }
 

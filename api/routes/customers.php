@@ -15,21 +15,16 @@ $subResource = isset($segments[2]) ? $segments[2] : null;
 
 /**
  * R-075: 得意先コードの自動採番。
- * 既存 code / access_customer_no のうち純数値のものの最大値+1を返す
- * （Access側の得意先番号域と衝突しない連番。非数値・空文字は無視）。
+ * Beaver新規得意先は90001〜の予約域で連番採番する（晴樹さん承認・Access側裏取り済み）。
+ * Access側も得意先№を独立採番している（現在812まで、オートナンバーでない通常Long列）ため、
+ * access_customer_noは採番に一切影響させない。将来のR-038同期時も90001域はAccess側と衝突しない。
  */
 function nextCustomerCode(PDO $pdo): string {
     $row = $pdo->query("
-        SELECT MAX(CAST(v AS INTEGER)) AS max_no FROM (
-            SELECT code AS v FROM customers
-                WHERE code IS NOT NULL AND code != '' AND code GLOB '[0-9]*' AND code NOT GLOB '*[^0-9]*'
-            UNION ALL
-            SELECT access_customer_no AS v FROM customers
-                WHERE access_customer_no IS NOT NULL AND access_customer_no != ''
-                    AND access_customer_no GLOB '[0-9]*' AND access_customer_no NOT GLOB '*[^0-9]*'
-        )
+        SELECT MAX(CAST(code AS INTEGER)) AS max_no FROM customers
+            WHERE CAST(code AS INTEGER) >= 90001
     ")->fetch();
-    $maxNo = ($row && $row['max_no'] !== null) ? (int)$row['max_no'] : 0;
+    $maxNo = ($row && $row['max_no'] !== null) ? (int)$row['max_no'] : 90000;
     return (string)($maxNo + 1);
 }
 
