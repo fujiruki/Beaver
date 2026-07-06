@@ -343,12 +343,12 @@ runTest('T-06: access_customer_no 照合 upsert の回帰防止 - access_custome
     assertEq('06-1111-2222', $res2['body']['tel'], 'tel が更新されている');
 });
 
-// T-07: UI経由の新規登録2件連続でコードが連番自動付与される
-runTest('T-07: UI経由の新規登録2件連続でコードが連番自動付与される', function () use ($pdo) {
+// T-07: UI経由の新規登録2件連続でコードが90001域の連番で自動付与される
+runTest('T-07: UI経由の新規登録2件連続で90001域の連番が自動付与される', function () use ($pdo) {
     $res1 = customerPost($pdo, ['name' => '新規得意先A']);
     assertEq(201, $res1['code'], '1件目 HTTP status');
     $code1 = (int)$res1['body']['code'];
-    assertTrue($code1 > 0, '1件目 code は正の数値');
+    assertTrue($code1 >= 90001, '1件目 code は予約域90001以上: ' . $code1);
 
     $res2 = customerPost($pdo, ['name' => '新規得意先B']);
     assertEq(201, $res2['code'], '2件目 HTTP status');
@@ -356,24 +356,35 @@ runTest('T-07: UI経由の新規登録2件連続でコードが連番自動付�
     assertEq($code1 + 1, $code2, '2件目 code は1件目+1の連番');
 });
 
+// T-07b: 既に90001域の最大値(90005)が存在する状態では次は90006
+runTest('T-07b: 既にcode=90005が存在する状態では次は90006になる', function () use ($pdo) {
+    $pdo->prepare('INSERT INTO customers (code, name, is_active) VALUES (?, ?, 1)')
+        ->execute(['90005', '90001域テスト用得意先']);
+
+    $res = customerPost($pdo, ['name' => '新規得意先C']);
+    assertEq(201, $res['code'], 'HTTP status');
+    assertEq(90006, (int)$res['body']['code'], '既存最大値90005の次として90006が採番される');
+});
+
 // T-08: クライアント指定codeが無視される
 runTest('T-08: UI経由の新規登録でクライアント指定codeは無視される', function () use ($pdo) {
     $res = customerPost($pdo, ['name' => 'コード指定テスト', 'code' => 'HACKED-CODE']);
     assertEq(201, $res['code'], 'HTTP status');
     assertTrue($res['body']['code'] !== 'HACKED-CODE', 'クライアント指定codeがそのまま使われていない');
-    assertTrue(is_numeric($res['body']['code']), '自動採番された数値codeになっている');
+    assertTrue((int)$res['body']['code'] >= 90001, '自動採番された90001域のcodeになっている: ' . $res['body']['code']);
 });
 
-// T-09: access_customer_no=数値最大の得意先が存在する状態でも採番衝突しない
-runTest('T-09: access_customer_noの数値最大値を考慮して採番される（Access番号域と衝突しない）', function () use ($pdo) {
-    // Access同期経路で access_customer_no=90000（他のcode/access_customer_noより大きい数値）の得意先を作る
-    $accessRes = customerPost($pdo, ['name' => 'Access得意先', 'access_customer_no' => '90000']);
+// T-09: access_customer_noの値は採番に一切影響しない（Access番号域と完全に独立）
+runTest('T-09: access_customer_noがあっても採番は90001域のまま影響されない', function () use ($pdo) {
+    // Access同期経路でaccess_customer_no=812（Access側の現在値に近い小さい数値）の得意先を作る
+    $accessRes = customerPost($pdo, ['name' => 'Access得意先', 'access_customer_no' => '812']);
     assertEq(201, $accessRes['code'], 'Access経路の事前登録');
+    assertTrue(((int)$accessRes['body']['code']) < 90001, 'Access経路のcodeは90001域に影響されない（今回はnull想定）');
 
-    // UI経由で新規登録すると、90000を超える番号が採番されるはず
+    // UI経由で新規登録しても、90001域の連番のまま（812の影響を受けない）
     $uiRes = customerPost($pdo, ['name' => 'UI経由得意先']);
     assertEq(201, $uiRes['code'], 'UI経由登録 HTTP status');
-    assertTrue((int)$uiRes['body']['code'] > 90000, 'access_customer_noの最大値を超えた番号が採番されている: ' . $uiRes['body']['code']);
+    assertTrue((int)$uiRes['body']['code'] >= 90001, 'access_customer_noに関わらず90001域で採番される: ' . $uiRes['body']['code']);
 });
 
 // T-10: code重複時のUNIQUE制約メッセージがcodeを正しく指す
