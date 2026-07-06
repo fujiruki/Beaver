@@ -13,6 +13,36 @@ $segments = explode('/', trim($path, '/'));
 $resourceId = isset($segments[1]) && is_numeric($segments[1]) ? (int)$segments[1] : null;
 $subResource = isset($segments[2]) ? $segments[2] : null;
 
+/**
+ * R-075: 得意先コードの自動採番。
+ * 既存 code / access_customer_no のうち純数値のものの最大値+1を返す
+ * （Access側の得意先番号域と衝突しない連番。非数値・空文字は無視）。
+ */
+function nextCustomerCode(PDO $pdo): string {
+    $row = $pdo->query("
+        SELECT MAX(CAST(v AS INTEGER)) AS max_no FROM (
+            SELECT code AS v FROM customers
+                WHERE code IS NOT NULL AND code != '' AND code GLOB '[0-9]*' AND code NOT GLOB '*[^0-9]*'
+            UNION ALL
+            SELECT access_customer_no AS v FROM customers
+                WHERE access_customer_no IS NOT NULL AND access_customer_no != ''
+                    AND access_customer_no GLOB '[0-9]*' AND access_customer_no NOT GLOB '*[^0-9]*'
+        )
+    ")->fetch();
+    $maxNo = ($row && $row['max_no'] !== null) ? (int)$row['max_no'] : 0;
+    return (string)($maxNo + 1);
+}
+
+/**
+ * R-075: PDOExceptionのUNIQUE制約違反メッセージから対象カラム名を判別する。
+ * 決め打ちせず実際に違反したカラムを返す（判別不能ならnull）。
+ */
+function classifyUniqueViolationColumn(string $message): ?string {
+    if (str_contains($message, 'customers.code')) return 'code';
+    if (str_contains($message, 'customers.access_customer_no')) return 'access_customer_no';
+    return null;
+}
+
 // PATCH /customers/{id}/carry-forward — 繰越残高例外修正
 if ($method === 'PATCH' && $resourceId && $subResource === 'carry-forward') {
     $data = json_decode(file_get_contents('php://input'), true) ?? [];
@@ -125,7 +155,13 @@ switch ($method) {
             }
         }
 
-        // UNIQUE 制約違反（別 access_customer_no 競合）は PDOException で 409 返却
+        // R-075: UI経由の新規作成（access_customer_noなし）はクライアント指定のcodeを無視して自動採番する。
+        // Access同期経路（access_customer_noあり）は従来どおりクライアント送信値をそのまま使う（変更しない）。
+        $code = $accessCustomerNo === null
+            ? nextCustomerCode($pdo)
+            : ($data['code'] ?? null);
+
+        // UNIQUE 制約違反（access_customer_no または code の重複）は PDOException で 409 返却
         try {
             $stmt = $pdo->prepare('
                 INSERT INTO customers
@@ -142,7 +178,7 @@ switch ($method) {
                      :carry_forward_balance, 1, :access_customer_no)
             ');
             $stmt->execute([
-                ':code'                 => $data['code'] ?? null,
+                ':code'                 => $code,
                 ':name'                 => $data['name'] ?? '',
                 ':name_kana'            => $data['name_kana'] ?? null,
                 ':honorific_type'       => $data['honorific_type'] ?? '御中',
@@ -165,6 +201,12 @@ switch ($method) {
             ]);
         } catch (PDOException $e) {
             if (str_contains($e->getMessage(), 'UNIQUE constraint failed')) {
+                $violated = classifyUniqueViolationColumn($e->getMessage());
+                if ($violated === 'code') {
+                    http_response_code(409);
+                    echo json_encode(['error' => 'code が既に存在します', 'code' => $code]);
+                    break;
+                }
                 http_response_code(409);
                 echo json_encode(['error' => 'access_customer_no が既に存在します', 'access_customer_no' => $accessCustomerNo]);
                 break;
@@ -182,7 +224,8 @@ switch ($method) {
         if (!$resourceId) { http_response_code(400); echo json_encode(['error' => 'ID required']); exit; }
         $data = json_decode(file_get_contents('php://input'), true) ?? [];
         // carry_forward_balance は PATCH /carry-forward 専用。通常更新では変更不可
-        $fields = ['code','name','name_kana','honorific_type','gender',
+        // R-075: codeはユーザーが変更できない（自動採番のみ）ため更新対象から除外
+        $fields = ['name','name_kana','honorific_type','gender',
                    'postal_code','address1','address2','tel','mobile','fax','email',
                    'memo','billing_name','billing_date_print',
                    'cutoff_day','billing_offset_days','payment_due_days','is_active',

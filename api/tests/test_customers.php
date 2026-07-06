@@ -79,6 +79,33 @@ function assertTrue(bool $cond, string $label = ''): void {
 // ============================================================
 
 /**
+ * R-075: routes/customers.php の nextCustomerCode() と同一ロジック。
+ */
+function nextCustomerCode(PDO $pdo): string {
+    $row = $pdo->query("
+        SELECT MAX(CAST(v AS INTEGER)) AS max_no FROM (
+            SELECT code AS v FROM customers
+                WHERE code IS NOT NULL AND code != '' AND code GLOB '[0-9]*' AND code NOT GLOB '*[^0-9]*'
+            UNION ALL
+            SELECT access_customer_no AS v FROM customers
+                WHERE access_customer_no IS NOT NULL AND access_customer_no != ''
+                    AND access_customer_no GLOB '[0-9]*' AND access_customer_no NOT GLOB '*[^0-9]*'
+        )
+    ")->fetch();
+    $maxNo = ($row && $row['max_no'] !== null) ? (int)$row['max_no'] : 0;
+    return (string)($maxNo + 1);
+}
+
+/**
+ * R-075: routes/customers.php の classifyUniqueViolationColumn() と同一ロジック。
+ */
+function classifyUniqueViolationColumn(string $message): ?string {
+    if (str_contains($message, 'customers.code')) return 'code';
+    if (str_contains($message, 'customers.access_customer_no')) return 'access_customer_no';
+    return null;
+}
+
+/**
  * customers.php の POST ロジックをインライン実行。
  * 戻り値: ['code' => int, 'body' => array]
  */
@@ -123,6 +150,12 @@ function customerPost(PDO $pdo, array $data): array {
         }
     }
 
+    // R-075: UI経由の新規作成（access_customer_noなし）はクライアント指定のcodeを無視して自動採番する。
+    // Access同期経路（access_customer_noあり）は従来どおりクライアント送信値をそのまま使う（変更しない）。
+    $code = $accessCustomerNo === null
+        ? nextCustomerCode($pdo)
+        : ($data['code'] ?? null);
+
     try {
         $stmt = $pdo->prepare('
             INSERT INTO customers
@@ -139,7 +172,7 @@ function customerPost(PDO $pdo, array $data): array {
                  :carry_forward_balance, 1, :access_customer_no)
         ');
         $stmt->execute([
-            ':code'                 => $data['code'] ?? null,
+            ':code'                 => $code,
             ':name'                 => $data['name'] ?? '',
             ':name_kana'            => $data['name_kana'] ?? null,
             ':honorific_type'       => $data['honorific_type'] ?? '御中',
@@ -162,6 +195,10 @@ function customerPost(PDO $pdo, array $data): array {
         ]);
     } catch (PDOException $e) {
         if (str_contains($e->getMessage(), 'UNIQUE constraint failed')) {
+            $violated = classifyUniqueViolationColumn($e->getMessage());
+            if ($violated === 'code') {
+                return ['code' => 409, 'body' => ['error' => 'code が既に存在します', 'code' => $code]];
+            }
             return ['code' => 409, 'body' => ['error' => 'access_customer_no が既に存在します', 'access_customer_no' => $accessCustomerNo]];
         }
         throw $e;
@@ -176,7 +213,8 @@ function customerPost(PDO $pdo, array $data): array {
  * customers.php の PUT ロジックをインライン実行。
  */
 function customerPut(PDO $pdo, int $resourceId, array $data): array {
-    $fields = ['code','name','name_kana','honorific_type','gender',
+    // R-075: codeはユーザーが変更できない（自動採番のみ）ため更新対象から除外
+    $fields = ['name','name_kana','honorific_type','gender',
                'postal_code','address1','address2','tel','mobile','fax','email',
                'memo','billing_name','billing_date_print',
                'cutoff_day','billing_offset_days','payment_due_days','is_active',
@@ -338,16 +376,24 @@ runTest('T-09: access_customer_noの数値最大値を考慮して採番され�
     assertTrue((int)$uiRes['body']['code'] > 90000, 'access_customer_noの最大値を超えた番号が採番されている: ' . $uiRes['body']['code']);
 });
 
-// T-10: code重複時の409メッセージが正しい列名になっている
-runTest('T-10: code重複時は「code」を指す409メッセージになる（access_customer_noの決め打ちをしない）', function () use ($pdo) {
-    // Access同期経路（access_customer_noあり）は従来どおりクライアント指定codeをそのまま使うため、
-    // 意図的に同じcodeを持つ2件を作ってUNIQUE制約をcode側で違反させる。
-    $res1 = customerPost($pdo, ['name' => 'コード重複テスト1', 'access_customer_no' => '77001', 'code' => '55555']);
-    assertEq(201, $res1['code'], '1件目登録');
+// T-10: code重複時のUNIQUE制約メッセージがcodeを正しく指す
+// 注記: POST /customers はaccess_customer_no指定時にcodeでのフォールバック照合を先に行うため
+// （同じcodeの既存レコードが見つかるとUPDATEにフォールバックする）、customerPost経由では
+// code側のUNIQUE制約違反に実際には到達できない（フォールバック照合が先にヒットしてしまう）。
+// そのため、INSERT文を直接使ってUNIQUE制約違反を発生させ、classifyUniqueViolationColumn() が
+// 「access_customer_noへの決め打ち」をせず正しくcodeを判別することを検証する。
+runTest('T-10: code重複のUNIQUE制約メッセージはaccess_customer_noに決め打ちせずcodeと判別される', function () use ($pdo) {
+    $pdo->prepare('INSERT INTO customers (code, name, is_active) VALUES (?, ?, 1)')
+        ->execute(['66666', 'コード重複テスト1']);
 
-    $res2 = customerPost($pdo, ['name' => 'コード重複テスト2', 'access_customer_no' => '77002', 'code' => '55555']);
-    assertEq(409, $res2['code'], '2件目は409');
-    assertEq('code が既に存在します', $res2['body']['error'], 'codeを指す409メッセージになっている（access_customer_noの決め打ちでない）');
+    try {
+        $pdo->prepare('INSERT INTO customers (code, name, is_active) VALUES (?, ?, 1)')
+            ->execute(['66666', 'コード重複テスト2']);
+        throw new RuntimeException('UNIQUE制約違反が発生しなかった');
+    } catch (PDOException $e) {
+        assertTrue(str_contains($e->getMessage(), 'UNIQUE constraint failed'), 'UNIQUE制約違反であること: ' . $e->getMessage());
+        assertEq('code', classifyUniqueViolationColumn($e->getMessage()), 'access_customer_noへの決め打ちでなくcodeと判別される');
+    }
 });
 
 // ============================================================
