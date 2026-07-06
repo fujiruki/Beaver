@@ -112,20 +112,23 @@ switch ($method) {
 
         // access_customer_no が指定されていれば既存レコードを検索して upsert
         if ($accessCustomerNo !== null) {
-            $checkStmt = $pdo->prepare('SELECT id FROM customers WHERE access_customer_no = ?');
+            $checkStmt = $pdo->prepare('SELECT id, code FROM customers WHERE access_customer_no = ?');
             $checkStmt->execute([$accessCustomerNo]);
-            $existingId = $checkStmt->fetchColumn();
+            $existing = $checkStmt->fetch();
 
             // access_customer_no で見つからなければ code でフォールバック照合
-            if (!$existingId && isset($data['code']) && $data['code'] !== null && $data['code'] !== '') {
-                $codeStmt = $pdo->prepare('SELECT id FROM customers WHERE code = ?');
+            if (!$existing && isset($data['code']) && $data['code'] !== null && $data['code'] !== '') {
+                $codeStmt = $pdo->prepare('SELECT id, code FROM customers WHERE code = ?');
                 $codeStmt->execute([(string)$data['code']]);
-                $existingId = $codeStmt->fetchColumn();
+                $existing = $codeStmt->fetch();
             }
 
-            if ($existingId) {
+            if ($existing) {
+                $existingId = $existing['id'];
                 // 既存レコードを UPDATE して 200 返却
-                $fields = ['code','name','name_kana','honorific_type','gender',
+                // R-075: codeはクライアント送信値を使わない。既存codeがNULL/空の場合のみ
+                // access_customer_noで埋める（B-2で整合済みの既存値は上書きしない）。
+                $fields = ['name','name_kana','honorific_type','gender',
                            'postal_code','address1','address2','tel','mobile','fax','email',
                            'memo','billing_name','billing_date_print',
                            'cutoff_day','billing_offset_days','payment_due_days','is_active'];
@@ -136,6 +139,10 @@ switch ($method) {
                         $sets[] = "$f = :$f";
                         $params[":$f"] = $data[$f];
                     }
+                }
+                if ($existing['code'] === null || $existing['code'] === '') {
+                    $sets[] = 'code = :code';
+                    $params[':code'] = $accessCustomerNo;
                 }
                 $sets[] = 'access_customer_no = :access_customer_no';
                 $params[':access_customer_no'] = $accessCustomerNo;
@@ -151,10 +158,11 @@ switch ($method) {
         }
 
         // R-075: UI経由の新規作成（access_customer_noなし）はクライアント指定のcodeを無視して自動採番する。
-        // Access同期経路（access_customer_noあり）は従来どおりクライアント送信値をそのまま使う（変更しない）。
+        // Access同期経路（access_customer_noあり）の新規作成はcode=access_customer_noに統一する
+        // （晴樹さん方針: Beaverのcodeを常にAccessの得意先番号と一致させる。クライアント送信のcodeは無視）。
         $code = $accessCustomerNo === null
             ? nextCustomerCode($pdo)
-            : ($data['code'] ?? null);
+            : $accessCustomerNo;
 
         // UNIQUE 制約違反（access_customer_no または code の重複）は PDOException で 409 返却
         try {
