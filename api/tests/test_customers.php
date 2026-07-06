@@ -305,6 +305,51 @@ runTest('T-06: access_customer_no 照合 upsert の回帰防止 - access_custome
     assertEq('06-1111-2222', $res2['body']['tel'], 'tel が更新されている');
 });
 
+// T-07: UI経由の新規登録2件連続でコードが連番自動付与される
+runTest('T-07: UI経由の新規登録2件連続でコードが連番自動付与される', function () use ($pdo) {
+    $res1 = customerPost($pdo, ['name' => '新規得意先A']);
+    assertEq(201, $res1['code'], '1件目 HTTP status');
+    $code1 = (int)$res1['body']['code'];
+    assertTrue($code1 > 0, '1件目 code は正の数値');
+
+    $res2 = customerPost($pdo, ['name' => '新規得意先B']);
+    assertEq(201, $res2['code'], '2件目 HTTP status');
+    $code2 = (int)$res2['body']['code'];
+    assertEq($code1 + 1, $code2, '2件目 code は1件目+1の連番');
+});
+
+// T-08: クライアント指定codeが無視される
+runTest('T-08: UI経由の新規登録でクライアント指定codeは無視される', function () use ($pdo) {
+    $res = customerPost($pdo, ['name' => 'コード指定テスト', 'code' => 'HACKED-CODE']);
+    assertEq(201, $res['code'], 'HTTP status');
+    assertTrue($res['body']['code'] !== 'HACKED-CODE', 'クライアント指定codeがそのまま使われていない');
+    assertTrue(is_numeric($res['body']['code']), '自動採番された数値codeになっている');
+});
+
+// T-09: access_customer_no=数値最大の得意先が存在する状態でも採番衝突しない
+runTest('T-09: access_customer_noの数値最大値を考慮して採番される（Access番号域と衝突しない）', function () use ($pdo) {
+    // Access同期経路で access_customer_no=90000（他のcode/access_customer_noより大きい数値）の得意先を作る
+    $accessRes = customerPost($pdo, ['name' => 'Access得意先', 'access_customer_no' => '90000']);
+    assertEq(201, $accessRes['code'], 'Access経路の事前登録');
+
+    // UI経由で新規登録すると、90000を超える番号が採番されるはず
+    $uiRes = customerPost($pdo, ['name' => 'UI経由得意先']);
+    assertEq(201, $uiRes['code'], 'UI経由登録 HTTP status');
+    assertTrue((int)$uiRes['body']['code'] > 90000, 'access_customer_noの最大値を超えた番号が採番されている: ' . $uiRes['body']['code']);
+});
+
+// T-10: code重複時の409メッセージが正しい列名になっている
+runTest('T-10: code重複時は「code」を指す409メッセージになる（access_customer_noの決め打ちをしない）', function () use ($pdo) {
+    // Access同期経路（access_customer_noあり）は従来どおりクライアント指定codeをそのまま使うため、
+    // 意図的に同じcodeを持つ2件を作ってUNIQUE制約をcode側で違反させる。
+    $res1 = customerPost($pdo, ['name' => 'コード重複テスト1', 'access_customer_no' => '77001', 'code' => '55555']);
+    assertEq(201, $res1['code'], '1件目登録');
+
+    $res2 = customerPost($pdo, ['name' => 'コード重複テスト2', 'access_customer_no' => '77002', 'code' => '55555']);
+    assertEq(409, $res2['code'], '2件目は409');
+    assertEq('code が既に存在します', $res2['body']['error'], 'codeを指す409メッセージになっている（access_customer_noの決め打ちでない）');
+});
+
 // ============================================================
 // 結果サマリ
 // ============================================================
