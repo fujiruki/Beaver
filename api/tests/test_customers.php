@@ -401,6 +401,39 @@ runTest('T-10: code重複のUNIQUE制約メッセージはaccess_customer_noに�
     }
 });
 
+// T-11: access_customer_no指定の新規syncでcode=access_customer_noが自動セットされる
+runTest('T-11: access_customer_no指定の新規syncでcode=access_customer_noが自動セットされる', function () use ($pdo) {
+    $res = customerPost($pdo, ['name' => '同期整合テスト得意先', 'access_customer_no' => '500']);
+    assertEq(201, $res['code'], 'HTTP status');
+    assertEq('500', $res['body']['code'], 'codeがaccess_customer_noと一致してセットされる');
+});
+
+// T-12: codeが空でaccess_customer_noが既に紐付いている得意先にsyncが来るとcodeが埋まる
+// （R-075発見事項: 修正前はAccess同期経路のINSERTでcodeがnullのまま作成されていたため、
+// 既存本番データにはこのような「access_customer_noはあるがcode空」のレコードが存在しうる）
+runTest('T-12: codeが空でaccess_customer_noが既に紐付いている得意先にsyncが来るとcodeが埋まる', function () use ($pdo) {
+    $pdo->prepare('INSERT INTO customers (name, access_customer_no, is_active) VALUES (?, ?, 1)')
+        ->execute(['未整合得意先', '502']);
+    $id = (int)$pdo->lastInsertId();
+    $before = $pdo->query("SELECT code FROM customers WHERE id = $id")->fetch();
+    assertEq(null, $before['code'], '前提: codeは未設定');
+
+    $res = customerPost($pdo, ['name' => '未整合得意先（再sync）', 'access_customer_no' => '502']);
+    assertEq(200, $res['code'], 'HTTP status（既存レコードのUPDATE）');
+    assertEq('502', $res['body']['code'], 'codeがaccess_customer_noで埋まる');
+});
+
+// T-13: codeが既に設定済みの得意先はsyncが来てもcodeを上書きされない（B-2整合済みデータの保護）
+runTest('T-13: codeが既に設定済みの得意先はsyncが来てもcodeを上書きされない', function () use ($pdo) {
+    $res1 = customerPost($pdo, ['name' => '整合済み得意先', 'access_customer_no' => '503']);
+    assertEq(201, $res1['code'], '事前作成');
+    assertEq('503', $res1['body']['code'], '前提: codeは503');
+
+    $res2 = customerPost($pdo, ['name' => '整合済み得意先（再sync）', 'access_customer_no' => '503', 'code' => '999999']);
+    assertEq(200, $res2['code'], 'HTTP status');
+    assertEq('503', $res2['body']['code'], 'codeは上書きされず維持される（クライアント指定999999は無視）');
+});
+
 // ============================================================
 // 結果サマリ
 // ============================================================
