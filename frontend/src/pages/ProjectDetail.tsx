@@ -125,7 +125,7 @@ export default function ProjectDetail() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
         {/* 基本情報 */}
         <div className="bg-white rounded-lg shadow-sm p-5 space-y-4">
           <h2 className="text-sm font-bold text-slate-600 border-b border-slate-100 pb-2">基本情報</h2>
