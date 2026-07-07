@@ -196,3 +196,16 @@ Phase 7（Access連携）完了後に着手。
 ### 対処方針（案）
 - 本番 `projects` テーブルの `PRAGMA table_info` と dev の `schema.sql`＋全migration適用後のスキーマを突合し、他に記録漏れの列・テーブルがないか棚卸しする
 - 本番手動変更の経緯（いつ・誰が・なぜ追加したか）が追跡できるドキュメントが無いため、可能な範囲で経緯を確認し、今後同様の手動変更をする際は migration ファイルとして必ず記録する運用を徹底する
+
+---
+
+## 15. R-076: 「Beaverと同期」統合のBeaver側対応（2026-07-07 計画承認済み）
+
+Access側の統合同期ボタンに対応するBeaver側タスク群（詳細: AccessTategu側R-076と共通計画）:
+- B1-1: /vouchers/sync の updated_at/last_synced_at をJST正規化（SQLiteのCURRENT_TIMESTAMPがUTCであることを本番実測で確認済み）
+- B1-2: syncVoucherUpsert 成功時に vouchers.last_synced_at をセット（エコー競合の抑止）
+- B2-1: /vouchers/sync 応答へヘッダ項目追加（trade_type/description/print_*等＋customer_access_no）
+- B2-2: lines_mode='replace'（競合解消の明示採用時の明細フル置換）
+- B2-3: PATCH /vouchers/{id}/access-link（Beaver発伝票のaccess_voucher_id書き戻し）
+- B3-1/B3-2: GET /customers/sync 新設（完全一致ルーティングガード必須）＋customers.last_synced_at
+- B4-1: mergeSyncedLines（access_line_id行単位マージ・edited_in_beaver保護、R-066(c) Phase2本丸）
