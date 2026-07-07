@@ -51,6 +51,37 @@ foreach ($rows as [$code, $name, $tel, $addr1]) {
     $pdo->exec("INSERT INTO customers (code, name, tel, address1, is_active) VALUES ('$code', '$name', '$tel', '$addr1', 1)");
 }
 
+// 建具台帳: code順・name順・total_cost順のすべてが互いに食い違うように投入する
+// （3つの並び順のいずれかが偶然一致すると、未実装のままでも見かけ上テストが通ってしまうため）
+$pdo->exec("DELETE FROM tategu_items WHERE code LIKE 'LT%'");
+$titems = [
+    // code, name, cost_body（他原価は0固定でtotal_cost=cost_bodyになる）
+    ['LT001', 'い建具', 3000],
+    ['LT002', 'ん建具', 1000],
+    ['LT003', 'あ建具', 2000],
+];
+foreach ($titems as [$code, $name, $body]) {
+    $pdo->exec("
+        INSERT INTO tategu_items (code, name, status, cost_body, cost_hardware, cost_glass, cost_factory_hours, cost_site_hours, cost_labor_rate)
+        VALUES ('$code', '$name', 'active', $body, 0, 0, 0, 0, 0)
+    ");
+}
+
+// 案件: project_code順・name順・updated_at順のすべてが互いに食い違うように投入する（既定はupdated_at DESC）
+$pdo->exec("DELETE FROM projects WHERE project_code LIKE 'LP%'");
+$customerIdForProjects = (int)$pdo->query("SELECT id FROM customers WHERE code = 'LS001'")->fetchColumn();
+$lprojects = [
+    ['LP001', 'い案件', '2026-01-03'],
+    ['LP002', 'ん案件', '2026-01-01'],
+    ['LP003', 'あ案件', '2026-01-02'],
+];
+foreach ($lprojects as [$code, $name, $updatedAt]) {
+    $pdo->exec("
+        INSERT INTO projects (project_code, customer_id, name, status, updated_at)
+        VALUES ('$code', $customerIdForProjects, '$name', '進行中', '$updatedAt 00:00:00')
+    ");
+}
+
 // ============================================================
 // テストハーネス
 // ============================================================
@@ -230,6 +261,72 @@ try {
         $data = json_decode($body, true);
         $codes = array_values(array_filter(array_column($data['data'], 'code'), fn($c) => str_starts_with((string)$c, 'LS')));
         assertEq(['LS001', 'LS002', 'LS003'], $codes, 'sort未指定はcode昇順');
+    });
+
+    // ============================================================
+    // GET /tategu-items?page=1 実データでのソート統合テスト
+    // ============================================================
+    echo "\n=== GET /tategu-items?page=1 サーバソート統合 ===\n";
+
+    runTest('sort 未指定時は従来通り code 降順で返る（既存挙動を維持）', function () use ($port) {
+        $body = file_get_contents("http://127.0.0.1:$port/contents/Beaver/api/tategu-items?page=1&per_page=200");
+        $data = json_decode($body, true);
+        $codes = array_values(array_filter(array_column($data['data'], 'code'), fn($c) => str_starts_with((string)$c, 'LT')));
+        assertEq(['LT003', 'LT002', 'LT001'], $codes, 'sort未指定はcode降順（既存動作）');
+    });
+
+    runTest('sort=name&order=asc で name 昇順に並ぶ', function () use ($port) {
+        $body = file_get_contents("http://127.0.0.1:$port/contents/Beaver/api/tategu-items?page=1&per_page=200&sort=name&order=asc");
+        $data = json_decode($body, true);
+        $codes = array_values(array_filter(array_column($data['data'], 'code'), fn($c) => str_starts_with((string)$c, 'LT')));
+        assertEq(['LT003', 'LT001', 'LT002'], $codes, 'name昇順（あ建具=LT003→い建具=LT001→ん建具=LT002）');
+    });
+
+    runTest('sort=total_cost&order=asc で原価合計の昇順に並ぶ（SQL式ホワイトリスト）', function () use ($port) {
+        $body = file_get_contents("http://127.0.0.1:$port/contents/Beaver/api/tategu-items?page=1&per_page=200&sort=total_cost&order=asc");
+        $data = json_decode($body, true);
+        $codes = array_values(array_filter(array_column($data['data'], 'code'), fn($c) => str_starts_with((string)$c, 'LT')));
+        assertEq(['LT002', 'LT003', 'LT001'], $codes, 'total_cost昇順（1000=LT002→2000=LT003→3000=LT001）');
+    });
+
+    runTest('sort=total_cost&order=desc で原価合計の降順に並ぶ', function () use ($port) {
+        $body = file_get_contents("http://127.0.0.1:$port/contents/Beaver/api/tategu-items?page=1&per_page=200&sort=total_cost&order=desc");
+        $data = json_decode($body, true);
+        $codes = array_values(array_filter(array_column($data['data'], 'code'), fn($c) => str_starts_with((string)$c, 'LT')));
+        assertEq(['LT001', 'LT003', 'LT002'], $codes, 'total_cost降順（3000=LT001→2000=LT003→1000=LT002）');
+    });
+
+    // ============================================================
+    // GET /projects?page=1 実データでのソート統合テスト
+    // ============================================================
+    echo "\n=== GET /projects?page=1 サーバソート統合 ===\n";
+
+    runTest('sort 未指定時は従来通り updated_at 降順で返る（既存挙動を維持）', function () use ($port) {
+        $body = file_get_contents("http://127.0.0.1:$port/contents/Beaver/api/projects?page=1&per_page=200");
+        $data = json_decode($body, true);
+        $codes = array_values(array_filter(array_column($data['data'], 'project_code'), fn($c) => str_starts_with((string)$c, 'LP')));
+        assertEq(['LP001', 'LP003', 'LP002'], $codes, 'sort未指定はupdated_at降順（既存動作）');
+    });
+
+    runTest('sort=name&order=asc で案件名の昇順に並ぶ', function () use ($port) {
+        $body = file_get_contents("http://127.0.0.1:$port/contents/Beaver/api/projects?page=1&per_page=200&sort=name&order=asc");
+        $data = json_decode($body, true);
+        $codes = array_values(array_filter(array_column($data['data'], 'project_code'), fn($c) => str_starts_with((string)$c, 'LP')));
+        assertEq(['LP003', 'LP001', 'LP002'], $codes, 'name昇順（あ案件=LP003→い案件=LP001→ん案件=LP002）');
+    });
+
+    runTest('projectsでホワイトリスト外の列名を指定しても400にならずupdated_at降順にフォールバックする', function () use ($port) {
+        $ctx = stream_context_create(['http' => ['ignore_errors' => true]]);
+        $body = file_get_contents(
+            "http://127.0.0.1:$port/contents/Beaver/api/projects?page=1&per_page=200&sort=" . urlencode('memo') . "&order=asc",
+            false,
+            $ctx
+        );
+        $statusLine = $http_response_header[0] ?? '';
+        assertTrue(str_contains($statusLine, '200'), 'expected 200 got: ' . $statusLine);
+        $data = json_decode($body, true);
+        $codes = array_values(array_filter(array_column($data['data'], 'project_code'), fn($c) => str_starts_with((string)$c, 'LP')));
+        assertEq(['LP001', 'LP003', 'LP002'], $codes, 'updated_at降順（デフォルト）にフォールバック');
     });
 } finally {
     if (is_resource($serverProc)) {
