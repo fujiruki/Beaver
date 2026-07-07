@@ -16,10 +16,10 @@ const ROWS: Row[] = [
 function makeColumns(overrides: Partial<DataTableColumn<Row>> = {}): DataTableColumn<Row>[] {
   return [
     { key: 'name', label: '名前', sortable: true, render: r => r.name },
-    { key: 'amount', label: '金額', align: 'right', width: 120, render: r => String(r.amount) },
+    { key: 'amount', label: '金額', align: 'right', width: 120, sortable: true, render: r => String(r.amount) },
     {
       key: 'actions',
-      label: '',
+      label: '操作',
       stopRowClick: true,
       render: r => `操作${r.id}`,
       ...overrides,
@@ -146,7 +146,7 @@ describe('DataTable ソート', () => {
         onSortChange={onSortChange}
       />,
     );
-    fireEvent.click(screen.getAllByText('操作1')[0]);
+    fireEvent.click(screen.getByText('操作'));
     expect(onSortChange).not.toHaveBeenCalled();
   });
 
@@ -189,7 +189,7 @@ describe('DataTable ソート', () => {
         rowKey={r => r.id}
       />,
     );
-    const th = screen.getByText('金額').closest('th');
+    const th = screen.getByText('操作').closest('th');
     expect(th?.hasAttribute('aria-sort')).toBe(false);
   });
 });
@@ -259,7 +259,7 @@ describe('DataTable 列幅の永続化', () => {
   });
 
   it('ドラッグ中(pointermove)は列幅が更新されるが、pointerup までlocalStorageへは保存されない', () => {
-    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem');
+    const storageKey = 'bv_table_widths_test-width-drag';
     const { container } = render(
       <DataTable
         tableId="test-width-drag"
@@ -272,20 +272,19 @@ describe('DataTable 列幅の永続化', () => {
     expect(handle).not.toBeNull();
 
     fireEvent.pointerDown(handle, { clientX: 100, pointerId: 1 });
-    setItemSpy.mockClear();
-
     fireEvent.pointerMove(window, { clientX: 150, pointerId: 1 });
-    // ドラッグ中は保存されない
-    expect(setItemSpy).not.toHaveBeenCalled();
+
+    // ドラッグ中はまだlocalStorageに保存されない
+    expect(localStorage.getItem(storageKey)).toBeNull();
     const col = container.querySelectorAll('colgroup col')[0] as HTMLElement;
     expect(col.style.width).not.toBe('');
+    const widthDuringDrag = col.style.width;
 
     fireEvent.pointerUp(window, { clientX: 150, pointerId: 1 });
-    // pointerup時に一度だけ保存される
-    expect(setItemSpy).toHaveBeenCalledTimes(1);
-    expect(setItemSpy).toHaveBeenCalledWith(
-      'bv_table_widths_test-width-drag',
-      expect.any(String),
-    );
+
+    // pointerup時にその時点の幅で保存される
+    const saved = JSON.parse(localStorage.getItem(storageKey) ?? 'null');
+    expect(saved).not.toBeNull();
+    expect(`${saved.name}px`).toBe(widthDuringDrag);
   });
 });
