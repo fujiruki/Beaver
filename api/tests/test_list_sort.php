@@ -129,6 +129,35 @@ runTest('tiebreaker が必ず末尾に付与される', function () {
     assertTrue(str_ends_with($clause, ', id ASC'), 'tiebreaker id ASC が末尾にあること');
 });
 
+// ============================================================
+// resolveSortClause 第4引数 $defaultOrder（DESC既定を維持したいエンドポイント向け）
+// ============================================================
+echo "\n=== resolveSortClause 第4引数 defaultOrder ===\n";
+
+runTest('order未指定・第4引数省略時はASC（既存の3引数呼び出し互換）', function () {
+    $_GET = ['sort' => 'code'];
+    $clause = resolveSortClause(['code' => 'code'], 'code', 'id');
+    assertEq('ORDER BY code ASC, id ASC', $clause);
+});
+
+runTest('order未指定・defaultOrder=DESC指定時はDESCになる', function () {
+    $_GET = ['sort' => 'code'];
+    $clause = resolveSortClause(['code' => 'code'], 'code', 'id', 'DESC');
+    assertEq('ORDER BY code DESC, id ASC', $clause);
+});
+
+runTest('defaultOrder=DESCでもorder=ascを明示指定すればASCが優先される', function () {
+    $_GET = ['sort' => 'code', 'order' => 'asc'];
+    $clause = resolveSortClause(['code' => 'code'], 'code', 'id', 'DESC');
+    assertEq('ORDER BY code ASC, id ASC', $clause);
+});
+
+runTest('defaultOrder=DESC時、不正なorder値はdefaultOrder(DESC)へフォールバックする', function () {
+    $_GET = ['sort' => 'code', 'order' => 'not-a-direction'];
+    $clause = resolveSortClause(['code' => 'code'], 'code', 'id', 'DESC');
+    assertEq('ORDER BY code DESC, id ASC', $clause);
+});
+
 $_GET = [];
 
 // ============================================================
