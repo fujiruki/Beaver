@@ -768,6 +768,51 @@ try {
         assertTrue(str_contains($r['status'], '400'), 'expected 400 got: ' . $r['status']);
     });
 
+    // ============================================================
+    // R-076 B2-1: GET /vouchers/sync 応答のヘッダ項目拡張
+    // ============================================================
+    echo "\n=== R-076 B2-1 GET /vouchers/sync のヘッダ項目拡張 ===\n";
+
+    runTest('レスポンスに拡張ヘッダ項目とcustomer_access_noが含まれる', function () use ($vfetch, $vbase) {
+        $data = json_decode($vfetch($vbase)['body'], true);
+        assertTrue(count($data['vouchers']) > 0, 'has vouchers');
+        $first = $data['vouchers'][0];
+        foreach ([
+            'trade_type', 'consumption_tax_type', 'description',
+            'print_date_flag', 'print_tax_excl_flag', 'print_company_seal',
+            'sales_category_id', 'delivery_date', 'billing_date',
+            'source_estimate_no', 'validity_period', 'customer_access_no',
+        ] as $key) {
+            assertTrue(array_key_exists($key, $first), "$key キーが存在すること");
+        }
+    });
+
+    runTest('既存項目（id/voucher_no/updated_at/last_synced_at等）に回帰がない', function () use ($vfetch, $vbase) {
+        $data = json_decode($vfetch($vbase)['body'], true);
+        $first = $data['vouchers'][0];
+        foreach ([
+            'id', 'voucher_no', 'voucher_type', 'status', 'voucher_date',
+            'access_voucher_id', 'access_voucher_no', 'customer_id', 'project_id',
+            'total_amount', 'updated_at', 'last_synced_at', 'lines',
+        ] as $key) {
+            assertTrue(array_key_exists($key, $first), "$key キーが既存通り存在すること");
+        }
+    });
+
+    runTest('customer_access_no が得意先の access_customer_no と一致する', function () use ($vfetch, $vbase, $testDbPath) {
+        $tmpPdo = new PDO('sqlite:' . $testDbPath, null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+        $voucherRow = $tmpPdo->query("SELECT id, customer_id FROM vouchers WHERE voucher_no = 'VS001'")->fetch(PDO::FETCH_ASSOC);
+        $voucherId = (int)$voucherRow['id'];
+        $expectedAccessNo = $tmpPdo->query("SELECT access_customer_no FROM customers WHERE id = " . (int)$voucherRow['customer_id'])->fetchColumn();
+        $tmpPdo = null;
+
+        $data = json_decode($vfetch($vbase)['body'], true);
+        $found = null;
+        foreach ($data['vouchers'] as $v) { if ((int)$v['id'] === $voucherId) { $found = $v; break; } }
+        assertTrue($found !== null, 'VS001 が見つかること');
+        assertEq($expectedAccessNo, $found['customer_access_no'], 'customer_access_noが得意先のaccess_customer_noと一致する');
+    });
+
 } finally {
     // サーバ停止
     if (is_resource($serverProc)) {
