@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { api } from './client';
 import type { Customer, CustomerInput } from '../types/customer';
-import type { PaginatedResponse } from '../types/pagination';
+import type { PaginatedResponse, SortParam } from '../types/pagination';
 
 const KEY = 'customers';
 
@@ -14,12 +14,17 @@ export function useCustomers() {
 }
 
 /** 得意先一覧取得（ページネーション付き・一覧ページ用） */
-export function useCustomersPaged(page: number, search = '') {
+export function useCustomersPaged(page: number, search = '', sort?: SortParam) {
   return useQuery({
-    queryKey: [KEY, 'paged', page, search],
+    queryKey: [KEY, 'paged', page, search, sort?.key, sort?.dir],
     queryFn: () => {
       const params = new URLSearchParams({ page: String(page), per_page: '50' });
       if (search) params.set('q', search);
+      // sort未指定時はsort/orderパラメータを付けない（既存のfetchモックURL互換のため）
+      if (sort) {
+        params.set('sort', sort.key);
+        params.set('order', sort.dir);
+      }
       return api.get<PaginatedResponse<Customer>>(`/customers?${params}`);
     },
     placeholderData: keepPreviousData,

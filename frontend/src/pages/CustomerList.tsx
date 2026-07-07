@@ -2,14 +2,19 @@ import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCustomersPaged, useDeleteCustomer } from '../api/customers';
 import Pagination from '../components/Pagination';
+import DataTable from '../components/DataTable';
+import type { DataTableColumn, SortDir } from '../components/DataTable';
+import type { Customer } from '../types/customer';
+import type { SortParam } from '../types/pagination';
 
 export default function CustomerList() {
   const navigate = useNavigate();
   const [page, setPage] = useState(1);
   const [inputValue, setInputValue] = useState('');
   const [search, setSearch] = useState('');
+  const [sort, setSort] = useState<SortParam | undefined>(undefined);
   const isComposingRef = useRef(false);
-  const { data, isLoading, error } = useCustomersPaged(page, search);
+  const { data, isLoading, error } = useCustomersPaged(page, search, sort);
   const deleteMutation = useDeleteCustomer();
 
   const customers = data?.data ?? [];
@@ -40,8 +45,42 @@ export default function CustomerList() {
     deleteMutation.mutate(id);
   }
 
+  function handleSortChange(key: string, dir: SortDir) {
+    setSort({ key, dir });
+    setPage(1);
+  }
+
   if (isLoading) return <div>読み込み中...</div>;
   if (error)     return <div style={{ color: 'red' }}>エラー: {String(error)}</div>;
+
+  const columns: DataTableColumn<Customer>[] = [
+    { key: 'code', label: 'コード', sortable: true, render: c => c.code },
+    { key: 'name', label: '得意先名', sortable: true, render: c => c.name },
+    { key: 'tel', label: '電話', sortable: true, render: c => c.tel ?? '—' },
+    { key: 'address1', label: '住所', sortable: true, render: c => `${c.address1 ?? ''} ${c.address2 ?? ''}`.trim() || '—' },
+    {
+      key: 'actions',
+      label: '',
+      width: 120,
+      align: 'right',
+      stopRowClick: true,
+      render: c => (
+        <>
+          <button onClick={() => navigate(`/customers/${c.id}`)} style={btnSmStyle('#475569')}>
+            編集
+          </button>
+          {' '}
+          <button
+            onClick={() => handleDelete(c.id, c.name)}
+            style={btnSmStyle('#dc2626')}
+            disabled={deleteMutation.isPending}
+          >
+            削除
+          </button>
+        </>
+      ),
+    },
+  ];
 
   return (
     <div>
@@ -68,50 +107,16 @@ export default function CustomerList() {
       </div>
 
       <div style={{ background: '#fff', borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #e2e8f0' }}>
-              <th style={thStyle}>コード</th>
-              <th style={thStyle}>得意先名</th>
-              <th style={thStyle}>電話</th>
-              <th style={thStyle}>住所</th>
-              <th style={{ ...thStyle, width: 120 }}></th>
-            </tr>
-          </thead>
-          <tbody>
-            {customers.length === 0 && (
-              <tr><td colSpan={5} style={{ padding: 16, textAlign: 'center', color: '#94a3b8' }}>登録なし</td></tr>
-            )}
-            {customers.map(c => (
-              <tr
-                key={c.id}
-                style={{ borderBottom: '1px solid #f1f5f9', cursor: 'pointer' }}
-                onClick={() => navigate(`/customers/${c.id}`)}
-              >
-                <td style={tdStyle}>{c.code}</td>
-                <td style={tdStyle}>{c.name}</td>
-                <td style={tdStyle}>{c.tel ?? '—'}</td>
-                <td style={tdStyle}>{`${c.address1 ?? ''} ${c.address2 ?? ''}`.trim() || '—'}</td>
-                <td style={{ ...tdStyle, textAlign: 'right' }} onClick={e => e.stopPropagation()}>
-                  <button
-                    onClick={() => navigate(`/customers/${c.id}`)}
-                    style={btnSmStyle('#475569')}
-                  >
-                    編集
-                  </button>
-                  {' '}
-                  <button
-                    onClick={() => handleDelete(c.id, c.name)}
-                    style={btnSmStyle('#dc2626')}
-                    disabled={deleteMutation.isPending}
-                  >
-                    削除
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <DataTable
+          tableId="customers"
+          columns={columns}
+          rows={customers}
+          rowKey={c => c.id}
+          onRowClick={c => navigate(`/customers/${c.id}`)}
+          sortKey={sort?.key}
+          sortDir={sort?.dir}
+          onSortChange={handleSortChange}
+        />
         {meta && (
           <Pagination
             page={meta.page}
@@ -126,12 +131,6 @@ export default function CustomerList() {
   );
 }
 
-const thStyle: React.CSSProperties = {
-  padding: '10px 12px', textAlign: 'left', fontSize: 13, fontWeight: 'bold', color: '#475569',
-};
-const tdStyle: React.CSSProperties = {
-  padding: '10px 12px', fontSize: 14, color: '#1e293b',
-};
 const btnStyle = (bg: string): React.CSSProperties => ({
   padding: '6px 14px', background: bg, color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 14,
 });

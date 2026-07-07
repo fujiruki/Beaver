@@ -46,7 +46,7 @@ describe('CustomerList サーバソート (R-076 Part A Phase 1)', () => {
     renderPage();
     await waitFor(() => expect(requestedUrls.length).toBeGreaterThan(0));
 
-    fireEvent.click(screen.getByText('得意先名'));
+    fireEvent.click(await screen.findByText('得意先名'));
 
     await waitFor(() => {
       const last = new URL(requestedUrls[requestedUrls.length - 1], 'http://localhost');
@@ -59,13 +59,13 @@ describe('CustomerList サーバソート (R-076 Part A Phase 1)', () => {
     renderPage();
     await waitFor(() => expect(requestedUrls.length).toBeGreaterThan(0));
 
-    fireEvent.click(screen.getByText('得意先名'));
+    fireEvent.click(await screen.findByText('得意先名'));
     await waitFor(() => {
       const last = new URL(requestedUrls[requestedUrls.length - 1], 'http://localhost');
       expect(last.searchParams.get('order')).toBe('asc');
     });
 
-    fireEvent.click(screen.getByText('得意先名'));
+    fireEvent.click(await screen.findByText('得意先名'));
     await waitFor(() => {
       const last = new URL(requestedUrls[requestedUrls.length - 1], 'http://localhost');
       expect(last.searchParams.get('sort')).toBe('name');
@@ -77,7 +77,7 @@ describe('CustomerList サーバソート (R-076 Part A Phase 1)', () => {
     renderPage();
     await waitFor(() => expect(requestedUrls.length).toBeGreaterThan(0));
 
-    fireEvent.click(screen.getByText('得意先名'));
+    fireEvent.click(await screen.findByText('得意先名'));
 
     await waitFor(() => {
       const last = new URL(requestedUrls[requestedUrls.length - 1], 'http://localhost');

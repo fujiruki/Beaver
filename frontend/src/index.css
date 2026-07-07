@@ -14,3 +14,11 @@ body {
 #root {
   min-height: 100vh;
 }
+
+.bv-datatable-row:hover {
+  background: #f8fafc;
+}
+
+.bv-datatable-resize-handle {
+  cursor: col-resize;
+}

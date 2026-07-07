@@ -7,3 +7,8 @@ export interface PaginatedResponse<T> {
     last_page: number;
   };
 }
+
+export interface SortParam {
+  key: string;
+  dir: 'asc' | 'desc';
+}
