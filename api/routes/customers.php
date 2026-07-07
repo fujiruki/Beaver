@@ -8,6 +8,8 @@
  * DELETE /customers/{id}    削除（論理削除）
  */
 
+require_once __DIR__ . '/list_helpers.php';
+
 // IDとサブリソースを取り出す
 $segments = explode('/', trim($path, '/'));
 $resourceId = isset($segments[1]) && is_numeric($segments[1]) ? (int)$segments[1] : null;
@@ -90,7 +92,13 @@ switch ($method) {
                 $cntStmt = $pdo->prepare("SELECT COUNT(*) FROM customers $where");
                 $cntStmt->execute($params);
                 $total = (int)$cntStmt->fetchColumn();
-                $stmt  = $pdo->prepare("SELECT * FROM customers $where ORDER BY code LIMIT $perPage OFFSET $offset");
+                // R-076 Part A Phase 1: サーバソート（ホワイトリストは全てハードコード文字列）
+                $sortClause = resolveSortClause(
+                    ['code' => 'code', 'name' => 'name', 'tel' => 'tel', 'address1' => 'address1'],
+                    'code',
+                    'id'
+                );
+                $stmt  = $pdo->prepare("SELECT * FROM customers $where $sortClause LIMIT $perPage OFFSET $offset");
                 $stmt->execute($params);
                 echo json_encode([
                     'data' => $stmt->fetchAll(),
