@@ -12,6 +12,8 @@
  * PUT    /tategu-items/{id}/cost-breakdown      集計区分別内訳の全件入れ替え
  */
 
+require_once __DIR__ . '/list_helpers.php';
+
 $segments = explode('/', trim($path, '/'));
 $resourceId  = isset($segments[1]) && is_numeric($segments[1]) ? (int)$segments[1] : null;
 $subAction   = $segments[2] ?? null;   // 'reload-cost' | 'additions'
@@ -107,7 +109,20 @@ switch ($method) {
                 $cntStmt = $pdo->prepare("SELECT COUNT(*) FROM tategu_items $where");
                 $cntStmt->execute($params);
                 $total = (int)$cntStmt->fetchColumn();
-                $stmt  = $pdo->prepare("SELECT * FROM tategu_items $where ORDER BY code DESC LIMIT $perPage OFFSET $offset");
+                // R-076 Part A: サーバソート（ホワイトリストは全てハードコード文字列）。
+                // total_costは原価合計のSQL式（GET詳細のtotal_cost計算とPHP側で同一の式）。
+                // 既存動作(code DESC)を維持するためdefaultOrder='DESC'を指定する。
+                $sortClause = resolveSortClause(
+                    [
+                        'code' => 'code',
+                        'name' => 'name',
+                        'total_cost' => '(cost_body + cost_hardware + cost_glass + (cost_factory_hours + cost_site_hours) * cost_labor_rate)',
+                    ],
+                    'code',
+                    'id',
+                    'DESC'
+                );
+                $stmt  = $pdo->prepare("SELECT * FROM tategu_items $where $sortClause LIMIT $perPage OFFSET $offset");
                 $stmt->execute($params);
                 $rows = $stmt->fetchAll();
                 foreach ($rows as &$row) {

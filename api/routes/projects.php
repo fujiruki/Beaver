@@ -24,6 +24,7 @@ function nextProjectCode(PDO $pdo): string {
 }
 
 require_once __DIR__ . '/sync_helpers.php';
+require_once __DIR__ . '/list_helpers.php';
 
 // --- R-025 Step E-Beaver: AccessTategu からの伝票 push 受信 ---
 // POST  /projects/{id}/vouchers/sync                    新規/upsert
@@ -253,11 +254,26 @@ switch ($method) {
                 $cntStmt = $pdo->prepare("SELECT COUNT(*) FROM projects p $where");
                 $cntStmt->execute($params);
                 $total = (int)$cntStmt->fetchColumn();
+                // R-076 Part A: サーバソート（ホワイトリストは全てハードコード文字列）。
+                // 既存動作(updated_at DESC)を維持するためdefaultOrder='DESC'を指定する。
+                // tiebreakerはcustomersとの結合でidが曖昧になるためp.idを明示する。
+                $sortClause = resolveSortClause(
+                    [
+                        'project_code'  => 'p.project_code',
+                        'name'          => 'p.name',
+                        'customer_name' => 'c.name',
+                        'status'        => 'p.status',
+                        'start_date'    => 'p.start_date',
+                    ],
+                    'p.updated_at',
+                    'p.id',
+                    'DESC'
+                );
                 $stmt  = $pdo->prepare("
                     SELECT p.*, c.name AS customer_name
                     FROM projects p
                     LEFT JOIN customers c ON c.id = p.customer_id
-                    $where ORDER BY p.updated_at DESC LIMIT $perPage OFFSET $offset
+                    $where $sortClause LIMIT $perPage OFFSET $offset
                 ");
                 $stmt->execute($params);
                 echo json_encode([

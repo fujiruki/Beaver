@@ -316,9 +316,12 @@ try {
     });
 
     runTest('projectsでホワイトリスト外の列名を指定しても400にならずupdated_at降順にフォールバックする', function () use ($port) {
+        // order未指定のため、列名フォールバック(p.updated_at)と方向フォールバック(defaultOrder=DESC)の
+        // 両方が効くことを確認する（order=ascを明示指定した場合は列だけフォールバックし
+        // 方向は要求通りASCになるのが正しい挙動であり、それは別の関心事のためここでは検証しない）。
         $ctx = stream_context_create(['http' => ['ignore_errors' => true]]);
         $body = file_get_contents(
-            "http://127.0.0.1:$port/contents/Beaver/api/projects?page=1&per_page=200&sort=" . urlencode('memo') . "&order=asc",
+            "http://127.0.0.1:$port/contents/Beaver/api/projects?page=1&per_page=200&sort=" . urlencode('memo'),
             false,
             $ctx
         );
