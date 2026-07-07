@@ -29,7 +29,7 @@ if ($method === 'POST' && isset($segments[1]) && $segments[1] === 'sync' && !$re
 }
 
 // --- R-060 Phase2a: Beaver→Access 伝票同期用 軽量増分API ---
-// GET /vouchers/sync[?updated_after=ISO8601][&limit=N][&cursor=ID]
+// GET /vouchers/sync[?updated_after=YYYY-MM-DD HH:NN:SS (JST)][&limit=N][&cursor=ID]
 // 完全一致チェック（/vouchers/sync/anything を全件返却で誤通過させない）
 if ($method === 'GET' && isset($segments[1]) && $segments[1] === 'sync' && isset($segments[2])) {
     http_response_code(404);
@@ -37,16 +37,19 @@ if ($method === 'GET' && isset($segments[1]) && $segments[1] === 'sync' && isset
     exit;
 }
 if ($method === 'GET' && isset($segments[1]) && $segments[1] === 'sync' && !isset($segments[2])) {
+    // R-076 B1-1: updated_after は JST の 'Y-m-d H:i:s' として受け取る契約（Access側の送信形式）。
+    // DB列 v.updated_at は UTC 保存のため、比較前に UTC へ逆変換する。
     $updatedAfterRaw = $_GET['updated_after'] ?? null;
     $updatedAfterSql = null;
     if ($updatedAfterRaw !== null && $updatedAfterRaw !== '') {
-        $ts = strtotime($updatedAfterRaw);
-        if ($ts === false) {
+        $updatedAfterDt = DateTime::createFromFormat('Y-m-d H:i:s', $updatedAfterRaw, new DateTimeZone('Asia/Tokyo'));
+        if ($updatedAfterDt === false || $updatedAfterDt->format('Y-m-d H:i:s') !== $updatedAfterRaw) {
             http_response_code(400);
             echo json_encode(['error' => 'Invalid updated_after format']);
             exit;
         }
-        $updatedAfterSql = gmdate('Y-m-d H:i:s', $ts);
+        $updatedAfterDt->setTimezone(new DateTimeZone('UTC'));
+        $updatedAfterSql = $updatedAfterDt->format('Y-m-d H:i:s');
     }
 
     // pagination: デフォルト limit=1000、最大 5000、cursor は since_id 方式（id > cursor 昇順）
@@ -119,10 +122,15 @@ if ($method === 'GET' && isset($segments[1]) && $segments[1] === 'sync' && !isse
             unset($lineRow['voucher_id']);
             $lineRow['access_line_id']   = $lineRow['access_line_id'] !== null ? (int)$lineRow['access_line_id'] : null;
             $lineRow['edited_in_beaver'] = (int)$lineRow['edited_in_beaver'];
+            // R-076 B1-1: 明細の updated_at も UTC→JST に統一する。
+            $lineRow['updated_at']       = utcToJst($lineRow['updated_at']);
             $linesByVoucherId[$vid][] = $lineRow;
         }
     }
     foreach ($rows as &$row) {
+        // R-076 B1-1: ヘッダーの updated_at / last_synced_at を UTC→JST に統一する。
+        $row['updated_at']     = utcToJst($row['updated_at']);
+        $row['last_synced_at'] = utcToJst($row['last_synced_at']);
         $row['lines'] = $linesByVoucherId[(int)$row['id']] ?? [];
     }
     unset($row);

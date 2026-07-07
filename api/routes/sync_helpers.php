@@ -50,6 +50,19 @@ function validateVoucherDate(?string $value): ?string {
 }
 
 /**
+ * R-076 B1-1: DB保存のUTC日時文字列('Y-m-d H:i:s')をJST('Y-m-d H:i:s')に変換する。
+ * null/空文字はそのままnullを返す（同期タイムスタンプは全経路でこの表現に統一する）。
+ */
+if (!function_exists('utcToJst')) {
+    function utcToJst(?string $utcDateTime): ?string {
+        if ($utcDateTime === null || $utcDateTime === '') return null;
+        $dt = new DateTime($utcDateTime, new DateTimeZone('UTC'));
+        $dt->setTimezone(new DateTimeZone('Asia/Tokyo'));
+        return $dt->format('Y-m-d H:i:s');
+    }
+}
+
+/**
  * shipped_at を ISO 8601 として検証。不正なら null。
  */
 function validateShippedAt(?string $value): ?string {
@@ -271,7 +284,7 @@ function syncVoucherUpsert(PDO $pdo, ?int $projectId): void {
                  trade_type, consumption_tax_type,
                  print_date_flag, print_tax_excl_flag, print_company_seal,
                  sales_category_id, delivery_date, billing_date, source_estimate_no,
-                 validity_period)
+                 validity_period, last_synced_at)
             VALUES
                 (:voucher_no, :voucher_type, :status, :project_id, :customer_id,
                  :voucher_date, :total_amount, :access_voucher_id, :access_voucher_no,
@@ -281,7 +294,7 @@ function syncVoucherUpsert(PDO $pdo, ?int $projectId): void {
                  COALESCE(:consumption_tax_type, ' . "'外税/伝票計'" . '),
                  COALESCE(:print_date_flag, 1), COALESCE(:print_tax_excl_flag, 0), COALESCE(:print_company_seal, 0),
                  :sales_category_id, :delivery_date, :billing_date, :source_estimate_no,
-                 :validity_period)
+                 :validity_period, CURRENT_TIMESTAMP)
             ON CONFLICT(access_voucher_id) DO UPDATE SET
                 voucher_type        = excluded.voucher_type,
                 status              = excluded.status,
@@ -312,7 +325,8 @@ function syncVoucherUpsert(PDO $pdo, ?int $projectId): void {
                 billing_date        = COALESCE(excluded.billing_date, billing_date),
                 source_estimate_no  = COALESCE(excluded.source_estimate_no, source_estimate_no),
                 validity_period     = COALESCE(excluded.validity_period, validity_period),
-                updated_at          = CURRENT_TIMESTAMP
+                updated_at          = CURRENT_TIMESTAMP,
+                last_synced_at      = CURRENT_TIMESTAMP
         ')->execute([
             ':voucher_no'          => $voucherNo,
             ':voucher_type'        => $voucherType,
