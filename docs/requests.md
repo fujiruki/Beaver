@@ -209,3 +209,7 @@ Access側の統合同期ボタンに対応するBeaver側タスク群（詳細: 
 - B2-3: PATCH /vouchers/{id}/access-link（Beaver発伝票のaccess_voucher_id書き戻し）
 - B3-1/B3-2: GET /customers/sync 新設（完全一致ルーティングガード必須）＋customers.last_synced_at
 - B4-1: mergeSyncedLines（access_line_id行単位マージ・edited_in_beaver保護、R-066(c) Phase2本丸）
+
+## 16. R-078: 建具台帳の型定義とDBカラムの不整合（2026-07-08 DataTable移行中に発見）
+
+`TateguItem`型の `item_code`/`spec`/`unit` フィールドが実DBと不一致（`PRAGMA table_info(tategu_items)` で確認: 実在は `code` のみ、`spec`/`unit` 列は存在しない）。建具台帳一覧の「品名コード・仕様・単位」表示は元から空欄になっているはず。型定義の修正 or カラム追加の仕様判断が必要。DataTable移行ではソート対象から除外済み。
