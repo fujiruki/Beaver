@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { api } from './client';
 import type { Project, ProjectInput, ProjectImage } from '../types/project';
-import type { PaginatedResponse } from '../types/pagination';
+import type { PaginatedResponse, SortParam } from '../types/pagination';
 
 const KEY = 'projects';
 
@@ -18,14 +18,22 @@ export function useProjects(params?: { status?: string; customer_id?: number; q?
 }
 
 /** 案件一覧取得（ページネーション付き・一覧ページ用） */
-export function useProjectsPaged(page: number, filters?: { status?: string; q?: string; customer_id?: number }) {
+export function useProjectsPaged(
+  page: number,
+  filters?: { status?: string; q?: string; customer_id?: number },
+  sort?: SortParam,
+) {
   return useQuery({
-    queryKey: [KEY, 'paged', page, filters],
+    queryKey: [KEY, 'paged', page, filters, sort?.key, sort?.dir],
     queryFn: () => {
       const params = new URLSearchParams({ page: String(page), per_page: '50' });
       if (filters?.status) params.set('status', filters.status);
       if (filters?.q) params.set('q', filters.q);
       if (filters?.customer_id) params.set('customer_id', String(filters.customer_id));
+      if (sort) {
+        params.set('sort', sort.key);
+        params.set('order', sort.dir);
+      }
       return api.get<PaginatedResponse<Project>>(`/projects?${params}`);
     },
     placeholderData: keepPreviousData,

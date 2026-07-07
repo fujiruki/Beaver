@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { api } from './client';
 import type { TateguItem, TateguItemInput, CostBreakdownLine } from '../types/tateguItem';
-import type { PaginatedResponse } from '../types/pagination';
+import type { PaginatedResponse, SortParam } from '../types/pagination';
 
 const KEY = 'tateguItems';
 
@@ -13,12 +13,16 @@ export function useTateguItems() {
 }
 
 /** 建具台帳一覧取得（ページネーション付き・一覧ページ用） */
-export function useTateguItemsPaged(page: number, search = '') {
+export function useTateguItemsPaged(page: number, search = '', sort?: SortParam) {
   return useQuery({
-    queryKey: [KEY, 'paged', page, search],
+    queryKey: [KEY, 'paged', page, search, sort?.key, sort?.dir],
     queryFn: () => {
       const params = new URLSearchParams({ page: String(page), per_page: '50' });
       if (search) params.set('q', search);
+      if (sort) {
+        params.set('sort', sort.key);
+        params.set('order', sort.dir);
+      }
       return api.get<PaginatedResponse<TateguItem>>(`/tategu-items?${params}`);
     },
     placeholderData: keepPreviousData,

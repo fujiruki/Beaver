@@ -3,7 +3,10 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useProjectsPaged, useDeleteProject } from '../api/projects';
 import { useCustomers } from '../api/customers';
 import Pagination from '../components/Pagination';
-import type { ProjectStatus } from '../types/project';
+import DataTable from '../components/DataTable';
+import type { DataTableColumn, SortDir } from '../components/DataTable';
+import type { Project, ProjectStatus } from '../types/project';
+import type { SortParam } from '../types/pagination';
 
 const statusLabel: Record<ProjectStatus, string> = {
   '問い合わせ': '問い合わせ',
@@ -31,11 +34,12 @@ export default function ProjectList() {
   const [page, setPage] = useState(1);
   const [inputValue, setInputValue] = useState('');
   const [search, setSearch] = useState('');
+  const [sort, setSort] = useState<SortParam | undefined>(undefined);
   const isComposingRef = useRef(false);
   const [customerFilter] = useState<number | undefined>(initCustomerId);
   const { data: customers = [] } = useCustomers();
   const filters = { ...(search ? { q: search } : {}), ...(customerFilter ? { customer_id: customerFilter } : {}) };
-  const { data, isLoading, error } = useProjectsPaged(page, Object.keys(filters).length ? filters : undefined);
+  const { data, isLoading, error } = useProjectsPaged(page, Object.keys(filters).length ? filters : undefined, sort);
   const deleteMutation = useDeleteProject();
   const filterCustomer = customerFilter ? customers.find(c => c.id === customerFilter) : null;
 
@@ -67,8 +71,53 @@ export default function ProjectList() {
     deleteMutation.mutate(id);
   }
 
+  function handleSortChange(key: string, dir: SortDir) {
+    setSort({ key, dir });
+    setPage(1);
+  }
+
   if (isLoading) return <div className="p-6">読み込み中...</div>;
   if (error)     return <div className="p-6 text-red-600">エラー: {String(error)}</div>;
+
+  const columns: DataTableColumn<Project>[] = [
+    { key: 'project_code', label: '案件コード', sortable: true, render: p => p.project_code ?? '—' },
+    { key: 'name', label: '案件名', sortable: true, render: p => p.name },
+    { key: 'customer_name', label: '得意先', sortable: true, render: p => p.customer_name ?? `ID:${p.customer_id}` },
+    {
+      key: 'status',
+      label: 'ステータス',
+      sortable: true,
+      render: p => (
+        p.status && statusColor[p.status as ProjectStatus] ? (
+          <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${statusColor[p.status as ProjectStatus]}`}>
+            {statusLabel[p.status as ProjectStatus]}
+          </span>
+        ) : (
+          <span className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600">
+            {p.status}
+          </span>
+        )
+      ),
+    },
+    { key: 'start_date', label: '開始日', sortable: true, render: p => p.start_date ?? '—' },
+    {
+      key: 'actions',
+      label: '',
+      width: 100,
+      align: 'right',
+      stopRowClick: true,
+      render: p => (
+        <>
+          <button onClick={() => navigate(`/projects/${p.id}`)} className="px-2.5 py-1 bg-slate-500 text-white rounded text-xs mr-1 hover:bg-slate-600">編集</button>
+          <button
+            onClick={() => handleDelete(p.id, p.name)}
+            className="px-2.5 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700"
+            disabled={deleteMutation.isPending}
+          >削除</button>
+        </>
+      ),
+    },
+  ];
 
   return (
     <div>
@@ -107,57 +156,16 @@ export default function ProjectList() {
       </div>
 
       <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 border-b border-slate-200">
-            <tr>
-              <th className="px-3 py-2.5 text-left text-slate-500 font-semibold">案件コード</th>
-              <th className="px-3 py-2.5 text-left text-slate-500 font-semibold">案件名</th>
-              <th className="px-3 py-2.5 text-left text-slate-500 font-semibold">得意先</th>
-              <th className="px-3 py-2.5 text-left text-slate-500 font-semibold">ステータス</th>
-              <th className="px-3 py-2.5 text-left text-slate-500 font-semibold">開始日</th>
-              <th className="w-24"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {projects.length === 0 && (
-              <tr><td colSpan={6} className="px-3 py-4 text-center text-slate-400">登録なし</td></tr>
-            )}
-            {projects.map(p => (
-              <tr
-                key={p.id}
-                className="border-b border-slate-100 hover:bg-slate-50 cursor-pointer"
-                onClick={() => navigate(`/projects/${p.id}`)}
-              >
-                <td className="px-3 py-2.5 font-mono text-slate-500">{p.project_code ?? '—'}</td>
-                <td className="px-3 py-2.5 font-medium">{p.name}</td>
-                <td className="px-3 py-2.5 text-slate-500">{p.customer_name ?? `ID:${p.customer_id}`}</td>
-                <td className="px-3 py-2.5">
-                  {p.status && statusColor[p.status as ProjectStatus] ? (
-                    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${statusColor[p.status as ProjectStatus]}`}>
-                      {statusLabel[p.status as ProjectStatus]}
-                    </span>
-                  ) : (
-                    <span className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600">
-                      {p.status}
-                    </span>
-                  )}
-                </td>
-                <td className="px-3 py-2.5 text-slate-500">{p.start_date ?? '—'}</td>
-                <td className="px-3 py-2.5 text-right" onClick={e => e.stopPropagation()}>
-                  <button
-                    onClick={() => navigate(`/projects/${p.id}`)}
-                    className="px-2.5 py-1 bg-slate-500 text-white rounded text-xs mr-1 hover:bg-slate-600"
-                  >編集</button>
-                  <button
-                    onClick={() => handleDelete(p.id, p.name)}
-                    className="px-2.5 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700"
-                    disabled={deleteMutation.isPending}
-                  >削除</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <DataTable
+          tableId="projects"
+          columns={columns}
+          rows={projects}
+          rowKey={p => p.id}
+          onRowClick={p => navigate(`/projects/${p.id}`)}
+          sortKey={sort?.key}
+          sortDir={sort?.dir}
+          onSortChange={handleSortChange}
+        />
         {meta && (
           <Pagination
             page={meta.page}
