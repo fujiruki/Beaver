@@ -397,6 +397,42 @@ runTest('test_upsert_preserves_existing_customer_id_on_null_push', function () u
 });
 
 // ============================================================
+// R-076 B1-2: syncVoucherUpsert 成功時に last_synced_at をセットする
+// ============================================================
+echo "\n=== R-076 B1-2 syncVoucherUpsert で last_synced_at がセットされる ===\n";
+
+runTest('push（INSERT）成功後、vouchers.last_synced_at が非NULLであること', function () use (&$pdo) {
+    $r = runHelperCase('syncVoucherUpsert', null, [
+        'access_voucher_id'  => 9101,
+        'voucher_type'       => 'estimate',
+        'customer_access_no' => '',
+        'voucher_date'       => '2026-07-01',
+        'total_amount'       => 5000,
+    ]);
+    assertEq(200, $r['code'], 'insert http code', ['stderr' => $r['stderr'] ?? '']);
+
+    $row = $pdo->query('SELECT last_synced_at FROM vouchers WHERE access_voucher_id = 9101')->fetch();
+    assertTrue($row !== false, '対象伝票が見つかること');
+    assertTrue($row['last_synced_at'] !== null, 'INSERT時にlast_synced_atが非NULLであること');
+});
+
+runTest('push（UPDATE/ON CONFLICT）成功後も、vouchers.last_synced_at が非NULLであること', function () use (&$pdo) {
+    // 同じ access_voucher_id で再 push（ON CONFLICT DO UPDATE経路）
+    $r = runHelperCase('syncVoucherUpsert', null, [
+        'access_voucher_id'  => 9101,
+        'voucher_type'       => 'estimate',
+        'customer_access_no' => '',
+        'voucher_date'       => '2026-07-02',
+        'total_amount'       => 6000,
+    ]);
+    assertEq(200, $r['code'], 'update http code', ['stderr' => $r['stderr'] ?? '']);
+
+    $row = $pdo->query('SELECT last_synced_at FROM vouchers WHERE access_voucher_id = 9101')->fetch();
+    assertTrue($row !== false, '対象伝票が見つかること');
+    assertTrue($row['last_synced_at'] !== null, 'UPDATE時もlast_synced_atが非NULLであること');
+});
+
+// ============================================================
 // GET /projects/sync の pagination と routing 厳格化
 // ============================================================
 echo "\n=== R-034 (b) / R-035 (a) GET /projects/sync ===\n";
@@ -654,6 +690,82 @@ try {
         assertTrue($lineB !== null, 'Beaver新規明細が見つかる');
         assertEq(null, $lineB['access_line_id'], 'access_line_id=null（Beaver新規行）');
         assertEq(1, (int)$lineB['edited_in_beaver'], 'edited_in_beaver=1');
+    });
+
+    // ============================================================
+    // R-076 B1-1: GET /vouchers/sync の updated_at / last_synced_at をJSTで返す
+    // ============================================================
+    echo "\n=== R-076 B1-1 GET /vouchers/sync のタイムスタンプJST変換 ===\n";
+
+    runTest('updated_at / last_synced_at がUTC生値からJST(+9時間)に変換されて返る', function () use ($vfetch, $vbase, $testDbPath) {
+        $tmpPdo = new PDO('sqlite:' . $testDbPath, null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+        $voucherRow = $tmpPdo->query("SELECT id FROM vouchers WHERE voucher_no = 'VS001'")->fetch(PDO::FETCH_ASSOC);
+        $voucherId = (int)$voucherRow['id'];
+        // DB列はUTCで保持される契約のため、既知のUTC値を直接セットして期待値を固定する
+        $tmpPdo->exec("UPDATE vouchers SET updated_at = '2026-06-24 01:23:45', last_synced_at = '2026-06-24 02:00:00' WHERE id = $voucherId");
+        $tmpPdo = null;
+
+        $data = json_decode($vfetch($vbase)['body'], true);
+        $found = null;
+        foreach ($data['vouchers'] as $v) { if ((int)$v['id'] === $voucherId) { $found = $v; break; } }
+        assertTrue($found !== null, 'VS001 が見つかること');
+        assertEq('2026-06-24 10:23:45', $found['updated_at'], 'updated_at がUTC+9時間のJSTで返ること');
+        assertEq('2026-06-24 11:00:00', $found['last_synced_at'], 'last_synced_at がUTC+9時間のJSTで返ること');
+    });
+
+    runTest('last_synced_at がNULLのときはnullのまま返る（変換で誤値化しない）', function () use ($vfetch, $vbase, $testDbPath) {
+        $tmpPdo = new PDO('sqlite:' . $testDbPath, null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+        $voucherRow = $tmpPdo->query("SELECT id FROM vouchers WHERE voucher_no = 'VS002'")->fetch(PDO::FETCH_ASSOC);
+        $voucherId = (int)$voucherRow['id'];
+        $tmpPdo->exec("UPDATE vouchers SET last_synced_at = NULL WHERE id = $voucherId");
+        $tmpPdo = null;
+
+        $data = json_decode($vfetch($vbase)['body'], true);
+        $found = null;
+        foreach ($data['vouchers'] as $v) { if ((int)$v['id'] === $voucherId) { $found = $v; break; } }
+        assertTrue($found !== null, 'VS002 が見つかること');
+        assertEq(null, $found['last_synced_at'], 'last_synced_at=NULLはnullのまま返る');
+    });
+
+    runTest('lines[].updated_at もJST(+9時間)に変換されて返る', function () use ($vfetch, $vbase, $testDbPath) {
+        $tmpPdo = new PDO('sqlite:' . $testDbPath, null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+        $voucherRow = $tmpPdo->query("SELECT id FROM vouchers WHERE voucher_no = 'VS001'")->fetch(PDO::FETCH_ASSOC);
+        $voucherId = (int)$voucherRow['id'];
+        $tmpPdo->exec("UPDATE voucher_lines SET updated_at = '2026-06-24 04:00:00' WHERE voucher_id = $voucherId AND access_line_id = 555");
+        $tmpPdo = null;
+
+        $data = json_decode($vfetch($vbase)['body'], true);
+        $found = null;
+        foreach ($data['vouchers'] as $v) { if ((int)$v['id'] === $voucherId) { $found = $v; break; } }
+        assertTrue($found !== null, 'VS001 が見つかること');
+        $lineA = null;
+        foreach ($found['lines'] as $l) { if ($l['access_line_id'] === 555) { $lineA = $l; break; } }
+        assertTrue($lineA !== null, 'access_line_id=555 の明細が見つかる');
+        assertEq('2026-06-24 13:00:00', $lineA['updated_at'], 'lines[].updated_at がUTC+9時間のJSTで返ること');
+    });
+
+    runTest('updated_after はJST指定として解釈されUTCへ変換して比較される（境界値）', function () use ($vfetch, $vbase, $testDbPath) {
+        $tmpPdo = new PDO('sqlite:' . $testDbPath, null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+        $vs002 = (int)$tmpPdo->query("SELECT id FROM vouchers WHERE voucher_no = 'VS002'")->fetchColumn();
+        $vs003 = (int)$tmpPdo->query("SELECT id FROM vouchers WHERE voucher_no = 'VS003'")->fetchColumn();
+        // UTC生値を直接セット。VS002=JST 10:00相当、VS003=JST 12:00相当。
+        $tmpPdo->exec("UPDATE vouchers SET updated_at = '2026-06-24 01:00:00' WHERE id = $vs002");
+        $tmpPdo->exec("UPDATE vouchers SET updated_at = '2026-06-24 03:00:00' WHERE id = $vs003");
+        $tmpPdo = null;
+
+        // VS002 のJST相当時刻ちょうど（2026-06-24 10:00:00 JST）を updated_after に指定。
+        // 正しくJST→UTC変換されれば閾値はUTC 01:00:00となり、VS002自身は不等号(>)のため除外、VS003は含まれる。
+        // もしJST→UTC変換を行わず生値のまま比較する実装バグがあれば、VS003(UTC 03:00)も
+        // 閾値文字列 '2026-06-24 10:00:00' より小さいため誤って除外され、このテストで検出できる。
+        $data = json_decode($vfetch($vbase . '?updated_after=' . urlencode('2026-06-24 10:00:00'))['body'], true);
+        $ids = array_column($data['vouchers'], 'id');
+        assertTrue(!in_array($vs002, $ids, true), 'VS002(閾値と同時刻)はJST変換後は含まれない');
+        assertTrue(in_array($vs003, $ids, true), 'VS003(閾値より後)はJST変換後に含まれる');
+    });
+
+    runTest('updated_after に不正な形式を指定すると400', function () use ($vfetch, $vbase) {
+        $r = $vfetch($vbase . '?updated_after=' . urlencode('not-a-date'));
+        assertTrue(str_contains($r['status'], '400'), 'expected 400 got: ' . $r['status']);
     });
 
 } finally {
