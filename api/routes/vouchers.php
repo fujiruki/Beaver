@@ -67,10 +67,19 @@ if ($method === 'GET' && isset($segments[1]) && $segments[1] === 'sync' && !isse
         $cursor = (int)$_GET['cursor'];
     }
 
+    // R-076 B2-1: Access側の競合解決フォーム表示用にヘッダ項目を拡張。
+    // customer_access_no は customers.access_customer_no を LEFT JOIN で取得する
+    // （syncVoucherUpsert が customer_access_no から customer_id を解決する経路と対になる）。
     $sql = 'SELECT v.id, v.voucher_no, v.voucher_type, v.status, v.voucher_date,
                    v.access_voucher_id, v.access_voucher_no, v.customer_id, v.project_id,
-                   v.total_amount, v.updated_at, v.last_synced_at
+                   v.total_amount, v.updated_at, v.last_synced_at,
+                   v.trade_type, v.consumption_tax_type, v.description,
+                   v.print_date_flag, v.print_tax_excl_flag, v.print_company_seal,
+                   v.sales_category_id, v.delivery_date, v.billing_date,
+                   v.source_estimate_no, v.validity_period,
+                   c.access_customer_no AS customer_access_no
             FROM vouchers v
+            LEFT JOIN customers c ON c.id = v.customer_id
             WHERE 1=1';
     $params = [];
     if ($updatedAfterSql !== null) {
