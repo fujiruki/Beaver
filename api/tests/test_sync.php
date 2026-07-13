@@ -602,6 +602,38 @@ try {
         return ['body' => (string)$body, 'status' => $hdr[0] ?? ''];
     };
 
+    runTest('PATCH /vouchers/{id}/access-link は Access 採番IDを書き戻す', function () use ($port, $testDbPath) {
+        $tmpPdo = new PDO('sqlite:' . $testDbPath, null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+        $tmpPdo->exec("INSERT INTO vouchers
+            (voucher_no, voucher_type, status, voucher_date, total_amount)
+            VALUES ('R076-B2-HTTP', 'estimate', 'draft', '2026-07-12', 7000)");
+        $voucherId = (int)$tmpPdo->lastInsertId();
+        $tmpPdo = null;
+
+        $payload = json_encode([
+            'access_voucher_id' => 99061,
+            'access_voucher_no' => 'A-99061',
+        ], JSON_UNESCAPED_UNICODE);
+        $ctx = stream_context_create(['http' => [
+            'method' => 'PATCH',
+            'header' => "Content-Type: application/json\r\nConnection: close\r\n",
+            'content' => $payload,
+            'timeout' => 5,
+            'ignore_errors' => true,
+        ]]);
+        $body = file_get_contents("http://127.0.0.1:$port/contents/Beaver/api/vouchers/$voucherId/access-link", false, $ctx);
+        $statusLine = $http_response_header[0] ?? '';
+        assertTrue(str_contains($statusLine, '200'), 'expected 200 got: ' . $statusLine . ' body=' . $body);
+        $data = json_decode((string)$body, true);
+        assertEq($voucherId, (int)$data['voucher_id'], 'response voucher_id');
+        assertEq(99061, (int)$data['access_voucher_id'], 'response access_voucher_id');
+
+        $checkPdo = new PDO('sqlite:' . $testDbPath, null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+        $row = $checkPdo->query("SELECT access_voucher_id, access_voucher_no FROM vouchers WHERE id = $voucherId")->fetch(PDO::FETCH_ASSOC);
+        assertEq(99061, (int)$row['access_voucher_id'], 'DB: access_voucher_id');
+        assertEq('A-99061', $row['access_voucher_no'], 'DB: access_voucher_no');
+    });
+
     runTest('/vouchers/sync/anything は 404', function () use ($vfetch, $vbase) {
         $r = $vfetch($vbase . '/anything');
         assertTrue(str_contains($r['status'], '404'), 'expected 404 got: ' . $r['status']);
@@ -1170,6 +1202,85 @@ runTest('B2-2-update: syncVoucherUpdate は lines_mode=replace を受けて明�
     assertEq('access', $rows[0]['source'], 'source=access');
     assertEq(0, (int)$rows[0]['edited_in_beaver'], 'edited_in_beaver は 0 にリセット');
     assertEq('0', (string)$pdo->query("SELECT COUNT(*) FROM voucher_lines WHERE voucher_id = $voucherId AND item_name = 'old-update-line'")->fetchColumn(), '旧明細は削除済み');
+});
+
+// ============================================================
+// R-076 B2-3: Beaver発新規伝票へ Access 採番IDを書き戻す
+// ============================================================
+echo "
+=== R-076 B2-3 PATCH /vouchers/{id}/access-link ===
+";
+
+runTest('B2-3: access_voucher_id/access_voucher_no を未リンク伝票へ保存する', function () use (&$pdo) {
+    $pdo->exec("INSERT INTO vouchers
+        (voucher_no, voucher_type, status, voucher_date, total_amount)
+        VALUES ('R076-B2-LINK', 'estimate', 'draft', '2026-07-12', 12000)");
+    $voucherId = (int)$pdo->lastInsertId();
+
+    $r = runHelperCase('syncVoucherAccessLink', $voucherId, [
+        'access_voucher_id' => 99031,
+        'access_voucher_no' => 'A-99031',
+    ]);
+    assertEq(200, $r['code'], 'http code', ['stderr' => $r['stderr'] ?? '', 'body' => $r['body'] ?? null]);
+    assertEq($voucherId, (int)$r['body']['voucher_id'], 'response voucher_id');
+    assertEq(99031, (int)$r['body']['access_voucher_id'], 'response access_voucher_id');
+    assertEq('A-99031', $r['body']['access_voucher_no'], 'response access_voucher_no');
+
+    $row = $pdo->query("SELECT access_voucher_id, access_voucher_no, last_synced_at FROM vouchers WHERE id = $voucherId")->fetch();
+    assertEq(99031, (int)$row['access_voucher_id'], 'DB: access_voucher_id');
+    assertEq('A-99031', $row['access_voucher_no'], 'DB: access_voucher_no');
+    assertTrue($row['last_synced_at'] !== null, 'DB: last_synced_at is set');
+});
+
+runTest('B2-3: 同じ access_voucher_id の再送は冪等に 200 を返す', function () use (&$pdo) {
+    $row = $pdo->query("SELECT id FROM vouchers WHERE voucher_no = 'R076-B2-LINK'")->fetch();
+    $voucherId = (int)$row['id'];
+
+    $r = runHelperCase('syncVoucherAccessLink', $voucherId, [
+        'access_voucher_id' => 99031,
+        'access_voucher_no' => 'A-99031',
+    ]);
+    assertEq(200, $r['code'], 'http code', ['stderr' => $r['stderr'] ?? '', 'body' => $r['body'] ?? null]);
+    assertEq('linked', $r['body']['status'], 'status');
+});
+
+runTest('B2-3: 既に別の access_voucher_id がある伝票への書き換えは 409', function () use (&$pdo) {
+    $row = $pdo->query("SELECT id FROM vouchers WHERE voucher_no = 'R076-B2-LINK'")->fetch();
+    $voucherId = (int)$row['id'];
+
+    $r = runHelperCase('syncVoucherAccessLink', $voucherId, [
+        'access_voucher_id' => 99032,
+        'access_voucher_no' => 'A-99032',
+    ]);
+    assertEq(409, $r['code'], 'http code');
+
+    $after = $pdo->query("SELECT access_voucher_id, access_voucher_no FROM vouchers WHERE id = $voucherId")->fetch();
+    assertEq(99031, (int)$after['access_voucher_id'], 'DB: access_voucher_id は維持');
+    assertEq('A-99031', $after['access_voucher_no'], 'DB: access_voucher_no は維持');
+});
+
+runTest('B2-3: 他伝票で使用済みの access_voucher_id は 409', function () use (&$pdo) {
+    $pdo->exec("INSERT INTO vouchers
+        (voucher_no, voucher_type, status, voucher_date, total_amount, access_voucher_id, access_voucher_no)
+        VALUES ('R076-B2-LINK-OTHER', 'estimate', 'draft', '2026-07-12', 1000, 99041, 'A-99041')");
+    $pdo->exec("INSERT INTO vouchers
+        (voucher_no, voucher_type, status, voucher_date, total_amount)
+        VALUES ('R076-B2-LINK-DUP', 'estimate', 'draft', '2026-07-12', 1000)");
+    $voucherId = (int)$pdo->lastInsertId();
+
+    $r = runHelperCase('syncVoucherAccessLink', $voucherId, [
+        'access_voucher_id' => 99041,
+        'access_voucher_no' => 'A-99041',
+    ]);
+    assertEq(409, $r['code'], 'http code');
+});
+
+runTest('B2-3: 存在しない voucher_id は 404', function () {
+    $r = runHelperCase('syncVoucherAccessLink', 999999, [
+        'access_voucher_id' => 99051,
+        'access_voucher_no' => 'A-99051',
+    ]);
+    assertEq(404, $r['code'], 'http code');
 });
 
 // ============================================================

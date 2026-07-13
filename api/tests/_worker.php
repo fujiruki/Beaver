@@ -65,6 +65,9 @@ try {
         case 'syncVoucherShipped':
             syncVoucherShipped($pdo, (int)$arg1['project_id'], (string)$arg1['voucher_no']);
             break;
+        case 'syncVoucherAccessLink':
+            syncVoucherAccessLink($pdo, (int)$arg1);
+            break;
         case 'syncProjectCustomer':
             syncProjectCustomer($pdo, (int)$arg1);
             break;

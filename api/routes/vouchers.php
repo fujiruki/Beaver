@@ -21,6 +21,13 @@ $subId      = isset($segments[3]) && is_numeric($segments[3]) ? (int)$segments[3
 
 require_once __DIR__ . '/sync_helpers.php';
 
+// --- R-076 B2-3: Beaver発新規伝票の Access 採番IDを書き戻す ---
+// PATCH /vouchers/{id}/access-link
+if ($method === 'PATCH' && $resourceId && $subAction === 'access-link') {
+    syncVoucherAccessLink($pdo, $resourceId);
+    exit;
+}
+
 // --- R-025 Step E-Beaver: 案件番号なしの過去伝票 push 受信 ---
 // POST /vouchers/sync
 if ($method === 'POST' && isset($segments[1]) && $segments[1] === 'sync' && !$resourceId) {

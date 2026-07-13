@@ -824,6 +824,96 @@ function syncVoucherShipped(PDO $pdo, int $projectId, string $accessVoucherNo): 
 }
 
 /**
+ * PATCH /vouchers/{id}/access-link
+ * Beaver発の新規伝票をAccess側へ取り込んだ後、Access採番IDをBeaverへ書き戻す。
+ */
+function syncVoucherAccessLink(PDO $pdo, int $voucherId): void {
+    $data = readJsonBody();
+
+    $accessVoucherIdRaw = $data['access_voucher_id'] ?? null;
+    if (!is_numeric($accessVoucherIdRaw) || (int)$accessVoucherIdRaw <= 0) {
+        respond(400, ['error' => 'access_voucher_id は正の整数で指定してください']);
+        return;
+    }
+    $accessVoucherId = (int)$accessVoucherIdRaw;
+    $accessVoucherNo = array_key_exists('access_voucher_no', $data) && (string)$data['access_voucher_no'] !== ''
+        ? (string)$data['access_voucher_no']
+        : null;
+
+    $stmt = $pdo->prepare('SELECT id, access_voucher_id, access_voucher_no FROM vouchers WHERE id = ?');
+    $stmt->execute([$voucherId]);
+    $target = $stmt->fetch();
+    if (!$target) {
+        respond(404, ['error' => 'voucher_id が Beaver に存在しません', 'voucher_id' => $voucherId]);
+        return;
+    }
+
+    if ($target['access_voucher_id'] !== null && (int)$target['access_voucher_id'] !== $accessVoucherId) {
+        respond(409, [
+            'error' => 'access_voucher_id は既に別の値でリンク済みです',
+            'voucher_id' => $voucherId,
+            'current_access_voucher_id' => (int)$target['access_voucher_id'],
+            'requested_access_voucher_id' => $accessVoucherId,
+        ]);
+        return;
+    }
+
+    if ($accessVoucherNo !== null && $target['access_voucher_no'] !== null
+        && $target['access_voucher_no'] !== '' && $target['access_voucher_no'] !== $accessVoucherNo) {
+        respond(409, [
+            'error' => 'access_voucher_no は既に別の値でリンク済みです',
+            'voucher_id' => $voucherId,
+            'current_access_voucher_no' => $target['access_voucher_no'],
+            'requested_access_voucher_no' => $accessVoucherNo,
+        ]);
+        return;
+    }
+
+    $dupStmt = $pdo->prepare('SELECT id FROM vouchers WHERE access_voucher_id = ? AND id <> ? LIMIT 1');
+    $dupStmt->execute([$accessVoucherId, $voucherId]);
+    $dupId = $dupStmt->fetchColumn();
+    if ($dupId) {
+        respond(409, [
+            'error' => 'access_voucher_id は別の伝票で使用済みです',
+            'voucher_id' => $voucherId,
+            'existing_voucher_id' => (int)$dupId,
+            'access_voucher_id' => $accessVoucherId,
+        ]);
+        return;
+    }
+
+    try {
+        $pdo->prepare('
+            UPDATE vouchers
+            SET access_voucher_id = :access_voucher_id,
+                access_voucher_no = COALESCE(:access_voucher_no, access_voucher_no),
+                updated_at = CURRENT_TIMESTAMP,
+                last_synced_at = CURRENT_TIMESTAMP
+            WHERE id = :id
+        ')->execute([
+            ':access_voucher_id' => $accessVoucherId,
+            ':access_voucher_no' => $accessVoucherNo,
+            ':id' => $voucherId,
+        ]);
+    } catch (Throwable $e) {
+        respondInternalError($e, 'syncVoucherAccessLink');
+        return;
+    }
+
+    $s = $pdo->prepare('SELECT id, access_voucher_id, access_voucher_no, last_synced_at FROM vouchers WHERE id = ?');
+    $s->execute([$voucherId]);
+    $row = $s->fetch() ?: [];
+
+    respond(200, [
+        'voucher_id' => (int)$row['id'],
+        'access_voucher_id' => (int)$row['access_voucher_id'],
+        'access_voucher_no' => $row['access_voucher_no'],
+        'last_synced_at' => $row['last_synced_at'],
+        'status' => 'linked',
+    ]);
+}
+
+/**
  * PATCH /projects/{id}/customer
  * 案件マスタの得意先変更を受信。Body: {customer_access_no: "456"}
  */
