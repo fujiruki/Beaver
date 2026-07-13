@@ -360,13 +360,14 @@ function syncVoucherUpsert(PDO $pdo, ?int $projectId): void {
         // R-066(c) Phase1: payload に lines がある場合、当該伝票の voucher_lines が
         // 0件のときのみ Access 明細を INSERT する（Beaver 編集済み明細を保護）。
         // INSERT 経路（新規伝票）も UPDATE 経路（既存伝票）も同じ条件でガードする。
-        if (!empty($data['lines']) && is_array($data['lines'])) {
+        $lineError = replaceSyncedLinesFromPayload($pdo, $voucherId, $data);
+        if ($lineError === null && ($data['lines_mode'] ?? null) !== 'replace' && !empty($data['lines']) && is_array($data['lines'])) {
             $lineError = insertSyncedLinesIfEmpty($pdo, $voucherId, $data['lines']);
-            if ($lineError !== null) {
-                $pdo->rollBack();
-                respond(422, $lineError);
-                return;
-            }
+        }
+        if ($lineError !== null) {
+            $pdo->rollBack();
+            respond(422, $lineError);
+            return;
         }
 
 
@@ -406,6 +407,25 @@ function insertSyncedLinesIfEmpty(PDO $pdo, int $voucherId, array $lines): ?arra
         return null;
     }
     return insertSyncedLines($pdo, $voucherId, $lines);
+}
+
+/**
+ * R-076 B2-2: Access採用 payload(lines_mode=replace) では既存明細を全削除し、
+ * Access側から送られた lines をそのまま再INSERTする。
+ */
+function replaceSyncedLinesFromPayload(PDO $pdo, int $voucherId, array $data): ?array {
+    if (($data['lines_mode'] ?? null) !== 'replace') {
+        return null;
+    }
+    if (!array_key_exists('lines', $data) || !is_array($data['lines'])) {
+        return [
+            'error' => 'invalid_lines',
+            'field' => 'lines',
+        ];
+    }
+
+    $pdo->prepare('DELETE FROM voucher_lines WHERE voucher_id = ?')->execute([$voucherId]);
+    return insertSyncedLines($pdo, $voucherId, $data['lines']);
 }
 
 /**
@@ -608,6 +628,7 @@ function syncVoucherUpdate(PDO $pdo, int $projectId, string $accessVoucherNo): v
         : null;
 
     try {
+        $pdo->beginTransaction();
         if ($target) {
             // 既存レコードあり → UPDATE
             $sets = [];
@@ -640,9 +661,18 @@ function syncVoucherUpdate(PDO $pdo, int $projectId, string $accessVoucherNo): v
             $pdo->prepare('UPDATE vouchers SET ' . implode(', ', $sets) . ' WHERE id = :id')->execute($params);
 
             $voucherId = (int)$target['id'];
+            $lineError = replaceSyncedLinesFromPayload($pdo, $voucherId, $data);
+            if ($lineError !== null) {
+                $pdo->rollBack();
+                respond(422, $lineError);
+                return;
+            }
+
             $s = $pdo->prepare('SELECT * FROM vouchers WHERE id = ?');
             $s->execute([$voucherId]);
-            respond(200, $s->fetch() ?: []);
+            $body = $s->fetch() ?: [];
+            $pdo->commit();
+            respond(200, $body);
         } else {
             // R-055: 未登録 access_voucher_no → INSERT (upsert)
             $insertType = $voucherType ?? 'sales';
@@ -710,11 +740,21 @@ function syncVoucherUpdate(PDO $pdo, int $projectId, string $accessVoucherNo): v
                 updateProjectCustomerFromSales($pdo, $projectAccessNo, $customerAccessNoForProject);
             }
 
+            $lineError = replaceSyncedLinesFromPayload($pdo, $voucherId, $data);
+            if ($lineError !== null) {
+                $pdo->rollBack();
+                respond(422, $lineError);
+                return;
+            }
+
             $s = $pdo->prepare('SELECT * FROM vouchers WHERE id = ?');
             $s->execute([$voucherId]);
-            respond(201, $s->fetch() ?: []);
+            $body = $s->fetch() ?: [];
+            $pdo->commit();
+            respond(201, $body);
         }
     } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
         respondInternalError($e, 'syncVoucherUpdate');
         return;
     }

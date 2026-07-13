@@ -1071,6 +1071,108 @@ runTest('R-066-保持-upsert: syncVoucherUpsert の ON CONFLICT 経路で未送�
 });
 
 // ============================================================
+// R-076 B2-2: Access採用 payload(lines_mode=replace) で明細を全置換する
+// ============================================================
+echo "
+=== R-076 B2-2 lines_mode=replace で voucher_lines を全置換する ===
+";
+
+runTest('B2-2-upsert: syncVoucherUpsert は既存明細を DELETE して Access 明細を INSERT し直す', function () use (&$pdo) {
+    $pdo->exec("INSERT INTO vouchers
+        (voucher_no, voucher_type, status, voucher_date, total_amount, access_voucher_no, access_voucher_id)
+        VALUES ('R076-B2-UP', 'estimate', 'approved', '2026-07-10', 1000, 'R076-B2-UP', 87621)");
+    $voucherId = (int)$pdo->lastInsertId();
+    $pdo->exec("INSERT INTO voucher_lines
+        (voucher_id, line_no, line_type, item_name, quantity, line_total, tax_category, source, access_line_id, edited_in_beaver, updated_at)
+        VALUES ($voucherId, 1, 'normal', 'old-line', 1, 1000, '課税', 'beaver', 76101, 1, CURRENT_TIMESTAMP)");
+
+    $r = runHelperCase('syncVoucherUpsert', null, [
+        'access_voucher_id'  => 87621,
+        'access_voucher_no'  => 'R076-B2-UP',
+        'voucher_type'       => 'estimate',
+        'customer_access_no' => '',
+        'voucher_date'       => '2026-07-11',
+        'total_amount'       => 5000,
+        'lines_mode'         => 'replace',
+        'lines' => [
+            [
+                'access_line_id' => 76111,
+                'line_no' => 1,
+                'item_name' => 'new-line-a',
+                'quantity' => 2,
+                'price_body' => 1200,
+                'price_hardware' => 300,
+                'price_glass' => 100,
+                'line_total' => 1600,
+                'tax_category' => '課税',
+                'memo' => 'access-a',
+            ],
+            [
+                'access_line_id' => 76112,
+                'line_no' => 2,
+                'item_name' => 'new-line-b',
+                'quantity' => 1,
+                'line_total' => 3400,
+                'tax_category' => '非課税',
+            ],
+        ],
+    ]);
+    assertEq(200, $r['code'], 'http code', ['stderr' => $r['stderr'] ?? '', 'body' => $r['body'] ?? null]);
+
+    $rows = $pdo->query("SELECT access_line_id, line_no, item_name, quantity, price_body, price_hardware, price_glass, line_total, source, edited_in_beaver
+                         FROM voucher_lines WHERE voucher_id = $voucherId ORDER BY line_no")->fetchAll();
+    assertEq(2, count($rows), 'replace 後の明細件数');
+    assertEq(76111, (int)$rows[0]['access_line_id'], 'Access 明細IDを保存');
+    assertEq('new-line-a', $rows[0]['item_name'], '1行目 item_name');
+    assertEq(1200.0, (float)$rows[0]['price_body'], '1行目 price_body');
+    assertEq(300.0, (float)$rows[0]['price_hardware'], '1行目 price_hardware');
+    assertEq(100.0, (float)$rows[0]['price_glass'], '1行目 price_glass');
+    assertEq(0, (int)$rows[0]['edited_in_beaver'], 'edited_in_beaver は 0 にリセット');
+    assertEq(76112, (int)$rows[1]['access_line_id'], '2行目 Access 明細ID');
+    assertEq('0', (string)$pdo->query("SELECT COUNT(*) FROM voucher_lines WHERE voucher_id = $voucherId AND item_name = 'old-line'")->fetchColumn(), '旧明細は削除済み');
+});
+
+runTest('B2-2-update: syncVoucherUpdate は lines_mode=replace を受けて明細を全置換する', function () use (&$pdo, $projectId) {
+    $pdo->exec("INSERT INTO vouchers
+        (voucher_no, voucher_type, status, project_id, voucher_date, total_amount, access_voucher_no, access_voucher_id)
+        VALUES ('R076-B2-UD', 'sales', 'approved', $projectId, '2026-07-10', 1000, 'R076-B2-UD', 87622)");
+    $voucherId = (int)$pdo->lastInsertId();
+    $pdo->exec("INSERT INTO voucher_lines
+        (voucher_id, line_no, line_type, item_name, quantity, line_total, tax_category, source, access_line_id, edited_in_beaver, updated_at)
+        VALUES ($voucherId, 1, 'normal', 'old-update-line', 1, 1000, '課税', 'beaver', 76201, 1, CURRENT_TIMESTAMP)");
+
+    $r = runHelperCase('syncVoucherUpdate', ['project_id' => $projectId, 'voucher_no' => 'R076-B2-UD'], [
+        'voucher_type'       => 'sales',
+        'customer_access_no' => '100',
+        'voucher_date'       => '2026-07-11',
+        'total_amount'       => 4500,
+        'lines_mode'         => 'replace',
+        'lines' => [
+            [
+                'access_line_id' => 76211,
+                'line_no' => 1,
+                'item_name' => 'update-new-line',
+                'quantity' => 3,
+                'line_total' => 4500,
+                'tax_category' => '課税',
+            ],
+        ],
+    ]);
+    assertEq(200, $r['code'], 'http code', ['stderr' => $r['stderr'] ?? '', 'body' => $r['body'] ?? null]);
+
+    $rows = $pdo->query("SELECT access_line_id, item_name, quantity, line_total, source, edited_in_beaver
+                         FROM voucher_lines WHERE voucher_id = $voucherId ORDER BY line_no")->fetchAll();
+    assertEq(1, count($rows), 'replace 後の明細件数');
+    assertEq(76211, (int)$rows[0]['access_line_id'], 'Access 明細IDを保存');
+    assertEq('update-new-line', $rows[0]['item_name'], 'item_name');
+    assertEq(3.0, (float)$rows[0]['quantity'], 'quantity');
+    assertEq(4500.0, (float)$rows[0]['line_total'], 'line_total');
+    assertEq('access', $rows[0]['source'], 'source=access');
+    assertEq(0, (int)$rows[0]['edited_in_beaver'], 'edited_in_beaver は 0 にリセット');
+    assertEq('0', (string)$pdo->query("SELECT COUNT(*) FROM voucher_lines WHERE voucher_id = $voucherId AND item_name = 'old-update-line'")->fetchColumn(), '旧明細は削除済み');
+});
+
+// ============================================================
 // 結果サマリ
 // ============================================================
 echo "\n========================================\n";
