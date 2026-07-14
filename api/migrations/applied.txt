@@ -36,3 +36,5 @@
 018_vouchers_last_synced_at      2026-07-06  prod
 019_voucher_lines_updated_at     2026-07-06  prod (DEFAULT句なしで適用。SQLiteはADD COLUMNに非定数DEFAULT不可、dev実態と同一定義)
 020_projects_owner_contractor_contact  2026-07-06  prod (適用不要: 本番に4列とも既存。手動追加されていた模様)
+021_tategu_cost_lines      2026-07-14  dev
+021_tategu_cost_lines      2026-07-14  prod (backup: api/backups/database_20260714_145125_pre_r076_tategu_cost_lines.sqlite)
