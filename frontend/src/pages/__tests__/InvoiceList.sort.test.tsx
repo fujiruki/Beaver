@@ -22,6 +22,7 @@ const INVOICES = [
 ];
 
 beforeEach(() => {
+  localStorage.clear();
   vi.stubGlobal('fetch', vi.fn(async (url: string) => {
     const body = url.includes('/customers') ? [] : INVOICES;
     return new Response(JSON.stringify(body), { status: 200 });

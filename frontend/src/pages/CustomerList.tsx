@@ -2,17 +2,16 @@ import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCustomersPaged, useDeleteCustomer } from '../api/customers';
 import Pagination from '../components/Pagination';
-import DataTable from '../components/DataTable';
+import DataTable, { useSortState } from '../components/DataTable';
 import type { DataTableColumn, SortDir } from '../components/DataTable';
 import type { Customer } from '../types/customer';
-import type { SortParam } from '../types/pagination';
 
 export default function CustomerList() {
   const navigate = useNavigate();
   const [page, setPage] = useState(1);
   const [inputValue, setInputValue] = useState('');
   const [search, setSearch] = useState('');
-  const [sort, setSort] = useState<SortParam | undefined>(undefined);
+  const [sort, setSort] = useSortState('customers');
   const isComposingRef = useRef(false);
   const { data, isLoading, error } = useCustomersPaged(page, search, sort);
   const deleteMutation = useDeleteCustomer();
@@ -46,7 +45,7 @@ export default function CustomerList() {
   }
 
   function handleSortChange(key: string, dir: SortDir) {
-    setSort({ key, dir });
+    setSort(key, dir);
     setPage(1);
   }
 

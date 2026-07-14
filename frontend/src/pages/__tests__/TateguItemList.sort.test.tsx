@@ -12,6 +12,7 @@ const ALL_ITEMS = [
 let requestedUrls: string[] = [];
 
 beforeEach(() => {
+  localStorage.clear();
   requestedUrls = [];
   vi.stubGlobal('fetch', vi.fn(async (url: string) => {
     requestedUrls.push(url);

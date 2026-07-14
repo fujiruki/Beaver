@@ -6,9 +6,8 @@ import { useProjects } from '../api/projects';
 import ComboSelect from '../components/ComboSelect';
 import type { ComboOption } from '../components/ComboSelect';
 import Pagination from '../components/Pagination';
-import DataTable from '../components/DataTable';
+import DataTable, { useSortState } from '../components/DataTable';
 import type { DataTableColumn, SortDir } from '../components/DataTable';
-import type { SortParam } from '../types/pagination';
 import type { Voucher, VoucherType, VoucherStatus } from '../types/voucher';
 
 const TYPE_LABELS: Record<VoucherType, string> = { estimate: '見積', sales: '売上' };
@@ -25,7 +24,7 @@ export default function VoucherList() {
   const [page, setPage] = useState(1);
   const [typeFilter, setTypeFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  const [sort, setSort] = useState<SortParam | undefined>(undefined);
+  const [sort, setSort] = useSortState('vouchers');
   const [customerFilter, setCustomerFilter] = useState<number | null>(
     searchParams.get('customer_id') ? Number(searchParams.get('customer_id')) : null
   );
@@ -75,7 +74,7 @@ export default function VoucherList() {
   }
 
   function handleSortChange(key: string, dir: SortDir) {
-    setSort({ key, dir });
+    setSort(key, dir);
     setPage(1);
   }
 
