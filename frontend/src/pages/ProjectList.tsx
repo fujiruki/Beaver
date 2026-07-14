@@ -3,10 +3,9 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useProjectsPaged, useDeleteProject } from '../api/projects';
 import { useCustomers } from '../api/customers';
 import Pagination from '../components/Pagination';
-import DataTable from '../components/DataTable';
+import DataTable, { useSortState } from '../components/DataTable';
 import type { DataTableColumn, SortDir } from '../components/DataTable';
 import type { Project, ProjectStatus } from '../types/project';
-import type { SortParam } from '../types/pagination';
 
 const statusLabel: Record<ProjectStatus, string> = {
   '問い合わせ': '問い合わせ',
@@ -34,7 +33,7 @@ export default function ProjectList() {
   const [page, setPage] = useState(1);
   const [inputValue, setInputValue] = useState('');
   const [search, setSearch] = useState('');
-  const [sort, setSort] = useState<SortParam | undefined>(undefined);
+  const [sort, setSort] = useSortState('projects');
   const isComposingRef = useRef(false);
   const [customerFilter] = useState<number | undefined>(initCustomerId);
   const { data: customers = [] } = useCustomers();
@@ -72,7 +71,7 @@ export default function ProjectList() {
   }
 
   function handleSortChange(key: string, dir: SortDir) {
-    setSort({ key, dir });
+    setSort(key, dir);
     setPage(1);
   }
 

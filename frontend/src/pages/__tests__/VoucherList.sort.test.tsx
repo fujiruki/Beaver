@@ -14,6 +14,7 @@ const ALL_VOUCHERS = [
 let requestedUrls: string[] = [];
 
 beforeEach(() => {
+  localStorage.clear();
   requestedUrls = [];
   vi.stubGlobal('fetch', vi.fn(async (url: string) => {
     const u = new URL(url, 'http://localhost');

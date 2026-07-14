@@ -2,8 +2,8 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useInvoices } from '../api/invoices';
 import { useCustomers } from '../api/customers';
-import DataTable from '../components/DataTable';
-import type { DataTableColumn, SortDir } from '../components/DataTable';
+import DataTable, { useSortState } from '../components/DataTable';
+import type { DataTableColumn } from '../components/DataTable';
 import type { Invoice } from '../types/invoice';
 
 const MONTHS = ['1','2','3','4','5','6','7','8','9','10','11','12'];
@@ -24,7 +24,7 @@ export default function InvoiceList() {
   const [year, setYear] = useState(currentYear);
   const [month, setMonth] = useState(String(new Date().getMonth() + 1));
   const [customerId, setCustomerId] = useState('');
-  const [sort, setSort] = useState<{ key: string; dir: SortDir } | undefined>(undefined);
+  const [sort, setSort] = useSortState('invoices');
 
   const { data: invoices = [], isLoading } = useInvoices({
     year: year || undefined,
@@ -111,7 +111,7 @@ export default function InvoiceList() {
             onRowClick={i => navigate(`/invoices/${i.id}`)}
             sortKey={sort?.key}
             sortDir={sort?.dir}
-            onSortChange={(key, dir) => setSort({ key, dir })}
+            onSortChange={setSort}
             emptyMessage="請求書がありません"
           />
         </div>

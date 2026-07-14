@@ -27,8 +27,14 @@ interface DataTableProps<T> {
   density?: 'compact';
 }
 
+export interface SortState {
+  key: string;
+  dir: SortDir;
+}
+
 const STORAGE_PREFIX = 'bv_table_widths_';
 const ORDER_STORAGE_PREFIX = 'bv_table_order_';
+const SORT_STORAGE_PREFIX = 'bv_table_sort_';
 const DEFAULT_MIN_WIDTH = 60;
 const REORDER_MOVE_THRESHOLD = 4;
 
@@ -134,6 +140,46 @@ export function useColumnOrder<T>(tableId: string, columns: DataTableColumn<T>[]
   }, [order, tableId]);
 
   return { order, reorder };
+}
+
+function loadSort(tableId: string, defaultSort?: SortState): SortState | undefined {
+  try {
+    const raw = localStorage.getItem(SORT_STORAGE_PREFIX + tableId);
+    if (!raw) return defaultSort;
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return defaultSort;
+    const key = (parsed as Record<string, unknown>).key;
+    const dir = (parsed as Record<string, unknown>).dir;
+    if (typeof key === 'string' && (dir === 'asc' || dir === 'desc')) return { key, dir };
+    return defaultSort;
+  } catch {
+    return defaultSort;
+  }
+}
+
+export function useSortState(
+  tableId: string,
+  defaultSort?: SortState,
+): [SortState | undefined, (key: string, dir: SortDir) => void] {
+  const [sort, setSortState] = useState<SortState | undefined>(() => loadSort(tableId, defaultSort));
+
+  useEffect(() => {
+    setSortState(loadSort(tableId, defaultSort));
+    // tableId が変わったときのみ復元し直す（defaultSort は再生成されやすいため依存に含めない）
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tableId]);
+
+  const setSort = useCallback((key: string, dir: SortDir) => {
+    const next: SortState = { key, dir };
+    setSortState(next);
+    try {
+      localStorage.setItem(SORT_STORAGE_PREFIX + tableId, JSON.stringify(next));
+    } catch {
+      // localStorage が使えない環境（プライベートモード等）では保存を諦める
+    }
+  }, [tableId]);
+
+  return [sort, setSort];
 }
 
 export default function DataTable<T>({

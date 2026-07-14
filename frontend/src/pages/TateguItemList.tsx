@@ -2,17 +2,16 @@ import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTateguItemsPaged, useDeleteTateguItem } from '../api/tateguItems';
 import Pagination from '../components/Pagination';
-import DataTable from '../components/DataTable';
+import DataTable, { useSortState } from '../components/DataTable';
 import type { DataTableColumn, SortDir } from '../components/DataTable';
 import type { TateguItem } from '../types/tateguItem';
-import type { SortParam } from '../types/pagination';
 
 export default function TateguItemList() {
   const navigate = useNavigate();
   const [page, setPage] = useState(1);
   const [inputValue, setInputValue] = useState('');
   const [search, setSearch] = useState('');
-  const [sort, setSort] = useState<SortParam | undefined>(undefined);
+  const [sort, setSort] = useSortState('tategu-items');
   const isComposingRef = useRef(false);
   const { data, isLoading, error } = useTateguItemsPaged(page, search, sort);
   const deleteMutation = useDeleteTateguItem();
@@ -46,7 +45,7 @@ export default function TateguItemList() {
   }
 
   function handleSortChange(key: string, dir: SortDir) {
-    setSort({ key, dir });
+    setSort(key, dir);
     setPage(1);
   }
 

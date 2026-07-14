@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
-import DataTable, { type DataTableColumn } from '../DataTable';
+import { render, screen, fireEvent, renderHook, act } from '@testing-library/react';
+import DataTable, { useSortState, type DataTableColumn } from '../DataTable';
 
 interface Row {
   id: number;
@@ -191,6 +191,52 @@ describe('DataTable ソート', () => {
     );
     const th = screen.getByText('操作').closest('th');
     expect(th?.hasAttribute('aria-sort')).toBe(false);
+  });
+});
+
+describe('useSortState ソート状態の永続化', () => {
+  it('初期状態は undefined（既定ソート未指定時）', () => {
+    const { result } = renderHook(() => useSortState('sort-init'));
+    expect(result.current[0]).toBeUndefined();
+  });
+
+  it('既定ソートを渡すと保存が無いとき既定値を返す', () => {
+    const { result } = renderHook(() => useSortState('sort-default', { key: 'name', dir: 'asc' }));
+    expect(result.current[0]).toEqual({ key: 'name', dir: 'asc' });
+  });
+
+  it('setSort(key, dir) 呼び出しで状態が更新され localStorage に保存される', () => {
+    const { result } = renderHook(() => useSortState('sort-save'));
+    act(() => result.current[1]('amount', 'desc'));
+    expect(result.current[0]).toEqual({ key: 'amount', dir: 'desc' });
+    expect(JSON.parse(localStorage.getItem('bv_table_sort_sort-save') ?? 'null')).toEqual({
+      key: 'amount',
+      dir: 'desc',
+    });
+  });
+
+  it('同じ tableId で再マウントすると保存済みソートが復元される', () => {
+    const { result, unmount } = renderHook(() => useSortState('sort-remount'));
+    act(() => result.current[1]('name', 'asc'));
+    unmount();
+    const { result: result2 } = renderHook(() => useSortState('sort-remount'));
+    expect(result2.current[0]).toEqual({ key: 'name', dir: 'asc' });
+  });
+
+  it('tableId が変われば別のソート状態になる', () => {
+    localStorage.setItem('bv_table_sort_sort-a', JSON.stringify({ key: 'name', dir: 'asc' }));
+    const { result, rerender } = renderHook(({ id }) => useSortState(id), {
+      initialProps: { id: 'sort-a' },
+    });
+    expect(result.current[0]).toEqual({ key: 'name', dir: 'asc' });
+    rerender({ id: 'sort-b' });
+    expect(result.current[0]).toBeUndefined();
+  });
+
+  it('壊れたJSONが保存されていても例外を出さず既定値にフォールバックする', () => {
+    localStorage.setItem('bv_table_sort_sort-broken', '{not valid json');
+    const { result } = renderHook(() => useSortState('sort-broken', { key: 'code', dir: 'desc' }));
+    expect(result.current[0]).toEqual({ key: 'code', dir: 'desc' });
   });
 });
 
