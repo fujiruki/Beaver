@@ -288,3 +288,177 @@ describe('DataTable 列幅の永続化', () => {
     expect(`${saved.name}px`).toBe(widthDuringDrag);
   });
 });
+
+function headerLabels(container: HTMLElement): string[] {
+  return Array.from(container.querySelectorAll('thead th')).map(th =>
+    (th.textContent ?? '').replace(/[▲▼\s]/g, ''),
+  );
+}
+
+describe('DataTable 列順序の入れ替え', () => {
+  it('localStorage に保存済みの順序があれば復元する', () => {
+    localStorage.setItem(
+      'bv_table_order_test-order-restore',
+      JSON.stringify(['amount', 'name', 'actions']),
+    );
+    const { container } = render(
+      <DataTable
+        tableId="test-order-restore"
+        columns={makeColumns()}
+        rows={ROWS}
+        rowKey={r => r.id}
+      />,
+    );
+    expect(headerLabels(container)).toEqual(['金額', '名前', '操作']);
+  });
+
+  it('保存済み順序に無い新規列は末尾に定義順で追加される', () => {
+    localStorage.setItem(
+      'bv_table_order_test-order-partial',
+      JSON.stringify(['amount']),
+    );
+    const { container } = render(
+      <DataTable
+        tableId="test-order-partial"
+        columns={makeColumns()}
+        rows={ROWS}
+        rowKey={r => r.id}
+      />,
+    );
+    expect(headerLabels(container)).toEqual(['金額', '名前', '操作']);
+  });
+
+  it('ヘッダーをドラッグして別の列にドロップすると表示順が入れ替わり localStorage に保存される', () => {
+    const storageKey = 'bv_table_order_test-order-drag';
+    const { container } = render(
+      <DataTable
+        tableId="test-order-drag"
+        columns={makeColumns()}
+        rows={ROWS}
+        rowKey={r => r.id}
+      />,
+    );
+    const nameTh = screen.getByText('名前').closest('th') as HTMLElement;
+    const amountTh = screen.getByText('金額').closest('th') as HTMLElement;
+
+    fireEvent.pointerDown(nameTh, { clientX: 10, pointerId: 2 });
+    fireEvent.pointerMove(amountTh, { clientX: 200, pointerId: 2 });
+    fireEvent.pointerUp(window, { clientX: 200, pointerId: 2 });
+
+    expect(headerLabels(container)).toEqual(['金額', '名前', '操作']);
+    expect(JSON.parse(localStorage.getItem(storageKey) ?? 'null')).toEqual([
+      'amount',
+      'name',
+      'actions',
+    ]);
+  });
+
+  it('入れ替えた順序は同じ tableId で再マウントしても復元される', () => {
+    const { container, unmount } = render(
+      <DataTable
+        tableId="test-order-remount"
+        columns={makeColumns()}
+        rows={ROWS}
+        rowKey={r => r.id}
+      />,
+    );
+    const nameTh = screen.getByText('名前').closest('th') as HTMLElement;
+    const amountTh = screen.getByText('金額').closest('th') as HTMLElement;
+    fireEvent.pointerDown(nameTh, { clientX: 10, pointerId: 3 });
+    fireEvent.pointerMove(amountTh, { clientX: 200, pointerId: 3 });
+    fireEvent.pointerUp(window, { clientX: 200, pointerId: 3 });
+    expect(headerLabels(container)).toEqual(['金額', '名前', '操作']);
+    unmount();
+
+    const { container: c2 } = render(
+      <DataTable
+        tableId="test-order-remount"
+        columns={makeColumns()}
+        rows={ROWS}
+        rowKey={r => r.id}
+      />,
+    );
+    expect(headerLabels(c2)).toEqual(['金額', '名前', '操作']);
+  });
+
+  it('列幅設定は列の中身と一緒に移動する', () => {
+    localStorage.setItem(
+      'bv_table_widths_test-order-width',
+      JSON.stringify({ amount: 200 }),
+    );
+    const { container } = render(
+      <DataTable
+        tableId="test-order-width"
+        columns={makeColumns()}
+        rows={ROWS}
+        rowKey={r => r.id}
+      />,
+    );
+    const nameTh = screen.getByText('名前').closest('th') as HTMLElement;
+    const amountTh = screen.getByText('金額').closest('th') as HTMLElement;
+    fireEvent.pointerDown(nameTh, { clientX: 10, pointerId: 4 });
+    fireEvent.pointerMove(amountTh, { clientX: 200, pointerId: 4 });
+    fireEvent.pointerUp(window, { clientX: 200, pointerId: 4 });
+
+    // 入れ替え後、金額列が先頭。その幅200pxが追従していること
+    expect(headerLabels(container)).toEqual(['金額', '名前', '操作']);
+    const firstCol = container.querySelectorAll('colgroup col')[0] as HTMLElement;
+    expect(firstCol.style.width).toBe('200px');
+  });
+
+  it('実際にドラッグして移動した場合は直後のクリックでソートが誤発火しない', () => {
+    const onSortChange = vi.fn();
+    render(
+      <DataTable
+        tableId="test-order-nosort"
+        columns={makeColumns()}
+        rows={ROWS}
+        rowKey={r => r.id}
+        onSortChange={onSortChange}
+      />,
+    );
+    const nameTh = screen.getByText('名前').closest('th') as HTMLElement;
+    const amountTh = screen.getByText('金額').closest('th') as HTMLElement;
+    fireEvent.pointerDown(nameTh, { clientX: 10, pointerId: 5 });
+    fireEvent.pointerMove(amountTh, { clientX: 200, pointerId: 5 });
+    fireEvent.pointerUp(window, { clientX: 200, pointerId: 5 });
+    // ブラウザはドラッグ後に click を発火するが、それでソートしてはいけない
+    fireEvent.click(nameTh);
+    expect(onSortChange).not.toHaveBeenCalled();
+  });
+
+  it('ドラッグせずクリックした場合は従来通りソートが発火する', () => {
+    const onSortChange = vi.fn();
+    render(
+      <DataTable
+        tableId="test-order-clicksort"
+        columns={makeColumns()}
+        rows={ROWS}
+        rowKey={r => r.id}
+        onSortChange={onSortChange}
+      />,
+    );
+    const nameTh = screen.getByText('名前').closest('th') as HTMLElement;
+    fireEvent.pointerDown(nameTh, { clientX: 10, pointerId: 6 });
+    fireEvent.pointerUp(window, { clientX: 10, pointerId: 6 });
+    fireEvent.click(nameTh);
+    expect(onSortChange).toHaveBeenCalledWith('name', 'asc');
+  });
+
+  it('リサイズハンドルのドラッグでは列順序が変わらない', () => {
+    const { container } = render(
+      <DataTable
+        tableId="test-order-resize-sep"
+        columns={makeColumns()}
+        rows={ROWS}
+        rowKey={r => r.id}
+      />,
+    );
+    const handle = container.querySelector('.bv-datatable-resize-handle') as HTMLElement;
+    fireEvent.pointerDown(handle, { clientX: 100, pointerId: 7 });
+    fireEvent.pointerMove(window, { clientX: 300, pointerId: 7 });
+    fireEvent.pointerUp(window, { clientX: 300, pointerId: 7 });
+    expect(headerLabels(container)).toEqual(['名前', '金額', '操作']);
+    expect(localStorage.getItem('bv_table_order_test-order-resize-sep')).toBeNull();
+  });
+});
