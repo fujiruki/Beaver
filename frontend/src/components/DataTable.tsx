@@ -37,6 +37,7 @@ const ORDER_STORAGE_PREFIX = 'bv_table_order_';
 const SORT_STORAGE_PREFIX = 'bv_table_sort_';
 const DEFAULT_MIN_WIDTH = 60;
 const REORDER_MOVE_THRESHOLD = 4;
+const HEADER_TEXT_COLOR = '#475569';
 
 function loadWidths<T>(tableId: string, columns: DataTableColumn<T>[]): Record<string, number> {
   const defaults: Record<string, number> = {};
@@ -276,7 +277,8 @@ export default function DataTable<T>({
   const fontSize = density === 'compact' ? 13 : 14;
 
   return (
-    <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+    <div style={{ overflowX: 'auto', width: '100%' }}>
+      <table style={{ width: 'max-content', minWidth: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
       <colgroup>
         {orderedColumns.map(col => {
           const w = widths[col.key] ?? col.width;
@@ -298,7 +300,7 @@ export default function DataTable<T>({
               textAlign: col.align ?? 'left',
               fontSize,
               fontWeight: 'bold',
-              color: '#475569',
+              color: HEADER_TEXT_COLOR,
               cursor: col.sortable ? 'pointer' : undefined,
               userSelect: 'none',
               touchAction: 'none',
@@ -320,7 +322,14 @@ export default function DataTable<T>({
                   className="bv-datatable-resize-handle"
                   onPointerDown={e => handleResizePointerDown(e, col)}
                   onClick={e => e.stopPropagation()}
-                  style={{ position: 'absolute', top: 0, right: 0, bottom: 0, width: 6 }}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    right: 0,
+                    bottom: 0,
+                    width: 6,
+                    borderRight: `1px solid ${HEADER_TEXT_COLOR}`,
+                  }}
                 />
               </th>
             );
@@ -354,6 +363,7 @@ export default function DataTable<T>({
           </tr>
         ))}
       </tbody>
-    </table>
+      </table>
+    </div>
   );
 }

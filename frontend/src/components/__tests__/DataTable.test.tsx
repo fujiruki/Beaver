@@ -508,3 +508,66 @@ describe('DataTable 列順序の入れ替え', () => {
     expect(localStorage.getItem('bv_table_order_test-order-resize-sep')).toBeNull();
   });
 });
+
+function widthColumns(): DataTableColumn<Row>[] {
+  return [
+    { key: 'name', label: '名前', width: 100, render: r => r.name },
+    { key: 'amount', label: '金額', width: 120, render: r => String(r.amount) },
+    { key: 'actions', label: '操作', width: 80, render: r => `操作${r.id}` },
+  ];
+}
+
+describe('DataTable 列幅リサイズ（対象列のみ変化）', () => {
+  it('真ん中の列の右端をドラッグするとその列だけ幅が変わり、隣接・非隣接列は変わらない', () => {
+    const { container } = render(
+      <DataTable
+        tableId="test-width-isolated"
+        columns={widthColumns()}
+        rows={ROWS}
+        rowKey={r => r.id}
+      />,
+    );
+    const handles = container.querySelectorAll('.bv-datatable-resize-handle');
+    const middleHandle = handles[1] as HTMLElement;
+
+    fireEvent.pointerDown(middleHandle, { clientX: 200, pointerId: 10 });
+    fireEvent.pointerMove(window, { clientX: 260, pointerId: 10 });
+    fireEvent.pointerUp(window, { clientX: 260, pointerId: 10 });
+
+    const cols = container.querySelectorAll('colgroup col');
+    expect((cols[1] as HTMLElement).style.width).toBe('180px');
+    expect((cols[0] as HTMLElement).style.width).toBe('100px');
+    expect((cols[2] as HTMLElement).style.width).toBe('80px');
+  });
+
+  it('テーブルは横スクロール可能なコンテナでラップされる', () => {
+    const { container } = render(
+      <DataTable
+        tableId="test-width-scroll"
+        columns={widthColumns()}
+        rows={ROWS}
+        rowKey={r => r.id}
+      />,
+    );
+    const table = container.querySelector('table') as HTMLElement;
+    const wrapper = table.parentElement as HTMLElement;
+    expect(wrapper.style.overflowX).toBe('auto');
+    expect(table.style.width).toBe('max-content');
+    expect(table.style.minWidth).toBe('100%');
+  });
+
+  it('リサイズハンドルの縦線色はヘッダー文字色と一致する', () => {
+    const { container } = render(
+      <DataTable
+        tableId="test-width-line"
+        columns={widthColumns()}
+        rows={ROWS}
+        rowKey={r => r.id}
+      />,
+    );
+    const handle = container.querySelector('.bv-datatable-resize-handle') as HTMLElement;
+    const th = screen.getByText('名前').closest('th') as HTMLElement;
+    expect(handle.style.borderRightStyle).toBe('solid');
+    expect(handle.style.borderRightColor).toBe(th.style.color);
+  });
+});
