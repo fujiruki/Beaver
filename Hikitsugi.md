@@ -1,6 +1,6 @@
 # 引き継ぎ資料 — Beaver
 
-**最終更新**: 2026-07-06
+**最終更新**: 2026-07-14
 
 ---
 
@@ -17,24 +17,32 @@
 
 ---
 
-## 本日の作業（2026-07-06）: デプロイ列車完了 + R-071
+## 本日の作業（2026-07-14）: R-076完結 + 建具台帳原価モデル設計・P0実装・本番デプロイ
 
-### デプロイ列車 ✅ 完了
-- Access側: 本番BE migration 015-018 適用 + FE deploy + 事後検証
-- Beaver側: migration 018・019 を本番適用、020相当は本番に手動追加済みで既存充足と判明。6/24以降の全コード（税計算修正・R-060 Stage2 API・R-066(c)・R-067〜R-071）を本番反映済み
-- 本番バックアップ（巻き戻し用）: `api/backups/database_20260706_pre_train.sqlite`
+### R-076「Beaverと同期」統合 P2 ✅ 完了（AccessTategu側と合わせて完結）
+- B2-2（`lines_mode==='replace'`でvoucher_lines全置換）: コミット`dd6e1fb`
+- B2-3（`PATCH /vouchers/{id}/access-link`新設）: コミット`944e674`
+- AccessTategu側（A2-1〜A2-4）も全て完了・検証済み。詳細はAccessTategu `docs/handover/20260714_セッション引き継ぎ.md` 参照
 
-### R-071: 案件の保存ボタンが機能しない ✅ 完了
-- 赤 19f9a02 / 緑 1218189
-- 真因: R-067とは別種。`projects` テーブルに `order_date`/`owner_name`/`general_contractor_name`/`site_contact` の4カラムが一度も追加されていなかった（migration漏れ、commit af9750d以来）のに、フロントエンド・APIは常時これらを参照してINSERT/UPDATEするため毎回SQLエラー（`no such column: order_date`）で保存が全滅していた。migration 020で追加して修正。
-- 本番では該当4カラムが既に手動追加済みだったため、migration 020は本番未適用のまま充足（詳細はR-072-B参照）。
+### 建具台帳の原価モデル設計・ADR化 ✅ 完了
+- Access建具台帳（本体/金物/ガラス/労務費の行明細＋木材立米計算）とBeaver `tategu_items`（固定集計列）のギャップをCodexに静的調査させ、AccessTategu wiki `docs/wiki/integration/tategu_daicho_gap.md` にまとめた
+- 設計をADR化: AccessTategu wiki `docs/wiki/adr/ADR-003_tategu_cost_model.md`。核心は「労務費をどこに合算するか」をハードコードせず、既存の`aggregation_category_master.merge_into_price_code`（現状は伝票行でのみ使用）を建具台帳側にも流用する設計にしたこと
 
-### voucher_lines.updated_at の挙動統一 ✅ 完了
-- コミット d02c389
-- migration 019からDEFAULT句を除去した際（SQLiteのALTER TABLE ADD COLUMNは非定数DEFAULT不可のため）、「フレッシュDB（DEFAULTが効く）」と「migrate適用DB＝本番/dev実態（DEFAULTなし）」で `updated_at` の初期値挙動が割れ、回帰テストが検出。
-- 統一方針: カラムDEFAULTに依存せず、全INSERT経路（明細追加・convert-to-sales・insertSyncedLines）でアプリコードが `updated_at = CURRENT_TIMESTAMP` を明示セットするよう修正。
+### ADR-003 P0実装 ✅ 完了・本番デプロイ済み
+- migration 021: `tategu_item_cost_lines`（本体/金物/ガラス統合、`category_code`参照）・`tategu_item_labor_lines`（労務費）を新設
+- `PUT /tategu-items/{id}/cost-lines` / `/labor-lines`（全件入れ替え）＋`recalcTateguCost`拡張で`tategu_items`の固定集計列を明細から再計算するキャッシュに
+- コミット `55b1e92`。regression-suite.sh（vitest+PHP7本）全緑
+- **フロントUIは未実装**（今回はバックエンドのみ、次の作業候補の筆頭）
 
-要望管理: R-071 は `docs/requests.md` から `docs/request_log.md` へ移動済み。
+### 本番デプロイ ✅ 完了（SSH遮断のためFTPS代替手順を新規確立）
+- `upload.ps1`前提のSSH/SCPがConoHa側でブロックされていたため、FTPS（明示的AUTH TLS）での代替デプロイを実施
+- 手順・ハマりどころ（curl+Windows Schannelの451エラー対策等）は `docs/wiki/knowledge/deploy_ftps_fallback.md` に記録。次回SSHが使えない時はこれを参照
+- migration 021は「本番でPHPスクリプトを一回限り実行してその場で適用」方式（ダウンロード→再アップロードのレース回避）。バックアップ: `api/backups/database_20260714_145125_pre_r076_tategu_cost_lines.sqlite`
+- デプロイ範囲: 自分のP0実装 + 別作業でマージされていたDataTableソート機能（VoucherList/InvoiceList）等も含めmaster全体を本番同期
+
+### 副次的発見
+- 本番`aggregation_category_master`は現状0件（動的原価内訳の同期実績が無いため）。migration 021のseed（`merge_into_price_code`初期値）は無害な空振り。今後この機能を使い始めた時点で改めて設定が必要
+- R-027bの状況を再確認: 自動日次バックアップは**2026-06-09で停止したまま**（`backup.log`がそこで途切れている）。手動バックアップの慣行は生きている。今回も着手せず持ち越し
 
 ---
 
@@ -55,19 +63,21 @@
 | R-069 | 「＋新規得意先」ダイアログのフル画面化＋即時反映 | ✅ 本番反映済み |
 | R-070 | 案件一覧・建具台帳一覧のIMEフォーカス喪失 | ✅ 本番反映済み |
 | R-071 | 案件の保存ボタンが機能しない | ✅ 本番反映済み |
+| R-076 | AccessTategu ↔ Beaver 統合同期（P1・P2） | ✅ 本番反映済み |
+| ADR-003 P0 | 建具台帳 原価行明細テーブル（cost_lines/labor_lines）＋API | ✅ 本番反映済み（フロントUIは未実装） |
 
-### 検証状況（2026-07-06時点）
+### 検証状況（2026-07-14時点）
 
 - `cd frontend && npx vitest run` → 全通過
-- `bash .claude/regression-suite.sh`（vitest + PHPテスト5本）→ exit 0
+- `bash .claude/regression-suite.sh`（vitest + PHPテスト7本）→ exit 0
 - `cd frontend && npm run build`（tsc -b && vite build）→ exit 0
 
 ### migration 適用状況
 
 | 環境 | 最新適用 |
 |---|---|
-| dev（ローカル） | 020（`projects_owner_contractor_contact`）まで |
-| prod（本番） | 019（`voucher_lines_updated_at`）まで。020相当のカラムは本番に手動追加済みで充足（migration自体は未適用、詳細はR-072-B） |
+| dev（ローカル） | 021（`tategu_cost_lines`）まで |
+| prod（本番） | 021（`tategu_cost_lines`）まで適用済み（2026-07-14、FTPS経由。バックアップ: `api/backups/database_20260714_145125_pre_r076_tategu_cost_lines.sqlite`）。020相当のカラムは本番に手動追加済みで充足（migration自体は未適用、詳細はR-072-B） |
 
 ---
 
@@ -77,7 +87,10 @@
 
 | R番号 | タイトル | 種別 | 優先 |
 |---|---|---|---|
-| R-027b | 本番の日次バックアップが停止している疑い（backup.sh不在、api/backups/最新が6/16で停止） | バグ・要調査 | **高** |
+| R-027b | 本番の日次バックアップが停止している（2026-07-14再確認: `backup.log`は6/9で途切れたまま。疑いではなく確定） | バグ・要調査 | **高** |
+| ADR-003 P0残 | 建具台帳 原価行明細のフロントUI（`TateguItemDetail.tsx`等でcost-lines/labor-linesを編集できるようにする） | 機能追加 | 高 |
+| ADR-003 P1 | 木材原価サブドメイン（`wood_species_master`/`tategu_item_wood_lines`、立米計算） | 機能追加 | 中 |
+| ADR-003 P2 | 集計区分の合算設定画面（`aggregation_category_master`の`merge_into_price_code`をUIから編集） | 機能追加 | 中 |
 | R-072-B | projectsテーブルのdev/prodスキーマ乖離の棚卸し（本番手動追加分がmigration履歴に記録されていなかった） | 品質改善 | 中 |
 | R-034 | validation 強化（silent NULL 許容など） | 品質改善 | 低（実運用での顕在化待ち） |
 | R-035 | /projects/sync pagination + 重複対策 | 品質改善 | 低（実運用での顕在化待ち） |
@@ -89,17 +102,25 @@
 
 ### 優先1: R-027b（本番日次バックアップ停止の調査・復旧）
 
-backup.sh不在・crontab確認・直近バックアップの動作確認まで実施。障害時のデータ復旧リスクに直結するため優先度高。
+backup.sh不在・crontab確認・直近バックアップの動作確認まで実施。障害時のデータ復旧リスクに直結するため優先度高。2026-07-14時点でも未着手のまま。
 
-### 優先2: R-072-B（projectsスキーマ乖離の棚卸し）
+### 優先2: ADR-003 P0の続き（建具台帳 原価行明細のフロントUI）
+
+バックエンド（migration 021・`PUT /tategu-items/{id}/cost-lines`・`/labor-lines`）は実装・本番デプロイ済み。`TateguItemDetail.tsx`（またはその配下）から本体/金物/ガラス/労務費の行を編集できるUIが必要。設計は `docs/wiki/adr/ADR-003_tategu_cost_model.md`（AccessTateguリポジトリ）参照。
+
+### 優先3: R-072-B（projectsスキーマ乖離の棚卸し）
 
 本番`projects`テーブルの`PRAGMA table_info`とdevの`schema.sql`＋全migration適用後のスキーマを突合し、他に記録漏れがないか棚卸し。
 
-### 優先3: R-034/R-035（品質改善、低優先）
+### 優先4: ADR-003 P1/P2（木材原価サブドメイン・合算設定画面）
+
+フロントUIの後。詳細はADR-003参照。
+
+### 優先5: R-034/R-035（品質改善、低優先）
 
 実運用で問題が顕在化してから着手する想定。`docs/requests.md` に詳細あり。
 
-### 優先4: R-038（得意先マスタ双方向同期）
+### 優先6: R-038（得意先マスタ双方向同期）
 
 未設計。着手前に設計から必要。
 
