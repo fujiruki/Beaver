@@ -20,30 +20,79 @@ $subAction   = $segments[2] ?? null;   // 'reload-cost' | 'additions'
 $subId       = isset($segments[3]) && is_numeric($segments[3]) ? (int)$segments[3] : null;
 
 // --- 原価合計を計算して tategu_items を更新するヘルパー ---
-function recalcTateguCost(PDO $pdo, int $id): void {
-    $stmt = $pdo->prepare('
+function recalcTateguCost(PDO $pdo, int $id, bool $forceLineRecalc = false): void {
+    $countStmt = $pdo->prepare('
         SELECT
-            COALESCE(SUM(cost_body), 0)          AS body,
-            COALESCE(SUM(cost_hardware), 0)       AS hardware,
-            COALESCE(SUM(cost_glass), 0)          AS glass,
-            COALESCE(SUM(cost_factory_hours), 0)  AS factory_h,
-            COALESCE(SUM(cost_site_hours), 0)     AS site_h,
-            MAX(cost_labor_rate)                  AS labor_rate
-        FROM tategu_item_additions WHERE tategu_item_id = ?
+            (SELECT COUNT(*) FROM tategu_item_cost_lines WHERE tategu_item_id = ?) +
+            (SELECT COUNT(*) FROM tategu_item_labor_lines WHERE tategu_item_id = ?)
     ');
-    $stmt->execute([$id]);
-    $add = $stmt->fetch();
+    $countStmt->execute([$id, $id]);
+    $lineCount = (int)$countStmt->fetchColumn();
 
-    // 台帳本体の base 原価を取得
-    $base = $pdo->prepare('SELECT cost_body, cost_hardware, cost_glass, cost_factory_hours, cost_site_hours, cost_labor_rate FROM tategu_items WHERE id = ?');
-    $base->execute([$id]);
-    $b = $base->fetch();
+    if (!$forceLineRecalc && $lineCount === 0) {
+        $pdo->prepare('UPDATE tategu_items SET cost_snapshot_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+            ->execute([$id]);
+        return;
+    }
 
-    // 台帳本体の値はそのまま維持し、additions の合計は別保管ではなく
-    // 台帳フィールドを additions の合算で上書きする設計ではない（台帳自体を直接編集する）
-    // ここでは cost_snapshot_at だけ更新
-    $pdo->prepare('UPDATE tategu_items SET cost_snapshot_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
-        ->execute([$id]);
+    $costs = ['body' => 0.0, 'hardware' => 0.0, 'glass' => 0.0];
+    $costStmt = $pdo->prepare('
+        SELECT category_code, COALESCE(SUM(amount), 0) AS amount
+        FROM tategu_item_cost_lines
+        WHERE tategu_item_id = ?
+        GROUP BY category_code
+    ');
+    $costStmt->execute([$id]);
+    foreach ($costStmt->fetchAll() as $row) {
+        if (array_key_exists($row['category_code'], $costs)) {
+            $costs[$row['category_code']] = (float)$row['amount'];
+        }
+    }
+
+    $hours = ['factory_hours' => 0.0, 'site_hours' => 0.0];
+    $laborAmount = 0.0;
+    $totalHours = 0.0;
+    $laborStmt = $pdo->prepare('
+        SELECT
+            category_code,
+            COALESCE(SUM(work_hours), 0) AS work_hours,
+            COALESCE(SUM(amount), 0) AS amount
+        FROM tategu_item_labor_lines
+        WHERE tategu_item_id = ?
+        GROUP BY category_code
+    ');
+    $laborStmt->execute([$id]);
+    foreach ($laborStmt->fetchAll() as $row) {
+        $workHours = (float)$row['work_hours'];
+        $amount = (float)$row['amount'];
+        if (array_key_exists($row['category_code'], $hours)) {
+            $hours[$row['category_code']] = $workHours;
+        }
+        $totalHours += $workHours;
+        $laborAmount += $amount;
+    }
+    $laborRate = $totalHours > 0 ? $laborAmount / $totalHours : 0;
+
+    $pdo->prepare('
+        UPDATE tategu_items SET
+            cost_body = :cost_body,
+            cost_hardware = :cost_hardware,
+            cost_glass = :cost_glass,
+            cost_factory_hours = :cost_factory_hours,
+            cost_site_hours = :cost_site_hours,
+            cost_labor_rate = :cost_labor_rate,
+            cost_snapshot_at = CURRENT_TIMESTAMP,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = :id
+    ')->execute([
+        ':cost_body'          => $costs['body'],
+        ':cost_hardware'      => $costs['hardware'],
+        ':cost_glass'         => $costs['glass'],
+        ':cost_factory_hours' => $hours['factory_hours'],
+        ':cost_site_hours'    => $hours['site_hours'],
+        ':cost_labor_rate'    => $laborRate,
+        ':id'                 => $id,
+    ]);
 }
 
 switch ($method) {
@@ -73,6 +122,14 @@ switch ($method) {
             $stmt_bd = $pdo->prepare('SELECT * FROM tategu_item_cost_breakdown WHERE tategu_item_id = ? ORDER BY sort_order, id');
             $stmt_bd->execute([$resourceId]);
             $row['cost_breakdown'] = $stmt_bd->fetchAll();
+
+            $stmt_cost_lines = $pdo->prepare('SELECT * FROM tategu_item_cost_lines WHERE tategu_item_id = ? ORDER BY sort_order, id');
+            $stmt_cost_lines->execute([$resourceId]);
+            $row['cost_lines'] = $stmt_cost_lines->fetchAll();
+
+            $stmt_labor_lines = $pdo->prepare('SELECT * FROM tategu_item_labor_lines WHERE tategu_item_id = ? ORDER BY sort_order, id');
+            $stmt_labor_lines->execute([$resourceId]);
+            $row['labor_lines'] = $stmt_labor_lines->fetchAll();
 
             // 使用履歴
             $stmt3 = $pdo->prepare('
@@ -224,6 +281,79 @@ switch ($method) {
         break;
 
     case 'PUT':
+        if ($resourceId && $subAction === 'cost-lines') {
+            $data = json_decode(file_get_contents('php://input'), true) ?? [];
+            $lines = $data['lines'] ?? [];
+            $pdo->beginTransaction();
+            try {
+                $pdo->prepare('DELETE FROM tategu_item_cost_lines WHERE tategu_item_id = ?')->execute([$resourceId]);
+                $ins = $pdo->prepare('
+                    INSERT INTO tategu_item_cost_lines
+                        (tategu_item_id, category_code, name, quantity, unit_cost, amount, source, sort_order)
+                    VALUES
+                        (:tategu_item_id, :category_code, :name, :quantity, :unit_cost, :amount, :source, :sort_order)
+                ');
+                foreach ($lines as $i => $line) {
+                    $quantity = (float)($line['quantity'] ?? 0);
+                    $unitCost = (float)($line['unit_cost'] ?? 0);
+                    $source = $line['source'] ?? 'manual';
+                    if (!in_array($source, ['manual', 'wood_calc'], true)) {
+                        $source = 'manual';
+                    }
+                    $ins->execute([
+                        ':tategu_item_id' => $resourceId,
+                        ':category_code'  => $line['category_code'] ?? '',
+                        ':name'           => $line['name'] ?? '',
+                        ':quantity'       => $quantity,
+                        ':unit_cost'      => $unitCost,
+                        ':amount'         => array_key_exists('amount', $line) ? (float)$line['amount'] : $quantity * $unitCost,
+                        ':source'         => $source,
+                        ':sort_order'     => $line['sort_order'] ?? $i,
+                    ]);
+                }
+                recalcTateguCost($pdo, $resourceId, true);
+                $pdo->commit();
+            } catch (Throwable $e) {
+                $pdo->rollBack();
+                throw $e;
+            }
+            echo json_encode(['ok' => true]);
+            break;
+        }
+        if ($resourceId && $subAction === 'labor-lines') {
+            $data = json_decode(file_get_contents('php://input'), true) ?? [];
+            $lines = $data['lines'] ?? [];
+            $pdo->beginTransaction();
+            try {
+                $pdo->prepare('DELETE FROM tategu_item_labor_lines WHERE tategu_item_id = ?')->execute([$resourceId]);
+                $ins = $pdo->prepare('
+                    INSERT INTO tategu_item_labor_lines
+                        (tategu_item_id, process_name, category_code, work_hours, labor_rate, amount, sort_order)
+                    VALUES
+                        (:tategu_item_id, :process_name, :category_code, :work_hours, :labor_rate, :amount, :sort_order)
+                ');
+                foreach ($lines as $i => $line) {
+                    $workHours = (float)($line['work_hours'] ?? 0);
+                    $laborRate = (float)($line['labor_rate'] ?? 0);
+                    $ins->execute([
+                        ':tategu_item_id' => $resourceId,
+                        ':process_name'   => $line['process_name'] ?? '',
+                        ':category_code'  => $line['category_code'] ?? '',
+                        ':work_hours'     => $workHours,
+                        ':labor_rate'     => $laborRate,
+                        ':amount'         => array_key_exists('amount', $line) ? (float)$line['amount'] : $workHours * $laborRate,
+                        ':sort_order'     => $line['sort_order'] ?? $i,
+                    ]);
+                }
+                recalcTateguCost($pdo, $resourceId, true);
+                $pdo->commit();
+            } catch (Throwable $e) {
+                $pdo->rollBack();
+                throw $e;
+            }
+            echo json_encode(['ok' => true]);
+            break;
+        }
         if ($resourceId && $subAction === 'cost-breakdown') {
             $data = json_decode(file_get_contents('php://input'), true) ?? [];
             $lines = $data['lines'] ?? [];
