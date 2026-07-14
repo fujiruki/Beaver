@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { api } from './client';
-import type { TateguItem, TateguItemInput, CostBreakdownLine } from '../types/tateguItem';
+import type { TateguItem, TateguItemInput, TateguItemUpdateInput, CostBreakdownLine, CostLine, LaborLine } from '../types/tateguItem';
 import type { PaginatedResponse, SortParam } from '../types/pagination';
 
 const KEY = 'tateguItems';
@@ -48,7 +48,7 @@ export function useCreateTateguItem() {
 export function useUpdateTateguItem(id: number) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: TateguItemInput) => api.put<TateguItem>(`/tategu-items/${id}`, data),
+    mutationFn: (data: TateguItemUpdateInput) => api.put<TateguItem>(`/tategu-items/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [KEY] });
       queryClient.invalidateQueries({ queryKey: [KEY, id] });
@@ -61,6 +61,24 @@ export function useUpdateCostBreakdown(tateguItemId: number) {
   return useMutation({
     mutationFn: (lines: Omit<CostBreakdownLine, 'id' | 'tategu_item_id'>[]) =>
       api.put<{ ok: boolean }>(`/tategu-items/${tateguItemId}/cost-breakdown`, { lines }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [KEY, tateguItemId] }); },
+  });
+}
+
+export function useUpdateCostLines(tateguItemId: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (lines: Omit<CostLine, 'id' | 'tategu_item_id'>[]) =>
+      api.put<{ ok: boolean }>(`/tategu-items/${tateguItemId}/cost-lines`, { lines }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [KEY, tateguItemId] }); },
+  });
+}
+
+export function useUpdateLaborLines(tateguItemId: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (lines: Omit<LaborLine, 'id' | 'tategu_item_id'>[]) =>
+      api.put<{ ok: boolean }>(`/tategu-items/${tateguItemId}/labor-lines`, { lines }),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: [KEY, tateguItemId] }); },
   });
 }
