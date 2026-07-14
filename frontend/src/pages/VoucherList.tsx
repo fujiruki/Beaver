@@ -6,7 +6,10 @@ import { useProjects } from '../api/projects';
 import ComboSelect from '../components/ComboSelect';
 import type { ComboOption } from '../components/ComboSelect';
 import Pagination from '../components/Pagination';
-import type { VoucherType, VoucherStatus } from '../types/voucher';
+import DataTable from '../components/DataTable';
+import type { DataTableColumn, SortDir } from '../components/DataTable';
+import type { SortParam } from '../types/pagination';
+import type { Voucher, VoucherType, VoucherStatus } from '../types/voucher';
 
 const TYPE_LABELS: Record<VoucherType, string> = { estimate: '見積', sales: '売上' };
 const STATUS_LABELS: Record<VoucherStatus, string> = {
@@ -22,6 +25,7 @@ export default function VoucherList() {
   const [page, setPage] = useState(1);
   const [typeFilter, setTypeFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [sort, setSort] = useState<SortParam | undefined>(undefined);
   const [customerFilter, setCustomerFilter] = useState<number | null>(
     searchParams.get('customer_id') ? Number(searchParams.get('customer_id')) : null
   );
@@ -37,7 +41,7 @@ export default function VoucherList() {
     status: statusFilter || undefined,
     customer_id: customerFilter ?? undefined,
     project_id: projectFilter ?? undefined,
-  });
+  }, sort);
 
   const vouchers = data?.data ?? [];
   const meta = data?.meta;
@@ -70,6 +74,11 @@ export default function VoucherList() {
     setPage(1);
   }
 
+  function handleSortChange(key: string, dir: SortDir) {
+    setSort({ key, dir });
+    setPage(1);
+  }
+
   function handleNewVoucher() {
     const params = new URLSearchParams();
     if (projectFilter) params.set('project_id', String(projectFilter));
@@ -77,6 +86,45 @@ export default function VoucherList() {
     const qs = params.toString();
     navigate(`/vouchers/new${qs ? `?${qs}` : ''}`);
   }
+
+  const columns: DataTableColumn<Voucher>[] = [
+    { key: 'voucher_no', label: '伝票番号', sortable: true, render: v => v.voucher_no },
+    { key: 'voucher_type', label: '種別', sortable: true, render: v => TYPE_LABELS[v.voucher_type] },
+    {
+      key: 'status',
+      label: 'ステータス',
+      sortable: true,
+      render: v => (
+        <span style={{ padding: '2px 8px', borderRadius: 12, fontSize: 12,
+          background: STATUS_COLORS[v.status] + '20', color: STATUS_COLORS[v.status] }}>
+          {STATUS_LABELS[v.status]}
+        </span>
+      ),
+    },
+    { key: 'customer_name', label: '得意先', sortable: true, render: v => v.customer_name ?? '-' },
+    { key: 'description', label: '摘要', sortable: true, render: v => v.description ?? '-' },
+    { key: 'project_name', label: '案件', sortable: true, render: v => v.project_name ?? '-' },
+    { key: 'voucher_date', label: '伝票日付', sortable: true, render: v => v.voucher_date },
+    {
+      key: 'total_amount',
+      label: '合計金額',
+      align: 'right',
+      sortable: true,
+      render: v => `¥${v.total_amount.toLocaleString()}`,
+    },
+    {
+      key: 'source_estimate_no',
+      label: '引用',
+      render: v => (
+        v.voucher_type === 'sales' && v.source_estimate_no ? (
+          <span style={{ padding: '2px 7px', borderRadius: 10, fontSize: 11,
+            background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe' }}>
+            引用: {v.source_estimate_no}
+          </span>
+        ) : null
+      ),
+    },
+  ];
 
   return (
     <div>
@@ -130,60 +178,17 @@ export default function VoucherList() {
         <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>読み込み中...</div>
       ) : (
         <div style={{ background: '#fff', borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
-            <thead>
-              <tr style={{ background: '#f8fafc' }}>
-                <Th>伝票番号</Th>
-                <Th>種別</Th>
-                <Th>ステータス</Th>
-                <Th width="10em">得意先</Th>
-                <Th>摘要</Th>
-                <Th>案件</Th>
-                <Th>伝票日付</Th>
-                <Th right>合計金額</Th>
-                <Th>引用</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {vouchers.length === 0 ? (
-                <tr>
-                  <td colSpan={9} style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>
-                    伝票がありません
-                  </td>
-                </tr>
-              ) : (
-                vouchers.map(v => (
-                  <tr key={v.id} onClick={() => navigate(`/vouchers/${v.id}`)}
-                    style={{ cursor: 'pointer', borderTop: '1px solid #f1f5f9' }}
-                    onMouseEnter={e => (e.currentTarget.style.background = '#f0f9ff')}
-                    onMouseLeave={e => (e.currentTarget.style.background = '')}>
-                    <Td>{v.voucher_no}</Td>
-                    <Td>{TYPE_LABELS[v.voucher_type]}</Td>
-                    <Td>
-                      <span style={{ padding: '2px 8px', borderRadius: 12, fontSize: 12,
-                        background: STATUS_COLORS[v.status] + '20',
-                        color: STATUS_COLORS[v.status] }}>
-                        {STATUS_LABELS[v.status]}
-                      </span>
-                    </Td>
-                    <Td width="10em">{v.customer_name ?? '-'}</Td>
-                    <Td>{v.description ?? '-'}</Td>
-                    <Td>{v.project_name ?? '-'}</Td>
-                    <Td>{v.voucher_date}</Td>
-                    <Td right>¥{v.total_amount.toLocaleString()}</Td>
-                    <Td>
-                      {v.voucher_type === 'sales' && v.source_estimate_no && (
-                        <span style={{ padding: '2px 7px', borderRadius: 10, fontSize: 11,
-                          background: '#eff6ff', color: '#2563eb', border: '1px solid #bfdbfe' }}>
-                          引用: {v.source_estimate_no}
-                        </span>
-                      )}
-                    </Td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+          <DataTable
+            tableId="vouchers"
+            columns={columns}
+            rows={vouchers}
+            rowKey={v => v.id}
+            onRowClick={v => navigate(`/vouchers/${v.id}`)}
+            sortKey={sort?.key}
+            sortDir={sort?.dir}
+            onSortChange={handleSortChange}
+            emptyMessage="伝票がありません"
+          />
           {meta && (
             <Pagination
               page={meta.page}
@@ -196,23 +201,6 @@ export default function VoucherList() {
         </div>
       )}
     </div>
-  );
-}
-
-function Th({ children, right, width }: { children: React.ReactNode; right?: boolean; width?: string }) {
-  return (
-    <th style={{ padding: '10px 14px', textAlign: right ? 'right' : 'left', fontSize: 12,
-      color: '#64748b', fontWeight: 'bold', borderBottom: '1px solid #e2e8f0', width }}>
-      {children}
-    </th>
-  );
-}
-
-function Td({ children, right, width }: { children: React.ReactNode; right?: boolean; width?: string }) {
-  return (
-    <td style={{ padding: '10px 14px', textAlign: right ? 'right' : 'left', color: '#1e293b', width }}>
-      {children}
-    </td>
   );
 }
 

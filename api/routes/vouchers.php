@@ -20,6 +20,7 @@ $subAction  = $segments[2] ?? null;
 $subId      = isset($segments[3]) && is_numeric($segments[3]) ? (int)$segments[3] : null;
 
 require_once __DIR__ . '/sync_helpers.php';
+require_once __DIR__ . '/list_helpers.php';
 
 // --- R-076 B2-3: Beaver発新規伝票の Access 採番IDを書き戻す ---
 // PATCH /vouchers/{id}/access-link
@@ -526,12 +527,28 @@ switch ($method) {
                 $cntStmt = $pdo->prepare("SELECT COUNT(*) FROM vouchers v $where");
                 $cntStmt->execute($params);
                 $total = (int)$cntStmt->fetchColumn();
+                // R-076 Part A Phase 1: サーバソート（ホワイトリストは全てハードコード文字列・実カラム/JOIN別名のみ）
+                $sortClause = resolveSortClause(
+                    [
+                        'voucher_no'    => 'v.voucher_no',
+                        'voucher_type'  => 'v.voucher_type',
+                        'status'        => 'v.status',
+                        'customer_name' => 'c.name',
+                        'description'   => 'v.description',
+                        'project_name'  => 'p.name',
+                        'voucher_date'  => 'v.voucher_date',
+                        'total_amount'  => 'v.total_amount',
+                    ],
+                    'v.voucher_date',
+                    'v.id',
+                    'DESC'
+                );
                 $stmt  = $pdo->prepare("
                     SELECT v.*, c.name AS customer_name, p.name AS project_name
                     FROM vouchers v
                     LEFT JOIN customers c ON c.id = v.customer_id
                     LEFT JOIN projects  p ON p.id = v.project_id
-                    $where ORDER BY v.voucher_date DESC LIMIT $perPage OFFSET $offset
+                    $where $sortClause LIMIT $perPage OFFSET $offset
                 ");
                 $stmt->execute($params);
                 echo json_encode([
