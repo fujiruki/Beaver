@@ -82,6 +82,22 @@ foreach ($lprojects as [$code, $name, $updatedAt]) {
     ");
 }
 
+// 伝票: voucher_no順・voucher_date順・total_amount順のすべてが互いに食い違うように投入する
+$pdo->exec("DELETE FROM vouchers WHERE voucher_no LIKE 'LV%'");
+$customerIdForVouchers = (int)$pdo->query("SELECT id FROM customers WHERE code = 'LS001'")->fetchColumn();
+$lvouchers = [
+    // voucher_no, voucher_date, total_amount
+    ['LV001', '2026-03-02', 3000],
+    ['LV002', '2026-03-03', 1000],
+    ['LV003', '2026-03-01', 2000],
+];
+foreach ($lvouchers as [$no, $date, $total]) {
+    $pdo->exec("
+        INSERT INTO vouchers (voucher_no, voucher_type, status, customer_id, voucher_date, total_amount)
+        VALUES ('$no', 'estimate', 'draft', $customerIdForVouchers, '$date', $total)
+    ");
+}
+
 // ============================================================
 // テストハーネス
 // ============================================================
@@ -330,6 +346,53 @@ try {
         $data = json_decode($body, true);
         $codes = array_values(array_filter(array_column($data['data'], 'project_code'), fn($c) => str_starts_with((string)$c, 'LP')));
         assertEq(['LP001', 'LP003', 'LP002'], $codes, 'updated_at降順（デフォルト）にフォールバック');
+    });
+
+    // ============================================================
+    // GET /vouchers?page=1 実データでのソート統合テスト
+    // ============================================================
+    echo "\n=== GET /vouchers?page=1 サーバソート統合 ===\n";
+
+    runTest('sort 未指定時は従来通り voucher_date 降順で返る（既存挙動を維持）', function () use ($port) {
+        $body = file_get_contents("http://127.0.0.1:$port/contents/Beaver/api/vouchers?page=1&per_page=200");
+        $data = json_decode($body, true);
+        $nos = array_values(array_filter(array_column($data['data'], 'voucher_no'), fn($n) => str_starts_with((string)$n, 'LV')));
+        assertEq(['LV002', 'LV001', 'LV003'], $nos, 'sort未指定はvoucher_date降順（2026-03-03=LV002→03-02=LV001→03-01=LV003）');
+    });
+
+    runTest('sort=voucher_no&order=asc で伝票番号の昇順に並ぶ', function () use ($port) {
+        $body = file_get_contents("http://127.0.0.1:$port/contents/Beaver/api/vouchers?page=1&per_page=200&sort=voucher_no&order=asc");
+        $data = json_decode($body, true);
+        $nos = array_values(array_filter(array_column($data['data'], 'voucher_no'), fn($n) => str_starts_with((string)$n, 'LV')));
+        assertEq(['LV001', 'LV002', 'LV003'], $nos, 'voucher_no昇順');
+    });
+
+    runTest('sort=total_amount&order=asc で合計金額の昇順に並ぶ', function () use ($port) {
+        $body = file_get_contents("http://127.0.0.1:$port/contents/Beaver/api/vouchers?page=1&per_page=200&sort=total_amount&order=asc");
+        $data = json_decode($body, true);
+        $nos = array_values(array_filter(array_column($data['data'], 'voucher_no'), fn($n) => str_starts_with((string)$n, 'LV')));
+        assertEq(['LV002', 'LV003', 'LV001'], $nos, 'total_amount昇順（1000=LV002→2000=LV003→3000=LV001）');
+    });
+
+    runTest('sort=total_amount&order=desc で合計金額の降順に並ぶ', function () use ($port) {
+        $body = file_get_contents("http://127.0.0.1:$port/contents/Beaver/api/vouchers?page=1&per_page=200&sort=total_amount&order=desc");
+        $data = json_decode($body, true);
+        $nos = array_values(array_filter(array_column($data['data'], 'voucher_no'), fn($n) => str_starts_with((string)$n, 'LV')));
+        assertEq(['LV001', 'LV003', 'LV002'], $nos, 'total_amount降順（3000=LV001→2000=LV003→1000=LV002）');
+    });
+
+    runTest('vouchersでホワイトリスト外の列名を指定しても400にならずvoucher_date降順にフォールバックする', function () use ($port) {
+        $ctx = stream_context_create(['http' => ['ignore_errors' => true]]);
+        $body = file_get_contents(
+            "http://127.0.0.1:$port/contents/Beaver/api/vouchers?page=1&per_page=200&sort=" . urlencode('memo'),
+            false,
+            $ctx
+        );
+        $statusLine = $http_response_header[0] ?? '';
+        assertTrue(str_contains($statusLine, '200'), 'expected 200 got: ' . $statusLine);
+        $data = json_decode($body, true);
+        $nos = array_values(array_filter(array_column($data['data'], 'voucher_no'), fn($n) => str_starts_with((string)$n, 'LV')));
+        assertEq(['LV002', 'LV001', 'LV003'], $nos, 'voucher_date降順（デフォルト）にフォールバック');
     });
 } finally {
     if (is_resource($serverProc)) {

@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from './client';
 import type { Voucher, VoucherInput, VoucherLine } from '../types/voucher';
-import type { PaginatedResponse } from '../types/pagination';
+import type { PaginatedResponse, SortParam } from '../types/pagination';
 
 const KEY = 'vouchers';
 
@@ -25,15 +25,20 @@ export function useVouchers(filters?: VoucherFilters) {
 }
 
 /** 伝票一覧取得（ページネーション付き・一覧ページ用） */
-export function useVouchersPaged(page: number, filters?: VoucherFilters) {
+export function useVouchersPaged(page: number, filters?: VoucherFilters, sort?: SortParam) {
   return useQuery({
-    queryKey: [KEY, 'paged', page, filters],
+    queryKey: [KEY, 'paged', page, filters, sort?.key, sort?.dir],
     queryFn: () => {
       const params = new URLSearchParams({ page: String(page), per_page: '50' });
       if (filters?.voucher_type) params.set('voucher_type', filters.voucher_type);
       if (filters?.status) params.set('status', filters.status);
       if (filters?.customer_id) params.set('customer_id', String(filters.customer_id));
       if (filters?.project_id) params.set('project_id', String(filters.project_id));
+      // sort未指定時はsort/orderパラメータを付けない（既定の伝票日付降順を維持）
+      if (sort) {
+        params.set('sort', sort.key);
+        params.set('order', sort.dir);
+      }
       return api.get<PaginatedResponse<Voucher>>(`/vouchers?${params}`);
     },
   });

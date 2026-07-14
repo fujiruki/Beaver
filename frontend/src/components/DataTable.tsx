@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, PointerEvent as ReactPointerEvent, ReactNode } from 'react';
 
 export type SortDir = 'asc' | 'desc';
@@ -28,7 +28,9 @@ interface DataTableProps<T> {
 }
 
 const STORAGE_PREFIX = 'bv_table_widths_';
+const ORDER_STORAGE_PREFIX = 'bv_table_order_';
 const DEFAULT_MIN_WIDTH = 60;
+const REORDER_MOVE_THRESHOLD = 4;
 
 function loadWidths<T>(tableId: string, columns: DataTableColumn<T>[]): Record<string, number> {
   const defaults: Record<string, number> = {};
@@ -75,6 +77,65 @@ export function useColumnWidths<T>(tableId: string, columns: DataTableColumn<T>[
   return { widths, setWidth, persist };
 }
 
+function loadOrder(tableId: string): string[] | null {
+  try {
+    const raw = localStorage.getItem(ORDER_STORAGE_PREFIX + tableId);
+    if (!raw) return null;
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return null;
+    const keys = parsed.filter((k): k is string => typeof k === 'string');
+    return keys.length > 0 ? keys : null;
+  } catch {
+    return null;
+  }
+}
+
+// 保存順を優先しつつ、未知の列は定義順で末尾に補完したキー配列を返す
+function resolveOrder<T>(saved: string[] | null, columns: DataTableColumn<T>[]): string[] {
+  const defKeys = columns.map(c => c.key);
+  if (!saved) return defKeys;
+  const known = new Set(defKeys);
+  const ordered = saved.filter(k => known.has(k));
+  const seen = new Set(ordered);
+  for (const k of defKeys) {
+    if (!seen.has(k)) ordered.push(k);
+  }
+  return ordered;
+}
+
+export function useColumnOrder<T>(tableId: string, columns: DataTableColumn<T>[]) {
+  const [saved, setSaved] = useState<string[] | null>(() => loadOrder(tableId));
+
+  useEffect(() => {
+    setSaved(loadOrder(tableId));
+    // tableId が変わったときのみ復元し直す（columns は再生成されやすいため依存に含めない）
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tableId]);
+
+  const order = useMemo(() => resolveOrder(saved, columns), [saved, columns]);
+
+  const reorder = useCallback((fromKey: string, toKey: string) => {
+    setSaved(() => {
+      const fromIdx = order.indexOf(fromKey);
+      const toIdx = order.indexOf(toKey);
+      if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx) return order;
+      const next = [...order];
+      next.splice(fromIdx, 1);
+      let insertAt = next.indexOf(toKey);
+      if (fromIdx < toIdx) insertAt += 1;
+      next.splice(insertAt, 0, fromKey);
+      try {
+        localStorage.setItem(ORDER_STORAGE_PREFIX + tableId, JSON.stringify(next));
+      } catch {
+        // localStorage が使えない環境では保存を諦める
+      }
+      return next;
+    });
+  }, [order, tableId]);
+
+  return { order, reorder };
+}
+
 export default function DataTable<T>({
   tableId,
   columns,
@@ -88,11 +149,54 @@ export default function DataTable<T>({
   density = 'compact',
 }: DataTableProps<T>) {
   const { widths, setWidth, persist } = useColumnWidths(tableId, columns);
+  const { order, reorder } = useColumnOrder(tableId, columns);
+
+  const orderedColumns = useMemo(() => {
+    const byKey = new Map(columns.map(c => [c.key, c]));
+    return order.map(k => byKey.get(k)).filter((c): c is DataTableColumn<T> => c !== undefined);
+  }, [order, columns]);
+
+  const dragRef = useRef<{ sourceKey: string; startX: number; moved: boolean; overKey: string | null } | null>(null);
+  const suppressClickRef = useRef(false);
 
   function handleHeaderClick(col: DataTableColumn<T>) {
+    if (suppressClickRef.current) {
+      suppressClickRef.current = false;
+      return;
+    }
     if (!col.sortable || !onSortChange) return;
     const nextDir: SortDir = sortKey === col.key && sortDir === 'asc' ? 'desc' : 'asc';
     onSortChange(col.key, nextDir);
+  }
+
+  function handleReorderPointerDown(e: ReactPointerEvent<HTMLTableCellElement>, col: DataTableColumn<T>) {
+    dragRef.current = { sourceKey: col.key, startX: e.clientX, moved: false, overKey: null };
+
+    function handleMove(ev: PointerEvent) {
+      const state = dragRef.current;
+      if (!state) return;
+      if (Math.abs(ev.clientX - state.startX) > REORDER_MOVE_THRESHOLD) state.moved = true;
+    }
+
+    function handleUp() {
+      window.removeEventListener('pointermove', handleMove);
+      window.removeEventListener('pointerup', handleUp);
+      const state = dragRef.current;
+      dragRef.current = null;
+      if (!state || !state.moved) return;
+      // ドラッグして離した直後の click はソートさせない
+      suppressClickRef.current = true;
+      if (state.overKey && state.overKey !== state.sourceKey) {
+        reorder(state.sourceKey, state.overKey);
+      }
+    }
+
+    window.addEventListener('pointermove', handleMove);
+    window.addEventListener('pointerup', handleUp);
+  }
+
+  function handleReorderPointerOver(col: DataTableColumn<T>) {
+    if (dragRef.current) dragRef.current.overKey = col.key;
   }
 
   function handleResizePointerDown(e: ReactPointerEvent<HTMLDivElement>, col: DataTableColumn<T>) {
@@ -128,14 +232,14 @@ export default function DataTable<T>({
   return (
     <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
       <colgroup>
-        {columns.map(col => {
+        {orderedColumns.map(col => {
           const w = widths[col.key] ?? col.width;
           return <col key={col.key} style={w !== undefined ? { width: `${w}px` } : undefined} />;
         })}
       </colgroup>
       <thead>
         <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #e2e8f0' }}>
-          {columns.map(col => {
+          {orderedColumns.map(col => {
             const isSorted = sortKey === col.key;
             const ariaSort: 'ascending' | 'descending' | 'none' | undefined = !col.sortable
               ? undefined
@@ -151,12 +255,15 @@ export default function DataTable<T>({
               color: '#475569',
               cursor: col.sortable ? 'pointer' : undefined,
               userSelect: 'none',
+              touchAction: 'none',
             };
             return (
               <th
                 key={col.key}
                 aria-sort={ariaSort}
                 onClick={() => handleHeaderClick(col)}
+                onPointerDown={e => handleReorderPointerDown(e, col)}
+                onPointerMove={() => handleReorderPointerOver(col)}
                 style={thStyle}
               >
                 {col.label}
@@ -189,7 +296,7 @@ export default function DataTable<T>({
             style={{ borderBottom: '1px solid #f1f5f9', cursor: onRowClick ? 'pointer' : undefined }}
             onClick={() => onRowClick?.(row)}
           >
-            {columns.map(col => (
+            {orderedColumns.map(col => (
               <td
                 key={col.key}
                 style={{ padding: cellPadding, fontSize, textAlign: col.align ?? 'left' }}

@@ -1,17 +1,30 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useInvoices } from '../api/invoices';
 import { useCustomers } from '../api/customers';
+import DataTable from '../components/DataTable';
+import type { DataTableColumn, SortDir } from '../components/DataTable';
+import type { Invoice } from '../types/invoice';
 
 const MONTHS = ['1','2','3','4','5','6','7','8','9','10','11','12'];
 const currentYear = String(new Date().getFullYear());
 const YEARS = [currentYear, String(Number(currentYear) - 1), String(Number(currentYear) - 2)];
+
+const NUMERIC_KEYS = new Set([
+  'sales_total', 'tax_total', 'invoice_total', 'payment_received', 'next_carry_forward',
+]);
+
+function sortValue(inv: Invoice, key: string): number | string {
+  if (NUMERIC_KEYS.has(key)) return Number(inv[key as keyof Invoice] ?? 0);
+  return String(inv[key as keyof Invoice] ?? '');
+}
 
 export default function InvoiceList() {
   const navigate = useNavigate();
   const [year, setYear] = useState(currentYear);
   const [month, setMonth] = useState(String(new Date().getMonth() + 1));
   const [customerId, setCustomerId] = useState('');
+  const [sort, setSort] = useState<{ key: string; dir: SortDir } | undefined>(undefined);
 
   const { data: invoices = [], isLoading } = useInvoices({
     year: year || undefined,
@@ -23,6 +36,38 @@ export default function InvoiceList() {
   const totalInvoiced = invoices.reduce((s, i) => s + i.invoice_total, 0);
   const totalReceived = invoices.reduce((s, i) => s + i.payment_received, 0);
   const totalUnpaid   = invoices.reduce((s, i) => s + i.next_carry_forward, 0);
+
+  const sortedInvoices = useMemo(() => {
+    if (!sort) return invoices;
+    const factor = sort.dir === 'asc' ? 1 : -1;
+    return [...invoices].sort((a, b) => {
+      const va = sortValue(a, sort.key);
+      const vb = sortValue(b, sort.key);
+      if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * factor;
+      return String(va).localeCompare(String(vb), 'ja') * factor;
+    });
+  }, [invoices, sort]);
+
+  const columns: DataTableColumn<Invoice>[] = [
+    { key: 'invoice_no', label: '請求番号', sortable: true, render: i => i.invoice_no },
+    { key: 'customer_name', label: '得意先', sortable: true, render: i => i.customer_name ?? '-' },
+    { key: 'billing_date', label: '請求日', sortable: true, render: i => i.billing_date },
+    { key: 'cutoff_date', label: '締め日', sortable: true, render: i => i.cutoff_date },
+    { key: 'sales_total', label: '売上合計', align: 'right', sortable: true,
+      render: i => `¥${i.sales_total.toLocaleString()}` },
+    { key: 'tax_total', label: '消費税', align: 'right', sortable: true,
+      render: i => `¥${i.tax_total.toLocaleString()}` },
+    { key: 'invoice_total', label: '請求合計', align: 'right', sortable: true,
+      render: i => <span style={{ fontWeight: 'bold' }}>¥{i.invoice_total.toLocaleString()}</span> },
+    { key: 'payment_received', label: '入金額', align: 'right', sortable: true,
+      render: i => <span style={{ color: '#10b981' }}>¥{i.payment_received.toLocaleString()}</span> },
+    { key: 'next_carry_forward', label: '次月繰越', align: 'right', sortable: true,
+      render: i => (
+        <span style={{ color: i.next_carry_forward > 0 ? '#f59e0b' : '#64748b' }}>
+          ¥{i.next_carry_forward.toLocaleString()}
+        </span>
+      ) },
+  ];
 
   return (
     <div>
@@ -58,49 +103,17 @@ export default function InvoiceList() {
         <div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>読み込み中...</div>
       ) : (
         <div style={{ background: '#fff', borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
-            <thead>
-              <tr style={{ background: '#f8fafc' }}>
-                <Th>請求番号</Th>
-                <Th>得意先</Th>
-                <Th>請求日</Th>
-                <Th>締め日</Th>
-                <Th right>売上合計</Th>
-                <Th right>消費税</Th>
-                <Th right>請求合計</Th>
-                <Th right>入金額</Th>
-                <Th right>次月繰越</Th>
-              </tr>
-            </thead>
-            <tbody>
-              {invoices.length === 0 ? (
-                <tr>
-                  <td colSpan={9} style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>
-                    請求書がありません
-                  </td>
-                </tr>
-              ) : (
-                invoices.map(inv => (
-                  <tr key={inv.id} onClick={() => navigate(`/invoices/${inv.id}`)}
-                    style={{ cursor: 'pointer', borderTop: '1px solid #f1f5f9' }}
-                    onMouseEnter={e => (e.currentTarget.style.background = '#f0f9ff')}
-                    onMouseLeave={e => (e.currentTarget.style.background = '')}>
-                    <Td>{inv.invoice_no}</Td>
-                    <Td>{inv.customer_name ?? '-'}</Td>
-                    <Td>{inv.billing_date}</Td>
-                    <Td>{inv.cutoff_date}</Td>
-                    <Td right>¥{inv.sales_total.toLocaleString()}</Td>
-                    <Td right>¥{inv.tax_total.toLocaleString()}</Td>
-                    <Td right bold>¥{inv.invoice_total.toLocaleString()}</Td>
-                    <Td right color="#10b981">¥{inv.payment_received.toLocaleString()}</Td>
-                    <Td right color={inv.next_carry_forward > 0 ? '#f59e0b' : '#64748b'}>
-                      ¥{inv.next_carry_forward.toLocaleString()}
-                    </Td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+          <DataTable
+            tableId="invoices"
+            columns={columns}
+            rows={sortedInvoices}
+            rowKey={i => i.id}
+            onRowClick={i => navigate(`/invoices/${i.id}`)}
+            sortKey={sort?.key}
+            sortDir={sort?.dir}
+            onSortChange={(key, dir) => setSort({ key, dir })}
+            emptyMessage="請求書がありません"
+          />
         </div>
       )}
     </div>
@@ -114,26 +127,6 @@ function SummaryCard({ label, value, color }: { label: string; value: number; co
       <div style={{ fontSize: 12, color: '#64748b', marginBottom: 4 }}>{label}</div>
       <div style={{ fontSize: 22, fontWeight: 'bold', color }}>{`¥${value.toLocaleString()}`}</div>
     </div>
-  );
-}
-
-function Th({ children, right }: { children: React.ReactNode; right?: boolean }) {
-  return (
-    <th style={{ padding: '10px 12px', textAlign: right ? 'right' : 'left', fontSize: 12,
-      color: '#64748b', fontWeight: 'bold', borderBottom: '1px solid #e2e8f0' }}>
-      {children}
-    </th>
-  );
-}
-
-function Td({ children, right, bold, color }: {
-  children: React.ReactNode; right?: boolean; bold?: boolean; color?: string;
-}) {
-  return (
-    <td style={{ padding: '10px 12px', textAlign: right ? 'right' : 'left',
-      fontWeight: bold ? 'bold' : 'normal', color: color ?? '#1e293b' }}>
-      {children}
-    </td>
   );
 }
 
