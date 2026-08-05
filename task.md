@@ -1,7 +1,9 @@
 # Beaver タスクキュー
 
 ## 進行中
-- [ ] R-0080: 改善要望フィードバックフォーム実装（`docs/spec/R-0080_feedback_form.md`）
+- [x] R-0080: 改善要望フィードバックフォーム実装・本番デプロイ完了（`docs/spec/R-0080_feedback_form.md`）
+- [ ] R-0081/R-0082: フィードバックモーダル視認性修正・クリップボード貼り付け（`docs/spec/R-0081_R-0082_feedback_modal_improvements.md`）
+- [ ] R-0083: 検索の複数プロパティ対応 Phase1（`docs/spec/R-0083_search_multi_property.md`）
 
 ## 次のステップ（オプション）
 - [ ] 実データでの動作確認（dev_start → npm run dev → ブラウザ確認）

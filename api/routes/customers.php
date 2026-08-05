@@ -9,6 +9,7 @@
  */
 
 require_once __DIR__ . '/list_helpers.php';
+require_once __DIR__ . '/../search_helpers.php';
 
 // IDとサブリソースを取り出す
 $segments = explode('/', trim($path, '/'));
@@ -77,10 +78,13 @@ switch ($method) {
             $where = 'WHERE 1=1';
             $params = [];
             if (!empty($_GET['q'])) {
-                $where .= ' AND (name LIKE ? OR code LIKE ?)';
-                $q = '%' . $_GET['q'] . '%';
-                $params[] = $q;
-                $params[] = $q;
+                // R-0083: 得意先検索は名前・コードに加え、読み・電話番号・住所・備考も対象にする
+                [$searchClause, $searchParams] = buildMultiColumnSearchClause(
+                    ['name', 'code', 'name_kana', 'tel', 'mobile', 'address1', 'address2', 'memo'],
+                    $_GET['q']
+                );
+                $where .= ' AND ' . $searchClause;
+                $params = array_merge($params, $searchParams);
             }
             if (!isset($_GET['include_inactive'])) {
                 $where .= ' AND is_active = 1';

@@ -65,7 +65,7 @@ export default function ProjectDetail() {
     id: c.id,
     primaryText: c.name,
     secondaryText: c.memo ?? undefined,
-    searchText: [c.name, c.name_kana, c.memo].filter(Boolean).join(' '),
+    searchText: [c.name, c.name_kana, c.tel, c.mobile, c.address1, c.address2, c.memo].filter(Boolean).join(' '),
   }));
 
   function handleCustomerChange(id: number | null) {

@@ -48,7 +48,7 @@ export default function VoucherList() {
   const customerOptions: ComboOption[] = customers.map(c => ({
     id: c.id,
     primaryText: c.name,
-    searchText: [c.name, c.name_kana].filter(Boolean).join(' '),
+    searchText: [c.name, c.name_kana, c.tel, c.mobile, c.address1, c.address2, c.memo].filter(Boolean).join(' '),
   }));
   const projectOptions: ComboOption[] = projects.map(p => ({
     id: p.id,

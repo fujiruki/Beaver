@@ -11,6 +11,7 @@
 declare(strict_types=1);
 
 $ROOT = dirname(__DIR__);
+require_once $ROOT . '/search_helpers.php';
 
 // ============================================================
 // 専用テスト DB の準備
@@ -209,6 +210,25 @@ function customerPost(PDO $pdo, array $data): array {
     $stmt2 = $pdo->prepare('SELECT * FROM customers WHERE id = ?');
     $stmt2->execute([$id]);
     return ['code' => 201, 'body' => $stmt2->fetch()];
+}
+
+/**
+ * R-0083: customers.php GET一覧の検索ロジック（複数プロパティ対象）をインライン実行。
+ */
+function customerSearch(PDO $pdo, string $q): array {
+    $where = 'WHERE 1=1 AND is_active = 1';
+    $params = [];
+    if ($q !== '') {
+        [$clause, $qParams] = buildMultiColumnSearchClause(
+            ['name', 'code', 'name_kana', 'tel', 'mobile', 'address1', 'address2', 'memo'],
+            $q
+        );
+        $where .= ' AND ' . $clause;
+        $params = array_merge($params, $qParams);
+    }
+    $stmt = $pdo->prepare("SELECT * FROM customers $where ORDER BY code");
+    $stmt->execute($params);
+    return $stmt->fetchAll();
 }
 
 /**
@@ -440,6 +460,67 @@ runTest('T-13: codeが既に設定済みの得意先はsyncが来てもcodeを�
     $res2 = customerPost($pdo, ['name' => '整合済み得意先（再sync）', 'access_customer_no' => '503', 'code' => '999999']);
     assertEq(200, $res2['code'], 'HTTP status');
     assertEq('503', $res2['body']['code'], 'codeは上書きされず維持される（クライアント指定999999は無視）');
+});
+
+// T-14: R-0083 得意先一覧検索が name_kana でもヒットする
+runTest('T-14: R-0083 検索が name_kana でもヒットする', function () use ($pdo) {
+    $res = customerPost($pdo, ['name' => '検索対象商店', 'name_kana' => 'ケンサクタイショウショウテン']);
+    assertEq(201, $res['code'], '事前登録');
+
+    $hits = customerSearch($pdo, 'ケンサクタイショウショウテン');
+    assertTrue(count($hits) >= 1, 'name_kanaでヒットする');
+    assertTrue(
+        in_array((int)$res['body']['id'], array_map(fn($r) => (int)$r['id'], $hits), true),
+        '登録した得意先がname_kana検索結果に含まれる'
+    );
+});
+
+// T-15: R-0083 得意先一覧検索が tel でもヒットする
+runTest('T-15: R-0083 検索が tel でもヒットする', function () use ($pdo) {
+    $res = customerPost($pdo, ['name' => '電話検索商店', 'tel' => '03-9999-8888']);
+    assertEq(201, $res['code'], '事前登録');
+
+    $hits = customerSearch($pdo, '9999-8888');
+    assertTrue(
+        in_array((int)$res['body']['id'], array_map(fn($r) => (int)$r['id'], $hits), true),
+        '登録した得意先がtel検索結果に含まれる'
+    );
+});
+
+// T-16: R-0083 得意先一覧検索が address1 でもヒットする
+runTest('T-16: R-0083 検索が address1 でもヒットする', function () use ($pdo) {
+    $res = customerPost($pdo, ['name' => '住所検索商店', 'address1' => '大阪府大阪市住之江区']);
+    assertEq(201, $res['code'], '事前登録');
+
+    $hits = customerSearch($pdo, '住之江区');
+    assertTrue(
+        in_array((int)$res['body']['id'], array_map(fn($r) => (int)$r['id'], $hits), true),
+        '登録した得意先がaddress1検索結果に含まれる'
+    );
+});
+
+// T-17: R-0083 得意先一覧検索が memo でもヒットする
+runTest('T-17: R-0083 検索が memo でもヒットする', function () use ($pdo) {
+    $res = customerPost($pdo, ['name' => '備考検索商店', 'memo' => '特記事項：休業日は水曜日']);
+    assertEq(201, $res['code'], '事前登録');
+
+    $hits = customerSearch($pdo, '水曜日');
+    assertTrue(
+        in_array((int)$res['body']['id'], array_map(fn($r) => (int)$r['id'], $hits), true),
+        '登録した得意先がmemo検索結果に含まれる'
+    );
+});
+
+// T-18: R-0083 検索が既存どおり name でもヒットする（回帰防止）
+runTest('T-18: R-0083 検索がnameで引き続きヒットする（回帰防止）', function () use ($pdo) {
+    $res = customerPost($pdo, ['name' => '名前検索回帰商店']);
+    assertEq(201, $res['code'], '事前登録');
+
+    $hits = customerSearch($pdo, '名前検索回帰商店');
+    assertTrue(
+        in_array((int)$res['body']['id'], array_map(fn($r) => (int)$r['id'], $hits), true),
+        '登録した得意先がname検索結果に含まれる'
+    );
 });
 
 // ============================================================

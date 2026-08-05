@@ -72,6 +72,8 @@ export default function ComboSelect({ options, value, onChange, placeholder, dis
     } else if (e.key === 'Enter') {
       e.preventDefault();
       if (highlighted >= 0 && filtered[highlighted]) handleSelect(filtered[highlighted].id);
+      // R-0083: 候補が1件に絞られていれば、ハイライト操作なしでもEnterで選択する
+      else if (filtered.length === 1) handleSelect(filtered[0].id);
     } else if (e.key === 'Escape') {
       setOpen(false);
       setQuery('');

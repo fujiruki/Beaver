@@ -23,6 +23,8 @@
 | [05_技術設計.md](spec/05_技術設計.md) | 技術スタック・ディレクトリ構成・設計パターン | 2026-03-21 |
 | [06_変更履歴.md](spec/06_変更履歴.md) | 仕様変更の経緯と理由 | 2026-03-21 |
 | [R-0080_feedback_form.md](spec/R-0080_feedback_form.md) | 改善要望フィードバックフォーム（画像複数添付） | 2026-08-05 |
+| [R-0081_R-0082_feedback_modal_improvements.md](spec/R-0081_R-0082_feedback_modal_improvements.md) | フィードバックモーダルの視認性修正・クリップボード貼り付け | 2026-08-05 |
+| [R-0083_search_multi_property.md](spec/R-0083_search_multi_property.md) | 検索の複数プロパティ対応 Phase1（得意先 + ComboSelect） | 2026-08-05 |
 
 ---
 

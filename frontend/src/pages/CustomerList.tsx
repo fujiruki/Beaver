@@ -39,6 +39,13 @@ export default function CustomerList() {
     commitSearch(e.currentTarget.value);
   }
 
+  function handleSearchKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    // R-0083: 検索結果が1件に絞られた状態でEnterを押すと、その1件の詳細画面へ遷移する
+    if (e.key === 'Enter' && customers.length === 1) {
+      navigate(`/customers/${customers[0].id}`);
+    }
+  }
+
   function handleDelete(id: number, name: string) {
     if (!confirm(`「${name}」を削除しますか？`)) return;
     deleteMutation.mutate(id);
@@ -101,6 +108,7 @@ export default function CustomerList() {
           onChange={handleChange}
           onCompositionStart={handleCompositionStart}
           onCompositionEnd={handleCompositionEnd}
+          onKeyDown={handleSearchKeyDown}
           style={{ padding: '6px 10px', border: '1px solid #cbd5e1', borderRadius: 6, fontSize: 13, width: 240 }}
         />
       </div>
