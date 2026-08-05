@@ -60,6 +60,8 @@ try {
         'sales-categories'  => __DIR__ . '/routes/sales_categories.php',
         'catalog-proxy'            => __DIR__ . '/routes/catalog_proxy.php',
         'aggregation-categories'   => __DIR__ . '/routes/aggregation_categories.php',
+        'feedback'                 => __DIR__ . '/routes/feedback.php',
+        'admin/feedback'           => __DIR__ . '/routes/feedback.php',
     ];
 
     $matched = false;

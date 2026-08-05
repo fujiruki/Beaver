@@ -1,5 +1,6 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAppSettings } from '../../contexts/AppSettingsContext';
+import FeedbackModal from '../feedback/FeedbackModal';
 
 const navItems = [
   { to: '/',           label: 'ダッシュボード' },
@@ -45,6 +46,10 @@ export default function AppLayout() {
             {label}
           </NavLink>
         ))}
+
+        <div style={{ padding: '16px 16px 0' }}>
+          <FeedbackModal />
+        </div>
       </nav>
 
       {/* メインコンテンツ */}

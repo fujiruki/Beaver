@@ -43,6 +43,7 @@ if ($KeepLocalDB) {
     Write-Host "  -> Excluding local SQLite DB..." -ForegroundColor Yellow
     Remove-Item "$stagingDir\api\*.sqlite" -ErrorAction SilentlyContinue
     Remove-Item "$stagingDir\api\*.db"     -ErrorAction SilentlyContinue
+    Remove-Item "$stagingDir\api\config.local.php" -ErrorAction SilentlyContinue
 }
 
 # 3. Archive
