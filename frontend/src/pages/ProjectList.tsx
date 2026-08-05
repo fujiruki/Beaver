@@ -99,6 +99,7 @@ export default function ProjectList() {
       ),
     },
     { key: 'start_date', label: '開始日', sortable: true, render: p => p.start_date ?? '—' },
+    { key: 'delivery_date', label: '納期', sortable: true, render: p => p.delivery_date ?? '—' },
     {
       key: 'actions',
       label: '',

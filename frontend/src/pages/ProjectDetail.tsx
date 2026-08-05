@@ -101,6 +101,10 @@ export default function ProjectDetail() {
   const isPending = createMutation.isPending || updateMutation.isPending;
   const mutError  = createMutation.error || updateMutation.error;
 
+  const selectedCustomer = customers.find(c => c.id === customerId) ?? null;
+  const customerAddress = selectedCustomer ? [selectedCustomer.address1, selectedCustomer.address2].filter(Boolean).join('') : '';
+  const customerPhone = selectedCustomer?.tel || selectedCustomer?.mobile || '';
+
   const estimates = project?.vouchers?.filter(v => v.voucher_type === 'estimate') ?? [];
   const sales     = project?.vouchers?.filter(v => v.voucher_type === 'sales') ?? [];
   const images    = project?.images ?? [];
@@ -114,7 +118,16 @@ export default function ProjectDetail() {
         <button onClick={() => navigate('/projects')} className="px-3 py-1 border border-slate-300 rounded text-sm text-slate-600 hover:bg-slate-50">
           ← 戻る
         </button>
-        <h1 className="text-xl font-bold">{isNew ? '案件 新規登録' : '案件 編集'}</h1>
+        <h1 className="text-xl font-bold flex-1">{isNew ? '案件 新規登録' : '案件 編集'}</h1>
+        <button
+          type="button"
+          aria-label="タイトル横保存"
+          onClick={handleSubmit(onSubmit)}
+          disabled={isPending}
+          className="px-4 py-1.5 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:opacity-50"
+        >
+          {isPending ? '保存中...' : '保存'}
+        </button>
       </div>
 
       {mutError && (
@@ -128,7 +141,7 @@ export default function ProjectDetail() {
         <div className="bg-white rounded-lg shadow-sm p-5 space-y-4">
           <h2 className="text-sm font-bold text-slate-600 border-b border-slate-100 pb-2">基本情報</h2>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className={isNew ? 'grid grid-cols-2 gap-4' : 'grid grid-cols-[140px_1fr] gap-4'}>
             {!isNew && (
               <Field label="案件コード">
                 <div className="px-2.5 py-1.5 border border-slate-200 rounded-md text-sm font-mono bg-slate-50 text-slate-500">
@@ -160,6 +173,27 @@ export default function ProjectDetail() {
                 ＋ 新規得意先
               </button>
             </div>
+            {selectedCustomer && (
+              <div className="mt-1.5 flex items-start justify-between gap-2 text-xs text-slate-500">
+                <div className="space-y-0.5">
+                  {customerAddress && <div>{customerAddress}</div>}
+                  {customerPhone && (
+                    <div><a href={`tel:${customerPhone}`} className="text-blue-600 hover:underline">{customerPhone}</a></div>
+                  )}
+                  {selectedCustomer.email && (
+                    <div><a href={`mailto:${selectedCustomer.email}`} className="text-blue-600 hover:underline">{selectedCustomer.email}</a></div>
+                  )}
+                  {selectedCustomer.memo && <div>{selectedCustomer.memo}</div>}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => window.open(`${import.meta.env.BASE_URL}customers/${selectedCustomer.id}`, '_blank')}
+                  className="px-2 py-1 text-xs bg-slate-100 border border-slate-300 rounded-md text-slate-600 hover:bg-slate-200 whitespace-nowrap"
+                >
+                  得意先を編集
+                </button>
+              </div>
+            )}
           </Field>
 
           <div className="grid grid-cols-2 gap-4">
