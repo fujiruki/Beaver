@@ -34,9 +34,10 @@ export default function ProjectDetail() {
   const [modalOpen, setModalOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm<ProjectInput>({
+  const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<ProjectInput>({
     defaultValues: { status: '問い合わせ' },
   });
+  const currentStatus = watch('status');
 
   useEffect(() => {
     if (project) {
@@ -197,12 +198,33 @@ export default function ProjectDetail() {
           </Field>
 
           <div className="grid grid-cols-2 gap-4">
-            <Field label="ステータス">
-              <select {...register('status')} className={inputCls}>
-                {projectStatuses.map(s => (
-                  <option key={s.id} value={s.name}>{s.name}</option>
-                ))}
-              </select>
+            <Field label="ステータス" className="col-span-2">
+              <div className="flex items-start">
+                {projectStatuses.map((s, idx) => {
+                  const isActive = currentStatus === s.name;
+                  return (
+                    <div key={s.id} className={`flex items-center ${idx < projectStatuses.length - 1 ? 'flex-1' : ''}`}>
+                      <div className="flex flex-col items-center">
+                        <button
+                          type="button"
+                          aria-pressed={isActive}
+                          aria-label={s.name}
+                          onClick={() => setValue('status', s.name)}
+                          className={`w-6 h-6 rounded-full border-2 shrink-0 transition-colors ${
+                            isActive ? 'bg-blue-600 border-blue-600' : 'bg-white border-slate-300'
+                          }`}
+                        />
+                        <span className={`mt-1 text-[10px] whitespace-nowrap ${isActive ? 'text-blue-600 font-semibold' : 'text-slate-400'}`}>
+                          {s.name}
+                        </span>
+                      </div>
+                      {idx < projectStatuses.length - 1 && (
+                        <div className="flex-1 h-0.5 bg-slate-200 mt-3" />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </Field>
             <Field label="受注日">
               <input {...register('order_date')} type="date" className={inputCls} />

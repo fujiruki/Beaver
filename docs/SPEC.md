@@ -27,6 +27,9 @@
 | [R-0083_search_multi_property.md](spec/R-0083_search_multi_property.md) | 検索の複数プロパティ対応 Phase1（得意先 + ComboSelect） | 2026-08-05 |
 | [R-0085_project_status_master.md](spec/R-0085_project_status_master.md) | 案件ステータスのマスタ化（設定画面管理・工程順ソート） | 2026-08-05 |
 | [R-0086_R-0087_R-0088_project_screens.md](spec/R-0086_R-0087_R-0088_project_screens.md) | 案件一覧・案件編集画面の改善（納期列・得意先プレビュー・レイアウト） | 2026-08-05 |
+| [R-0089_status_stepper.md](spec/R-0089_status_stepper.md) | 案件ステータスのステッパーUI化 | 2026-08-05 |
+| [R-0090_search_kana_and.md](spec/R-0090_search_kana_and.md) | 検索のかな正規化＋空白区切りAND検索 | 2026-08-05 |
+| [R-0091_R-0092_project_list_search_sort.md](spec/R-0091_R-0092_project_list_search_sort.md) | 案件一覧の検索拡張・状態保持・複合ソート | 2026-08-05 |
 
 ---
 
