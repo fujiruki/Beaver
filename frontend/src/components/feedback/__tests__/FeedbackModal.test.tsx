@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import FeedbackModal from '../FeedbackModal';
@@ -15,6 +15,17 @@ function renderModal() {
 
 function makeImageFile(name: string): File {
   return new File(['dummy-image-bytes'], name, { type: 'image/png' });
+}
+
+function makeClipboardItem(file: File) {
+  return {
+    types: [file.type],
+    getType: async () => file,
+  } as unknown as ClipboardItem;
+}
+
+function stubClipboard(value: object) {
+  Object.defineProperty(navigator, 'clipboard', { value, configurable: true });
 }
 
 describe('FeedbackModal (R-0080)', () => {
@@ -100,5 +111,66 @@ describe('FeedbackModal (R-0080)', () => {
     expect(await screen.findByText('送信に失敗しました。もう一度お試しください。')).not.toBeNull();
     expect(screen.getByRole('dialog')).not.toBeNull();
     expect((textarea as HTMLTextAreaElement).value).toBe('送信できない');
+  });
+
+  it('「📋 貼り付け」ボタンでクリップボードの画像が添付される', async () => {
+    const user = userEvent.setup();
+    stubClipboard({ read: vi.fn(async () => [makeClipboardItem(makeImageFile('clip.png'))]) });
+    renderModal();
+    await user.click(screen.getByRole('button', { name: '改善要望を送る' }));
+
+    await user.click(screen.getByRole('button', { name: /貼り付け/ }));
+
+    expect(await screen.findAllByRole('img')).toHaveLength(1);
+  });
+
+  it('クリップボードに画像がない場合はエラーを表示し既存の入力内容を保持する', async () => {
+    const user = userEvent.setup();
+    stubClipboard({ read: vi.fn(async () => []) });
+    renderModal();
+    await user.click(screen.getByRole('button', { name: '改善要望を送る' }));
+
+    const textarea = screen.getByPlaceholderText('不具合や改善してほしい点を入力してください');
+    await user.type(textarea, '保持されるべきテキスト');
+
+    await user.click(screen.getByRole('button', { name: /貼り付け/ }));
+
+    expect(await screen.findByText('クリップボードに画像がありません')).not.toBeNull();
+    expect((textarea as HTMLTextAreaElement).value).toBe('保持されるべきテキスト');
+  });
+
+  it('clipboard.read が使えないブラウザではエラーを表示する', async () => {
+    const user = userEvent.setup();
+    stubClipboard({});
+    renderModal();
+    await user.click(screen.getByRole('button', { name: '改善要望を送る' }));
+
+    await user.click(screen.getByRole('button', { name: /貼り付け/ }));
+
+    expect(
+      await screen.findByText('このブラウザではクリップボードからの貼り付けに対応していません'),
+    ).not.toBeNull();
+  });
+
+  it('textareaへのCtrl+V貼り付けで画像ファイルが検出されると添付される', async () => {
+    renderModal();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: '改善要望を送る' }));
+
+    const textarea = screen.getByPlaceholderText('不具合や改善してほしい点を入力してください');
+    const file = makeImageFile('pasted.png');
+    fireEvent.paste(textarea, {
+      clipboardData: {
+        items: [
+          {
+            kind: 'file',
+            type: 'image/png',
+            getAsFile: () => file,
+          },
+        ],
+      },
+    });
+
+    expect(await screen.findAllByRole('img')).toHaveLength(1);
   });
 });
