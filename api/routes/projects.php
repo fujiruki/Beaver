@@ -257,7 +257,7 @@ switch ($method) {
                 $page    = max(1, (int)$_GET['page']);
                 $perPage = min(200, max(10, (int)($_GET['per_page'] ?? 50)));
                 $offset  = ($page - 1) * $perPage;
-                $cntStmt = $pdo->prepare("SELECT COUNT(*) FROM projects p $where");
+                $cntStmt = $pdo->prepare("SELECT COUNT(*) FROM projects p LEFT JOIN customers c ON c.id = p.customer_id $where");
                 $cntStmt->execute($params);
                 $total = (int)$cntStmt->fetchColumn();
                 // R-076 Part A: サーバソート（ホワイトリストは全てハードコード文字列）。

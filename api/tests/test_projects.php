@@ -218,6 +218,61 @@ function projectListQuery(PDO $pdo, array $getParams): array {
     return $rows;
 }
 
+/**
+ * R-0093: projects.php GET一覧（q + page 同時指定、COUNTクエリ）のロジックをインライン実行。
+ * routes/projects.php の該当SQL（COUNTクエリに customers への LEFT JOIN を含む）と
+ * 同一の構成にする。
+ */
+function projectListPage(PDO $pdo, array $getParams): array {
+    require_once dirname(__DIR__) . '/routes/list_helpers.php';
+    require_once dirname(__DIR__) . '/search_helpers.php';
+
+    $_GET = $getParams;
+    $where = 'WHERE p.status != "キャンセル"';
+    $params = [];
+    if (!empty($_GET['q'])) {
+        [$searchClause, $searchParams] = buildMultiColumnSearchClause(
+            ['p.project_code', 'p.name', 'c.name'],
+            $_GET['q']
+        );
+        $where .= ' AND ' . $searchClause;
+        $params = array_merge($params, $searchParams);
+    }
+    $page    = max(1, (int)$_GET['page']);
+    $perPage = min(200, max(10, (int)($_GET['per_page'] ?? 50)));
+    $offset  = ($page - 1) * $perPage;
+    $cntStmt = $pdo->prepare("SELECT COUNT(*) FROM projects p LEFT JOIN customers c ON c.id = p.customer_id $where");
+    $cntStmt->execute($params);
+    $total = (int)$cntStmt->fetchColumn();
+    $sortClause = resolveSortClause(
+        [
+            'project_code'  => 'p.project_code',
+            'name'          => 'p.name',
+            'customer_name' => 'c.name',
+            'status'        => 'ps.sort_order',
+            'start_date'    => 'p.start_date',
+            'delivery_date' => 'p.delivery_date',
+        ],
+        'p.updated_at',
+        'p.id',
+        'DESC'
+    );
+    $stmt = $pdo->prepare("
+        SELECT p.*, c.name AS customer_name
+        FROM projects p
+        LEFT JOIN customers c ON c.id = p.customer_id
+        LEFT JOIN project_statuses ps ON ps.name = p.status
+        $where $sortClause LIMIT $perPage OFFSET $offset
+    ");
+    $stmt->execute($params);
+    $rows = $stmt->fetchAll();
+    $_GET = [];
+    return [
+        'data' => $rows,
+        'meta' => ['total' => $total, 'page' => $page, 'per_page' => $perPage, 'last_page' => (int)ceil($total / $perPage)],
+    ];
+}
+
 // ============================================================
 // テスト本体
 // ============================================================
@@ -343,6 +398,23 @@ runTest('T-06: sort=status,delivery_dateの複合ソートでステータス優�
     $codes = array_column($filtered, 'project_code');
     // 見積済(sort_order=2)が最優先、進行中(sort_order=4)同士は納期昇順（01-01→02-02）
     assertEq(['PM003', 'PM002', 'PM001'], $codes, 'ステータス優先・納期昇順の順序');
+});
+
+// T-07: q + page 同時指定でも500エラーにならず正しい件数が返る（R-0093: COUNTクエリにcustomers JOIN漏れのバグ再現）
+runTest('T-07: q（検索）+ page（ページネーション）同時指定でSQLエラーにならず正しい件数が返る', function () use ($pdo) {
+    $pdo->exec("DELETE FROM customers WHERE name = '検索対象得意先ABC'");
+    $pdo->exec("INSERT INTO customers (name, honorific_type) VALUES ('検索対象得意先ABC', '御中')");
+    $customerId = (int)$pdo->lastInsertId();
+    $pdo->exec("DELETE FROM projects WHERE project_code LIKE 'PR%'");
+    $pdo->exec("
+        INSERT INTO projects (project_code, customer_id, name, status)
+        VALUES ('PR001', $customerId, '検索キーワードを含まない案件名', '進行中')
+    ");
+
+    $result = projectListPage($pdo, ['q' => 'ABC', 'page' => '1']);
+    $filtered = array_values(array_filter($result['data'], fn($r) => str_starts_with((string)$r['project_code'], 'PR')));
+    assertEq(1, count($filtered), '得意先名検索×ページネーションでヒットする件数');
+    assertEq(1, $result['meta']['total'] >= 1 ? 1 : 0, 'meta.totalが取得できている（COUNTクエリがSQLエラーにならない）');
 });
 
 // ============================================================
