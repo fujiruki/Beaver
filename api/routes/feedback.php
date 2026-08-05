@@ -19,7 +19,7 @@ if ($path === '/admin/feedback') {
         echo json_encode(['error' => 'unauthorized']);
         exit;
     }
-    echo json_encode(feedbackAdminList($pdo));
+    echo json_encode(feedbackAdminList($pdo), JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE);
     exit;
 }
 
@@ -34,6 +34,13 @@ if ($path === '/feedback') {
     if ($message === '') {
         http_response_code(400);
         echo json_encode(['error' => 'message is required']);
+        exit;
+    }
+
+    $pagePath = $_POST['page_path'] ?? null;
+    if (!mb_check_encoding($message, 'UTF-8') || ($pagePath !== null && !mb_check_encoding($pagePath, 'UTF-8'))) {
+        http_response_code(400);
+        echo json_encode(['error' => 'message must be valid UTF-8']);
         exit;
     }
 
@@ -56,14 +63,13 @@ if ($path === '/feedback') {
         }
     }
 
-    $pagePath  = $_POST['page_path'] ?? null;
     $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? null;
 
     $result = feedbackCreate($pdo, $message, $pagePath, $userAgent, $imageFiles, FEEDBACK_UPLOAD_DIR);
     http_response_code(201);
-    echo json_encode($result);
+    echo json_encode($result, JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE);
     exit;
 }
 
 http_response_code(404);
-echo json_encode(['error' => 'Not found', 'path' => $path]);
+echo json_encode(['error' => 'Not found', 'path' => $path], JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE);

@@ -260,6 +260,30 @@ try {
         assertTrue(str_contains($res['status'], '401'), 'expected 401 got: ' . $res['status']);
     });
 
+    runTest('T-09: 不正なUTF-8バイト列を含むmessageでPOSTすると400になりDBに保存されない', function () use ($port, $testDbPath) {
+        $tmpPdo = new PDO('sqlite:' . $testDbPath, null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]);
+        $before = (int)$tmpPdo->query('SELECT COUNT(*) AS c FROM feedback')->fetch()['c'];
+
+        $invalidMessage = "不正バイト列\xFF\xFEテスト";
+        $res = postFeedback($port, ['message' => $invalidMessage, 'page_path' => '/projects/1']);
+        assertTrue(str_contains($res['status'], '400'), 'expected 400 got: ' . $res['status'] . ' body=' . $res['body']);
+
+        $after = (int)$tmpPdo->query('SELECT COUNT(*) AS c FROM feedback')->fetch()['c'];
+        assertEq($before, $after, '不正UTF-8のfeedbackはDBに保存されない');
+    });
+
+    runTest('T-10: DBに不正UTF-8を含む行があってもGET /admin/feedbackが200・有効なJSONを返す', function () use ($port, $testDbPath) {
+        $tmpPdo = new PDO('sqlite:' . $testDbPath, null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]);
+        $stmt = $tmpPdo->prepare('INSERT INTO feedback (message, page_path, user_agent) VALUES (?,?,?)');
+        $stmt->execute(["壊れたバイト列\xFF\xFEデータ", '/broken', 'test-agent']);
+
+        $res = getAdminFeedback($port, TEST_ADMIN_TOKEN);
+        assertTrue(str_contains($res['status'], '200'), 'expected 200 got: ' . $res['status'] . ' body=' . $res['body']);
+        assertTrue($res['body'] !== '', 'レスポンスボディが空でない');
+        $data = json_decode($res['body'], true);
+        assertTrue(is_array($data), 'DBに不正UTF-8行があっても有効なJSON配列が返る: ' . json_last_error_msg());
+    });
+
 } finally {
     if (is_resource($serverProc)) {
         proc_terminate($serverProc);
