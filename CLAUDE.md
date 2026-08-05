@@ -1,5 +1,20 @@
 # Beaver CLAUDE.md
 
+<!-- このファイルは Claude Code 向けのアダプターです。SdDDの正本ルールは SDDD.md に置きます。 -->
+
+<!-- sddd:rules:start -->
+## SdDD adapter
+
+作業を始める前に、必ずプロジェクト直下の [SDDD.md](SDDD.md) を読む。その規則が、要望・仕様・タスク・検証の正本である。
+
+- 会話で受けた要望は、仕様の検討を始める前に `docs/requests.md` へ原文のまま記録する
+- 仕様が確定するまで実装を始めない。確定時には、`SDDD.md` の手順に従い、要望台帳・仕様・タスクを更新してから該当の入力を `requests.md` から取り除く
+- 要望IDの採番、状態の変更、公開範囲、他要望への統合は、すべて `SDDD.md` の規則に従う
+- Claude Code の補助コマンドを使える場合は `.claude/commands/` を使う。ただし、コマンドの説明より `SDDD.md` を優先する
+
+<!-- sddd:rules:end -->
+
+<!-- sddd:project:start -->
 建具店向け 見積・売上・請求・案件管理 Web システム。
 
 ## 最初に読むべきファイル
@@ -145,3 +160,4 @@ cd frontend && npx vitest run
 - **並行修正は worktree で隔離**する。複数エージェントが同時にファイルを書く場合は `isolation: worktree` を使い、競合を避ける（単一ファイル逐次なら不要）。
 - **行き詰まったバグ・回帰(⚫黒)は専門エージェント `fixer`（`.claude/agents/fixer.md`）に委譲**する。別コンテキストで再現→根因→最小修正→TDDで固定。
 - 指揮役は実装を直接編集せず、報告（コマンドと生ログのパス）を**再実行して判定**する（verify-before-trust）。
+<!-- sddd:project:end -->

@@ -7,3 +7,6 @@ api/tests/*.sqlite
 api/tests/_server_bootstrap.php
 .env
 *.log
+.sddd/
+.codegraph/
+api/config.local.php
