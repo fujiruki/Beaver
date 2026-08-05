@@ -523,6 +523,64 @@ runTest('T-18: R-0083 検索がnameで引き続きヒットする（回帰防止
     );
 });
 
+// T-19: R-0090 ひらがな入力でカタカナ表記のname_kanaにマッチする
+runTest('T-19: R-0090 ひらがな入力でカタカナのname_kanaにヒットする', function () use ($pdo) {
+    $res = customerPost($pdo, ['name' => 'かな正規化商店', 'name_kana' => 'カナセイキカショウテン']);
+    assertEq(201, $res['code'], '事前登録');
+
+    $hits = customerSearch($pdo, 'かなせいきか');
+    assertTrue(
+        in_array((int)$res['body']['id'], array_map(fn($r) => (int)$r['id'], $hits), true),
+        'ひらがな入力でカタカナのname_kanaにヒットする'
+    );
+});
+
+// T-20: R-0090 カタカナ入力でひらがな表記のnameにマッチする（逆方向）
+runTest('T-20: R-0090 カタカナ入力でひらがなのnameにヒットする（逆方向）', function () use ($pdo) {
+    $res = customerPost($pdo, ['name' => 'ぎゃくむき商店']);
+    assertEq(201, $res['code'], '事前登録');
+
+    $hits = customerSearch($pdo, 'ギャクムキ');
+    assertTrue(
+        in_array((int)$res['body']['id'], array_map(fn($r) => (int)$r['id'], $hits), true),
+        'カタカナ入力でひらがなのnameにヒットする'
+    );
+});
+
+// T-21: R-0090 空白区切りの複数キーワードがAND条件でヒットする
+runTest('T-21: R-0090 空白区切りの複数キーワードがAND条件でヒットする', function () use ($pdo) {
+    $res = customerPost($pdo, [
+        'name'     => 'AND検索対象商店',
+        'address1' => '大阪府堺市',
+        'tel'      => '072-1234-5678',
+    ]);
+    assertEq(201, $res['code'], '事前登録');
+
+    $hits = customerSearch($pdo, 'AND検索対象 堺市');
+    assertTrue(
+        in_array((int)$res['body']['id'], array_map(fn($r) => (int)$r['id'], $hits), true),
+        '複数キーワードが全て含まれる行がヒットする'
+    );
+
+    $noHits = customerSearch($pdo, 'AND検索対象 存在しないキーワードxyz');
+    assertTrue(
+        !in_array((int)$res['body']['id'], array_map(fn($r) => (int)$r['id'], $noHits), true),
+        '一部のキーワードしか含まれない場合はヒットしない（AND条件）'
+    );
+});
+
+// T-22: R-0090 全角スペース区切りでもAND条件が機能する
+runTest('T-22: R-0090 全角スペース区切りでもAND条件が機能する', function () use ($pdo) {
+    $res = customerPost($pdo, ['name' => '全角スペース商店', 'memo' => '全角空白テスト用']);
+    assertEq(201, $res['code'], '事前登録');
+
+    $hits = customerSearch($pdo, '全角スペース　空白テスト');
+    assertTrue(
+        in_array((int)$res['body']['id'], array_map(fn($r) => (int)$r['id'], $hits), true),
+        '全角スペース区切りでもAND条件でヒットする'
+    );
+});
+
 // ============================================================
 // 結果サマリ
 // ============================================================

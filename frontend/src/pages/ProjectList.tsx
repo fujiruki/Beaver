@@ -3,9 +3,17 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useProjectsPaged, useDeleteProject } from '../api/projects';
 import { useCustomers } from '../api/customers';
 import Pagination from '../components/Pagination';
-import DataTable, { useSortState } from '../components/DataTable';
-import type { DataTableColumn, SortDir } from '../components/DataTable';
+import DataTable from '../components/DataTable';
+import type { DataTableColumn, SortState } from '../components/DataTable';
 import type { Project, ProjectStatus } from '../types/project';
+
+// R-0091: sort=a,b&order=asc,desc 形式のURLクエリを複合ソートキー配列に変換する
+function parseSortKeys(sortParam: string | null, orderParam: string | null): SortState[] {
+  if (!sortParam) return [];
+  const keys = sortParam.split(',').filter(Boolean);
+  const dirs = (orderParam ?? '').split(',');
+  return keys.map((key, i) => ({ key, dir: dirs[i] === 'desc' ? 'desc' : 'asc' }));
+}
 
 const statusLabel: Record<ProjectStatus, string> = {
   '問い合わせ': '問い合わせ',
@@ -28,26 +36,45 @@ const statusColor: Record<ProjectStatus, string> = {
 
 export default function ProjectList() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const initCustomerId = searchParams.get('customer_id') ? Number(searchParams.get('customer_id')) : undefined;
-  const [page, setPage] = useState(1);
-  const [inputValue, setInputValue] = useState('');
-  const [search, setSearch] = useState('');
-  const [sort, setSort] = useSortState('projects');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const customerFilter = searchParams.get('customer_id') ? Number(searchParams.get('customer_id')) : undefined;
+
+  const [page, setPage] = useState(() => {
+    const p = Number(searchParams.get('page'));
+    return Number.isFinite(p) && p > 0 ? p : 1;
+  });
+  const [search, setSearch] = useState(() => searchParams.get('q') ?? '');
+  const [inputValue, setInputValue] = useState(() => searchParams.get('q') ?? '');
+  const [sortKeys, setSortKeys] = useState<SortState[]>(() =>
+    parseSortKeys(searchParams.get('sort'), searchParams.get('order')),
+  );
   const isComposingRef = useRef(false);
-  const [customerFilter] = useState<number | undefined>(initCustomerId);
   const { data: customers = [] } = useCustomers();
   const filters = { ...(search ? { q: search } : {}), ...(customerFilter ? { customer_id: customerFilter } : {}) };
-  const { data, isLoading, error } = useProjectsPaged(page, Object.keys(filters).length ? filters : undefined, sort);
+  const { data, isLoading, error } = useProjectsPaged(page, Object.keys(filters).length ? filters : undefined, sortKeys);
   const deleteMutation = useDeleteProject();
   const filterCustomer = customerFilter ? customers.find(c => c.id === customerFilter) : null;
 
   const projects = data?.data ?? [];
   const meta = data?.meta;
 
+  // R-0091: ページ・検索語・ソートキーの状態をURLクエリへ反映し、リロード後も復元できるようにする
+  function syncUrl(nextPage: number, nextSearch: string, nextSortKeys: SortState[]) {
+    const next = new URLSearchParams();
+    if (customerFilter) next.set('customer_id', String(customerFilter));
+    if (nextPage > 1) next.set('page', String(nextPage));
+    if (nextSearch) next.set('q', nextSearch);
+    if (nextSortKeys.length > 0) {
+      next.set('sort', nextSortKeys.map(s => s.key).join(','));
+      next.set('order', nextSortKeys.map(s => s.dir).join(','));
+    }
+    setSearchParams(next, { replace: true });
+  }
+
   function commitSearch(q: string) {
     setSearch(q);
     setPage(1);
+    syncUrl(1, q, sortKeys);
   }
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -70,9 +97,15 @@ export default function ProjectList() {
     deleteMutation.mutate(id);
   }
 
-  function handleSortChange(key: string, dir: SortDir) {
-    setSort(key, dir);
+  function handlePageChange(p: number) {
+    setPage(p);
+    syncUrl(p, search, sortKeys);
+  }
+
+  function handleMultiSortChange(keys: SortState[]) {
+    setSortKeys(keys);
     setPage(1);
+    syncUrl(1, search, keys);
   }
 
   if (isLoading) return <div className="p-6">読み込み中...</div>;
@@ -146,7 +179,7 @@ export default function ProjectList() {
       <div className="mb-3">
         <input
           type="text"
-          placeholder="案件名で検索"
+          placeholder="案件名・得意先名で検索"
           value={inputValue}
           onChange={handleChange}
           onCompositionStart={handleCompositionStart}
@@ -162,9 +195,9 @@ export default function ProjectList() {
           rows={projects}
           rowKey={p => p.id}
           onRowClick={p => navigate(`/projects/${p.id}`)}
-          sortKey={sort?.key}
-          sortDir={sort?.dir}
-          onSortChange={handleSortChange}
+          multiSort
+          sortKeys={sortKeys}
+          onMultiSortChange={handleMultiSortChange}
         />
         {meta && (
           <Pagination
@@ -172,7 +205,7 @@ export default function ProjectList() {
             lastPage={meta.last_page}
             total={meta.total}
             perPage={meta.per_page}
-            onChange={p => setPage(p)}
+            onChange={handlePageChange}
           />
         )}
       </div>

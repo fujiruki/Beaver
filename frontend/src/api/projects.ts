@@ -17,22 +17,22 @@ export function useProjects(params?: { status?: string; customer_id?: number; q?
   });
 }
 
-/** 案件一覧取得（ページネーション付き・一覧ページ用） */
+/** 案件一覧取得（ページネーション付き・一覧ページ用）。sortは複数キー指定可（R-0092複合ソート） */
 export function useProjectsPaged(
   page: number,
   filters?: { status?: string; q?: string; customer_id?: number },
-  sort?: SortParam,
+  sort?: SortParam[],
 ) {
   return useQuery({
-    queryKey: [KEY, 'paged', page, filters, sort?.key, sort?.dir],
+    queryKey: [KEY, 'paged', page, filters, sort?.map(s => `${s.key}:${s.dir}`).join(',')],
     queryFn: () => {
       const params = new URLSearchParams({ page: String(page), per_page: '50' });
       if (filters?.status) params.set('status', filters.status);
       if (filters?.q) params.set('q', filters.q);
       if (filters?.customer_id) params.set('customer_id', String(filters.customer_id));
-      if (sort) {
-        params.set('sort', sort.key);
-        params.set('order', sort.dir);
+      if (sort && sort.length > 0) {
+        params.set('sort', sort.map(s => s.key).join(','));
+        params.set('order', sort.map(s => s.dir).join(','));
       }
       return api.get<PaginatedResponse<Project>>(`/projects?${params}`);
     },

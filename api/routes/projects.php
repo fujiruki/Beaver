@@ -25,6 +25,7 @@ function nextProjectCode(PDO $pdo): string {
 
 require_once __DIR__ . '/sync_helpers.php';
 require_once __DIR__ . '/list_helpers.php';
+require_once __DIR__ . '/../search_helpers.php';
 
 // --- R-025 Step E-Beaver: AccessTategu からの伝票 push 受信 ---
 // POST  /projects/{id}/vouchers/sync                    新規/upsert
@@ -244,8 +245,13 @@ switch ($method) {
                 $params[] = $_GET['status'];
             }
             if (!empty($_GET['q'])) {
-                $where .= ' AND p.name LIKE ?';
-                $params[] = '%' . $_GET['q'] . '%';
+                // R-0091: 検索対象を案件コード・案件名・得意先名に拡張
+                [$searchClause, $searchParams] = buildMultiColumnSearchClause(
+                    ['p.project_code', 'p.name', 'c.name'],
+                    $_GET['q']
+                );
+                $where .= ' AND ' . $searchClause;
+                $params = array_merge($params, $searchParams);
             }
             if (isset($_GET['page'])) {
                 $page    = max(1, (int)$_GET['page']);
@@ -264,6 +270,7 @@ switch ($method) {
                         'customer_name' => 'c.name',
                         'status'        => 'ps.sort_order',
                         'start_date'    => 'p.start_date',
+                        'delivery_date' => 'p.delivery_date',
                     ],
                     'p.updated_at',
                     'p.id',

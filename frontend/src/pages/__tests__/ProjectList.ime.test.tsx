@@ -42,7 +42,7 @@ function renderPage() {
 describe('ProjectList IMEインクリメンタルサーチ (R-070)', () => {
   it('IME変換中はonChangeで検索APIを発火せず、フォーカスも維持される', async () => {
     renderPage();
-    const input = await screen.findByPlaceholderText('案件名で検索') as HTMLInputElement;
+    const input = await screen.findByPlaceholderText('案件名・得意先名で検索') as HTMLInputElement;
     input.focus();
     expect(document.activeElement).toBe(input);
 
@@ -64,7 +64,7 @@ describe('ProjectList IMEインクリメンタルサーチ (R-070)', () => {
 
   it('複数文字を連続確定してもフォーカスが外れない', async () => {
     renderPage();
-    const input = await screen.findByPlaceholderText('案件名で検索') as HTMLInputElement;
+    const input = await screen.findByPlaceholderText('案件名・得意先名で検索') as HTMLInputElement;
     input.focus();
     await waitFor(() => expect(requestedQueries.length).toBeGreaterThan(0));
 

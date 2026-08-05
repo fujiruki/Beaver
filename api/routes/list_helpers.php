@@ -24,16 +24,35 @@ if (!function_exists('resolveSortClause')) {
      * @return string 'ORDER BY ...' から始まる句
      */
     function resolveSortClause(array $whitelist, string $default, string $tiebreaker, string $defaultOrder = 'ASC'): string {
-        $sortKey = isset($_GET['sort']) ? (string)$_GET['sort'] : '';
-        $orderRaw = isset($_GET['order']) ? strtolower((string)$_GET['order']) : '';
-        if ($orderRaw === 'asc' || $orderRaw === 'desc') {
-            $order = strtoupper($orderRaw);
-        } else {
-            $order = strtoupper($defaultOrder) === 'DESC' ? 'DESC' : 'ASC';
+        $sortRaw = isset($_GET['sort']) ? (string)$_GET['sort'] : '';
+        $orderRaw = isset($_GET['order']) ? (string)$_GET['order'] : '';
+        $fallbackOrder = strtoupper($defaultOrder) === 'DESC' ? 'DESC' : 'ASC';
+
+        $sortKeys = array_values(array_filter(explode(',', $sortRaw), fn(string $k) => $k !== ''));
+
+        // カンマが無い単一カラム指定（従来の3引数/4引数呼び出しと完全互換の経路）
+        if (count($sortKeys) <= 1) {
+            $sortKey = $sortKeys[0] ?? '';
+            $singleOrderRaw = strtolower($orderRaw);
+            $order = ($singleOrderRaw === 'asc' || $singleOrderRaw === 'desc') ? strtoupper($singleOrderRaw) : $fallbackOrder;
+            $expr = array_key_exists($sortKey, $whitelist) ? $whitelist[$sortKey] : $default;
+            return "ORDER BY $expr $order, $tiebreaker ASC";
         }
 
-        $expr = array_key_exists($sortKey, $whitelist) ? $whitelist[$sortKey] : $default;
+        // R-0092: 複合ソート（カンマ区切り）。ホワイトリスト外のカラムは無視する。
+        $orderParts = explode(',', $orderRaw);
+        $clauses = [];
+        foreach ($sortKeys as $i => $key) {
+            if (!array_key_exists($key, $whitelist)) continue;
+            $orderPart = strtolower(trim($orderParts[$i] ?? ''));
+            $order = ($orderPart === 'asc' || $orderPart === 'desc') ? strtoupper($orderPart) : $fallbackOrder;
+            $clauses[] = "{$whitelist[$key]} $order";
+        }
 
-        return "ORDER BY $expr $order, $tiebreaker ASC";
+        if (empty($clauses)) {
+            return "ORDER BY $default $fallbackOrder, $tiebreaker ASC";
+        }
+
+        return 'ORDER BY ' . implode(', ', $clauses) . ", $tiebreaker ASC";
     }
 }

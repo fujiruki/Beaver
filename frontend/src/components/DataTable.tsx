@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties, PointerEvent as ReactPointerEvent, ReactNode } from 'react';
+import type { CSSProperties, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, ReactNode } from 'react';
 
 export type SortDir = 'asc' | 'desc';
 
@@ -23,6 +23,12 @@ interface DataTableProps<T> {
   sortKey?: string;
   sortDir?: SortDir;
   onSortChange?: (key: string, dir: SortDir) => void;
+  /** R-0092: trueのとき複合ソート（Shift+クリックで第2キー追加）を有効にする（オプトイン、既定false） */
+  multiSort?: boolean;
+  /** multiSort時の現在のソートキー配列（優先順） */
+  sortKeys?: SortState[];
+  /** multiSort時に呼ばれるコールバック。既存のonSortChangeとは独立させ、単一ソート利用側の型・呼び出しを変えない */
+  onMultiSortChange?: (keys: SortState[]) => void;
   emptyMessage?: string;
   density?: 'compact';
 }
@@ -192,6 +198,9 @@ export default function DataTable<T>({
   sortKey,
   sortDir,
   onSortChange,
+  multiSort = false,
+  sortKeys,
+  onMultiSortChange,
   emptyMessage = '登録なし',
   density = 'compact',
 }: DataTableProps<T>) {
@@ -206,12 +215,34 @@ export default function DataTable<T>({
   const dragRef = useRef<{ sourceKey: string; startX: number; moved: boolean; overKey: string | null } | null>(null);
   const suppressClickRef = useRef(false);
 
-  function handleHeaderClick(col: DataTableColumn<T>) {
+  function handleHeaderClick(col: DataTableColumn<T>, e: ReactMouseEvent<HTMLTableCellElement>) {
     if (suppressClickRef.current) {
       suppressClickRef.current = false;
       return;
     }
-    if (!col.sortable || !onSortChange) return;
+    if (!col.sortable) return;
+
+    if (multiSort) {
+      if (!onMultiSortChange) return;
+      const current = sortKeys ?? [];
+      if (!e.shiftKey) {
+        const existing = current.length === 1 ? current[0] : undefined;
+        const nextDir: SortDir = existing?.key === col.key && existing.dir === 'asc' ? 'desc' : 'asc';
+        onMultiSortChange([{ key: col.key, dir: nextDir }]);
+        return;
+      }
+      const idx = current.findIndex(s => s.key === col.key);
+      if (idx >= 0) {
+        const existing = current[idx];
+        const rest = [...current.slice(0, idx), ...current.slice(idx + 1)];
+        onMultiSortChange([...rest, { key: col.key, dir: existing.dir === 'asc' ? 'desc' : 'asc' }]);
+      } else {
+        onMultiSortChange([...current, { key: col.key, dir: 'asc' }]);
+      }
+      return;
+    }
+
+    if (!onSortChange) return;
     const nextDir: SortDir = sortKey === col.key && sortDir === 'asc' ? 'desc' : 'asc';
     onSortChange(col.key, nextDir);
   }
@@ -288,11 +319,14 @@ export default function DataTable<T>({
       <thead>
         <tr style={{ background: '#f1f5f9', borderBottom: '1px solid #e2e8f0' }}>
           {orderedColumns.map(col => {
-            const isSorted = sortKey === col.key;
+            const multiSortIndex = multiSort ? (sortKeys ?? []).findIndex(s => s.key === col.key) : -1;
+            const multiSortEntry = multiSortIndex >= 0 ? (sortKeys as SortState[])[multiSortIndex] : undefined;
+            const isSorted = multiSort ? multiSortIndex >= 0 : sortKey === col.key;
+            const effectiveDir = multiSort ? multiSortEntry?.dir : sortDir;
             const ariaSort: 'ascending' | 'descending' | 'none' | undefined = !col.sortable
               ? undefined
               : isSorted
-                ? (sortDir === 'desc' ? 'descending' : 'ascending')
+                ? (effectiveDir === 'desc' ? 'descending' : 'ascending')
                 : 'none';
             const thStyle: CSSProperties = {
               position: 'relative',
@@ -309,14 +343,18 @@ export default function DataTable<T>({
               <th
                 key={col.key}
                 aria-sort={ariaSort}
-                onClick={() => handleHeaderClick(col)}
+                onClick={e => handleHeaderClick(col, e)}
                 onPointerDown={e => handleReorderPointerDown(e, col)}
                 onPointerMove={() => handleReorderPointerOver(col)}
                 style={thStyle}
               >
                 {col.label}
                 {col.sortable && isSorted && (
-                  <span aria-hidden="true"> {sortDir === 'desc' ? '▼' : '▲'}</span>
+                  <span aria-hidden="true" style={multiSort ? { fontSize: fontSize - 3 } : undefined}>
+                    {' '}
+                    {effectiveDir === 'desc' ? '▼' : '▲'}
+                    {multiSort && multiSortIndex + 1}
+                  </span>
                 )}
                 <div
                   className="bv-datatable-resize-handle"

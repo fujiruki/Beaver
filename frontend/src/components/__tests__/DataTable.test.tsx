@@ -509,6 +509,119 @@ describe('DataTable 列順序の入れ替え', () => {
   });
 });
 
+describe('DataTable 複合ソート（multiSort）', () => {
+  it('multiSort未指定時はShift+クリックでも通常クリックと同じonSortChangeが呼ばれる（後方互換）', () => {
+    const onSortChange = vi.fn();
+    render(
+      <DataTable
+        tableId="test-multisort-off"
+        columns={makeColumns()}
+        rows={ROWS}
+        rowKey={r => r.id}
+        onSortChange={onSortChange}
+      />,
+    );
+    fireEvent.click(screen.getByText('名前'), { shiftKey: true });
+    expect(onSortChange).toHaveBeenCalledWith('name', 'asc');
+  });
+
+  it('multiSort有効時、通常クリックは単一キー配列でonMultiSortChangeを呼ぶ（複合ソートをリセット）', () => {
+    const onMultiSortChange = vi.fn();
+    render(
+      <DataTable
+        tableId="test-multisort-1"
+        columns={makeColumns()}
+        rows={ROWS}
+        rowKey={r => r.id}
+        multiSort
+        sortKeys={[{ key: 'amount', dir: 'asc' }]}
+        onMultiSortChange={onMultiSortChange}
+      />,
+    );
+    fireEvent.click(screen.getByText('名前'));
+    expect(onMultiSortChange).toHaveBeenCalledWith([{ key: 'name', dir: 'asc' }]);
+  });
+
+  it('multiSort有効時、Shift+クリックで第2ソートキーとして追加される', () => {
+    const onMultiSortChange = vi.fn();
+    render(
+      <DataTable
+        tableId="test-multisort-2"
+        columns={makeColumns()}
+        rows={ROWS}
+        rowKey={r => r.id}
+        multiSort
+        sortKeys={[{ key: 'name', dir: 'asc' }]}
+        onMultiSortChange={onMultiSortChange}
+      />,
+    );
+    fireEvent.click(screen.getByText('金額'), { shiftKey: true });
+    expect(onMultiSortChange).toHaveBeenCalledWith([
+      { key: 'name', dir: 'asc' },
+      { key: 'amount', dir: 'asc' },
+    ]);
+  });
+
+  it('multiSort有効時、既存キーを再度Shift+クリックすると昇順/降順がトグルされ末尾に付け直される', () => {
+    const onMultiSortChange = vi.fn();
+    render(
+      <DataTable
+        tableId="test-multisort-3"
+        columns={makeColumns()}
+        rows={ROWS}
+        rowKey={r => r.id}
+        multiSort
+        sortKeys={[
+          { key: 'name', dir: 'asc' },
+          { key: 'amount', dir: 'asc' },
+        ]}
+        onMultiSortChange={onMultiSortChange}
+      />,
+    );
+    fireEvent.click(screen.getByText('名前'), { shiftKey: true });
+    expect(onMultiSortChange).toHaveBeenCalledWith([
+      { key: 'amount', dir: 'asc' },
+      { key: 'name', dir: 'desc' },
+    ]);
+  });
+
+  it('multiSort有効時、ヘッダーに現在のソート順位(▲1 ▲2)が表示される', () => {
+    render(
+      <DataTable
+        tableId="test-multisort-4"
+        columns={makeColumns()}
+        rows={ROWS}
+        rowKey={r => r.id}
+        multiSort
+        sortKeys={[
+          { key: 'name', dir: 'asc' },
+          { key: 'amount', dir: 'desc' },
+        ]}
+      />,
+    );
+    const nameTh = screen.getByText('名前').closest('th') as HTMLElement;
+    const amountTh = screen.getByText('金額').closest('th') as HTMLElement;
+    expect(nameTh.textContent).toContain('▲1');
+    expect(amountTh.textContent).toContain('▼2');
+  });
+
+  it('multiSort有効かつonMultiSortChange未指定時はonSortChangeが呼ばれない（安全側フォールバック）', () => {
+    const onSortChange = vi.fn();
+    render(
+      <DataTable
+        tableId="test-multisort-5"
+        columns={makeColumns()}
+        rows={ROWS}
+        rowKey={r => r.id}
+        multiSort
+        onSortChange={onSortChange}
+      />,
+    );
+    fireEvent.click(screen.getByText('名前'));
+    expect(onSortChange).not.toHaveBeenCalled();
+  });
+});
+
 function widthColumns(): DataTableColumn<Row>[] {
   return [
     { key: 'name', label: '名前', width: 100, render: r => r.name },

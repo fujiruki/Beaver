@@ -208,6 +208,51 @@ runTest('defaultOrder=DESC時、不正なorder値はdefaultOrder(DESC)へフォ�
 $_GET = [];
 
 // ============================================================
+// R-0092: resolveSortClause 複合ソート（カンマ区切り）
+// ============================================================
+echo "\n=== resolveSortClause 複合ソート（カンマ区切り） ===\n";
+
+runTest('sort=a,b&order=asc,desc で複数カラムのORDER BYが順に組み立てられる', function () {
+    $_GET = ['sort' => 'a,b', 'order' => 'asc,desc'];
+    $clause = resolveSortClause(['a' => 'col_a', 'b' => 'col_b'], 'code', 'id');
+    assertEq('ORDER BY col_a ASC, col_b DESC, id ASC', $clause);
+});
+
+runTest('複合ソートでもtiebreakerは末尾に一度だけ付与される', function () {
+    $_GET = ['sort' => 'a,b', 'order' => 'desc,asc'];
+    $clause = resolveSortClause(['a' => 'col_a', 'b' => 'col_b'], 'code', 'id');
+    assertTrue(str_ends_with($clause, ', id ASC'), 'tiebreakerが末尾に一度だけ');
+    assertEq(1, substr_count($clause, 'id ASC'), 'id ASCの出現回数は1回');
+});
+
+runTest('複合ソートでorderの指定数がsortより少ない場合は不足分をdefaultOrderで補う', function () {
+    $_GET = ['sort' => 'a,b', 'order' => 'desc'];
+    $clause = resolveSortClause(['a' => 'col_a', 'b' => 'col_b'], 'code', 'id');
+    assertEq('ORDER BY col_a DESC, col_b ASC, id ASC', $clause);
+});
+
+runTest('複合ソートでホワイトリスト外のカラムは無視され、有効なカラムのみでORDER BYが組み立てられる', function () {
+    $_GET = ['sort' => 'a,invalid,b', 'order' => 'asc,asc,desc'];
+    $clause = resolveSortClause(['a' => 'col_a', 'b' => 'col_b'], 'code', 'id');
+    assertEq('ORDER BY col_a ASC, col_b DESC, id ASC', $clause);
+});
+
+runTest('複合ソート指定で全カラムがホワイトリスト外ならデフォルト単一カラムにフォールバックする', function () {
+    $_GET = ['sort' => 'invalid1,invalid2', 'order' => 'asc,asc'];
+    $clause = resolveSortClause(['a' => 'col_a', 'b' => 'col_b'], 'code', 'id');
+    assertEq('ORDER BY code ASC, id ASC', $clause);
+});
+
+runTest('カンマが無い単一カラム指定は既存動作と完全に同じ結果になる（後方互換）', function () {
+    $_GET = ['sort' => 'a', 'order' => 'desc'];
+    $single = resolveSortClause(['a' => 'col_a', 'b' => 'col_b'], 'code', 'id');
+    $_GET = ['sort' => 'a,', 'order' => 'desc'];
+    assertEq('ORDER BY col_a DESC, id ASC', $single, '単一カラム指定は従来通り');
+});
+
+$_GET = [];
+
+// ============================================================
 // GET /customers?page=1 実データでのソート統合テスト
 // ============================================================
 echo "\n=== GET /customers?page=1 サーバソート統合 ===\n";

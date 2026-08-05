@@ -172,6 +172,52 @@ function projectListSortedByStatus(PDO $pdo, string $order): array {
     return $stmt->fetchAll();
 }
 
+/**
+ * R-0091/R-0092: projects.php GET一覧（検索・複合ソート）のロジックをインライン実行。
+ * routes/projects.php の該当SQL（buildMultiColumnSearchClause + resolveSortClause）と
+ * 同一の構成にする。
+ */
+function projectListQuery(PDO $pdo, array $getParams): array {
+    require_once dirname(__DIR__) . '/routes/list_helpers.php';
+    require_once dirname(__DIR__) . '/search_helpers.php';
+
+    $_GET = $getParams;
+    $where = 'WHERE p.status != "キャンセル"';
+    $params = [];
+    if (!empty($_GET['q'])) {
+        [$searchClause, $searchParams] = buildMultiColumnSearchClause(
+            ['p.project_code', 'p.name', 'c.name'],
+            $_GET['q']
+        );
+        $where .= ' AND ' . $searchClause;
+        $params = array_merge($params, $searchParams);
+    }
+    $sortClause = resolveSortClause(
+        [
+            'project_code'  => 'p.project_code',
+            'name'          => 'p.name',
+            'customer_name' => 'c.name',
+            'status'        => 'ps.sort_order',
+            'start_date'    => 'p.start_date',
+            'delivery_date' => 'p.delivery_date',
+        ],
+        'p.updated_at',
+        'p.id',
+        'DESC'
+    );
+    $stmt = $pdo->prepare("
+        SELECT p.*, c.name AS customer_name
+        FROM projects p
+        LEFT JOIN customers c ON c.id = p.customer_id
+        LEFT JOIN project_statuses ps ON ps.name = p.status
+        $where $sortClause
+    ");
+    $stmt->execute($params);
+    $rows = $stmt->fetchAll();
+    $_GET = [];
+    return $rows;
+}
+
 // ============================================================
 // テスト本体
 // ============================================================
@@ -258,6 +304,45 @@ runTest('T-04: status列でソートすると工程順（sort_order順）に並�
     $filtered = array_values(array_filter($rows, fn($r) => str_starts_with((string)$r['project_code'], 'PS')));
     $statusesInOrder = array_column($filtered, 'status');
     assertEq(['見積済', '進行中', '完了'], $statusesInOrder, '工程順（見積済→進行中→完了）に並ぶこと');
+});
+
+// T-05: 一覧検索は得意先名でもヒットする（R-0091: 検索対象拡張）
+runTest('T-05: 検索キーワードが得意先名に一致する案件もヒットする', function () use ($pdo) {
+    $pdo->exec("DELETE FROM customers WHERE name = '検索対象得意先XYZ'");
+    $pdo->exec("INSERT INTO customers (name, honorific_type) VALUES ('検索対象得意先XYZ', '御中')");
+    $customerId = (int)$pdo->lastInsertId();
+    $pdo->exec("DELETE FROM projects WHERE project_code LIKE 'PQ%'");
+    $pdo->exec("
+        INSERT INTO projects (project_code, customer_id, name, status)
+        VALUES ('PQ001', $customerId, '検索キーワードを含まない案件名', '進行中')
+    ");
+
+    $rows = projectListQuery($pdo, ['q' => 'XYZ']);
+    $filtered = array_values(array_filter($rows, fn($r) => str_starts_with((string)$r['project_code'], 'PQ')));
+    assertEq(1, count($filtered), '得意先名検索でヒットする件数');
+    assertEq('PQ001', $filtered[0]['project_code'], 'ヒットした案件コード');
+});
+
+// T-06: status,delivery_date の複合ソート（ステータス優先・納期を第2キー）
+runTest('T-06: sort=status,delivery_dateの複合ソートでステータス優先・納期第2キーの順に並ぶ', function () use ($pdo) {
+    $pdo->exec("DELETE FROM projects WHERE project_code LIKE 'PM%'");
+    $rows = [
+        ['PM001', '進行中', '2026-02-02'],
+        ['PM002', '進行中', '2026-01-01'],
+        ['PM003', '見積済', '2026-03-03'],
+    ];
+    foreach ($rows as [$code, $status, $delivery]) {
+        $pdo->exec("
+            INSERT INTO projects (project_code, customer_id, name, status, delivery_date)
+            VALUES ('$code', 1, '複合ソート確認案件', '$status', '$delivery')
+        ");
+    }
+
+    $result = projectListQuery($pdo, ['sort' => 'status,delivery_date', 'order' => 'asc,asc']);
+    $filtered = array_values(array_filter($result, fn($r) => str_starts_with((string)$r['project_code'], 'PM')));
+    $codes = array_column($filtered, 'project_code');
+    // 見積済(sort_order=2)が最優先、進行中(sort_order=4)同士は納期昇順（01-01→02-02）
+    assertEq(['PM003', 'PM002', 'PM001'], $codes, 'ステータス優先・納期昇順の順序');
 });
 
 // ============================================================
