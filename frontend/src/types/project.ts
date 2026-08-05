@@ -1,5 +1,5 @@
-export type ProjectStatus =
-  '問い合わせ' | '見積済' | '受注済' | '進行中' | '納品済' | '請求済' | '完了';
+// R-0085: 設定画面からステータスの追加・編集ができるようになったため、固定ユニオン型ではなくstringにする
+export type ProjectStatus = string;
 
 export interface ProjectImage {
   id: number;

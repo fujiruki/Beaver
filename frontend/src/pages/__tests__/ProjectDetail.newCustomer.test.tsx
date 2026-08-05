@@ -24,6 +24,9 @@ beforeEach(() => {
       customers = [...customers, created];
       return new Response(JSON.stringify(created), { status: 201 });
     }
+    if (u.pathname.endsWith('/project-statuses')) {
+      return new Response(JSON.stringify([{ id: 1, name: '問い合わせ', sort_order: 1, is_active: 1, created_at: '2026-01-01 00:00:00' }]), { status: 200 });
+    }
     return new Response('{}', { status: 200 });
   }));
 });

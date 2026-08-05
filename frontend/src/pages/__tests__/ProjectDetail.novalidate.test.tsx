@@ -10,9 +10,13 @@ import ProjectDetail from '../ProjectDetail';
 // フォームの noValidate 属性そのものを回帰固定する。
 describe('ProjectDetail フォームのネイティブ検証抑止 (R-073)', () => {
   it('form 要素に noValidate が付与されている', () => {
-    vi.stubGlobal('fetch', vi.fn(() =>
-      Promise.resolve(new Response(JSON.stringify({}), { status: 200 }))
-    ));
+    vi.stubGlobal('fetch', vi.fn((url: string) => {
+      const u = new URL(url, 'http://localhost');
+      if (u.pathname.endsWith('/project-statuses')) {
+        return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+      }
+      return Promise.resolve(new Response(JSON.stringify({}), { status: 200 }));
+    }));
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const { container } = render(
       <QueryClientProvider client={qc}>

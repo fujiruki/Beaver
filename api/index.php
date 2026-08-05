@@ -58,6 +58,7 @@ try {
         'payments'      => __DIR__ . '/routes/payments.php',
         'settings'          => __DIR__ . '/routes/settings.php',
         'sales-categories'  => __DIR__ . '/routes/sales_categories.php',
+        'project-statuses'  => __DIR__ . '/routes/project_statuses.php',
         'catalog-proxy'            => __DIR__ . '/routes/catalog_proxy.php',
         'aggregation-categories'   => __DIR__ . '/routes/aggregation_categories.php',
         'feedback'                 => __DIR__ . '/routes/feedback.php',

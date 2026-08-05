@@ -107,7 +107,7 @@ if ($method === 'GET' && isset($segments[1]) && $segments[1] === 'sync' && !isse
         $params[':cursor'] = $cursor;
     }
     if (!$includeCancelled) {
-        $sql .= " AND p.status != 'cancelled'";
+        $sql .= " AND p.status != 'キャンセル'";
     }
     // cursor pagination の安定性のため id ASC で並べる（updated_at DESC ではページング順が崩れる）
     $sql .= ' ORDER BY p.id ASC LIMIT :limit_plus_one';
@@ -233,7 +233,7 @@ switch ($method) {
 
             echo json_encode($row);
         } else {
-            $where = 'WHERE p.status != "cancelled"';
+            $where = 'WHERE p.status != "キャンセル"';
             $params = [];
             if (!empty($_GET['customer_id'])) {
                 $where .= ' AND p.customer_id = ?';
@@ -262,7 +262,7 @@ switch ($method) {
                         'project_code'  => 'p.project_code',
                         'name'          => 'p.name',
                         'customer_name' => 'c.name',
-                        'status'        => 'p.status',
+                        'status'        => 'ps.sort_order',
                         'start_date'    => 'p.start_date',
                     ],
                     'p.updated_at',
@@ -273,6 +273,7 @@ switch ($method) {
                     SELECT p.*, c.name AS customer_name
                     FROM projects p
                     LEFT JOIN customers c ON c.id = p.customer_id
+                    LEFT JOIN project_statuses ps ON ps.name = p.status
                     $where $sortClause LIMIT $perPage OFFSET $offset
                 ");
                 $stmt->execute($params);
@@ -342,7 +343,7 @@ switch ($method) {
 
     case 'DELETE':
         if (!$resourceId) { http_response_code(400); echo json_encode(['error' => 'ID required']); exit; }
-        $pdo->prepare('UPDATE projects SET status = "cancelled", updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+        $pdo->prepare('UPDATE projects SET status = "キャンセル", updated_at = CURRENT_TIMESTAMP WHERE id = ?')
             ->execute([$resourceId]);
         echo json_encode(['cancelled' => true]);
         break;

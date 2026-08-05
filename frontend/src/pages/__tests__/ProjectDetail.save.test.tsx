@@ -37,6 +37,9 @@ beforeEach(() => {
     if (u.pathname.endsWith('/customers')) {
       return new Response(JSON.stringify([{ id: 1, name: '既存得意先', name_kana: null, memo: null }]), { status: 200 });
     }
+    if (u.pathname.endsWith('/project-statuses')) {
+      return new Response(JSON.stringify([{ id: 1, name: '進行中', sort_order: 4, is_active: 1, created_at: '2026-01-01 00:00:00' }]), { status: 200 });
+    }
     if (method === 'PUT') {
       const body = JSON.parse(String(init?.body ?? '{}'));
       putBodies.push(body);

@@ -132,6 +132,46 @@ function projectPut(PDO $pdo, int $resourceId, array $data): array {
     return ['code' => 200, 'body' => $stmt->fetch()];
 }
 
+/**
+ * projects.php の DELETE ロジックをインライン実行（routes/projects.php と同一SQL、R-0085でcancelled→キャンセルに修正）。
+ */
+function projectDelete(PDO $pdo, int $resourceId): array {
+    $pdo->prepare('UPDATE projects SET status = "キャンセル", updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+        ->execute([$resourceId]);
+    return ['code' => 200, 'body' => ['cancelled' => true]];
+}
+
+/**
+ * projects.php GET一覧（page指定・status列ソート）のロジックをインライン実行。
+ * R-0085: project_statuses を LEFT JOIN した sort_order 順にソートされることを検証するため、
+ * routes/projects.php の該当SQL（LEFT JOIN + ホワイトリスト 'status' => 'ps.sort_order'）と同一の構成にする。
+ */
+function projectListSortedByStatus(PDO $pdo, string $order): array {
+    require_once dirname(__DIR__) . '/routes/list_helpers.php';
+    $_GET = ['sort' => 'status', 'order' => $order];
+    $sortClause = resolveSortClause(
+        [
+            'project_code'  => 'p.project_code',
+            'name'          => 'p.name',
+            'customer_name' => 'c.name',
+            'status'        => 'ps.sort_order',
+            'start_date'    => 'p.start_date',
+        ],
+        'p.updated_at',
+        'p.id',
+        'DESC'
+    );
+    $stmt = $pdo->query("
+        SELECT p.*, c.name AS customer_name
+        FROM projects p
+        LEFT JOIN customers c ON c.id = p.customer_id
+        LEFT JOIN project_statuses ps ON ps.name = p.status
+        WHERE p.status != 'キャンセル' $sortClause
+    ");
+    $_GET = [];
+    return $stmt->fetchAll();
+}
+
 // ============================================================
 // テスト本体
 // ============================================================
@@ -184,6 +224,40 @@ runTest('T-02: order_date等を含むPUTで更新できる（保存ボタンが�
     assertEq(200, $res['code'], 'HTTP status');
     assertEq('既存案件B（更新後）', $res['body']['name'], 'name が更新されている');
     assertEq('更新後メモ', $res['body']['memo'], 'memo が更新されている');
+});
+
+// T-03: DELETE（論理キャンセル）はstatusを日本語の'キャンセル'にする（R-0085: 'cancelled'英語バグの修正確認）
+runTest('T-03: DELETEはstatusを"キャンセル"（日本語）にする', function () use ($pdo) {
+    $created = projectPost($pdo, ['customer_id' => 1, 'name' => '削除対象案件']);
+    $id = (int)$created['body']['id'];
+
+    $res = projectDelete($pdo, $id);
+    assertEq(200, $res['code'], 'HTTP status');
+    assertEq(true, $res['body']['cancelled'], 'cancelledフラグ');
+
+    $stmt = $pdo->prepare('SELECT status FROM projects WHERE id = ?');
+    $stmt->execute([$id]);
+    assertEq('キャンセル', $stmt->fetchColumn(), 'statusが日本語のキャンセルになっている');
+});
+
+// T-04: 一覧のstatusソートは project_statuses.sort_order 順（工程順）になる（R-0085）
+runTest('T-04: status列でソートすると工程順（sort_order順）に並ぶ', function () use ($pdo) {
+    $pdo->exec("DELETE FROM projects WHERE project_code LIKE 'PS%'");
+    $pdo->exec("UPDATE sequences SET last_no = last_no WHERE key = 'project'");
+    // 文字コード順とsort_order順が食い違うように status を選ぶ
+    // （'完了' < '見積済' < '進行中' は文字コード順だと工程順と一致しないため、これが崩れていないことを確認できる）
+    $statuses = ['完了', '見積済', '進行中'];
+    foreach ($statuses as $i => $status) {
+        $pdo->exec("
+            INSERT INTO projects (project_code, customer_id, name, status)
+            VALUES ('PS00" . ($i + 1) . "', 1, 'ソート確認案件" . ($i + 1) . "', '$status')
+        ");
+    }
+
+    $rows = projectListSortedByStatus($pdo, 'asc');
+    $filtered = array_values(array_filter($rows, fn($r) => str_starts_with((string)$r['project_code'], 'PS')));
+    $statusesInOrder = array_column($filtered, 'status');
+    assertEq(['見積済', '進行中', '完了'], $statusesInOrder, '工程順（見積済→進行中→完了）に並ぶこと');
 });
 
 // ============================================================

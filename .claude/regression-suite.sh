@@ -21,6 +21,7 @@ php "$root/api/tests/test_projects.php"          >/tmp/bv_projects.log 2>&1 || f
 php "$root/api/tests/test_list_sort.php"         >/tmp/bv_list_sort.log 2>&1 || fail "[test_list_sort] $(tail -n 8 /tmp/bv_list_sort.log)"
 php "$root/api/tests/test_tategu_cost_lines.php" >/tmp/bv_tategu_cost_lines.log 2>&1 || fail "[test_tategu_cost_lines] $(tail -n 8 /tmp/bv_tategu_cost_lines.log)"
 php "$root/api/tests/test_feedback.php"          >/tmp/bv_feedback.log 2>&1 || fail "[test_feedback] $(tail -n 8 /tmp/bv_feedback.log)"
+php "$root/api/tests/test_project_statuses.php"  >/tmp/bv_project_statuses.log 2>&1 || fail "[test_project_statuses] $(tail -n 8 /tmp/bv_project_statuses.log)"
 
 rm -f "$root"/api/tests/*.sqlite 2>/dev/null
 exit 0

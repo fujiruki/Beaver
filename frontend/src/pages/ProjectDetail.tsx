@@ -3,16 +3,13 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useProject, useCreateProject, useUpdateProject, useUploadProjectImage, useDeleteProjectImage } from '../api/projects';
 import { useCustomers } from '../api/customers';
+import { useProjectStatuses } from '../api/projectStatuses';
 import ComboSelect from '../components/ComboSelect';
 import type { ComboOption } from '../components/ComboSelect';
 import NewCustomerModal from '../components/NewCustomerModal';
 import { useAppSettings } from '../contexts/AppSettingsContext';
-import type { ProjectInput, ProjectStatus } from '../types/project';
+import type { ProjectInput } from '../types/project';
 import type { Customer } from '../types/customer';
-
-const STATUS_OPTIONS: ProjectStatus[] = [
-  '問い合わせ', '見積済', '受注済', '進行中', '納品済', '請求済', '完了',
-];
 
 const VOUCHER_STATUS_LABEL: Record<string, string> = {
   draft: '下書き', submitted: '提出済', approved: '承認済', billed: '請求済', void: '無効',
@@ -26,6 +23,7 @@ export default function ProjectDetail() {
 
   const { data: project, isLoading } = useProject(projectId);
   const { data: customers = [], refetch: refetchCustomers } = useCustomers();
+  const { data: projectStatuses = [] } = useProjectStatuses();
   const createMutation = useCreateProject();
   const updateMutation = useUpdateProject(projectId);
   const uploadImageMutation = useUploadProjectImage(projectId);
@@ -167,8 +165,8 @@ export default function ProjectDetail() {
           <div className="grid grid-cols-2 gap-4">
             <Field label="ステータス">
               <select {...register('status')} className={inputCls}>
-                {STATUS_OPTIONS.map(s => (
-                  <option key={s} value={s}>{s}</option>
+                {projectStatuses.map(s => (
+                  <option key={s.id} value={s.name}>{s.name}</option>
                 ))}
               </select>
             </Field>

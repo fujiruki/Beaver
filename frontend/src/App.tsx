@@ -17,6 +17,7 @@ const VoucherEdit          = lazy(() => import('./pages/VoucherEdit'));
 const InvoiceList          = lazy(() => import('./pages/InvoiceList'));
 const InvoiceDetail        = lazy(() => import('./pages/InvoiceDetail'));
 const SalesCategorySettings = lazy(() => import('./pages/SalesCategorySettings'));
+const ProjectStatusSettings = lazy(() => import('./pages/ProjectStatusSettings'));
 const AppSettings          = lazy(() => import('./pages/AppSettings'));
 const Help                 = lazy(() => import('./pages/Help'));
 
@@ -55,6 +56,7 @@ export default function App() {
                 <Route path="invoices/new" element={<InvoiceDetail />} />
                 <Route path="invoices/:id" element={<InvoiceDetail />} />
                 <Route path="settings/sales-categories" element={<SalesCategorySettings />} />
+                <Route path="settings/project-statuses" element={<ProjectStatusSettings />} />
                 <Route path="settings/app" element={<AppSettings />} />
                 <Route path="help" element={<Help />} />
               </Route>

@@ -98,6 +98,17 @@ export default function AppSettings() {
           </button>
         </div>
 
+        {/* 案件ステータス */}
+        <div className="border-t border-slate-100 pt-4">
+          <button
+            onClick={() => navigate('/settings/project-statuses')}
+            className="flex items-center justify-between w-full px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded border border-slate-200"
+          >
+            <span>案件ステータス設定</span>
+            <span className="text-slate-400">→</span>
+          </button>
+        </div>
+
         {/* 集計区分マスター */}
         <div className="border-t border-slate-100 pt-4">
           <h2 className="text-xs font-semibold text-slate-500 mb-3">集計区分マスター（catalog-system連携）</h2>
