@@ -30,6 +30,8 @@
 | [R-0089_status_stepper.md](spec/R-0089_status_stepper.md) | 案件ステータスのステッパーUI化 | 2026-08-05 |
 | [R-0090_search_kana_and.md](spec/R-0090_search_kana_and.md) | 検索のかな正規化＋空白区切りAND検索 | 2026-08-05 |
 | [R-0091_R-0092_project_list_search_sort.md](spec/R-0091_R-0092_project_list_search_sort.md) | 案件一覧の検索拡張・状態保持・複合ソート | 2026-08-05 |
+| [R-0094_feedback_modal_autofocus.md](spec/R-0094_feedback_modal_autofocus.md) | フィードバックモーダルのオートフォーカス | 2026-08-05 |
+| [R-0095_R-0097_project_delete_and_hours.md](spec/R-0095_R-0097_project_delete_and_hours.md) | 案件の完全削除・工数目安 | 2026-08-05 |
 
 ---
 
