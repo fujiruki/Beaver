@@ -1,15 +1,31 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
-import { useProject, useCreateProject, useUpdateProject, useUploadProjectImage, useDeleteProjectImage } from '../api/projects';
+import { useProject, useCreateProject, useUpdateProject, useUploadProjectImage, useDeleteProjectImage, useHardDeleteProject } from '../api/projects';
 import { useCustomers } from '../api/customers';
 import { useProjectStatuses } from '../api/projectStatuses';
 import ComboSelect from '../components/ComboSelect';
 import type { ComboOption } from '../components/ComboSelect';
 import NewCustomerModal from '../components/NewCustomerModal';
+import HardDeleteProjectModal from '../components/HardDeleteProjectModal';
 import { useAppSettings } from '../contexts/AppSettingsContext';
 import type { ProjectInput } from '../types/project';
 import type { Customer } from '../types/customer';
+
+/** APIクライアントの `API error 409: {"error":"..."}` 形式からサーバのエラーメッセージ本文を取り出す */
+function extractServerErrorMessage(err: unknown): string {
+  const raw = String(err);
+  const match = raw.match(/:\s*(\{.*\})$/s);
+  if (match) {
+    try {
+      const parsed = JSON.parse(match[1]);
+      if (typeof parsed?.error === 'string') return parsed.error;
+    } catch {
+      // JSON以外のボディはそのままフォールバック
+    }
+  }
+  return raw;
+}
 
 const VOUCHER_STATUS_LABEL: Record<string, string> = {
   draft: '下書き', submitted: '提出済', approved: '承認済', billed: '請求済', void: '無効',
@@ -28,10 +44,13 @@ export default function ProjectDetail() {
   const updateMutation = useUpdateProject(projectId);
   const uploadImageMutation = useUploadProjectImage(projectId);
   const deleteImageMutation = useDeleteProjectImage(projectId);
+  const hardDeleteMutation = useHardDeleteProject();
   const { settings } = useAppSettings();
 
   const [customerId, setCustomerId] = useState<number | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [hardDeleteModalOpen, setHardDeleteModalOpen] = useState(false);
+  const [hardDeleteError, setHardDeleteError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<ProjectInput>({
@@ -55,6 +74,7 @@ export default function ProjectDetail() {
         owner_name: project.owner_name,
         general_contractor_name: project.general_contractor_name,
         site_contact: project.site_contact,
+        manual_estimated_hours: project.manual_estimated_hours,
       });
       setCustomerId(project.customer_id);
     }
@@ -112,6 +132,20 @@ export default function ProjectDetail() {
 
   const factoryDays = ((project?.estimated_factory_hours ?? 0) / settings.hoursPerDay).toFixed(1);
   const siteDays    = ((project?.estimated_site_hours ?? 0) / settings.hoursPerDay).toFixed(1);
+
+  // R-0097: 見積伝票集計工数（工場+現場）があればそれを優先し、無ければ手動入力を使う
+  const voucherSumHours = (project?.estimated_factory_hours ?? 0) + (project?.estimated_site_hours ?? 0);
+  const voucherSumDays  = (voucherSumHours / settings.hoursPerDay).toFixed(1);
+
+  async function handleHardDeleteConfirm() {
+    setHardDeleteError(null);
+    try {
+      await hardDeleteMutation.mutateAsync(projectId);
+      navigate('/projects');
+    } catch (err) {
+      setHardDeleteError(extractServerErrorMessage(err));
+    }
+  }
 
   return (
     <div className="max-w-2xl">
@@ -260,6 +294,22 @@ export default function ProjectDetail() {
           <Field label="備考">
             <textarea {...register('memo')} rows={3} className={`${inputCls} w-full resize-none`} />
           </Field>
+
+          <Field label="工数目安">
+            {voucherSumHours > 0 ? (
+              <div className="px-2.5 py-1.5 border border-slate-200 rounded-md text-sm bg-slate-50 text-slate-600">
+                見積伝票から自動計算: {voucherSumHours}時間（{voucherSumDays}日）
+              </div>
+            ) : (
+              <input
+                type="number"
+                step="0.1"
+                aria-label="工数目安（時間）"
+                {...register('manual_estimated_hours', { valueAsNumber: true })}
+                className={inputCls}
+              />
+            )}
+          </Field>
         </div>
 
         {/* 画像（編集時のみ） */}
@@ -407,12 +457,37 @@ export default function ProjectDetail() {
             </div>
           </div>
         )}
+
+        {/* 完全削除（編集時のみ、R-0095） */}
+        {!isNew && (
+          <div className="bg-white rounded-lg shadow-sm p-5 border border-red-200">
+            <h2 className="text-sm font-bold text-red-600 border-b border-red-100 pb-2 mb-3">危険な操作</h2>
+            <p className="text-xs text-slate-500 mb-3">
+              この案件を伝票・明細も含めて完全に削除します。請求書に紐づく伝票がある場合は実行できません。
+            </p>
+            <button
+              type="button"
+              onClick={() => { setHardDeleteError(null); setHardDeleteModalOpen(true); }}
+              className="px-4 py-2 bg-red-600 text-white rounded-md text-sm font-bold hover:bg-red-700"
+            >
+              完全削除
+            </button>
+          </div>
+        )}
       </form>
 
       <NewCustomerModal
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
         onCreated={handleCustomerCreated}
+      />
+
+      <HardDeleteProjectModal
+        isOpen={hardDeleteModalOpen}
+        isPending={hardDeleteMutation.isPending}
+        errorMessage={hardDeleteError}
+        onClose={() => setHardDeleteModalOpen(false)}
+        onConfirm={handleHardDeleteConfirm}
       />
     </div>
   );

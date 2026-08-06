@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useProjectsPaged, useDeleteProject } from '../api/projects';
 import { useCustomers } from '../api/customers';
+import { useAppSettings } from '../contexts/AppSettingsContext';
 import Pagination from '../components/Pagination';
 import DataTable from '../components/DataTable';
 import type { DataTableColumn, SortState } from '../components/DataTable';
@@ -50,6 +51,7 @@ export default function ProjectList() {
   );
   const isComposingRef = useRef(false);
   const { data: customers = [] } = useCustomers();
+  const { settings } = useAppSettings();
   const filters = { ...(search ? { q: search } : {}), ...(customerFilter ? { customer_id: customerFilter } : {}) };
   const { data, isLoading, error } = useProjectsPaged(page, Object.keys(filters).length ? filters : undefined, sortKeys);
   const deleteMutation = useDeleteProject();
@@ -133,6 +135,13 @@ export default function ProjectList() {
     },
     { key: 'start_date', label: '開始日', sortable: true, render: p => p.start_date ?? '—' },
     { key: 'delivery_date', label: '納期', sortable: true, render: p => p.delivery_date ?? '—' },
+    {
+      key: 'effective_estimated_hours',
+      label: '工数目安',
+      render: p => (p.effective_estimated_hours != null
+        ? `${(p.effective_estimated_hours / settings.hoursPerDay).toFixed(1)}日`
+        : '—'),
+    },
     {
       key: 'actions',
       label: '',

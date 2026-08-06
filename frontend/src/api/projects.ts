@@ -75,6 +75,15 @@ export function useDeleteProject() {
   });
 }
 
+/** R-0095: 案件の完全削除（伝票・明細も含めて完全に削除する）。請求書に紐づく伝票がある場合は409エラー */
+export function useHardDeleteProject() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api.delete<{ deleted: boolean }>(`/projects/${id}?hard=1`),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [KEY] }); },
+  });
+}
+
 export function useUploadProjectImage(projectId: number) {
   const queryClient = useQueryClient();
   return useMutation({

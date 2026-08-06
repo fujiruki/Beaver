@@ -41,6 +41,8 @@ export interface Project {
   vouchers?: ProjectVoucher[];
   estimated_factory_hours?: number;
   estimated_site_hours?: number;
+  manual_estimated_hours?: number | null;
+  effective_estimated_hours?: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -59,4 +61,5 @@ export type ProjectInput = {
   owner_name?: string | null;
   general_contractor_name?: string | null;
   site_contact?: string | null;
+  manual_estimated_hours?: number | null;
 };

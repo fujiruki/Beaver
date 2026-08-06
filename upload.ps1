@@ -56,7 +56,7 @@ Write-Host "`n[4/4] Uploading and extracting..."
 
 $sshOpts   = @("-o", "StrictHostKeyChecking=no", "-p", $serverPort, "-i", $sshKeyPath)
 $mkdirCmd  = "mkdir -p $remoteDir"
-$deployCmd = "cd $remoteDir && find . -maxdepth 1 ! -name 'api' ! -name '.' ! -name '$archiveName' ! -name '*.sqlite' -exec rm -rf {} + && tar -xf $archiveName && rm $archiveName"
+$deployCmd = "cd $remoteDir && find . -maxdepth 1 ! -name 'api' ! -name '.' ! -name '$archiveName' ! -name '*.sqlite' ! -name '.htpasswd' -exec rm -rf {} + && tar -xf $archiveName && rm $archiveName"
 $chmodCmd  = "find $remoteDir -type d -exec chmod 755 {} + && find $remoteDir -type f -exec chmod 644 {} + && if [ -f $remoteDir/api/database.sqlite ]; then chmod 666 $remoteDir/api/database.sqlite; chmod 777 $remoteDir/api; fi"
 
 try {

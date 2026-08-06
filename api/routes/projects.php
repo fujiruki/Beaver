@@ -7,6 +7,7 @@
  * POST   /projects                    新規作成（project_code 自動採番）
  * PUT    /projects/{id}               更新
  * DELETE /projects/{id}               削除（キャンセル扱い）
+ * DELETE /projects/{id}?hard=1        完全削除（R-0095、請求書に紐づく伝票がある場合は409）
  * GET    /projects/{id}/images        画像一覧
  * POST   /projects/{id}/images        画像アップロード（multipart/form-data）
  * DELETE /projects/{id}/images/{imgId} 画像削除
@@ -232,6 +233,10 @@ switch ($method) {
             $stmt4->execute([$resourceId]);
             $row['images'] = $stmt4->fetchAll();
 
+            // R-0097: 実効工数目安（見積伝票集計優先・無ければ手動入力）
+            $sumHours = $row['estimated_factory_hours'] + $row['estimated_site_hours'];
+            $row['effective_estimated_hours'] = effectiveEstimatedHours($sumHours, $row['manual_estimated_hours']);
+
             echo json_encode($row);
         } else {
             $where = 'WHERE p.status != "キャンセル"';
@@ -284,8 +289,15 @@ switch ($method) {
                     $where $sortClause LIMIT $perPage OFFSET $offset
                 ");
                 $stmt->execute($params);
+                $rows = $stmt->fetchAll();
+                // R-0097: 該当ページの案件IDに絞って集計工数を取得し、実効工数目安を付与する
+                $hoursMap = fetchEstimatedHoursByProjectIds($pdo, array_column($rows, 'id'));
+                foreach ($rows as &$r) {
+                    $r['effective_estimated_hours'] = effectiveEstimatedHours($hoursMap[(int)$r['id']] ?? 0, $r['manual_estimated_hours']);
+                }
+                unset($r);
                 echo json_encode([
-                    'data' => $stmt->fetchAll(),
+                    'data' => $rows,
                     'meta' => ['total' => $total, 'page' => $page, 'per_page' => $perPage, 'last_page' => (int)ceil($total / $perPage)],
                 ]);
             } else {
@@ -296,7 +308,13 @@ switch ($method) {
                     $where ORDER BY p.updated_at DESC
                 ");
                 $stmt->execute($params);
-                echo json_encode($stmt->fetchAll());
+                $rows = $stmt->fetchAll();
+                $hoursMap = fetchEstimatedHoursByProjectIds($pdo, array_column($rows, 'id'));
+                foreach ($rows as &$r) {
+                    $r['effective_estimated_hours'] = effectiveEstimatedHours($hoursMap[(int)$r['id']] ?? 0, $r['manual_estimated_hours']);
+                }
+                unset($r);
+                echo json_encode($rows);
             }
         }
         break;
@@ -305,8 +323,8 @@ switch ($method) {
         $data = json_decode(file_get_contents('php://input'), true) ?? [];
         $code = nextProjectCode($pdo);
         $stmt = $pdo->prepare('
-            INSERT INTO projects (project_code, customer_id, name, description, status, start_date, end_date, delivery_date, address, memo, order_date, owner_name, general_contractor_name, site_contact)
-            VALUES (:project_code, :customer_id, :name, :description, :status, :start_date, :end_date, :delivery_date, :address, :memo, :order_date, :owner_name, :general_contractor_name, :site_contact)
+            INSERT INTO projects (project_code, customer_id, name, description, status, start_date, end_date, delivery_date, address, memo, order_date, owner_name, general_contractor_name, site_contact, manual_estimated_hours)
+            VALUES (:project_code, :customer_id, :name, :description, :status, :start_date, :end_date, :delivery_date, :address, :memo, :order_date, :owner_name, :general_contractor_name, :site_contact, :manual_estimated_hours)
         ');
         $stmt->execute([
             ':project_code'              => $code,
@@ -323,6 +341,7 @@ switch ($method) {
             ':owner_name'                => $data['owner_name'] ?? null,
             ':general_contractor_name'   => $data['general_contractor_name'] ?? null,
             ':site_contact'              => $data['site_contact'] ?? null,
+            ':manual_estimated_hours'    => $data['manual_estimated_hours'] ?? null,
         ]);
         $id = $pdo->lastInsertId();
         http_response_code(201);
@@ -334,7 +353,7 @@ switch ($method) {
     case 'PUT':
         if (!$resourceId) { http_response_code(400); echo json_encode(['error' => 'ID required']); exit; }
         $data = json_decode(file_get_contents('php://input'), true) ?? [];
-        $fields = ['customer_id','name','description','status','start_date','end_date','delivery_date','address','memo','order_date','owner_name','general_contractor_name','site_contact'];
+        $fields = ['customer_id','name','description','status','start_date','end_date','delivery_date','address','memo','order_date','owner_name','general_contractor_name','site_contact','manual_estimated_hours'];
         $sets = []; $params = [];
         foreach ($fields as $f) {
             if (array_key_exists($f, $data)) { $sets[] = "$f = :$f"; $params[":$f"] = $data[$f]; }
@@ -350,6 +369,13 @@ switch ($method) {
 
     case 'DELETE':
         if (!$resourceId) { http_response_code(400); echo json_encode(['error' => 'ID required']); exit; }
+        if (isset($_GET['hard']) && $_GET['hard'] === '1') {
+            require_once __DIR__ . '/project_delete_helpers.php';
+            $result = hardDeleteProject($pdo, $resourceId);
+            http_response_code($result['code']);
+            echo json_encode($result['body']);
+            break;
+        }
         $pdo->prepare('UPDATE projects SET status = "キャンセル", updated_at = CURRENT_TIMESTAMP WHERE id = ?')
             ->execute([$resourceId]);
         echo json_encode(['cancelled' => true]);

@@ -56,3 +56,41 @@ if (!function_exists('resolveSortClause')) {
         return 'ORDER BY ' . implode(', ', $clauses) . ", $tiebreaker ASC";
     }
 }
+
+if (!function_exists('fetchEstimatedHoursByProjectIds')) {
+    /**
+     * R-0097: 指定した案件ID群について、見積伝票のvoucher_linesから集計した
+     * 工場時間+現場時間の合計を project_id => 時間 で返す（0件のIDはキーが存在しない）。
+     * 一覧はページングされるため、呼び出し側は「該当ページの案件ID」だけを渡すこと。
+     *
+     * @param array<int> $projectIds
+     * @return array<int,float>
+     */
+    function fetchEstimatedHoursByProjectIds(PDO $pdo, array $projectIds): array {
+        if (empty($projectIds)) return [];
+        $placeholders = implode(',', array_fill(0, count($projectIds), '?'));
+        $stmt = $pdo->prepare("
+            SELECT v.project_id,
+                   COALESCE(SUM(vl.cost_factory_hours * vl.quantity), 0) AS total_factory_hours,
+                   COALESCE(SUM(vl.cost_site_hours    * vl.quantity), 0) AS total_site_hours
+            FROM voucher_lines vl
+            JOIN vouchers v ON v.id = vl.voucher_id
+            WHERE v.project_id IN ($placeholders) AND v.voucher_type = 'estimate' AND v.status != 'void'
+            GROUP BY v.project_id
+        ");
+        $stmt->execute(array_values($projectIds));
+        $result = [];
+        foreach ($stmt->fetchAll() as $row) {
+            $result[(int)$row['project_id']] = round((float)$row['total_factory_hours'] + (float)$row['total_site_hours'], 2);
+        }
+        return $result;
+    }
+}
+
+if (!function_exists('effectiveEstimatedHours')) {
+    /** R-0097: 見積伝票集計値があればそれを優先し、無ければ手動入力値を使う（実効工数目安）。 */
+    function effectiveEstimatedHours(float $sumHours, $manualHours): ?float {
+        if ($sumHours > 0) return $sumHours;
+        return $manualHours === null ? null : (float)$manualHours;
+    }
+}

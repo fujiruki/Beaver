@@ -3,6 +3,8 @@ import { useVouchers } from '../api/vouchers';
 import { useInvoices } from '../api/invoices';
 import { useCustomers } from '../api/customers';
 import { useProjects } from '../api/projects';
+import { useProjectStatuses } from '../api/projectStatuses';
+import { useAppSettings } from '../contexts/AppSettingsContext';
 import type { Project } from '../types/project';
 
 const ACTIVE_STATUSES = ['受注済', '進行中'];
@@ -17,10 +19,25 @@ export default function Dashboard() {
   const { data: monthInvoices = [] } = useInvoices({ year: currentYear, month: currentMonth });
   const { data: approvedVouchers = [] } = useVouchers({ status: 'approved' });
   const { data: allProjects = [] } = useProjects();
+  const { data: projectStatuses = [] } = useProjectStatuses();
+  const { settings } = useAppSettings();
 
   const monthSales   = monthInvoices.reduce((s, i) => s + i.invoice_total, 0);
   const activeProjects  = allProjects.filter(p => ACTIVE_STATUSES.includes(p.status));
   const pendingProjects = allProjects.filter(p => PENDING_STATUSES.includes(p.status));
+
+  // R-0097: 「完了」「キャンセル」より前の全ステータス（問い合わせ〜請求済等）の案件について、
+  // 工数目安の合計を日数換算し、稼働予定日数として表示する。
+  const closedSortOrders = projectStatuses
+    .filter(s => s.name === '完了' || s.name === 'キャンセル')
+    .map(s => s.sort_order);
+  const closedCutoff = closedSortOrders.length > 0 ? Math.min(...closedSortOrders) : Infinity;
+  const inProgressStatusNames = new Set(
+    projectStatuses.filter(s => s.sort_order < closedCutoff).map(s => s.name),
+  );
+  const inProgressProjects = allProjects.filter(p => inProgressStatusNames.has(p.status));
+  const inProgressHours = inProgressProjects.reduce((s, p) => s + (p.effective_estimated_hours ?? 0), 0);
+  const inProgressDays  = (inProgressHours / settings.hoursPerDay).toFixed(1);
 
   return (
     <div>
@@ -56,6 +73,16 @@ export default function Dashboard() {
           color="#7c3aed"
           onClick={() => navigate('/vouchers')}
         />
+      </div>
+
+      {/* 稼働予定日数（R-0097） */}
+      <div style={{
+        background: '#fff', borderRadius: 8, padding: '14px 18px', marginBottom: 24,
+        boxShadow: '0 1px 3px rgba(0,0,0,0.1)', borderLeft: '4px solid #10b981',
+        fontSize: 14, color: '#334155',
+      }}>
+        稼働予定 <strong style={{ fontSize: 18, color: '#10b981' }}>{inProgressDays}日</strong> 分の案件が進行中です
+        <span style={{ marginLeft: 8, fontSize: 12, color: '#94a3b8' }}>({inProgressProjects.length} 件・工数目安合計 {inProgressHours}h)</span>
       </div>
 
       {/* クイックアクション */}
