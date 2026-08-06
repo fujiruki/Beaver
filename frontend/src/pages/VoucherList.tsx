@@ -7,7 +7,7 @@ import ComboSelect from '../components/ComboSelect';
 import type { ComboOption } from '../components/ComboSelect';
 import Pagination from '../components/Pagination';
 import DataTable, { useSortState } from '../components/DataTable';
-import type { DataTableColumn, SortDir } from '../components/DataTable';
+import type { DataTableColumn, SortDir, SortState } from '../components/DataTable';
 import type { Voucher, VoucherType, VoucherStatus } from '../types/voucher';
 
 const TYPE_LABELS: Record<VoucherType, string> = { estimate: '見積', sales: '売上' };
@@ -20,11 +20,17 @@ const STATUS_COLORS: Record<VoucherStatus, string> = {
 
 export default function VoucherList() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const [page, setPage] = useState(1);
-  const [typeFilter, setTypeFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [sort, setSort] = useSortState('vouchers');
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const [page, setPage] = useState(() => {
+    const p = Number(searchParams.get('page'));
+    return Number.isFinite(p) && p > 0 ? p : 1;
+  });
+  const [typeFilter, setTypeFilter] = useState(() => searchParams.get('voucher_type') ?? '');
+  const [statusFilter, setStatusFilter] = useState(() => searchParams.get('status') ?? '');
+  const urlSortKey = searchParams.get('sort');
+  const [sort, setSortStorage] = useSortState('vouchers',
+    urlSortKey ? { key: urlSortKey, dir: searchParams.get('order') === 'desc' ? 'desc' : 'asc' } : undefined);
   const [customerFilter, setCustomerFilter] = useState<number | null>(
     searchParams.get('customer_id') ? Number(searchParams.get('customer_id')) : null
   );
@@ -45,6 +51,28 @@ export default function VoucherList() {
   const vouchers = data?.data ?? [];
   const meta = data?.meta;
 
+  // R-0096: フィルタ・ページ・ソートの状態をURLクエリへ反映し、リロード後も復元できるようにする
+  function syncUrl(next: {
+    page: number;
+    typeFilter: string;
+    statusFilter: string;
+    customerFilter: number | null;
+    projectFilter: number | null;
+    sort?: SortState;
+  }) {
+    const params = new URLSearchParams();
+    if (next.customerFilter) params.set('customer_id', String(next.customerFilter));
+    if (next.projectFilter) params.set('project_id', String(next.projectFilter));
+    if (next.typeFilter) params.set('voucher_type', next.typeFilter);
+    if (next.statusFilter) params.set('status', next.statusFilter);
+    if (next.page > 1) params.set('page', String(next.page));
+    if (next.sort) {
+      params.set('sort', next.sort.key);
+      params.set('order', next.sort.dir);
+    }
+    setSearchParams(params, { replace: true });
+  }
+
   const customerOptions: ComboOption[] = customers.map(c => ({
     id: c.id,
     primaryText: c.name,
@@ -57,25 +85,40 @@ export default function VoucherList() {
     searchText: p.name,
   }));
 
-  function handleFilterChange(setter: (v: string) => void, value: string) {
-    setter(value);
+  function handleTypeFilterChange(value: string) {
+    setTypeFilter(value);
     setPage(1);
+    syncUrl({ page: 1, typeFilter: value, statusFilter, customerFilter, projectFilter, sort });
+  }
+
+  function handleStatusFilterChange(value: string) {
+    setStatusFilter(value);
+    setPage(1);
+    syncUrl({ page: 1, typeFilter, statusFilter: value, customerFilter, projectFilter, sort });
   }
 
   function handleCustomerChange(id: number | null) {
     setCustomerFilter(id);
     setProjectFilter(null);
     setPage(1);
+    syncUrl({ page: 1, typeFilter, statusFilter, customerFilter: id, projectFilter: null, sort });
   }
 
   function handleProjectChange(id: number | null) {
     setProjectFilter(id);
     setPage(1);
+    syncUrl({ page: 1, typeFilter, statusFilter, customerFilter, projectFilter: id, sort });
   }
 
   function handleSortChange(key: string, dir: SortDir) {
-    setSort(key, dir);
+    setSortStorage(key, dir);
     setPage(1);
+    syncUrl({ page: 1, typeFilter, statusFilter, customerFilter, projectFilter, sort: { key, dir } });
+  }
+
+  function handlePageChange(p: number) {
+    setPage(p);
+    syncUrl({ page: p, typeFilter, statusFilter, customerFilter, projectFilter, sort });
   }
 
   function handleNewVoucher() {
@@ -154,7 +197,7 @@ export default function VoucherList() {
         </div>
         <div>
           <label style={filterLabelStyle}>種別</label>
-          <select value={typeFilter} onChange={e => handleFilterChange(setTypeFilter, e.target.value)} style={filterStyle}>
+          <select value={typeFilter} onChange={e => handleTypeFilterChange(e.target.value)} style={filterStyle}>
             <option value="">すべて</option>
             <option value="estimate">見積</option>
             <option value="sales">売上</option>
@@ -162,7 +205,7 @@ export default function VoucherList() {
         </div>
         <div>
           <label style={filterLabelStyle}>ステータス</label>
-          <select value={statusFilter} onChange={e => handleFilterChange(setStatusFilter, e.target.value)} style={filterStyle}>
+          <select value={statusFilter} onChange={e => handleStatusFilterChange(e.target.value)} style={filterStyle}>
             <option value="">すべて</option>
             <option value="draft">下書き</option>
             <option value="submitted">提出済</option>
@@ -194,7 +237,7 @@ export default function VoucherList() {
               lastPage={meta.last_page}
               total={meta.total}
               perPage={meta.per_page}
-              onChange={p => setPage(p)}
+              onChange={handlePageChange}
             />
           )}
         </div>

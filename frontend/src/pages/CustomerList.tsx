@@ -1,17 +1,24 @@
 import { useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useCustomersPaged, useDeleteCustomer } from '../api/customers';
 import Pagination from '../components/Pagination';
 import DataTable, { useSortState } from '../components/DataTable';
-import type { DataTableColumn, SortDir } from '../components/DataTable';
+import type { DataTableColumn, SortDir, SortState } from '../components/DataTable';
 import type { Customer } from '../types/customer';
 
 export default function CustomerList() {
   const navigate = useNavigate();
-  const [page, setPage] = useState(1);
-  const [inputValue, setInputValue] = useState('');
-  const [search, setSearch] = useState('');
-  const [sort, setSort] = useSortState('customers');
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const [page, setPage] = useState(() => {
+    const p = Number(searchParams.get('page'));
+    return Number.isFinite(p) && p > 0 ? p : 1;
+  });
+  const [inputValue, setInputValue] = useState(() => searchParams.get('q') ?? '');
+  const [search, setSearch] = useState(() => searchParams.get('q') ?? '');
+  const urlSortKey = searchParams.get('sort');
+  const [sort, setSortStorage] = useSortState('customers',
+    urlSortKey ? { key: urlSortKey, dir: searchParams.get('order') === 'desc' ? 'desc' : 'asc' } : undefined);
   const isComposingRef = useRef(false);
   const { data, isLoading, error } = useCustomersPaged(page, search, sort);
   const deleteMutation = useDeleteCustomer();
@@ -19,9 +26,22 @@ export default function CustomerList() {
   const customers = data?.data ?? [];
   const meta = data?.meta;
 
+  // R-0096: 検索語・ページ・ソートの状態をURLクエリへ反映し、リロード後も復元できるようにする
+  function syncUrl(nextPage: number, nextSearch: string, nextSort?: SortState) {
+    const next = new URLSearchParams();
+    if (nextPage > 1) next.set('page', String(nextPage));
+    if (nextSearch) next.set('q', nextSearch);
+    if (nextSort) {
+      next.set('sort', nextSort.key);
+      next.set('order', nextSort.dir);
+    }
+    setSearchParams(next, { replace: true });
+  }
+
   function commitSearch(q: string) {
     setSearch(q);
     setPage(1);
+    syncUrl(1, q, sort);
   }
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -52,8 +72,14 @@ export default function CustomerList() {
   }
 
   function handleSortChange(key: string, dir: SortDir) {
-    setSort(key, dir);
+    setSortStorage(key, dir);
     setPage(1);
+    syncUrl(1, search, { key, dir });
+  }
+
+  function handlePageChange(p: number) {
+    setPage(p);
+    syncUrl(p, search, sort);
   }
 
   if (isLoading) return <div>読み込み中...</div>;
@@ -130,7 +156,7 @@ export default function CustomerList() {
             lastPage={meta.last_page}
             total={meta.total}
             perPage={meta.per_page}
-            onChange={p => setPage(p)}
+            onChange={handlePageChange}
           />
         )}
       </div>

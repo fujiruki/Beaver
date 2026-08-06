@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useInvoices } from '../api/invoices';
 import { useCustomers } from '../api/customers';
 import DataTable, { useSortState } from '../components/DataTable';
-import type { DataTableColumn } from '../components/DataTable';
+import type { DataTableColumn, SortDir, SortState } from '../components/DataTable';
 import type { Invoice } from '../types/invoice';
 
 const MONTHS = ['1','2','3','4','5','6','7','8','9','10','11','12'];
@@ -21,10 +21,13 @@ function sortValue(inv: Invoice, key: string): number | string {
 
 export default function InvoiceList() {
   const navigate = useNavigate();
-  const [year, setYear] = useState(currentYear);
-  const [month, setMonth] = useState(String(new Date().getMonth() + 1));
-  const [customerId, setCustomerId] = useState('');
-  const [sort, setSort] = useSortState('invoices');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [year, setYear] = useState(() => searchParams.get('year') ?? currentYear);
+  const [month, setMonth] = useState(() => searchParams.get('month') ?? String(new Date().getMonth() + 1));
+  const [customerId, setCustomerId] = useState(() => searchParams.get('customer_id') ?? '');
+  const urlSortKey = searchParams.get('sort');
+  const [sort, setSortStorage] = useSortState('invoices',
+    urlSortKey ? { key: urlSortKey, dir: searchParams.get('order') === 'desc' ? 'desc' : 'asc' } : undefined);
 
   const { data: invoices = [], isLoading } = useInvoices({
     year: year || undefined,
@@ -32,6 +35,39 @@ export default function InvoiceList() {
     customer_id: customerId ? Number(customerId) : undefined,
   });
   const { data: customers = [] } = useCustomers();
+
+  // R-0096: フィルタ・ソートの状態をURLクエリへ反映し、リロード後も復元できるようにする
+  function syncUrl(next: { year: string; month: string; customerId: string; sort?: SortState }) {
+    const params = new URLSearchParams();
+    if (next.year) params.set('year', next.year);
+    if (next.month) params.set('month', next.month);
+    if (next.customerId) params.set('customer_id', next.customerId);
+    if (next.sort) {
+      params.set('sort', next.sort.key);
+      params.set('order', next.sort.dir);
+    }
+    setSearchParams(params, { replace: true });
+  }
+
+  function handleYearChange(value: string) {
+    setYear(value);
+    syncUrl({ year: value, month, customerId, sort });
+  }
+
+  function handleMonthChange(value: string) {
+    setMonth(value);
+    syncUrl({ year, month: value, customerId, sort });
+  }
+
+  function handleCustomerIdChange(value: string) {
+    setCustomerId(value);
+    syncUrl({ year, month, customerId: value, sort });
+  }
+
+  function handleSortChange(key: string, dir: SortDir) {
+    setSortStorage(key, dir);
+    syncUrl({ year, month, customerId, sort: { key, dir } });
+  }
 
   const totalInvoiced = invoices.reduce((s, i) => s + i.invoice_total, 0);
   const totalReceived = invoices.reduce((s, i) => s + i.payment_received, 0);
@@ -79,14 +115,14 @@ export default function InvoiceList() {
       {/* フィルタ */}
       <div style={{ display: 'flex', gap: 12, marginBottom: 16, background: '#fff',
         padding: '12px 16px', borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.08)', flexWrap: 'wrap' }}>
-        <select value={year} onChange={e => setYear(e.target.value)} style={filterStyle}>
+        <select value={year} onChange={e => handleYearChange(e.target.value)} style={filterStyle}>
           {YEARS.map(y => <option key={y} value={y}>{y}年</option>)}
         </select>
-        <select value={month} onChange={e => setMonth(e.target.value)} style={filterStyle}>
+        <select value={month} onChange={e => handleMonthChange(e.target.value)} style={filterStyle}>
           <option value="">月：すべて</option>
           {MONTHS.map(m => <option key={m} value={m}>{m}月</option>)}
         </select>
-        <select value={customerId} onChange={e => setCustomerId(e.target.value)} style={filterStyle}>
+        <select value={customerId} onChange={e => handleCustomerIdChange(e.target.value)} style={filterStyle}>
           <option value="">得意先：すべて</option>
           {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
@@ -111,7 +147,7 @@ export default function InvoiceList() {
             onRowClick={i => navigate(`/invoices/${i.id}`)}
             sortKey={sort?.key}
             sortDir={sort?.dir}
-            onSortChange={setSort}
+            onSortChange={handleSortChange}
             emptyMessage="請求書がありません"
           />
         </div>
