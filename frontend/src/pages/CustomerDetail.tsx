@@ -4,10 +4,12 @@ import { useForm } from 'react-hook-form';
 import { useCustomer, useCreateCustomer, useUpdateCustomer } from '../api/customers';
 import CustomerFormFields from '../components/CustomerFormFields';
 import HistoryDrawer from '../components/history/HistoryDrawer';
+import { useSmartBack } from '../hooks/useSmartBack';
 import type { CustomerInput } from '../types/customer';
 
 export default function CustomerDetail() {
   const navigate = useNavigate();
+  const goBack = useSmartBack('/customers');
   const { id } = useParams<{ id: string }>();
   const customerId = id ? Number(id) : 0;
   const isNew = !id;
@@ -54,7 +56,7 @@ export default function CustomerDetail() {
   return (
     <div style={{ maxWidth: 720 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
-        <button onClick={() => navigate('/customers')} style={backBtnStyle}>← 戻る</button>
+        <button onClick={goBack} style={backBtnStyle}>← 戻る</button>
         <h1 style={{ margin: 0, fontSize: 20, fontWeight: 'bold' }}>
           {isNew ? '得意先 新規登録' : '得意先 編集'}
         </h1>
@@ -93,7 +95,7 @@ export default function CustomerDetail() {
         />
 
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-          <button type="button" onClick={() => navigate('/customers')} style={cancelBtnStyle}>
+          <button type="button" onClick={goBack} style={cancelBtnStyle}>
             キャンセル
           </button>
           <button type="submit" disabled={isPending} style={submitBtnStyle}>

@@ -19,9 +19,11 @@ import CostBreakdownPanel from '../components/CostBreakdownPanel';
 import type { BreakdownDraft } from '../components/CostBreakdownPanel';
 import { TateguCostLinesPanel, TateguLaborLinesPanel } from '../components/TateguLineItemsPanel';
 import type { CostLineDraft, LaborLineDraft } from '../components/TateguLineItemsPanel';
+import { useSmartBack } from '../hooks/useSmartBack';
 
 export default function TateguItemDetail() {
   const navigate = useNavigate();
+  const goBack = useSmartBack('/tategu');
   const { id } = useParams<{ id: string }>();
   const itemId = id ? Number(id) : 0;
   const isNew  = !id;
@@ -137,7 +139,7 @@ export default function TateguItemDetail() {
   return (
     <div className="max-w-2xl">
       <div className="flex items-center gap-3 mb-6">
-        <button onClick={() => navigate('/tategu')} className="px-3 py-1 border border-slate-300 rounded text-sm text-slate-600 hover:bg-slate-50">
+        <button onClick={goBack} className="px-3 py-1 border border-slate-300 rounded text-sm text-slate-600 hover:bg-slate-50">
           ← 戻る
         </button>
         <h1 className="text-xl font-bold">{isNew ? '建具台帳 新規登録' : '建具台帳 編集'}</h1>
@@ -262,7 +264,7 @@ export default function TateguItemDetail() {
         </Field>
 
         <div className="flex justify-end gap-2">
-          <button type="button" onClick={() => navigate('/tategu')} className="px-4 py-2 bg-slate-100 text-slate-600 border border-slate-300 rounded-md text-sm hover:bg-slate-200">
+          <button type="button" onClick={goBack} className="px-4 py-2 bg-slate-100 text-slate-600 border border-slate-300 rounded-md text-sm hover:bg-slate-200">
             キャンセル
           </button>
           <button type="submit" disabled={isPending} className="px-5 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:opacity-50">

@@ -73,7 +73,7 @@ describe('ProjectDetail 工数目安 (R-0097)', () => {
     await screen.findByDisplayValue('既存案件');
 
     expect(await screen.findByText(/見積伝票から自動計算: 32時間（4\.0日）/)).toBeTruthy();
-    expect(screen.queryByLabelText('工数目安（時間）')).toBeNull();
+    expect(screen.queryByLabelText('工数目安（h）')).toBeNull();
   });
 
   it('見積伝票が無い場合は工数目安を小数第1位まで手動入力できる', async () => {
@@ -83,7 +83,7 @@ describe('ProjectDetail 工数目安 (R-0097)', () => {
     renderPage();
     await screen.findByDisplayValue('既存案件');
 
-    const input = await screen.findByLabelText('工数目安（時間）') as HTMLInputElement;
+    const input = await screen.findByLabelText('工数目安（h）') as HTMLInputElement;
     expect(input.value).toBe('4.5');
     expect(input.step).toBe('0.1');
 

@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useCustomer, useUpdateCarryForward } from '../api/customers';
+import { useSmartBack } from '../hooks/useSmartBack';
 
 export default function CarryForwardEdit() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const customerId = Number(id);
+  const goBack = useSmartBack(`/customers/${id}`);
 
   const { data: customer, isLoading } = useCustomer(customerId);
   const mutation = useUpdateCarryForward(customerId);
@@ -25,7 +27,7 @@ export default function CarryForwardEdit() {
   return (
     <div style={{ maxWidth: 560 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
-        <button onClick={() => navigate(`/customers/${id}`)} style={backBtnStyle}>← 戻る</button>
+        <button onClick={goBack} style={backBtnStyle}>← 戻る</button>
         <h1 style={{ margin: 0, fontSize: 20, fontWeight: 'bold' }}>繰越残高 修正</h1>
       </div>
 
@@ -71,7 +73,7 @@ export default function CarryForwardEdit() {
           )}
 
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-            <button type="button" onClick={() => navigate(`/customers/${id}`)} style={cancelBtnStyle}>
+            <button type="button" onClick={goBack} style={cancelBtnStyle}>
               キャンセル
             </button>
             <button

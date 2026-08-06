@@ -9,6 +9,7 @@ import type { ComboOption } from '../components/ComboSelect';
 import NewCustomerModal from '../components/NewCustomerModal';
 import HardDeleteProjectModal from '../components/HardDeleteProjectModal';
 import { useAppSettings } from '../contexts/AppSettingsContext';
+import { useSmartBack } from '../hooks/useSmartBack';
 import type { ProjectInput } from '../types/project';
 import type { Customer } from '../types/customer';
 
@@ -33,6 +34,7 @@ const VOUCHER_STATUS_LABEL: Record<string, string> = {
 
 export default function ProjectDetail() {
   const navigate = useNavigate();
+  const goBack = useSmartBack('/projects');
   const { id } = useParams<{ id: string }>();
   const projectId = id ? Number(id) : 0;
   const isNew = !id;
@@ -150,7 +152,7 @@ export default function ProjectDetail() {
   return (
     <div className="max-w-2xl">
       <div className="flex items-center gap-3 mb-6">
-        <button onClick={() => navigate('/projects')} className="px-3 py-1 border border-slate-300 rounded text-sm text-slate-600 hover:bg-slate-50">
+        <button onClick={goBack} className="px-3 py-1 border border-slate-300 rounded text-sm text-slate-600 hover:bg-slate-50">
           ← 戻る
         </button>
         <h1 className="text-xl font-bold flex-1">{isNew ? '案件 新規登録' : '案件 編集'}</h1>
@@ -261,19 +263,35 @@ export default function ProjectDetail() {
               </div>
             </Field>
             <Field label="受注日">
-              <input {...register('order_date')} type="date" className={inputCls} />
+              <input {...register('order_date')} type="date" className={dateInputCls} />
             </Field>
 
             <Field label="開始日">
-              <input {...register('start_date')} type="date" className={inputCls} />
+              <input {...register('start_date')} type="date" className={dateInputCls} />
             </Field>
             <Field label="納品日">
-              <input {...register('end_date')} type="date" className={inputCls} />
+              <input {...register('end_date')} type="date" className={dateInputCls} />
             </Field>
             <Field label="納期" className="col-span-2">
-              <input {...register('delivery_date')} type="date" className={inputCls} />
+              <input {...register('delivery_date')} type="date" className={dateInputCls} />
             </Field>
           </div>
+
+          <Field label="工数目安（h）">
+            {voucherSumHours > 0 ? (
+              <div className="inline-block px-2.5 py-1.5 border border-slate-200 rounded-md text-sm bg-slate-50 text-slate-600">
+                見積伝票から自動計算: {voucherSumHours}時間（{voucherSumDays}日）
+              </div>
+            ) : (
+              <input
+                type="number"
+                step="0.1"
+                aria-label="工数目安（h）"
+                {...register('manual_estimated_hours', { valueAsNumber: true })}
+                className={hoursInputCls}
+              />
+            )}
+          </Field>
 
           <Field label="施主">
             <input {...register('owner_name')} className={`${inputCls} w-full`} />
@@ -293,22 +311,6 @@ export default function ProjectDetail() {
 
           <Field label="備考">
             <textarea {...register('memo')} rows={3} className={`${inputCls} w-full resize-none`} />
-          </Field>
-
-          <Field label="工数目安">
-            {voucherSumHours > 0 ? (
-              <div className="px-2.5 py-1.5 border border-slate-200 rounded-md text-sm bg-slate-50 text-slate-600">
-                見積伝票から自動計算: {voucherSumHours}時間（{voucherSumDays}日）
-              </div>
-            ) : (
-              <input
-                type="number"
-                step="0.1"
-                aria-label="工数目安（時間）"
-                {...register('manual_estimated_hours', { valueAsNumber: true })}
-                className={inputCls}
-              />
-            )}
           </Field>
         </div>
 
@@ -361,7 +363,7 @@ export default function ProjectDetail() {
 
         {/* 保存ボタン */}
         <div className="flex justify-end gap-2">
-          <button type="button" onClick={() => navigate('/projects')} className="px-4 py-2 bg-slate-100 text-slate-600 border border-slate-300 rounded-md text-sm hover:bg-slate-200">
+          <button type="button" onClick={goBack} className="px-4 py-2 bg-slate-100 text-slate-600 border border-slate-300 rounded-md text-sm hover:bg-slate-200">
             キャンセル
           </button>
           <button type="submit" disabled={isPending} className="px-5 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:opacity-50">
@@ -509,3 +511,5 @@ function Field({ label, error, children, className = '' }: {
 }
 
 const inputCls = 'w-full px-2.5 py-1.5 border border-slate-300 rounded-md text-sm focus:outline-none focus:border-blue-400';
+const dateInputCls = 'w-40 px-2.5 py-1.5 border border-slate-300 rounded-md text-sm focus:outline-none focus:border-blue-400';
+const hoursInputCls = 'w-20 px-2.5 py-1.5 border border-slate-300 rounded-md text-sm focus:outline-none focus:border-blue-400';

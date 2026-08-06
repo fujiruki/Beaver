@@ -12,6 +12,7 @@ import VoucherHeader from '../components/voucher/VoucherHeader';
 import LineItemRow from '../components/voucher/LineItemRow';
 import ProfitRateBar from '../components/voucher/ProfitRateBar';
 import TotalSummary from '../components/voucher/TotalSummary';
+import { useSmartBack } from '../hooks/useSmartBack';
 import type { VoucherType, VoucherStatus, TaxInputType, LineCategoryValue } from '../types/voucher';
 
 export type VoucherFormValues = {
@@ -124,6 +125,10 @@ export default function VoucherEdit() {
   const { data: customers = [] } = useCustomers();
   const { data: projects = [] } = useProjects();
   const { data: categories = [] } = useAggregationCategories();
+
+  const projectFallbackId = voucher?.project_id ?? initProjectId;
+  const closeGoBack = useSmartBack('/vouchers');
+  const backToProjectGoBack = useSmartBack(projectFallbackId ? `/projects/${projectFallbackId}` : '/vouchers');
 
   const createMutation = useCreateVoucher();
   const updateMutation = useUpdateVoucher(voucherId);
@@ -363,7 +368,7 @@ export default function VoucherEdit() {
               onClick={() => window.print()}>
               プレビュー
             </button>
-            <button type="button" onClick={() => navigate(-1)} style={subBtnStyle}>
+            <button type="button" onClick={closeGoBack} style={subBtnStyle}>
               閉じる
             </button>
           </div>
@@ -499,7 +504,7 @@ export default function VoucherEdit() {
             <TotalSummary lines={linesForCalc} taxInputType={watchedTaxInputType} taxRate={0.10} costLines={costLinesForCalc} />
             <div style={{ display: 'flex', gap: 8 }}>
               {isReadOnly ? (
-                <button type="button" onClick={() => navigate(-1)} style={cancelBtnStyle}>
+                <button type="button" onClick={backToProjectGoBack} style={cancelBtnStyle}>
                   ← 案件に戻る
                 </button>
               ) : (

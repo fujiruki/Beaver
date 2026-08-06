@@ -8,10 +8,12 @@ import { useVouchers } from '../api/vouchers';
 import { useRestoreHistory } from '../api/history';
 import HistoryDrawer from '../components/history/HistoryDrawer';
 import UndoToast from '../components/history/UndoToast';
+import { useSmartBack } from '../hooks/useSmartBack';
 import type { Payment, InvoiceInput, PaymentInput } from '../types/invoice';
 
 export default function InvoiceDetail() {
   const navigate = useNavigate();
+  const goBack = useSmartBack('/invoices');
   const { id } = useParams<{ id: string }>();
   const invoiceId = id ? Number(id) : 0;
   const isNew = !id;
@@ -106,7 +108,7 @@ export default function InvoiceDetail() {
   return (
     <div style={{ maxWidth: 860 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-        <button onClick={() => navigate('/invoices')} style={backBtnStyle}>← 戻る</button>
+        <button onClick={goBack} style={backBtnStyle}>← 戻る</button>
         <h1 style={{ margin: 0, fontSize: 20, fontWeight: 'bold' }}>
           {isNew ? '請求書 新規作成' : `請求書 ${invoice?.invoice_no ?? ''}`}
         </h1>
@@ -181,7 +183,7 @@ export default function InvoiceDetail() {
           )}
 
           <div style={{ marginTop: 20, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-            <button type="button" onClick={() => navigate('/invoices')} style={cancelBtnStyle}>
+            <button type="button" onClick={goBack} style={cancelBtnStyle}>
               キャンセル
             </button>
             <button type="submit" disabled={createMutation.isPending} style={submitBtnStyle}>
