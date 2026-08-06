@@ -107,7 +107,7 @@ export default function ProjectDetail() {
     } else {
       await updateMutation.mutateAsync(data);
     }
-    navigate('/projects');
+    goBack();
   }
 
   async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -143,7 +143,7 @@ export default function ProjectDetail() {
     setHardDeleteError(null);
     try {
       await hardDeleteMutation.mutateAsync(projectId);
-      navigate('/projects');
+      goBack();
     } catch (err) {
       setHardDeleteError(extractServerErrorMessage(err));
     }
@@ -283,13 +283,34 @@ export default function ProjectDetail() {
                 見積伝票から自動計算: {voucherSumHours}時間（{voucherSumDays}日）
               </div>
             ) : (
-              <input
-                type="number"
-                step="0.1"
-                aria-label="工数目安（h）"
-                {...register('manual_estimated_hours', { valueAsNumber: true })}
-                className={hoursInputCls}
-              />
+              <div className="flex items-center gap-2 flex-wrap">
+                <input
+                  type="number"
+                  step="0.1"
+                  aria-label="工数目安（h）"
+                  {...register('manual_estimated_hours', { valueAsNumber: true })}
+                  className={hoursInputCls}
+                />
+                <div className="flex items-center gap-1 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => setValue('manual_estimated_hours', 4, { shouldDirty: true })}
+                    className={quickHoursBtnCls}
+                  >
+                    4h
+                  </button>
+                  {QUICK_HOURS_DAYS.map(days => (
+                    <button
+                      key={days}
+                      type="button"
+                      onClick={() => setValue('manual_estimated_hours', days * settings.hoursPerDay, { shouldDirty: true })}
+                      className={quickHoursBtnCls}
+                    >
+                      {days}日
+                    </button>
+                  ))}
+                </div>
+              </div>
             )}
           </Field>
 
@@ -513,3 +534,5 @@ function Field({ label, error, children, className = '' }: {
 const inputCls = 'w-full px-2.5 py-1.5 border border-slate-300 rounded-md text-sm focus:outline-none focus:border-blue-400';
 const dateInputCls = 'w-40 px-2.5 py-1.5 border border-slate-300 rounded-md text-sm focus:outline-none focus:border-blue-400';
 const hoursInputCls = 'w-20 px-2.5 py-1.5 border border-slate-300 rounded-md text-sm focus:outline-none focus:border-blue-400';
+const quickHoursBtnCls = 'px-2 py-1 text-xs bg-slate-100 border border-slate-300 rounded-full text-slate-600 hover:bg-slate-200';
+const QUICK_HOURS_DAYS = [1, 2, 3, 5, 8, 14];

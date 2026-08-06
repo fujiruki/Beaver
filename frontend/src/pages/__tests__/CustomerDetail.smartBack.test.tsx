@@ -66,4 +66,13 @@ describe('CustomerDetail 戻る (R-0096 Phase2)', () => {
 
     expect(await screen.findByText('一覧画面: ?sort=name&order=desc')).toBeTruthy();
   });
+
+  it('一覧のソート状態を保持したまま保存成功後に一覧に戻る（R-0096 Phase2b）', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: '保存' }));
+
+    expect(await screen.findByText('一覧画面: ?sort=name&order=desc')).toBeTruthy();
+  });
 });

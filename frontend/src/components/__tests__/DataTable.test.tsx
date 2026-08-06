@@ -666,7 +666,41 @@ describe('DataTable 列幅リサイズ（対象列のみ変化）', () => {
     const wrapper = table.parentElement as HTMLElement;
     expect(wrapper.style.overflowX).toBe('auto');
     expect(table.style.width).toBe('max-content');
-    expect(table.style.minWidth).toBe('100%');
+    // R-0103: minWidth:100%があると他列が比例配分で伸びて総幅が一定になってしまうため指定しない
+    expect(table.style.minWidth).toBe('');
+  });
+
+  it('列をドラッグで縮めると、他列の幅は変化せずテーブル総幅（列幅合計）が縮む', () => {
+    const { container } = render(
+      <DataTable
+        tableId="test-width-shrink-total"
+        columns={widthColumns()}
+        rows={ROWS}
+        rowKey={r => r.id}
+      />,
+    );
+    const sumColWidths = () =>
+      Array.from(container.querySelectorAll('colgroup col')).reduce(
+        (sum, col) => sum + parseFloat((col as HTMLElement).style.width || '0'),
+        0,
+      );
+    const totalBefore = sumColWidths();
+
+    const handles = container.querySelectorAll('.bv-datatable-resize-handle');
+    const firstHandle = handles[0] as HTMLElement;
+    fireEvent.pointerDown(firstHandle, { clientX: 200, pointerId: 11 });
+    fireEvent.pointerMove(window, { clientX: 150, pointerId: 11 });
+    fireEvent.pointerUp(window, { clientX: 150, pointerId: 11 });
+
+    const cols = container.querySelectorAll('colgroup col');
+    expect((cols[0] as HTMLElement).style.width).toBe('60px');
+    expect((cols[1] as HTMLElement).style.width).toBe('120px');
+    expect((cols[2] as HTMLElement).style.width).toBe('80px');
+    expect(sumColWidths()).toBe(totalBefore - 40);
+
+    const table = container.querySelector('table') as HTMLElement;
+    // 総幅が列幅合計に追従できるよう、テーブルにminWidth:100%を指定しない
+    expect(table.style.minWidth).toBe('');
   });
 
   it('リサイズハンドルの縦線色はヘッダー文字色と一致する', () => {

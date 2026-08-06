@@ -1,10 +1,9 @@
 import { useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { useCustomer, useUpdateCarryForward } from '../api/customers';
 import { useSmartBack } from '../hooks/useSmartBack';
 
 export default function CarryForwardEdit() {
-  const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const customerId = Number(id);
   const goBack = useSmartBack(`/customers/${id}`);
@@ -21,7 +20,7 @@ export default function CarryForwardEdit() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     await mutation.mutateAsync(Number(balance));
-    navigate(`/customers/${id}`);
+    goBack();
   }
 
   return (

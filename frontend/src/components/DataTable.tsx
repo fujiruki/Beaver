@@ -309,7 +309,7 @@ export default function DataTable<T>({
 
   return (
     <div style={{ overflowX: 'auto', width: '100%' }}>
-      <table style={{ width: 'max-content', minWidth: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+      <table style={{ width: 'max-content', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
       <colgroup>
         {orderedColumns.map(col => {
           const w = widths[col.key] ?? col.width;

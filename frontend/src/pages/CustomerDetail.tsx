@@ -45,7 +45,7 @@ export default function CustomerDetail() {
     } else {
       await updateMutation.mutateAsync(data);
     }
-    navigate('/customers');
+    goBack();
   }
 
   if (!isNew && isLoading) return <div>読み込み中...</div>;

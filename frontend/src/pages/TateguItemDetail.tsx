@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import {
   useTateguItem,
@@ -22,7 +22,6 @@ import type { CostLineDraft, LaborLineDraft } from '../components/TateguLineItem
 import { useSmartBack } from '../hooks/useSmartBack';
 
 export default function TateguItemDetail() {
-  const navigate = useNavigate();
   const goBack = useSmartBack('/tategu');
   const { id } = useParams<{ id: string }>();
   const itemId = id ? Number(id) : 0;
@@ -128,7 +127,7 @@ export default function TateguItemDetail() {
       await updateMutation.mutateAsync(prepareUpdatePayload(data, hasCostLines, hasLaborLines));
       await updateBreakdown.mutateAsync(breakdownLines);
     }
-    navigate('/tategu');
+    goBack();
   }
 
   if (!isNew && isLoading) return <div className="p-6">読み込み中...</div>;

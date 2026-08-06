@@ -245,7 +245,7 @@ export default function VoucherEdit() {
       navigate(`/vouchers/${created.id}`);
     } else {
       await updateMutation.mutateAsync(header);
-      navigate('/vouchers');
+      closeGoBack();
     }
   }
 
@@ -509,7 +509,7 @@ export default function VoucherEdit() {
                 </button>
               ) : (
                 <>
-                  <button type="button" onClick={() => navigate('/vouchers')} style={cancelBtnStyle}>
+                  <button type="button" onClick={closeGoBack} style={cancelBtnStyle}>
                     キャンセル
                   </button>
                   <button type="submit" disabled={isPending} style={submitBtnStyle}>

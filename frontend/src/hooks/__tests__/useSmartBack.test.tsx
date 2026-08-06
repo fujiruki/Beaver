@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Routes, Route, Link } from 'react-router-dom';
+import { MemoryRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { useSmartBack } from '../useSmartBack';
 
 function PageA() {
@@ -52,5 +52,33 @@ describe('useSmartBack', () => {
     await user.click(screen.getByText('← 戻る'));
 
     expect(await screen.findByText('フォールバック画面')).toBeTruthy();
+  });
+
+  it('履歴が無い場合、fallbackStateを渡していればフォールバック先にstateが渡る', async () => {
+    const user = userEvent.setup();
+
+    function PageBWithState() {
+      const goBack = useSmartBack('/fallback', { toast: { message: '削除しました' } });
+      return <button onClick={goBack}>← 戻る</button>;
+    }
+
+    function FallbackWithState() {
+      const location = useLocation();
+      const state = location.state as { toast?: { message: string } } | null;
+      return <div>フォールバック画面: {state?.toast?.message ?? 'stateなし'}</div>;
+    }
+
+    render(
+      <MemoryRouter initialEntries={['/b']}>
+        <Routes>
+          <Route path="/b" element={<PageBWithState />} />
+          <Route path="/fallback" element={<FallbackWithState />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByText('← 戻る'));
+
+    expect(await screen.findByText('フォールバック画面: 削除しました')).toBeTruthy();
   });
 });

@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useInvoice, useCreateInvoice, useDeleteInvoice } from '../api/invoices';
 import { useCreatePayment, useDeletePayment } from '../api/payments';
@@ -12,7 +12,6 @@ import { useSmartBack } from '../hooks/useSmartBack';
 import type { Payment, InvoiceInput, PaymentInput } from '../types/invoice';
 
 export default function InvoiceDetail() {
-  const navigate = useNavigate();
   const goBack = useSmartBack('/invoices');
   const { id } = useParams<{ id: string }>();
   const invoiceId = id ? Number(id) : 0;
@@ -31,6 +30,15 @@ export default function InvoiceDetail() {
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [showPaymentHistory, setShowPaymentHistory] = useState(false);
   const [paymentToast, setPaymentToast] = useState<{ message: string; historyId: number | null } | null>(null);
+  const [deleteToast, setDeleteToast] = useState<{ message: string; historyId: number | null } | null>(null);
+  const deleteGoBack = useSmartBack('/invoices', deleteToast ? { toast: deleteToast } : undefined);
+
+  useEffect(() => {
+    if (deleteToast) {
+      deleteGoBack();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deleteToast]);
 
   const { register, handleSubmit, watch, formState: { errors } } = useForm<InvoiceInput>({
     defaultValues: {
@@ -61,7 +69,7 @@ export default function InvoiceDetail() {
 
   async function onSubmit(data: InvoiceInput) {
     await createMutation.mutateAsync(data);
-    navigate('/invoices');
+    goBack();
   }
 
   async function onPaymentSubmit(data: PaymentInput) {
@@ -78,9 +86,7 @@ export default function InvoiceDetail() {
     if (!window.confirm('この請求書を削除しますか？（入金記録がある場合は削除できません）')) return;
     try {
       const result = await deleteMutation.mutateAsync(invoiceId);
-      navigate('/invoices', {
-        state: { toast: { message: `請求書 ${invoice?.invoice_no ?? ''} を削除しました`, historyId: result.history_id } },
-      });
+      setDeleteToast({ message: `請求書 ${invoice?.invoice_no ?? ''} を削除しました`, historyId: result.history_id });
     } catch (e) {
       alert(String(e));
     }

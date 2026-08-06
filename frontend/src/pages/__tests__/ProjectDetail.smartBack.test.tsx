@@ -78,4 +78,23 @@ describe('ProjectDetail 戻る (R-0096 Phase2)', () => {
 
     expect(await screen.findByText('一覧画面: ?sort=name&order=desc')).toBeTruthy();
   });
+
+  it('一覧のソート状態を保持したまま保存成功後に一覧に戻る（R-0096 Phase2b）', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: '保存' }));
+
+    expect(await screen.findByText('一覧画面: ?sort=name&order=desc')).toBeTruthy();
+  });
+
+  it('一覧のソート状態を保持したまま完全削除成功後に一覧に戻る（R-0096 Phase2b）', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: '完全削除' }));
+    await user.click(await screen.findByRole('button', { name: '完全に削除する' }));
+
+    expect(await screen.findByText('一覧画面: ?sort=name&order=desc')).toBeTruthy();
+  });
 });
