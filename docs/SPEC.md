@@ -32,6 +32,8 @@
 | [R-0091_R-0092_project_list_search_sort.md](spec/R-0091_R-0092_project_list_search_sort.md) | 案件一覧の検索拡張・状態保持・複合ソート | 2026-08-05 |
 | [R-0094_feedback_modal_autofocus.md](spec/R-0094_feedback_modal_autofocus.md) | フィードバックモーダルのオートフォーカス | 2026-08-05 |
 | [R-0095_R-0097_project_delete_and_hours.md](spec/R-0095_R-0097_project_delete_and_hours.md) | 案件の完全削除・工数目安 | 2026-08-05 |
+| [R-0098_undo_redo.md](spec/R-0098_undo_redo.md) | データ操作のUndo/Redo（得意先/入金/請求限定） | 2026-08-06 |
+| [R-0100_invoice_delete_carry_forward_bug.md](spec/R-0100_invoice_delete_carry_forward_bug.md) | 請求書削除の繰越残高バグ修正 | 2026-08-06 |
 
 ---
 
