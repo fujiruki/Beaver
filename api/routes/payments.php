@@ -7,6 +7,8 @@
  * DELETE /payments/{id}      削除
  */
 
+require_once __DIR__ . '/history_helpers.php';
+
 $segments   = explode('/', trim($path, '/'));
 $resourceId = isset($segments[1]) && is_numeric($segments[1]) ? (int)$segments[1] : null;
 
@@ -92,11 +94,14 @@ switch ($method) {
         $stmt = $pdo->prepare('SELECT * FROM payments WHERE id = ?');
         $stmt->execute([$resourceId]);
         $pay = $stmt->fetch();
+        // R-0098: max(0, ...)クランプが発動した削除は復元しても厳密な逆変換にならないため記録する
+        $clamped = false;
         if ($pay && $pay['invoice_id']) {
             $invStmt = $pdo->prepare('SELECT * FROM invoices WHERE id = ?');
             $invStmt->execute([$pay['invoice_id']]);
             $inv = $invStmt->fetch();
             if ($inv) {
+                $clamped = ((float)$inv['payment_received'] - (float)$pay['amount']) < 0;
                 $newReceived = max(0, (float)$inv['payment_received'] - (float)$pay['amount']);
                 $newCarryFwd = (float)$inv['invoice_total'] - $newReceived;
                 $pdo->prepare('UPDATE invoices SET payment_received = ?, next_carry_forward = ? WHERE id = ?')
@@ -105,8 +110,12 @@ switch ($method) {
                     ->execute([$newCarryFwd, $inv['customer_id']]);
             }
         }
+        $historyId = null;
+        if ($pay) {
+            $historyId = recordHistory($pdo, 'payments', $resourceId, 'delete', $pay, [], null, $clamped);
+        }
         $pdo->prepare('DELETE FROM payments WHERE id = ?')->execute([$resourceId]);
-        echo json_encode(['deleted' => true]);
+        echo json_encode(['deleted' => true, 'history_id' => $historyId]);
         break;
 
     default:

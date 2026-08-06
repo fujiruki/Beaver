@@ -28,11 +28,17 @@ export function useCreatePayment() {
   });
 }
 
+/** 入金削除時のレスポンス。history_idはUndoトーストからの復元に使う（R-0098） */
+export interface DeleteResult {
+  deleted: boolean;
+  history_id: number | null;
+}
+
 /** 入金削除（取消） */
 export function useDeletePayment() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: number) => api.delete<void>(`/payments/${id}`),
+    mutationFn: (id: number) => api.delete<DeleteResult>(`/payments/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [KEY] });
       queryClient.invalidateQueries({ queryKey: ['invoices'] });

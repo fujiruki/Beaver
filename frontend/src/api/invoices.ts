@@ -44,11 +44,17 @@ export function useCreateInvoice() {
   });
 }
 
+/** 請求書削除時のレスポンス。history_idはUndoトーストからの復元に使う（R-0098） */
+export interface DeleteResult {
+  deleted: boolean;
+  history_id: number | null;
+}
+
 /** 請求書削除 */
 export function useDeleteInvoice() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: number) => api.delete<void>(`/invoices/${id}`),
+    mutationFn: (id: number) => api.delete<DeleteResult>(`/invoices/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [KEY] });
       queryClient.invalidateQueries({ queryKey: ['vouchers'] });

@@ -1,8 +1,9 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useCustomer, useCreateCustomer, useUpdateCustomer } from '../api/customers';
 import CustomerFormFields from '../components/CustomerFormFields';
+import HistoryDrawer from '../components/history/HistoryDrawer';
 import type { CustomerInput } from '../types/customer';
 
 export default function CustomerDetail() {
@@ -14,6 +15,7 @@ export default function CustomerDetail() {
   const { data: customer, isLoading } = useCustomer(customerId);
   const createMutation = useCreateCustomer();
   const updateMutation = useUpdateCustomer(customerId);
+  const [showHistory, setShowHistory] = useState(false);
 
   const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<CustomerInput>({
     defaultValues: {
@@ -56,7 +58,22 @@ export default function CustomerDetail() {
         <h1 style={{ margin: 0, fontSize: 20, fontWeight: 'bold' }}>
           {isNew ? '得意先 新規登録' : '得意先 編集'}
         </h1>
+        {!isNew && (
+          <button onClick={() => setShowHistory(true)} style={{ ...backBtnStyle, marginLeft: 'auto' }}>
+            変更履歴
+          </button>
+        )}
       </div>
+
+      {!isNew && (
+        <HistoryDrawer
+          open={showHistory}
+          onClose={() => setShowHistory(false)}
+          entity="customers"
+          entityId={customerId}
+          title="得意先の変更履歴"
+        />
+      )}
 
       {mutError && (
         <div style={{ marginBottom: 16, padding: '10px 14px', background: '#fee2e2', color: '#dc2626', borderRadius: 6, fontSize: 14 }}>

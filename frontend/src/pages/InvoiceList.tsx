@@ -1,8 +1,11 @@
 import { useMemo, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useInvoices } from '../api/invoices';
 import { useCustomers } from '../api/customers';
+import { useRestoreHistory } from '../api/history';
 import DataTable, { useSortState } from '../components/DataTable';
+import HistoryDrawer from '../components/history/HistoryDrawer';
+import UndoToast from '../components/history/UndoToast';
 import type { DataTableColumn, SortDir, SortState } from '../components/DataTable';
 import type { Invoice } from '../types/invoice';
 
@@ -19,9 +22,25 @@ function sortValue(inv: Invoice, key: string): number | string {
   return String(inv[key as keyof Invoice] ?? '');
 }
 
+interface LocationToastState {
+  toast?: { message: string; historyId: number | null };
+}
+
 export default function InvoiceList() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
+  const [showDeleteHistory, setShowDeleteHistory] = useState(false);
+  const [deleteToast, setDeleteToast] = useState(
+    () => (location.state as LocationToastState | null)?.toast ?? null,
+  );
+  const restoreMutation = useRestoreHistory();
+
+  async function handleUndoDelete() {
+    if (!deleteToast?.historyId) return;
+    await restoreMutation.mutateAsync(deleteToast.historyId);
+    setDeleteToast(null);
+  }
   const [year, setYear] = useState(() => searchParams.get('year') ?? currentYear);
   const [month, setMonth] = useState(() => searchParams.get('month') ?? String(new Date().getMonth() + 1));
   const [customerId, setCustomerId] = useState(() => searchParams.get('customer_id') ?? '');
@@ -109,7 +128,10 @@ export default function InvoiceList() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <h1 style={{ margin: 0, fontSize: 20, fontWeight: 'bold' }}>請求一覧</h1>
-        <button onClick={() => navigate('/invoices/new')} style={newBtnStyle}>+ 新規請求書</button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={() => setShowDeleteHistory(true)} style={historyBtnStyle}>削除履歴</button>
+          <button onClick={() => navigate('/invoices/new')} style={newBtnStyle}>+ 新規請求書</button>
+        </div>
       </div>
 
       {/* フィルタ */}
@@ -152,6 +174,22 @@ export default function InvoiceList() {
           />
         </div>
       )}
+
+      <HistoryDrawer
+        open={showDeleteHistory}
+        onClose={() => setShowDeleteHistory(false)}
+        entity="invoices"
+        title="請求書の削除履歴"
+      />
+
+      {deleteToast && (
+        <UndoToast
+          message={deleteToast.message}
+          pending={restoreMutation.isPending}
+          onUndo={handleUndoDelete}
+          onDismiss={() => setDeleteToast(null)}
+        />
+      )}
     </div>
   );
 }
@@ -172,4 +210,8 @@ const newBtnStyle: React.CSSProperties = {
 };
 const filterStyle: React.CSSProperties = {
   padding: '6px 10px', border: '1px solid #cbd5e1', borderRadius: 6, fontSize: 13,
+};
+const historyBtnStyle: React.CSSProperties = {
+  padding: '8px 14px', background: '#fff', color: '#475569', border: '1px solid #cbd5e1',
+  borderRadius: 6, cursor: 'pointer', fontSize: 14,
 };

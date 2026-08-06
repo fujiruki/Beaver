@@ -44,3 +44,4 @@
 023_project_statuses       2026-08-05  prod (backup: api/backups/database_20260805_115140_pre_r0085_project_statuses.sqlite)
 024_projects_manual_estimated_hours  2026-08-06  dev
 024_projects_manual_estimated_hours  2026-08-06  prod (backup: api/backups/database_20260806_*_pre_r0095_r0097.sqlite)
+025_record_history          2026-08-06  dev

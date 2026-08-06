@@ -5,7 +5,10 @@ import { useInvoice, useCreateInvoice, useDeleteInvoice } from '../api/invoices'
 import { useCreatePayment, useDeletePayment } from '../api/payments';
 import { useCustomers } from '../api/customers';
 import { useVouchers } from '../api/vouchers';
-import type { InvoiceInput, PaymentInput } from '../types/invoice';
+import { useRestoreHistory } from '../api/history';
+import HistoryDrawer from '../components/history/HistoryDrawer';
+import UndoToast from '../components/history/UndoToast';
+import type { Payment, InvoiceInput, PaymentInput } from '../types/invoice';
 
 export default function InvoiceDetail() {
   const navigate = useNavigate();
@@ -21,8 +24,11 @@ export default function InvoiceDetail() {
   const deleteMutation = useDeleteInvoice();
   const createPaymentMutation = useCreatePayment();
   const deletePaymentMutation = useDeletePayment();
+  const restoreMutation = useRestoreHistory();
 
   const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const [showPaymentHistory, setShowPaymentHistory] = useState(false);
+  const [paymentToast, setPaymentToast] = useState<{ message: string; historyId: number | null } | null>(null);
 
   const { register, handleSubmit, watch, formState: { errors } } = useForm<InvoiceInput>({
     defaultValues: {
@@ -69,11 +75,25 @@ export default function InvoiceDetail() {
   async function handleDelete() {
     if (!window.confirm('この請求書を削除しますか？（入金記録がある場合は削除できません）')) return;
     try {
-      await deleteMutation.mutateAsync(invoiceId);
-      navigate('/invoices');
+      const result = await deleteMutation.mutateAsync(invoiceId);
+      navigate('/invoices', {
+        state: { toast: { message: `請求書 ${invoice?.invoice_no ?? ''} を削除しました`, historyId: result.history_id } },
+      });
     } catch (e) {
       alert(String(e));
     }
+  }
+
+  async function handleDeletePayment(p: Payment) {
+    if (!window.confirm('この入金記録を取り消しますか？')) return;
+    const result = await deletePaymentMutation.mutateAsync(p.id);
+    setPaymentToast({ message: `入金 ${p.payment_no} を削除しました`, historyId: result.history_id });
+  }
+
+  async function handleUndoPaymentDelete() {
+    if (!paymentToast?.historyId) return;
+    await restoreMutation.mutateAsync(paymentToast.historyId);
+    setPaymentToast(null);
   }
 
   const watchedCustomerId = watch('customer_id');
@@ -216,9 +236,14 @@ export default function InvoiceDetail() {
           <div style={{ ...cardStyle, marginTop: 16 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
               <h2 style={{ ...sectionTitle, margin: 0 }}>入金履歴</h2>
-              <button onClick={() => setShowPaymentForm(v => !v)} style={addPayBtnStyle}>
-                {showPaymentForm ? 'キャンセル' : '+ 入金登録'}
-              </button>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={() => setShowPaymentHistory(true)} style={backBtnStyle}>
+                  削除履歴
+                </button>
+                <button onClick={() => setShowPaymentForm(v => !v)} style={addPayBtnStyle}>
+                  {showPaymentForm ? 'キャンセル' : '+ 入金登録'}
+                </button>
+              </div>
             </div>
 
             {showPaymentForm && (
@@ -270,11 +295,8 @@ export default function InvoiceDetail() {
                       <Td right color="#10b981">¥{p.amount.toLocaleString()}</Td>
                       <Td>{p.memo ?? ''}</Td>
                       <Td>
-                        <button onClick={() => {
-                          if (window.confirm('この入金記録を取り消しますか？')) {
-                            deletePaymentMutation.mutate(p.id);
-                          }
-                        }} style={{ ...backBtnStyle, fontSize: 12, color: '#ef4444', borderColor: '#fca5a5' }}>
+                        <button onClick={() => handleDeletePayment(p)}
+                          style={{ ...backBtnStyle, fontSize: 12, color: '#ef4444', borderColor: '#fca5a5' }}>
                           取消
                         </button>
                       </Td>
@@ -285,6 +307,22 @@ export default function InvoiceDetail() {
             )}
           </div>
         </>
+      )}
+
+      <HistoryDrawer
+        open={showPaymentHistory}
+        onClose={() => setShowPaymentHistory(false)}
+        entity="payments"
+        title="入金の削除履歴"
+      />
+
+      {paymentToast && (
+        <UndoToast
+          message={paymentToast.message}
+          pending={restoreMutation.isPending}
+          onUndo={handleUndoPaymentDelete}
+          onDismiss={() => setPaymentToast(null)}
+        />
       )}
     </div>
   );

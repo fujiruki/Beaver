@@ -56,6 +56,7 @@ try {
         'vouchers'      => __DIR__ . '/routes/vouchers.php',
         'invoices'      => __DIR__ . '/routes/invoices.php',
         'payments'      => __DIR__ . '/routes/payments.php',
+        'history'       => __DIR__ . '/routes/history.php',
         'settings'          => __DIR__ . '/routes/settings.php',
         'sales-categories'  => __DIR__ . '/routes/sales_categories.php',
         'project-statuses'  => __DIR__ . '/routes/project_statuses.php',

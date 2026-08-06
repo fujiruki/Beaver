@@ -10,6 +10,7 @@
 
 require_once __DIR__ . '/list_helpers.php';
 require_once __DIR__ . '/../search_helpers.php';
+require_once __DIR__ . '/history_helpers.php';
 
 // IDとサブリソースを取り出す
 $segments = explode('/', trim($path, '/'));
@@ -256,10 +257,18 @@ switch ($method) {
         if (empty($sets)) { http_response_code(400); echo json_encode(['error' => 'No fields']); exit; }
         $sets[] = 'updated_at = CURRENT_TIMESTAMP';
         $params[':id'] = $resourceId;
+        // R-0098: 更新前の状態をUndo用に記録する（差分がある場合のみ）
+        $beforeStmt = $pdo->prepare('SELECT * FROM customers WHERE id = ?');
+        $beforeStmt->execute([$resourceId]);
+        $beforeRow = $beforeStmt->fetch();
         $pdo->prepare('UPDATE customers SET ' . implode(', ', $sets) . ' WHERE id = :id')->execute($params);
         $stmt = $pdo->prepare('SELECT * FROM customers WHERE id = ?');
         $stmt->execute([$resourceId]);
-        echo json_encode($stmt->fetch());
+        $afterRow = $stmt->fetch();
+        if ($beforeRow) {
+            recordCustomerUpdateIfChanged($pdo, $beforeRow, $afterRow);
+        }
+        echo json_encode($afterRow);
         break;
 
     case 'DELETE':

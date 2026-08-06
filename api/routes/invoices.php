@@ -7,6 +7,8 @@
  * DELETE /invoices/{id}              削除（発行済みは不可）
  */
 
+require_once __DIR__ . '/history_helpers.php';
+
 $segments   = explode('/', trim($path, '/'));
 $resourceId = isset($segments[1]) && is_numeric($segments[1]) ? (int)$segments[1] : null;
 
@@ -135,16 +137,24 @@ switch ($method) {
             exit;
         }
         // R-0100: 削除対象自身の carry_forward（作成前の繰越残高）を保持しておく
-        $invStmt = $pdo->prepare('SELECT customer_id, carry_forward FROM invoices WHERE id = ?');
+        // R-0098: 復元用にUndo記録も同じSELECTで賄う（全列が必要なため SELECT * にする）
+        $invStmt = $pdo->prepare('SELECT * FROM invoices WHERE id = ?');
         $invStmt->execute([$resourceId]);
         $targetInvoice = $invStmt->fetch();
 
         // 紐づき解除 → 伝票を approved に戻す
+        // R-0098: invoice_vouchers を DELETE する前に voucher_ids を確保して履歴に残す
         $iv = $pdo->prepare('SELECT voucher_id FROM invoice_vouchers WHERE invoice_id = ?');
         $iv->execute([$resourceId]);
-        foreach ($iv->fetchAll() as $row) {
+        $ivRows = $iv->fetchAll();
+        $voucherIds = array_map(fn($row) => (int)$row['voucher_id'], $ivRows);
+        foreach ($ivRows as $row) {
             $pdo->prepare('UPDATE vouchers SET status = "approved", updated_at = CURRENT_TIMESTAMP WHERE id = ?')
                 ->execute([$row['voucher_id']]);
+        }
+        $historyId = null;
+        if ($targetInvoice) {
+            $historyId = recordHistory($pdo, 'invoices', $resourceId, 'delete', $targetInvoice, ['voucher_ids' => $voucherIds]);
         }
         $pdo->prepare('DELETE FROM invoice_vouchers WHERE invoice_id = ?')->execute([$resourceId]);
         $pdo->prepare('DELETE FROM invoices WHERE id = ?')->execute([$resourceId]);
@@ -160,7 +170,7 @@ switch ($method) {
             }
         }
 
-        echo json_encode(['deleted' => true]);
+        echo json_encode(['deleted' => true, 'history_id' => $historyId]);
         break;
 
     default:
