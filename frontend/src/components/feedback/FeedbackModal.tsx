@@ -10,6 +10,7 @@ export default function FeedbackModal() {
   const [validationError, setValidationError] = useState<string | null>(null);
   const [showCompleted, setShowCompleted] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const submitMutation = useSubmitFeedback();
 
   const previews = useMemo(() => images.map((file) => URL.createObjectURL(file)), [images]);
@@ -18,6 +19,12 @@ export default function FeedbackModal() {
       previews.forEach((url) => URL.revokeObjectURL(url));
     };
   }, [previews]);
+
+  useEffect(() => {
+    if (isOpen) {
+      textareaRef.current?.focus();
+    }
+  }, [isOpen]);
 
   function openModal() {
     setIsOpen(true);
@@ -146,6 +153,7 @@ export default function FeedbackModal() {
 
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
               <textarea
+                ref={textareaRef}
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 onPaste={handleTextareaPaste}

@@ -173,4 +173,14 @@ describe('FeedbackModal (R-0080)', () => {
 
     expect(await screen.findAllByRole('img')).toHaveLength(1);
   });
+
+  it('モーダルを開くと本文入力欄に自動でフォーカスが当たる（R-0094）', async () => {
+    const user = userEvent.setup();
+    renderModal();
+
+    await user.click(screen.getByRole('button', { name: '改善要望を送る' }));
+
+    const textarea = screen.getByPlaceholderText('不具合や改善してほしい点を入力してください');
+    await waitFor(() => expect(textarea).toBe(document.activeElement));
+  });
 });
