@@ -134,6 +134,11 @@ switch ($method) {
             echo json_encode(['error' => '入金記録があるため削除できません']);
             exit;
         }
+        // R-0100: 削除対象自身の carry_forward（作成前の繰越残高）を保持しておく
+        $invStmt = $pdo->prepare('SELECT customer_id, carry_forward FROM invoices WHERE id = ?');
+        $invStmt->execute([$resourceId]);
+        $targetInvoice = $invStmt->fetch();
+
         // 紐づき解除 → 伝票を approved に戻す
         $iv = $pdo->prepare('SELECT voucher_id FROM invoice_vouchers WHERE invoice_id = ?');
         $iv->execute([$resourceId]);
@@ -143,6 +148,18 @@ switch ($method) {
         }
         $pdo->prepare('DELETE FROM invoice_vouchers WHERE invoice_id = ?')->execute([$resourceId]);
         $pdo->prepare('DELETE FROM invoices WHERE id = ?')->execute([$resourceId]);
+
+        // R-0100: 得意先の繰越残高を巻き戻す。ただし削除対象より後に作られた
+        // 同一得意先の請求書が存在する場合は、その最新残高を壊さないよう触らない
+        if ($targetInvoice) {
+            $newerStmt = $pdo->prepare('SELECT COUNT(*) FROM invoices WHERE customer_id = ? AND id > ?');
+            $newerStmt->execute([$targetInvoice['customer_id'], $resourceId]);
+            if ((int)$newerStmt->fetchColumn() === 0) {
+                $pdo->prepare('UPDATE customers SET carry_forward_balance = ? WHERE id = ?')
+                    ->execute([$targetInvoice['carry_forward'], $targetInvoice['customer_id']]);
+            }
+        }
+
         echo json_encode(['deleted' => true]);
         break;
 
