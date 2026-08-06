@@ -45,3 +45,4 @@
 024_projects_manual_estimated_hours  2026-08-06  dev
 024_projects_manual_estimated_hours  2026-08-06  prod (backup: api/backups/database_20260806_*_pre_r0095_r0097.sqlite)
 025_record_history          2026-08-06  dev
+025_record_history          2026-08-06  prod (backup: api/backups/database_20260806_*_pre_r0098_record_history.sqlite)
