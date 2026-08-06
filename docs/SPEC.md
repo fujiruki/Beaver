@@ -35,6 +35,7 @@
 | [R-0098_undo_redo.md](spec/R-0098_undo_redo.md) | データ操作のUndo/Redo（得意先/入金/請求限定） | 2026-08-06 |
 | [R-0100_invoice_delete_carry_forward_bug.md](spec/R-0100_invoice_delete_carry_forward_bug.md) | 請求書削除の繰越残高バグ修正 | 2026-08-06 |
 | [R-0096_phase2_smart_back.md](spec/R-0096_phase2_smart_back.md) | 戻るボタンのuseSmartBack化（一覧状態を壊さない） | 2026-08-06 |
+| [R-0096_phase2b_save_navigation.md](spec/R-0096_phase2b_save_navigation.md) | 保存・削除成功後の遷移もuseSmartBack化 | 2026-08-06 |
 | [R-0101_project_detail_layout_polish.md](spec/R-0101_project_detail_layout_polish.md) | 案件編集画面の入力欄レイアウト改善 | 2026-08-06 |
 
 ---
