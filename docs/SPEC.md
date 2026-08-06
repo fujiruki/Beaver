@@ -37,6 +37,8 @@
 | [R-0096_phase2_smart_back.md](spec/R-0096_phase2_smart_back.md) | 戻るボタンのuseSmartBack化（一覧状態を壊さない） | 2026-08-06 |
 | [R-0096_phase2b_save_navigation.md](spec/R-0096_phase2b_save_navigation.md) | 保存・削除成功後の遷移もuseSmartBack化 | 2026-08-06 |
 | [R-0101_project_detail_layout_polish.md](spec/R-0101_project_detail_layout_polish.md) | 案件編集画面の入力欄レイアウト改善 | 2026-08-06 |
+| [R-0102_estimated_hours_quick_buttons.md](spec/R-0102_estimated_hours_quick_buttons.md) | 工数目安のクイック入力ボタン | 2026-08-06 |
+| [R-0103_datatable_column_resize_width.md](spec/R-0103_datatable_column_resize_width.md) | 表の列幅ドラッグで総幅も追従する | 2026-08-06 |
 
 ---
 
