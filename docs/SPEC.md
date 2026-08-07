@@ -41,6 +41,7 @@
 | [R-0103_datatable_column_resize_width.md](spec/R-0103_datatable_column_resize_width.md) | 表の列幅ドラッグで総幅も追従する | 2026-08-06 |
 | [R-0104_datatable_column_resize_unspecified_widths.md](spec/R-0104_datatable_column_resize_unspecified_widths.md) | 列幅ドラッグでまだ他列の幅が変わる問題の根本修正 | 2026-08-07 |
 | [R-0105_sidebar_build_time.md](spec/R-0105_sidebar_build_time.md) | 左メニュー下部にビルド時刻を表示（経過時間で文字色変化） | 2026-08-07 |
+| [R-0106_R-0107_project_list_align_and_sort_persist.md](spec/R-0106_R-0107_project_list_align_and_sort_persist.md) | 工数目安右揃え・案件一覧の複合ソートlocalStorage永続化 | 2026-08-07 |
 
 ---
 
