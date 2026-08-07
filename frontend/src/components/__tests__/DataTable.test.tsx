@@ -31,6 +31,78 @@ beforeEach(() => {
   localStorage.clear();
 });
 
+describe('DataTable width未指定列の初期幅固定', () => {
+  function unspecifiedWidthColumns(): DataTableColumn<Row>[] {
+    return [
+      { key: 'name', label: 'Name', render: r => r.name },
+      { key: 'amount', label: 'Amount', render: r => String(r.amount) },
+      { key: 'actions', label: 'Actions', render: r => `Action ${r.id}` },
+    ];
+  }
+
+  function mockMeasuredWidths(width = 100) {
+    return vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(() => ({
+      width,
+      height: 24,
+      top: 0,
+      right: width,
+      bottom: 24,
+      left: 0,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
+    }));
+  }
+
+  it('1列をリサイズしても他のwidth未指定列のcol幅は変化しない', () => {
+    const rectSpy = mockMeasuredWidths();
+    const { container } = render(
+      <DataTable tableId="test-unspecified-width-isolated" columns={unspecifiedWidthColumns()} rows={ROWS} rowKey={r => r.id} />,
+    );
+    const cols = container.querySelectorAll('colgroup col');
+    expect(Array.from(cols).map(col => (col as HTMLElement).style.width)).toEqual(['100px', '100px', '100px']);
+
+    const handle = container.querySelectorAll('.bv-datatable-resize-handle')[0] as HTMLElement;
+    fireEvent.pointerDown(handle, { clientX: 100, pointerId: 20 });
+    fireEvent.pointerMove(window, { clientX: 140, pointerId: 20 });
+    expect((cols[0] as HTMLElement).style.width).toBe('140px');
+    expect((cols[1] as HTMLElement).style.width).toBe('100px');
+    expect((cols[2] as HTMLElement).style.width).toBe('100px');
+    fireEvent.pointerUp(window, { clientX: 140, pointerId: 20 });
+    rectSpy.mockRestore();
+  });
+
+  it('自動測定幅はドラッグして離すまでlocalStorageへ保存しない', () => {
+    const rectSpy = mockMeasuredWidths();
+    const storageKey = 'bv_table_widths_test-unspecified-width-persist';
+    const { container } = render(
+      <DataTable tableId="test-unspecified-width-persist" columns={unspecifiedWidthColumns()} rows={ROWS} rowKey={r => r.id} />,
+    );
+    expect(localStorage.getItem(storageKey)).toBeNull();
+
+    const handle = container.querySelector('.bv-datatable-resize-handle') as HTMLElement;
+    fireEvent.pointerDown(handle, { clientX: 100, pointerId: 21 });
+    fireEvent.pointerMove(window, { clientX: 125, pointerId: 21 });
+    expect(localStorage.getItem(storageKey)).toBeNull();
+    fireEvent.pointerUp(window, { clientX: 125, pointerId: 21 });
+    expect(JSON.parse(localStorage.getItem(storageKey) ?? 'null')).toEqual({ name: 125 });
+    rectSpy.mockRestore();
+  });
+
+  it('localStorageに保存済みの列幅を自動測定で上書きしない', () => {
+    const rectSpy = mockMeasuredWidths();
+    localStorage.setItem('bv_table_widths_test-unspecified-width-saved', JSON.stringify({ amount: 180 }));
+    const { container } = render(
+      <DataTable tableId="test-unspecified-width-saved" columns={unspecifiedWidthColumns()} rows={ROWS} rowKey={r => r.id} />,
+    );
+    const cols = container.querySelectorAll('colgroup col');
+    expect((cols[0] as HTMLElement).style.width).toBe('100px');
+    expect((cols[1] as HTMLElement).style.width).toBe('180px');
+    expect((cols[2] as HTMLElement).style.width).toBe('100px');
+    rectSpy.mockRestore();
+  });
+});
+
 describe('DataTable 描画', () => {
   it('列と行を描画する', () => {
     render(

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, ReactNode } from 'react';
 
 export type SortDir = 'asc' | 'desc';
@@ -206,11 +206,25 @@ export default function DataTable<T>({
 }: DataTableProps<T>) {
   const { widths, setWidth, persist } = useColumnWidths(tableId, columns);
   const { order, reorder } = useColumnOrder(tableId, columns);
+  const [measuredWidths, setMeasuredWidths] = useState<Record<string, number>>({});
+  const headerRefs = useRef<Record<string, HTMLTableCellElement | null>>({});
 
   const orderedColumns = useMemo(() => {
     const byKey = new Map(columns.map(c => [c.key, c]));
     return order.map(k => byKey.get(k)).filter((c): c is DataTableColumn<T> => c !== undefined);
   }, [order, columns]);
+
+  useLayoutEffect(() => {
+    const measured: Record<string, number> = {};
+    for (const col of columns) {
+      if (widths[col.key] !== undefined || col.width !== undefined) continue;
+      const width = headerRefs.current[col.key]?.getBoundingClientRect().width;
+      if (width !== undefined && width > 0) measured[col.key] = width;
+    }
+    setMeasuredWidths(measured);
+    // Initial widths are intentionally captured only when the table identity changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tableId]);
 
   const dragRef = useRef<{ sourceKey: string; startX: number; moved: boolean; overKey: string | null } | null>(null);
   const suppressClickRef = useRef(false);
@@ -281,7 +295,7 @@ export default function DataTable<T>({
     e.stopPropagation();
     e.preventDefault();
     const startX = e.clientX;
-    const startWidth = widths[col.key] ?? col.width ?? DEFAULT_MIN_WIDTH;
+    const startWidth = widths[col.key] ?? measuredWidths[col.key] ?? col.width ?? DEFAULT_MIN_WIDTH;
     const minWidth = col.minWidth ?? DEFAULT_MIN_WIDTH;
     // jsdom/happy-dom などテスト環境では setPointerCapture が未実装のため optional chaining で保護する
     e.currentTarget.setPointerCapture?.(e.pointerId);
@@ -312,7 +326,7 @@ export default function DataTable<T>({
       <table style={{ width: 'max-content', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
       <colgroup>
         {orderedColumns.map(col => {
-          const w = widths[col.key] ?? col.width;
+          const w = widths[col.key] ?? measuredWidths[col.key] ?? col.width;
           return <col key={col.key} style={w !== undefined ? { width: `${w}px` } : undefined} />;
         })}
       </colgroup>
@@ -342,6 +356,7 @@ export default function DataTable<T>({
             return (
               <th
                 key={col.key}
+                ref={element => { headerRefs.current[col.key] = element; }}
                 aria-sort={ariaSort}
                 onClick={e => handleHeaderClick(col, e)}
                 onPointerDown={e => handleReorderPointerDown(e, col)}
