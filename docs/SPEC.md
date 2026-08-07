@@ -39,6 +39,7 @@
 | [R-0101_project_detail_layout_polish.md](spec/R-0101_project_detail_layout_polish.md) | 案件編集画面の入力欄レイアウト改善 | 2026-08-06 |
 | [R-0102_estimated_hours_quick_buttons.md](spec/R-0102_estimated_hours_quick_buttons.md) | 工数目安のクイック入力ボタン | 2026-08-06 |
 | [R-0103_datatable_column_resize_width.md](spec/R-0103_datatable_column_resize_width.md) | 表の列幅ドラッグで総幅も追従する | 2026-08-06 |
+| [R-0104_datatable_column_resize_unspecified_widths.md](spec/R-0104_datatable_column_resize_unspecified_widths.md) | 列幅ドラッグでまだ他列の幅が変わる問題の根本修正 | 2026-08-07 |
 
 ---
 
