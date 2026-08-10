@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, renderHook, act } from '@testing-library/react';
-import DataTable, { useSortState, type DataTableColumn } from '../DataTable';
+import DataTable, { useMultiSortState, useSortState, type DataTableColumn } from '../DataTable';
 
 interface Row {
   id: number;
@@ -691,6 +691,37 @@ describe('DataTable 複合ソート（multiSort）', () => {
     );
     fireEvent.click(screen.getByText('名前'));
     expect(onSortChange).not.toHaveBeenCalled();
+  });
+});
+
+describe('useMultiSortState multi-sort persistence', () => {
+  it('prefers a saved localStorage array over defaultSortKeys', () => {
+    const saved = [
+      { key: 'status', dir: 'asc' as const },
+      { key: 'delivery_date', dir: 'desc' as const },
+    ];
+    localStorage.setItem('bv_table_sort_multi-saved', JSON.stringify(saved));
+    const { result } = renderHook(() =>
+      useMultiSortState('multi-saved', [{ key: 'name', dir: 'asc' }]),
+    );
+    expect(result.current[0]).toEqual(saved);
+  });
+
+  it('uses defaultSortKeys when localStorage has no saved value', () => {
+    const defaults = [{ key: 'name', dir: 'desc' as const }];
+    const { result } = renderHook(() => useMultiSortState('multi-default', defaults));
+    expect(result.current[0]).toEqual(defaults);
+  });
+
+  it('persists an array to localStorage when the setter is called', () => {
+    const next = [
+      { key: 'customer_name', dir: 'asc' as const },
+      { key: 'name', dir: 'desc' as const },
+    ];
+    const { result } = renderHook(() => useMultiSortState('multi-save'));
+    act(() => result.current[1](next));
+    expect(JSON.parse(localStorage.getItem('bv_table_sort_multi-save') ?? 'null')).toEqual(next);
+    expect(result.current[0]).toEqual(next);
   });
 });
 

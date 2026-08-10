@@ -189,6 +189,48 @@ export function useSortState(
   return [sort, setSort];
 }
 
+function loadMultiSort(tableId: string, defaultSortKeys: SortState[] = []): SortState[] {
+  try {
+    const raw = localStorage.getItem(SORT_STORAGE_PREFIX + tableId);
+    if (!raw) return defaultSortKeys;
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return defaultSortKeys;
+    const isSortState = (value: unknown): value is SortState => {
+      if (!value || typeof value !== 'object') return false;
+      const key = (value as Record<string, unknown>).key;
+      const dir = (value as Record<string, unknown>).dir;
+      return typeof key === 'string' && (dir === 'asc' || dir === 'desc');
+    };
+    return parsed.every(isSortState) ? parsed : defaultSortKeys;
+  } catch {
+    return defaultSortKeys;
+  }
+}
+
+export function useMultiSortState(
+  tableId: string,
+  defaultSortKeys: SortState[] = [],
+): [SortState[], (keys: SortState[]) => void] {
+  const [sortKeys, setSortKeysState] = useState<SortState[]>(() => loadMultiSort(tableId, defaultSortKeys));
+
+  useEffect(() => {
+    setSortKeysState(loadMultiSort(tableId, defaultSortKeys));
+    // Restore only when the table identity changes; defaults may be recreated on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tableId]);
+
+  const setSortKeys = useCallback((keys: SortState[]) => {
+    setSortKeysState(keys);
+    try {
+      localStorage.setItem(SORT_STORAGE_PREFIX + tableId, JSON.stringify(keys));
+    } catch {
+      // Ignore persistence failures when localStorage is unavailable.
+    }
+  }, [tableId]);
+
+  return [sortKeys, setSortKeys];
+}
+
 export default function DataTable<T>({
   tableId,
   columns,

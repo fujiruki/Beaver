@@ -27,6 +27,29 @@ beforeEach(() => {
   }));
 });
 
+it('restores multi-sort from localStorage after remounting ProjectList', async () => {
+  const first = renderPage();
+  await waitFor(() => expect(requestedUrls.length).toBeGreaterThan(0));
+
+  fireEvent.click(await screen.findByText('ステータス'));
+  fireEvent.click(screen.getByText('納期'), { shiftKey: true });
+  await waitFor(() => {
+    expect(JSON.parse(localStorage.getItem('bv_table_sort_projects') ?? 'null')).toEqual([
+      { key: 'status', dir: 'asc' },
+      { key: 'delivery_date', dir: 'asc' },
+    ]);
+  });
+
+  first.unmount();
+  requestedUrls = [];
+  renderPage();
+  await waitFor(() => {
+    const last = new URL(requestedUrls[requestedUrls.length - 1], 'http://localhost');
+    expect(last.searchParams.get('sort')).toBe('status,delivery_date');
+    expect(last.searchParams.get('order')).toBe('asc,asc');
+  });
+});
+
 function renderPage() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(

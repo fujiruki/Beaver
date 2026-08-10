@@ -5,6 +5,7 @@ import { useCustomers } from '../api/customers';
 import { useAppSettings } from '../contexts/AppSettingsContext';
 import Pagination from '../components/Pagination';
 import DataTable from '../components/DataTable';
+import { useMultiSortState } from '../components/DataTable';
 import type { DataTableColumn, SortState } from '../components/DataTable';
 import type { Project, ProjectStatus } from '../types/project';
 
@@ -46,7 +47,7 @@ export default function ProjectList() {
   });
   const [search, setSearch] = useState(() => searchParams.get('q') ?? '');
   const [inputValue, setInputValue] = useState(() => searchParams.get('q') ?? '');
-  const [sortKeys, setSortKeys] = useState<SortState[]>(() =>
+  const [sortKeys, setSortKeys] = useMultiSortState('projects',
     parseSortKeys(searchParams.get('sort'), searchParams.get('order')),
   );
   const isComposingRef = useRef(false);
@@ -137,6 +138,7 @@ export default function ProjectList() {
     { key: 'delivery_date', label: '納期', sortable: true, render: p => p.delivery_date ?? '—' },
     {
       key: 'effective_estimated_hours',
+      align: 'right',
       label: '工数目安',
       render: p => (p.effective_estimated_hours != null
         ? `${(p.effective_estimated_hours / settings.hoursPerDay).toFixed(1)}日`

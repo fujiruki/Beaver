@@ -1,6 +1,31 @@
 import { NavLink, Outlet } from 'react-router-dom';
+import { useEffect, useState } from 'react';
 import { useAppSettings } from '../../contexts/AppSettingsContext';
 import FeedbackModal from '../feedback/FeedbackModal';
+
+const ONE_HOUR_MS = 60 * 60 * 1000;
+const ONE_DAY_MS = 24 * ONE_HOUR_MS;
+
+export function getBuildTimeColor(buildTime: Date, now: Date): string {
+  const elapsedMs = now.getTime() - buildTime.getTime();
+  if (elapsedMs < ONE_HOUR_MS) return '#4ade80';
+  if (elapsedMs < ONE_DAY_MS) return '#fbbf24';
+  return '#94a3b8';
+}
+
+function formatBuildTime(buildTime: Date): string {
+  const parts = new Intl.DateTimeFormat('ja-JP', {
+    timeZone: 'Asia/Tokyo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(buildTime);
+  const value = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value ?? '';
+  return `${value('year')}-${value('month')}-${value('day')} ${value('hour')}:${value('minute')}`;
+}
 
 const navItems = [
   { to: '/',           label: 'ダッシュボード' },
@@ -15,6 +40,13 @@ const navItems = [
 
 export default function AppLayout() {
   const { settings } = useAppSettings();
+  const buildTime = new Date(__BUILD_TIME__);
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => setNow(new Date()), 60_000);
+    return () => window.clearInterval(intervalId);
+  }, []);
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', fontFamily: 'sans-serif', fontSize: settings.fontSize }}>
@@ -25,6 +57,8 @@ export default function AppLayout() {
         color: '#f1f5f9',
         flexShrink: 0,
         padding: '16px 0',
+        display: 'flex',
+        flexDirection: 'column',
       }}>
         <div style={{ padding: '8px 16px 20px', fontWeight: 'bold', fontSize: 14, color: '#94a3b8' }}>
           Beaver
@@ -47,8 +81,13 @@ export default function AppLayout() {
           </NavLink>
         ))}
 
-        <div style={{ padding: '16px 16px 0' }}>
-          <FeedbackModal />
+        <div style={{ marginTop: 'auto' }}>
+          <div style={{ padding: '16px 16px 0' }}>
+            <FeedbackModal />
+          </div>
+          <div style={{ padding: '10px 16px 0', fontSize: 11, color: getBuildTimeColor(buildTime, now) }}>
+            ビルド: {formatBuildTime(buildTime)}
+          </div>
         </div>
       </nav>
 
