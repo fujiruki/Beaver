@@ -8,6 +8,7 @@ import DataTable from '../components/DataTable';
 import { useMultiSortState } from '../components/DataTable';
 import type { DataTableColumn, SortState } from '../components/DataTable';
 import type { Project, ProjectStatus } from '../types/project';
+import { deadlineTierClassName, deadlineTierIcon, getDeadlineTier } from '../lib/dateHighlight';
 
 // R-0091: sort=a,b&order=asc,desc 形式のURLクエリを複合ソートキー配列に変換する
 function parseSortKeys(sortParam: string | null, orderParam: string | null): SortState[] {
@@ -135,7 +136,19 @@ export default function ProjectList() {
       ),
     },
     { key: 'start_date', label: '開始日', sortable: true, render: p => p.start_date ?? '—' },
-    { key: 'delivery_date', label: '納期', sortable: true, render: p => p.delivery_date ?? '—' },
+    {
+      key: 'delivery_date',
+      label: '納期',
+      sortable: true,
+      render: p => {
+        const tier = getDeadlineTier(p.delivery_date, new Date());
+        return (
+          <span className={deadlineTierClassName(tier)}>
+            {deadlineTierIcon(tier)}{p.delivery_date ?? '—'}
+          </span>
+        );
+      },
+    },
     {
       key: 'effective_estimated_hours',
       align: 'right',

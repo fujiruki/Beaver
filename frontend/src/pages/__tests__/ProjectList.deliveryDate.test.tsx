@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
@@ -12,6 +12,8 @@ const ALL_PROJECTS = [
 let requestedUrls: string[] = [];
 
 beforeEach(() => {
+  vi.useFakeTimers({ shouldAdvanceTime: true });
+  vi.setSystemTime(new Date('2026-01-15'));
   localStorage.clear();
   requestedUrls = [];
   vi.stubGlobal('fetch', vi.fn(async (url: string) => {
@@ -25,6 +27,10 @@ beforeEach(() => {
       meta: { total: ALL_PROJECTS.length, page: 1, per_page: 50, last_page: 1 },
     }), { status: 200 });
   }));
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 function renderPage() {

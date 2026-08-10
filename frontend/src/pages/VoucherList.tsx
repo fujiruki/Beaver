@@ -9,6 +9,7 @@ import Pagination from '../components/Pagination';
 import DataTable, { useSortState } from '../components/DataTable';
 import type { DataTableColumn, SortDir, SortState } from '../components/DataTable';
 import type { Voucher, VoucherType, VoucherStatus } from '../types/voucher';
+import { isRecentVoucherDate } from '../lib/dateHighlight';
 
 const TYPE_LABELS: Record<VoucherType, string> = { estimate: '見積', sales: '売上' };
 const STATUS_LABELS: Record<VoucherStatus, string> = {
@@ -146,7 +147,16 @@ export default function VoucherList() {
     { key: 'customer_name', label: '得意先', sortable: true, render: v => v.customer_name ?? '-' },
     { key: 'description', label: '摘要', sortable: true, render: v => v.description ?? '-' },
     { key: 'project_name', label: '案件', sortable: true, render: v => v.project_name ?? '-' },
-    { key: 'voucher_date', label: '伝票日付', sortable: true, render: v => v.voucher_date },
+    {
+      key: 'voucher_date',
+      label: '伝票日付',
+      sortable: true,
+      render: v => (
+        <span className={isRecentVoucherDate(v.voucher_date, new Date()) ? 'text-blue-600 font-medium' : ''}>
+          {v.voucher_date}
+        </span>
+      ),
+    },
     {
       key: 'total_amount',
       label: '合計金額',
