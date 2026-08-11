@@ -7,7 +7,7 @@
 | 2026-06-06(記録は2026-08-11) | R-034: Beaver validation強化（sync系4項目） | 完了 | 同上、コミット`a70a4ba`で実装済みと判明。ドキュメントを実態に合わせて訂正 |
 | 2026-06-06(記録は2026-08-11) | R-035: /projects/sync pagination + access_voucher_no重複対策 | 完了 | 同上、コミット`a70a4ba`で実装済みと判明。ドキュメントを実態に合わせて訂正 |
 | 2026-08-11 | R-0084: 検索の複数プロパティ対応 Phase2（建具台帳・伝票・請求書一覧） | 仕様化済み | 藤田晴樹さんより会話内で直接、着手指示。調査の結果、案件一覧は既にR-0090/91で対応済みと判明（スコープ外）。建具台帳は既存検索の対象列拡張、伝票・請求書一覧は検索ボックス自体が無いため新規追加。伝票一覧はR-0091と同種のCOUNTクエリJOIN欠落バグを踏まないよう明記。仕様: `docs/spec/R-0084_search_multi_property_phase2.md` |
-| 2026-08-11 | R-0093: PHPテスト用一時SQLiteファイルの競合対策 | 仕様化済み | 藤田晴樹さんより会話内で直接、着手指示。対象11ファイルの一時DBパスをgetmypid()で一意化し、register_shutdown_functionで確実にクリーンアップする方針。仕様: `docs/spec/R-0093_test_sqlite_temp_file_isolation.md` |
+| 2026-08-11 | R-0093: PHPテスト用一時SQLiteファイルの競合対策 | 完了 | 藤田晴樹さんより会話内で直接、着手指示。対象11ファイルの一時DBパスをgetmypid()で一意化し、register_shutdown_function（Windowsのファイルロック対策でPDO接続を明示的にnull化してからunlink）で確実にクリーンアップ。指揮役が2プロセス同時実行で競合解消・残存ファイル無しを再現確認済み。テスト基盤のみの変更のためデプロイ不要（コミットff07473）。仕様: `docs/spec/R-0093_test_sqlite_temp_file_isolation.md` |
 | 2026-03-21 | Phase 7: AccessTategu連携 | 未着手 | requests.md |
 | 2026-03-21 | TateguDesignStudioとの連携 | 未着手 | requests.md |
 | 2026-07-02 | R-067: 得意先詳細画面で保存ボタンが機能しない（バグ） | 完了 | `<input type="email">`のネイティブHTML5バリデーションが不正な値でsubmitを黙ってブロックしていたのが原因。`CustomerDetail.tsx`の`<form>`に`noValidate`追加（コミット2c55c60, b8354b3） |
