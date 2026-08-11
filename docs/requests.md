@@ -79,7 +79,9 @@ Fableへの相談は「ブラウザバック」機能として進めてよい（
 ---
 
 
-## 1. R-025: BA連携 Phase 1（案件番号橋渡し、2026-06-05 確定）
+## 1. ~~R-025: BA連携 Phase 1（案件番号橋渡し、2026-06-05 確定）~~ ✅ 完了（2026-08-11判明・実装は2026-06-06頃）
+
+**2026-08-11追記**: 以下の記述は2026-06-05時点の未着手メモのまま放置されていたが、指揮役が調査した結果、要望登録直後（コミット`c3cef43`→`2291a80`→`eaf0587`）にStep A〜Eすべて実装・レビュー修正まで完了し、本番適用済みであることを確認した。`GET /projects/sync`（`api/routes/projects.php:65-136`、updated_after/include_cancelled/limit/cursor対応、完全一致ルーティングガードあり）、push back受信一式（`api/routes/sync_helpers.php`）、マイグレーション3本（009/010/011、access_customer_no・access_voucher_id・UNIQUE制約）が揃っている。ドキュメントの放置による誤解を避けるため、この節は記録として残すが対応不要。
 
 藤田晴樹確定。AccessTategu との双方向同期基盤を構築する。**旧 Phase 7（AccessTategu 連携）はこの R-025 に統合・拡張。**
 
@@ -125,7 +127,9 @@ ConoHa の本番 Beaver に `backup.sh` 設置 + crontab 毎日 03:00 登録済�
 
 ---
 
-## 3. R-034: Beaver validation 強化（2026-06-06 R-025 review で発覚）
+## 3. ~~R-034: Beaver validation 強化（2026-06-06 R-025 review で発覚）~~ ✅ 完了（2026-08-11判明・実装はコミット`a70a4ba`）
+
+**2026-08-11追記**: 指揮役が調査した結果、(a)〜(d) すべて実装済みと確認。(a) `sync_helpers.php:222-225`でproject_id!==null かつ customerId===null なら400（過去伝票モードのみNULL許容）。(b) `projects.php:60`で`isset($segments[2])`なら404の完全一致ガード実装済み。(c) `insertSyncedLines`（`sync_helpers.php:440-529`）でline_type/tax_category/quantity/line_totalを厳格検証、不正時422。(d) `syncVoucherUpdate`が`replaceSyncedLinesFromPayload`を呼びUPDATE経路でも明細更新に対応（`lines_mode=replace`時）。対応不要、記録として残す。
 
 R-025 Step E-Beaver の review で発覚。デプロイ前に対応した HIGH 修正（H1/H2/H3/M2）と別に、運用してから対応すべき MEDIUM 級の改善。
 
@@ -140,7 +144,9 @@ R-025 デプロイ後に着手。実害は限定的（不正データ流入リ�
 
 ---
 
-## 4. R-035: Beaver /projects/sync pagination + access_voucher_no 重複対策（2026-06-06 R-025 review で発覚）
+## 4. ~~R-035: Beaver /projects/sync pagination + access_voucher_no 重複対策（2026-06-06 R-025 review で発覚）~~ ✅ 完了（2026-08-11判明・実装はコミット`a70a4ba`）
+
+**2026-08-11追記**: 指揮役が調査した結果、(a)(b)とも実装済みと確認。(a) `GET /projects/sync`はupdated_after/limit/cursor（since_id方式）に対応済み。(b) `syncVoucherUpdate`/`syncVoucherShipped`とも複数ヒット時は`error_log`警告＋`LIMIT 1`で先頭のみ更新する防御実装済み、加えてmigration 011で`access_voucher_id`のUNIQUE制約による根本対策も併存。対応不要、記録として残す。
 
 R-025 review の MEDIUM/LOW 級指摘。
 

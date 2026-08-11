@@ -3,6 +3,11 @@
 | 日付 | 内容 | 対応状況 | 反映先 |
 |---|---|---|---|
 | 2026-03-21 | 仕様書駆動開発への移行 | 完了 | spec/01〜06 |
+| 2026-06-06(記録は2026-08-11) | R-025: BA連携 Phase1（GET /projects/sync・push back受信） | 完了 | `docs/requests.md`が未着手メモのまま放置されていたが、要望登録直後に実装・本番適用済みと判明（コミット`c3cef43`〜`eaf0587`）。ドキュメントを実態に合わせて訂正 |
+| 2026-06-06(記録は2026-08-11) | R-034: Beaver validation強化（sync系4項目） | 完了 | 同上、コミット`a70a4ba`で実装済みと判明。ドキュメントを実態に合わせて訂正 |
+| 2026-06-06(記録は2026-08-11) | R-035: /projects/sync pagination + access_voucher_no重複対策 | 完了 | 同上、コミット`a70a4ba`で実装済みと判明。ドキュメントを実態に合わせて訂正 |
+| 2026-08-11 | R-0084: 検索の複数プロパティ対応 Phase2（建具台帳・伝票・請求書一覧） | 仕様化済み | 藤田晴樹さんより会話内で直接、着手指示。調査の結果、案件一覧は既にR-0090/91で対応済みと判明（スコープ外）。建具台帳は既存検索の対象列拡張、伝票・請求書一覧は検索ボックス自体が無いため新規追加。伝票一覧はR-0091と同種のCOUNTクエリJOIN欠落バグを踏まないよう明記。仕様: `docs/spec/R-0084_search_multi_property_phase2.md` |
+| 2026-08-11 | R-0093: PHPテスト用一時SQLiteファイルの競合対策 | 仕様化済み | 藤田晴樹さんより会話内で直接、着手指示。対象11ファイルの一時DBパスをgetmypid()で一意化し、register_shutdown_functionで確実にクリーンアップする方針。仕様: `docs/spec/R-0093_test_sqlite_temp_file_isolation.md` |
 | 2026-03-21 | Phase 7: AccessTategu連携 | 未着手 | requests.md |
 | 2026-03-21 | TateguDesignStudioとの連携 | 未着手 | requests.md |
 | 2026-07-02 | R-067: 得意先詳細画面で保存ボタンが機能しない（バグ） | 完了 | `<input type="email">`のネイティブHTML5バリデーションが不正な値でsubmitを黙ってブロックしていたのが原因。`CustomerDetail.tsx`の`<form>`に`noValidate`追加（コミット2c55c60, b8354b3） |

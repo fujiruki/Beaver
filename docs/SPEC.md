@@ -43,6 +43,8 @@
 | [R-0105_sidebar_build_time.md](spec/R-0105_sidebar_build_time.md) | 左メニュー下部にビルド時刻を表示（経過時間で文字色変化） | 2026-08-07 |
 | [R-0106_R-0107_project_list_align_and_sort_persist.md](spec/R-0106_R-0107_project_list_align_and_sort_persist.md) | 工数目安右揃え・案件一覧の複合ソートlocalStorage永続化 | 2026-08-07 |
 | [R-0108_date_deadline_highlight.md](spec/R-0108_date_deadline_highlight.md) | 納期・伝票日付の期限接近度による強調表示 | 2026-08-07 |
+| [R-0084_search_multi_property_phase2.md](spec/R-0084_search_multi_property_phase2.md) | 検索の複数プロパティ対応 Phase2（建具台帳・伝票・請求書一覧） | 2026-08-11 |
+| [R-0093_test_sqlite_temp_file_isolation.md](spec/R-0093_test_sqlite_temp_file_isolation.md) | PHPテスト用一時SQLiteファイルの競合対策 | 2026-08-11 |
 
 ---
 
