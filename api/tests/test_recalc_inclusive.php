@@ -12,10 +12,16 @@ declare(strict_types=1);
 
 $ROOT = dirname(__DIR__);
 
-$testDbPath = __DIR__ . '/test_recalc_inclusive.sqlite';
+$testDbPath = __DIR__ . '/test_recalc_inclusive_' . getmypid() . '.sqlite';
 if (file_exists($testDbPath)) {
     unlink($testDbPath);
 }
+register_shutdown_function(function () use ($testDbPath) {
+    $GLOBALS['pdo'] = null;
+    if (file_exists($testDbPath)) {
+        @unlink($testDbPath);
+    }
+});
 
 $pdo = new PDO('sqlite:' . $testDbPath, null, null, [
     PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,

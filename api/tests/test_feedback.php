@@ -17,10 +17,16 @@ $ROOT = dirname(__DIR__);
 // ============================================================
 // 専用テスト DB の準備
 // ============================================================
-$testDbPath = __DIR__ . '/test_feedback.sqlite';
+$testDbPath = __DIR__ . '/test_feedback_' . getmypid() . '.sqlite';
 if (file_exists($testDbPath)) {
     unlink($testDbPath);
 }
+register_shutdown_function(function () use ($testDbPath) {
+    $GLOBALS['pdo'] = null;
+    if (file_exists($testDbPath)) {
+        @unlink($testDbPath);
+    }
+});
 
 $pdo = new PDO('sqlite:' . $testDbPath, null, null, [
     PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,

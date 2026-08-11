@@ -9,12 +9,18 @@ declare(strict_types=1);
 
 $ROOT = dirname(__DIR__);
 
-$testDbPath = __DIR__ . '/test_tategu_cost_lines.sqlite';
+$testDbPath = __DIR__ . '/test_tategu_cost_lines_' . getmypid() . '.sqlite';
 foreach ([$testDbPath, $testDbPath . '-shm', $testDbPath . '-wal'] as $pathToRemove) {
     if (file_exists($pathToRemove)) {
         unlink($pathToRemove);
     }
 }
+register_shutdown_function(function () use ($testDbPath) {
+    $GLOBALS['pdo'] = null;
+    if (file_exists($testDbPath)) {
+        @unlink($testDbPath);
+    }
+});
 
 $pdo = new PDO('sqlite:' . $testDbPath, null, null, [
     PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,

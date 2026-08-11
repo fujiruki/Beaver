@@ -16,10 +16,16 @@ require_once $ROOT . '/search_helpers.php';
 // ============================================================
 // 専用テスト DB の準備
 // ============================================================
-$testDbPath = __DIR__ . '/test_customers.sqlite';
+$testDbPath = __DIR__ . '/test_customers_' . getmypid() . '.sqlite';
 if (file_exists($testDbPath)) {
     unlink($testDbPath);
 }
+register_shutdown_function(function () use ($testDbPath) {
+    $GLOBALS['pdo'] = null;
+    if (file_exists($testDbPath)) {
+        @unlink($testDbPath);
+    }
+});
 
 $pdo = new PDO('sqlite:' . $testDbPath, null, null, [
     PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
