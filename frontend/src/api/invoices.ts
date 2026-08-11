@@ -5,6 +5,7 @@ import type { Invoice, InvoiceInput } from '../types/invoice';
 const KEY = 'invoices';
 
 type InvoiceFilters = {
+  q?: string;
   customer_id?: number;
   year?: string;
   month?: string;
@@ -13,6 +14,7 @@ type InvoiceFilters = {
 /** 請求書一覧取得 */
 export function useInvoices(filters?: InvoiceFilters) {
   const params = new URLSearchParams();
+  if (filters?.q) params.set('q', filters.q);
   if (filters?.customer_id) params.set('customer_id', String(filters.customer_id));
   if (filters?.year) params.set('year', filters.year);
   if (filters?.month) params.set('month', filters.month);

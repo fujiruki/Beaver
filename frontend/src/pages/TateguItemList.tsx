@@ -129,7 +129,7 @@ export default function TateguItemList() {
       <div className="mb-3">
         <input
           type="text"
-          placeholder="品名・コードで検索"
+          placeholder="品番・品名・仕様で検索"
           value={inputValue}
           onChange={handleChange}
           onCompositionStart={handleCompositionStart}

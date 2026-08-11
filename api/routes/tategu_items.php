@@ -13,6 +13,7 @@
  */
 
 require_once __DIR__ . '/list_helpers.php';
+require_once dirname(__DIR__) . '/search_helpers.php';
 
 $segments = explode('/', trim($path, '/'));
 $resourceId  = isset($segments[1]) && is_numeric($segments[1]) ? (int)$segments[1] : null;
@@ -152,9 +153,12 @@ switch ($method) {
             $where = 'WHERE 1=1';
             $params = [];
             if (!empty($_GET['q'])) {
-                $where .= ' AND (name LIKE ? OR code LIKE ?)';
-                $q = '%' . $_GET['q'] . '%';
-                $params[] = $q; $params[] = $q;
+                [$searchClause, $searchParams] = buildMultiColumnSearchClause(
+                    ['name', 'code', 'description'],
+                    $_GET['q']
+                );
+                $where .= ' AND ' . $searchClause;
+                $params = array_merge($params, $searchParams);
             }
             if (!isset($_GET['include_archived'])) {
                 $where .= ' AND status = "active"';

@@ -49,6 +49,32 @@ function renderPage(initialEntries?: string[]) {
 }
 
 describe('VoucherList URL状態保持 (R-0096 Phase1)', () => {
+  it('検索はIME確定後にqへ反映され、既存フィルタと併用できる', async () => {
+    renderPage(['/vouchers?voucher_type=estimate&customer_id=1']);
+    await waitFor(() => expect(requestedUrls.length).toBeGreaterThan(0));
+    const input = await screen.findByPlaceholderText('伝票番号・得意先・案件・摘要で検索');
+    const callsBefore = requestedUrls.length;
+    fireEvent.compositionStart(input);
+    fireEvent.change(input, { target: { value: 'さくら' } });
+    expect(requestedUrls.length).toBe(callsBefore);
+    fireEvent.compositionEnd(input, { data: 'さくら' });
+    await waitFor(() => {
+      const last = new URL(requestedUrls[requestedUrls.length - 1], 'http://localhost');
+      expect(last.searchParams.get('q')).toBe('さくら');
+      expect(last.searchParams.get('voucher_type')).toBe('estimate');
+      expect(last.searchParams.get('customer_id')).toBe('1');
+    });
+  });
+
+  it('URLのqを初期表示とAPIリクエストへ復元する', async () => {
+    renderPage(['/vouchers?q=現場メモ&status=draft']);
+    expect((await screen.findByDisplayValue('現場メモ') as HTMLInputElement).value).toBe('現場メモ');
+    await waitFor(() => {
+      const last = new URL(requestedUrls[requestedUrls.length - 1], 'http://localhost');
+      expect(last.searchParams.get('q')).toBe('現場メモ');
+      expect(last.searchParams.get('status')).toBe('draft');
+    });
+  });
   it('種別フィルタを変更するとバックエンドリクエストのvoucher_typeパラメータに反映される', async () => {
     renderPage();
     await waitFor(() => expect(requestedUrls.length).toBeGreaterThan(0));

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useInvoices } from '../api/invoices';
 import { useCustomers } from '../api/customers';
@@ -44,11 +44,15 @@ export default function InvoiceList() {
   const [year, setYear] = useState(() => searchParams.get('year') ?? currentYear);
   const [month, setMonth] = useState(() => searchParams.get('month') ?? String(new Date().getMonth() + 1));
   const [customerId, setCustomerId] = useState(() => searchParams.get('customer_id') ?? '');
+  const [searchInput, setSearchInput] = useState(() => searchParams.get('q') ?? '');
+  const [searchQuery, setSearchQuery] = useState(() => searchParams.get('q') ?? '');
+  const isComposingRef = useRef(false);
   const urlSortKey = searchParams.get('sort');
   const [sort, setSortStorage] = useSortState('invoices',
     urlSortKey ? { key: urlSortKey, dir: searchParams.get('order') === 'desc' ? 'desc' : 'asc' } : undefined);
 
   const { data: invoices = [], isLoading } = useInvoices({
+    q: searchQuery || undefined,
     year: year || undefined,
     month: month || undefined,
     customer_id: customerId ? Number(customerId) : undefined,
@@ -56,16 +60,28 @@ export default function InvoiceList() {
   const { data: customers = [] } = useCustomers();
 
   // R-0096: フィルタ・ソートの状態をURLクエリへ反映し、リロード後も復元できるようにする
-  function syncUrl(next: { year: string; month: string; customerId: string; sort?: SortState }) {
+  function syncUrl(next: { year: string; month: string; customerId: string; sort?: SortState }, nextSearch = searchQuery) {
     const params = new URLSearchParams();
     if (next.year) params.set('year', next.year);
     if (next.month) params.set('month', next.month);
     if (next.customerId) params.set('customer_id', next.customerId);
+    if (nextSearch) params.set('q', nextSearch);
     if (next.sort) {
       params.set('sort', next.sort.key);
       params.set('order', next.sort.dir);
     }
     setSearchParams(params, { replace: true });
+  }
+
+  function commitSearch(value: string) {
+    setSearchQuery(value);
+    syncUrl({ year, month, customerId, sort }, value);
+  }
+
+  function handleSearchChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const value = e.target.value;
+    setSearchInput(value);
+    if (!isComposingRef.current) commitSearch(value);
   }
 
   function handleYearChange(value: string) {
@@ -137,6 +153,14 @@ export default function InvoiceList() {
       {/* フィルタ */}
       <div style={{ display: 'flex', gap: 12, marginBottom: 16, background: '#fff',
         padding: '12px 16px', borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.08)', flexWrap: 'wrap' }}>
+        <input
+          value={searchInput}
+          onChange={handleSearchChange}
+          onCompositionStart={() => { isComposingRef.current = true; }}
+          onCompositionEnd={e => { isComposingRef.current = false; commitSearch(e.currentTarget.value); }}
+          placeholder="請求書番号・得意先で検索"
+          style={{ ...filterStyle, minWidth: 260 }}
+        />
         <select value={year} onChange={e => handleYearChange(e.target.value)} style={filterStyle}>
           {YEARS.map(y => <option key={y} value={y}>{y}年</option>)}
         </select>

@@ -6,6 +6,7 @@ import type { PaginatedResponse, SortParam } from '../types/pagination';
 const KEY = 'vouchers';
 
 type VoucherFilters = {
+  q?: string;
   voucher_type?: string;
   status?: string;
   customer_id?: number;
@@ -30,6 +31,7 @@ export function useVouchersPaged(page: number, filters?: VoucherFilters, sort?: 
     queryKey: [KEY, 'paged', page, filters, sort?.key, sort?.dir],
     queryFn: () => {
       const params = new URLSearchParams({ page: String(page), per_page: '50' });
+      if (filters?.q) params.set('q', filters.q);
       if (filters?.voucher_type) params.set('voucher_type', filters.voucher_type);
       if (filters?.status) params.set('status', filters.status);
       if (filters?.customer_id) params.set('customer_id', String(filters.customer_id));

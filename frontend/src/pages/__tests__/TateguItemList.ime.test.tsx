@@ -39,7 +39,7 @@ function renderPage() {
 describe('TateguItemList IMEインクリメンタルサーチ (R-070)', () => {
   it('IME変換中はonChangeで検索APIを発火せず、フォーカスも維持される', async () => {
     renderPage();
-    const input = await screen.findByPlaceholderText('品名・コードで検索') as HTMLInputElement;
+    const input = await screen.findByPlaceholderText('品番・品名・仕様で検索') as HTMLInputElement;
     input.focus();
     expect(document.activeElement).toBe(input);
 
@@ -61,7 +61,7 @@ describe('TateguItemList IMEインクリメンタルサーチ (R-070)', () => {
 
   it('複数文字を連続確定してもフォーカスが外れない', async () => {
     renderPage();
-    const input = await screen.findByPlaceholderText('品名・コードで検索') as HTMLInputElement;
+    const input = await screen.findByPlaceholderText('品番・品名・仕様で検索') as HTMLInputElement;
     input.focus();
     await waitFor(() => expect(requestedQueries.length).toBeGreaterThan(0));
 

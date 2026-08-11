@@ -21,6 +21,7 @@ $subId      = isset($segments[3]) && is_numeric($segments[3]) ? (int)$segments[3
 
 require_once __DIR__ . '/sync_helpers.php';
 require_once __DIR__ . '/list_helpers.php';
+require_once dirname(__DIR__) . '/search_helpers.php';
 
 // --- R-076 B2-3: Beaver発新規伝票の Access 採番IDを書き戻す ---
 // PATCH /vouchers/{id}/access-link
@@ -520,11 +521,24 @@ switch ($method) {
             if (!empty($_GET['customer_id'])) { $where .= ' AND v.customer_id = ?'; $params[] = (int)$_GET['customer_id']; }
             if (!empty($_GET['project_id']))  { $where .= ' AND v.project_id = ?';  $params[] = (int)$_GET['project_id']; }
             if (!empty($_GET['status']))      { $where .= ' AND v.status = ?';      $params[] = $_GET['status']; }
+            if (!empty($_GET['q'])) {
+                [$searchClause, $searchParams] = buildMultiColumnSearchClause(
+                    ['v.voucher_no', 'c.name', 'p.name', 'v.description', 'v.memo'],
+                    $_GET['q']
+                );
+                $where .= ' AND ' . $searchClause;
+                $params = array_merge($params, $searchParams);
+            }
             if (isset($_GET['page'])) {
                 $page    = max(1, (int)$_GET['page']);
                 $perPage = min(200, max(10, (int)($_GET['per_page'] ?? 50)));
                 $offset  = ($page - 1) * $perPage;
-                $cntStmt = $pdo->prepare("SELECT COUNT(*) FROM vouchers v $where");
+                $cntStmt = $pdo->prepare("
+                    SELECT COUNT(*) FROM vouchers v
+                    LEFT JOIN customers c ON c.id = v.customer_id
+                    LEFT JOIN projects p ON p.id = v.project_id
+                    $where
+                ");
                 $cntStmt->execute($params);
                 $total = (int)$cntStmt->fetchColumn();
                 // R-076 Part A Phase 1: サーバソート（ホワイトリストは全てハードコード文字列・実カラム/JOIN別名のみ）

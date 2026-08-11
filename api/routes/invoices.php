@@ -1,4 +1,5 @@
 <?php
+require_once dirname(__DIR__) . '/search_helpers.php';
 /**
  * /invoices エンドポイント
  * GET    /invoices                   一覧
@@ -56,6 +57,14 @@ switch ($method) {
             if (!empty($_GET['customer_id'])) { $where .= ' AND inv.customer_id = ?'; $params[] = (int)$_GET['customer_id']; }
             if (!empty($_GET['year']))  { $where .= ' AND strftime("%Y", inv.billing_date) = ?'; $params[] = $_GET['year']; }
             if (!empty($_GET['month'])) { $where .= ' AND strftime("%m", inv.billing_date) = ?'; $params[] = str_pad($_GET['month'], 2, '0', STR_PAD_LEFT); }
+            if (!empty($_GET['q'])) {
+                [$searchClause, $searchParams] = buildMultiColumnSearchClause(
+                    ['inv.invoice_no', 'c.name'],
+                    $_GET['q']
+                );
+                $where .= ' AND ' . $searchClause;
+                $params = array_merge($params, $searchParams);
+            }
             $stmt = $pdo->prepare("
                 SELECT inv.*, c.name AS customer_name
                 FROM invoices inv

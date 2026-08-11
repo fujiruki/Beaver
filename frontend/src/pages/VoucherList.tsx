@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useVouchersPaged } from '../api/vouchers';
 import { useCustomers } from '../api/customers';
@@ -29,6 +29,9 @@ export default function VoucherList() {
   });
   const [typeFilter, setTypeFilter] = useState(() => searchParams.get('voucher_type') ?? '');
   const [statusFilter, setStatusFilter] = useState(() => searchParams.get('status') ?? '');
+  const [searchInput, setSearchInput] = useState(() => searchParams.get('q') ?? '');
+  const [searchQuery, setSearchQuery] = useState(() => searchParams.get('q') ?? '');
+  const isComposingRef = useRef(false);
   const urlSortKey = searchParams.get('sort');
   const [sort, setSortStorage] = useSortState('vouchers',
     urlSortKey ? { key: urlSortKey, dir: searchParams.get('order') === 'desc' ? 'desc' : 'asc' } : undefined);
@@ -43,6 +46,7 @@ export default function VoucherList() {
   const { data: projects = [] } = useProjects(customerFilter ? { customer_id: customerFilter } : undefined);
 
   const { data, isLoading } = useVouchersPaged(page, {
+    q: searchQuery || undefined,
     voucher_type: typeFilter || undefined,
     status: statusFilter || undefined,
     customer_id: customerFilter ?? undefined,
@@ -60,18 +64,31 @@ export default function VoucherList() {
     customerFilter: number | null;
     projectFilter: number | null;
     sort?: SortState;
-  }) {
+  }, nextSearch = searchQuery) {
     const params = new URLSearchParams();
     if (next.customerFilter) params.set('customer_id', String(next.customerFilter));
     if (next.projectFilter) params.set('project_id', String(next.projectFilter));
     if (next.typeFilter) params.set('voucher_type', next.typeFilter);
     if (next.statusFilter) params.set('status', next.statusFilter);
+    if (nextSearch) params.set('q', nextSearch);
     if (next.page > 1) params.set('page', String(next.page));
     if (next.sort) {
       params.set('sort', next.sort.key);
       params.set('order', next.sort.dir);
     }
     setSearchParams(params, { replace: true });
+  }
+
+  function commitSearch(value: string) {
+    setSearchQuery(value);
+    setPage(1);
+    syncUrl({ page: 1, typeFilter, statusFilter, customerFilter, projectFilter, sort }, value);
+  }
+
+  function handleSearchChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const value = e.target.value;
+    setSearchInput(value);
+    if (!isComposingRef.current) commitSearch(value);
   }
 
   const customerOptions: ComboOption[] = customers.map(c => ({
@@ -185,8 +202,19 @@ export default function VoucherList() {
         <button onClick={handleNewVoucher} style={newBtnStyle}>+ 新規伝票</button>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12, marginBottom: 16, background: '#fff',
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 16, background: '#fff',
         padding: '12px 16px', borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.08)', alignItems: 'end' }}>
+        <div style={{ gridColumn: '1 / -1' }}>
+          <label style={filterLabelStyle}>検索</label>
+          <input
+            value={searchInput}
+            onChange={handleSearchChange}
+            onCompositionStart={() => { isComposingRef.current = true; }}
+            onCompositionEnd={e => { isComposingRef.current = false; commitSearch(e.currentTarget.value); }}
+            placeholder="伝票番号・得意先・案件・摘要で検索"
+            style={{ ...filterStyle, width: '100%' }}
+          />
+        </div>
         <div>
           <label style={filterLabelStyle}>得意先</label>
           <ComboSelect

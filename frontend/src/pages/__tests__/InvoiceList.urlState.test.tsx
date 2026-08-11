@@ -58,6 +58,33 @@ function renderPage(initialEntries?: string[]) {
 }
 
 describe('InvoiceList URL状態保持 (R-0096 Phase1)', () => {
+  it('検索はIME確定後にqへ反映され、年月・得意先フィルタと併用できる', async () => {
+    renderPage(['/invoices?year=2025&month=6&customer_id=2']);
+    await waitFor(() => expect(requestedUrls.length).toBeGreaterThan(0));
+    const input = await screen.findByPlaceholderText('請求書番号・得意先で検索');
+    const callsBefore = requestedUrls.length;
+    fireEvent.compositionStart(input);
+    fireEvent.change(input, { target: { value: 'サクラ' } });
+    expect(requestedUrls.length).toBe(callsBefore);
+    fireEvent.compositionEnd(input, { data: 'サクラ' });
+    await waitFor(() => {
+      const last = new URL(requestedUrls[requestedUrls.length - 1], 'http://localhost');
+      expect(last.searchParams.get('q')).toBe('サクラ');
+      expect(last.searchParams.get('year')).toBe('2025');
+      expect(last.searchParams.get('month')).toBe('6');
+      expect(last.searchParams.get('customer_id')).toBe('2');
+    });
+  });
+
+  it('URLのqを初期表示とAPIリクエストへ復元する', async () => {
+    renderPage(['/invoices?q=I-R0084&year=2025']);
+    expect((await screen.findByDisplayValue('I-R0084') as HTMLInputElement).value).toBe('I-R0084');
+    await waitFor(() => {
+      const last = new URL(requestedUrls[requestedUrls.length - 1], 'http://localhost');
+      expect(last.searchParams.get('q')).toBe('I-R0084');
+      expect(last.searchParams.get('year')).toBe('2025');
+    });
+  });
   it('得意先フィルタを変更するとバックエンドリクエストのcustomer_idパラメータに反映される', async () => {
     renderPage();
     await waitFor(() => expect(requestedUrls.length).toBeGreaterThan(0));

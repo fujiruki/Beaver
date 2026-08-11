@@ -38,7 +38,7 @@ describe('TateguItemList URL状態保持 (R-0096 Phase1)', () => {
   it('検索語を入力すると検索APIリクエストのqパラメータに反映される', async () => {
     renderPage();
     await waitFor(() => expect(requestedUrls.length).toBeGreaterThan(0));
-    const input = await screen.findByPlaceholderText('品名・コードで検索');
+    const input = await screen.findByPlaceholderText('品番・品名・仕様で検索');
     fireEvent.change(input, { target: { value: 'ひきど' } });
 
     await waitFor(() => {
@@ -51,7 +51,7 @@ describe('TateguItemList URL状態保持 (R-0096 Phase1)', () => {
     renderPage(['/tategu?q=%E3%83%89%E3%82%A2&sort=name&order=desc&page=1']);
     await waitFor(() => expect(requestedUrls.length).toBeGreaterThan(0));
 
-    const input = await screen.findByPlaceholderText('品名・コードで検索') as HTMLInputElement;
+    const input = await screen.findByPlaceholderText('品番・品名・仕様で検索') as HTMLInputElement;
     expect(input.value).toBe('ドア');
 
     const last = new URL(requestedUrls[requestedUrls.length - 1], 'http://localhost');
