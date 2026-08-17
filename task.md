@@ -1,7 +1,7 @@
 # Beaver タスクキュー
 
 ## 進行中
-- [ ] R-0109: auth-hub連携によるログイン基盤の導入（`docs/spec/R-0109_auth_hub_integration.md`）
+（なし）
 
 ## 次のステップ（オプション）
 - [ ] 実データでの動作確認（dev_start → npm run dev → ブラウザ確認）
@@ -10,6 +10,7 @@
 - [ ] 権限管理（ユーザー認証）
 
 ## 完了
+- [x] R-0109: auth-hub連携によるログイン基盤の導入（2026-08-17、本番デプロイ・実機確認・Basic認証撤去済み、`docs/spec/R-0109_auth_hub_integration.md`）
 - [x] Step 2: パッケージインストール + 基盤ファイル作成（2026-03-17）
   - TanStack Query, Zustand, React Hook Form, Zod, React Router インストール済み
   - `src/api/client.ts`, 全 types/, `src/App.tsx`, `AppLayout.tsx` 作成済み
