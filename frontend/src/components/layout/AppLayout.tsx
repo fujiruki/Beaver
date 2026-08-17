@@ -1,7 +1,13 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { useAppSettings } from '../../contexts/AppSettingsContext';
+import { useMe } from '../../api/me';
 import FeedbackModal from '../feedback/FeedbackModal';
+
+function handleLogout() {
+  const redirect = encodeURIComponent(window.location.href);
+  window.location.href = `https://door-fujita.com/contents/auth/logout?redirect=${redirect}`;
+}
 
 const ONE_HOUR_MS = 60 * 60 * 1000;
 const ONE_DAY_MS = 24 * ONE_HOUR_MS;
@@ -40,6 +46,7 @@ const navItems = [
 
 export default function AppLayout() {
   const { settings } = useAppSettings();
+  const { data: me } = useMe();
   const buildTime = new Date(__BUILD_TIME__);
   const [now, setNow] = useState(() => new Date());
 
@@ -82,6 +89,25 @@ export default function AppLayout() {
         ))}
 
         <div style={{ marginTop: 'auto' }}>
+          {me && (
+            <div style={{ padding: '10px 16px 0', fontSize: 13, color: '#cbd5e1' }}>
+              <div>{me.name}</div>
+              <button
+                onClick={handleLogout}
+                style={{
+                  marginTop: 4,
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#94a3b8',
+                  fontSize: 12,
+                  cursor: 'pointer',
+                  padding: 0,
+                }}
+              >
+                ログアウト
+              </button>
+            </div>
+          )}
           <div style={{ padding: '16px 16px 0' }}>
             <FeedbackModal />
           </div>

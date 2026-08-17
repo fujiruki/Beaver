@@ -13,6 +13,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/Database.php';
+require_once __DIR__ . '/auth_client.php';
+require_once __DIR__ . '/auth_gate.php';
+auth_configure(['driver' => AUTH_DRIVER, 'base' => 'https://door-fujita.com/contents/auth']);
 
 // ルーティング
 $requestUri = $_SERVER['REQUEST_URI'] ?? '/';
@@ -45,6 +48,23 @@ try {
     // --- ヘルスチェック ---
     if ($path === '/health') {
         echo json_encode(['status' => 'ok', 'app' => 'Beaver']);
+        exit;
+    }
+
+    // --- 認証ゲート (R-0109) ---
+    // AUTH_DRIVER=none（ローカル開発既定）では従来通り認証なしで通す
+    if (AUTH_DRIVER !== 'none' && !authGateIsExempt($path, $method)) {
+        auth_require_user(json: true);
+    }
+
+    // --- ログインユーザー情報 ---
+    if ($path === '/me') {
+        if ($method !== 'GET') {
+            http_response_code(405);
+            echo json_encode(['error' => 'Method not allowed']);
+            exit;
+        }
+        echo json_encode(currentUser());
         exit;
     }
 

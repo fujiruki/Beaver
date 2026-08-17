@@ -23,6 +23,8 @@ php "$root/api/tests/test_tategu_cost_lines.php" >/tmp/bv_tategu_cost_lines.log 
 php "$root/api/tests/test_feedback.php"          >/tmp/bv_feedback.log 2>&1 || fail "[test_feedback] $(tail -n 8 /tmp/bv_feedback.log)"
 php "$root/api/tests/test_project_statuses.php"  >/tmp/bv_project_statuses.log 2>&1 || fail "[test_project_statuses] $(tail -n 8 /tmp/bv_project_statuses.log)"
 php "$root/api/tests/test_history.php"           >/tmp/bv_history.log 2>&1 || fail "[test_history] $(tail -n 8 /tmp/bv_history.log)"
+php "$root/api/tests/test_auth_gate_unit.php"    >/tmp/bv_auth_gate_unit.log 2>&1 || fail "[test_auth_gate_unit] $(tail -n 8 /tmp/bv_auth_gate_unit.log)"
+php "$root/api/tests/test_auth_gate.php"         >/tmp/bv_auth_gate.log 2>&1 || fail "[test_auth_gate] $(tail -n 8 /tmp/bv_auth_gate.log)"
 
 rm -f "$root"/api/tests/*.sqlite 2>/dev/null
 exit 0

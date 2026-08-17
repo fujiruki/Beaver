@@ -28,3 +28,6 @@ if (file_exists(__DIR__ . '/config.local.php')) {
 // R-0080: フィードバック管理API用トークン。config.local.php で未定義の場合のみ開発用フォールバック値を使う
 if (!defined('ADMIN_FEEDBACK_TOKEN')) define('ADMIN_FEEDBACK_TOKEN', 'dev-local-token-change-me');
 if (!defined('FEEDBACK_UPLOAD_DIR')) define('FEEDBACK_UPLOAD_DIR', __DIR__ . '/uploads/feedback/');
+
+// R-0109: auth-hub連携の認証ドライバ。config.local.php で未定義の場合はローカル開発用に 'none'（認証スキップ）
+if (!defined('AUTH_DRIVER')) define('AUTH_DRIVER', 'none');

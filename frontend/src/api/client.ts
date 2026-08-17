@@ -5,6 +5,13 @@ const BASE = '/contents/Beaver/api';
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(BASE + path, init);
+  if (res.status === 401) {
+    const body: { loginUrl?: string } | null = await res.clone().json().catch(() => null);
+    if (body?.loginUrl) {
+      window.location.href = body.loginUrl;
+      return new Promise<T>(() => {}); // 遷移するまで呼び出し元を待たせる
+    }
+  }
   if (!res.ok) {
     const text = await res.text().catch(() => '');
     throw new Error(`API error ${res.status}: ${text}`);
