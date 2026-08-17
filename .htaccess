@@ -1,8 +1,3 @@
-AuthType Basic
-AuthName "Beaver - Staff Only"
-AuthUserFile /home/c6924945/public_html/door-fujita.com/contents/Beaver/.htpasswd
-Require valid-user
-
 RewriteEngine On
 RewriteBase /contents/Beaver/
 
