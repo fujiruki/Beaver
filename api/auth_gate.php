@@ -15,3 +15,11 @@ function authGateIsExempt(string $path, string $method): bool
     if (preg_match('#/access-link$#', $path)) return true;
     return false;
 }
+
+/** R-0110: 番頭AI向けの固定トークン認証（Authorization: Bearer <BANTO_API_TOKEN>） */
+function authGateHasValidBantoToken(): bool
+{
+    $auth = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+    if (strncmp($auth, 'Bearer ', 7) !== 0) return false;
+    return hash_equals(BANTO_API_TOKEN, substr($auth, 7));
+}

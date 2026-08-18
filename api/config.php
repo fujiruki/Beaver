@@ -31,3 +31,6 @@ if (!defined('FEEDBACK_UPLOAD_DIR')) define('FEEDBACK_UPLOAD_DIR', __DIR__ . '/u
 
 // R-0109: auth-hub連携の認証ドライバ。config.local.php で未定義の場合はローカル開発用に 'none'（認証スキップ）
 if (!defined('AUTH_DRIVER')) define('AUTH_DRIVER', 'none');
+
+// R-0110: 番頭AI向けAPIトークン。config.local.php で未定義の場合のみ開発用フォールバック値を使う
+if (!defined('BANTO_API_TOKEN')) define('BANTO_API_TOKEN', 'dev-local-banto-token-change-me');

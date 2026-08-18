@@ -1,7 +1,7 @@
 # Beaver タスクキュー
 
 ## 進行中
-（なし）
+- [ ] R-0110: 番頭AI向けAPIトークン認証の追加（`docs/spec/R-0110_banto_api_token.md`）
 
 ## 次のステップ（オプション）
 - [ ] 実データでの動作確認（dev_start → npm run dev → ブラウザ確認）

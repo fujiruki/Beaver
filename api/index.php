@@ -51,9 +51,10 @@ try {
         exit;
     }
 
-    // --- 認証ゲート (R-0109) ---
+    // --- 認証ゲート (R-0109 / R-0110) ---
     // AUTH_DRIVER=none（ローカル開発既定）では従来通り認証なしで通す
-    if (AUTH_DRIVER !== 'none' && !authGateIsExempt($path, $method)) {
+    // 番頭AI用の固定トークン（Bearer）が一致すればauth-hubログインなしでも通す
+    if (AUTH_DRIVER !== 'none' && !authGateIsExempt($path, $method) && !authGateHasValidBantoToken()) {
         auth_require_user(json: true);
     }
 

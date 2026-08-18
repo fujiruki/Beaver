@@ -7,6 +7,7 @@
 
 declare(strict_types=1);
 
+define('BANTO_API_TOKEN', 'unit-test-banto-token');
 require_once dirname(__DIR__) . '/auth_gate.php';
 
 $passed = 0;
@@ -66,6 +67,31 @@ foreach ($guardedCases as [$method, $path]) {
 
 runTest('GET /feedback は対象外ではない（POSTのみ免除）', function () {
     assertTrue(!authGateIsExempt('/feedback', 'GET'));
+});
+
+echo "\n=== R-0110 authGateHasValidBantoToken() テスト ===\n\n";
+
+runTest('一致するBearerトークンはtrue', function () {
+    $_SERVER['HTTP_AUTHORIZATION'] = 'Bearer unit-test-banto-token';
+    assertTrue(authGateHasValidBantoToken());
+    unset($_SERVER['HTTP_AUTHORIZATION']);
+});
+
+runTest('不一致のBearerトークンはfalse', function () {
+    $_SERVER['HTTP_AUTHORIZATION'] = 'Bearer wrong-token';
+    assertTrue(!authGateHasValidBantoToken());
+    unset($_SERVER['HTTP_AUTHORIZATION']);
+});
+
+runTest('Authorizationヘッダーなしはfalse', function () {
+    unset($_SERVER['HTTP_AUTHORIZATION']);
+    assertTrue(!authGateHasValidBantoToken());
+});
+
+runTest('Bearer以外のスキームはfalse', function () {
+    $_SERVER['HTTP_AUTHORIZATION'] = 'Basic dXNlcjpwYXNz';
+    assertTrue(!authGateHasValidBantoToken());
+    unset($_SERVER['HTTP_AUTHORIZATION']);
 });
 
 echo "\n";

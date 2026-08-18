@@ -46,6 +46,17 @@ function httpGet(int $port, string $path, array $headers = []): array {
     return ['status' => $status, 'body' => (string)$body];
 }
 
+function httpPost(int $port, string $path, array $bodyData, array $headers = []): array {
+    $header = "Connection: close\r\nContent-Type: application/json\r\n" . implode('', array_map(fn($h) => "$h\r\n", $headers));
+    $ctx = stream_context_create(['http' => [
+        'method' => 'POST', 'header' => $header, 'content' => json_encode($bodyData),
+        'timeout' => 5, 'ignore_errors' => true,
+    ]]);
+    $body = @file_get_contents("http://127.0.0.1:$port/contents/Beaver/api$path", false, $ctx);
+    $status = $http_response_header[0] ?? '';
+    return ['status' => $status, 'body' => (string)$body];
+}
+
 function startServer(string $root, string $bootstrap, int $port): mixed {
     $proc = proc_open(
         ['php', '-d', 'auto_prepend_file=' . $bootstrap, '-S', "127.0.0.1:$port", '-t', $root, $root . '/index.php'],
@@ -152,6 +163,25 @@ try {
     runTest('GET /projects/sync はAccessTategu連携用のため未ログインでも200', function () use ($sharedPort) {
         $res = httpGet($sharedPort, '/projects/sync');
         assertTrue(str_contains($res['status'], '200'), 'expected 200 got: ' . $res['status'] . ' body=' . $res['body']);
+    });
+
+    // --- R-0110 番頭AI向けAPIトークン ---
+
+    runTest('番頭AIトークン一致のBearerヘッダーがあれば未ログインでも保護対象パス(GET)が通る', function () use ($sharedPort) {
+        $res = httpGet($sharedPort, '/customers', ['Authorization: Bearer dev-local-banto-token-change-me']);
+        assertTrue(str_contains($res['status'], '200'), 'expected 200 got: ' . $res['status'] . ' body=' . $res['body']);
+    });
+
+    runTest('番頭AIトークン一致のBearerヘッダーがあれば未ログインでもPOST /customersが成功する', function () use ($sharedPort) {
+        $res = httpPost($sharedPort, '/customers', ['name' => '番頭AIテスト得意先'], ['Authorization: Bearer dev-local-banto-token-change-me']);
+        assertTrue(str_contains($res['status'], '201') || str_contains($res['status'], '200'), 'expected 200/201 got: ' . $res['status'] . ' body=' . $res['body']);
+    });
+
+    runTest('番頭AIトークン不一致なら未ログイン扱いで401 + loginUrl', function () use ($sharedPort) {
+        $res = httpGet($sharedPort, '/customers', ['Authorization: Bearer wrong-token']);
+        assertTrue(str_contains($res['status'], '401'), 'expected 401 got: ' . $res['status']);
+        $data = json_decode($res['body'], true);
+        assertTrue(($data['error'] ?? null) === 'unauthenticated', 'error=unauthenticated: ' . $res['body']);
     });
 
 } finally {
