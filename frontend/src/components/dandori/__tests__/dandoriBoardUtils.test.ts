@@ -10,6 +10,7 @@ import {
   freeMarkerLabels,
   monthBoundaries,
   buildBar,
+  unstartedProjects,
 } from '../dandoriBoardUtils';
 
 describe('statusCategory', () => {
@@ -102,6 +103,22 @@ describe('buildBar', () => {
     expect(bar.unknownHours).toBe(true);
     expect(bar.end).toBe('2024-01-01');
     expect(bar.category).toBe('notstarted');
+  });
+});
+
+describe('unstartedProjects', () => {
+  const projects = [
+    { id: 1, status: '問い合わせ', start_date: null },
+    { id: 2, status: '進行中', start_date: '2024-01-01' },
+    { id: 3, status: '完了', start_date: null },
+  ];
+
+  it('既定では完了・キャンセル系を除外する', () => {
+    expect(unstartedProjects(projects, false).map(p => p.id)).toEqual([1]);
+  });
+
+  it('showDone=trueなら完了・キャンセル系も含める', () => {
+    expect(unstartedProjects(projects, true).map(p => p.id)).toEqual([1, 3]);
   });
 });
 

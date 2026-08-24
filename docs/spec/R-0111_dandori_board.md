@@ -87,6 +87,13 @@ export function dailyLoad(bars: {start: string; end: string}[], rangeStart: stri
 export function freeDayMarkers(load: Map<string, number>, todayISO: string): string[]
 ```
 
+## 実機確認フィードバック対応（2026-08-24、藤田晴樹さんより）
+
+原文: 「beaver全体の左右スクロールと、ガントチャート内の左右スクロールが表示されている。beaver内の左右スクロールは表示されないようにして。それと、表示されている案件の数が以上に少ないように見えるがどうしてだろうか？」
+
+- **F1: ページ全体の横スクロール禁止**: 原因は `AppLayout.tsx` の `<main style={{flex:1}}>` にflexアイテムの既定 `min-width:auto` が効き、中身のガント固定幅より縮まないこと。`minWidth: 0` を追加し、横スクロールはガント内（`.gantt-scroll`）のみに閉じる
+- **F2: 開始日未設定の案件の可視化**: 表示案件が少なく見えるのは開始日未入力の案件が「開始日未設定 n件」に集約されるため（仕様どおり）。対策として、ボード下に開始日未設定の案件一覧（案件名・得意先・納期、完了/キャンセル系は表示トグルに従う）を表示し、各行の「今日に置く」ボタンで `start_date=今日` を保存して即バー化できるようにする
+
 ## 受け入れ条件
 
 1. `/dandori` で開始日ありの案件がバー表示される（開始日・工数・納期は既存データをそのまま使用）

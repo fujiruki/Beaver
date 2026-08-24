@@ -134,3 +134,17 @@
 .dandori-board .wrap-bar .cont-mark { font-size: 11px; opacity: 0.85; margin-left: auto; }
 .dandori-board .w-deadline { position: absolute; top: 2px; bottom: 2px; width: 3px; background: var(--danger); border-radius: 2px; z-index: 1; }
 .dandori-board .w-today { position: absolute; top: 0; bottom: 0; background: var(--today-tint); z-index: 0; }
+
+/* F2: 開始日未設定の案件一覧 */
+.dandori-board .unset-list { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.dandori-board .unset-row { display: flex; align-items: center; gap: 10px; padding: 0 14px; height: calc(30px * var(--scale)); border-bottom: 1px solid var(--line); font-size: calc(14px * var(--scale)); }
+.dandori-board .unset-row:last-child { border-bottom: none; }
+.dandori-board .unset-row .name { font-weight: 700; }
+.dandori-board .unset-row .cust { color: var(--muted); font-size: calc(11px * var(--scale)); }
+.dandori-board .unset-row .spacer { flex: 1; }
+.dandori-board .unset-row .delivery { color: var(--danger); font-size: calc(12px * var(--scale)); }
+.dandori-board .unset-row button {
+  border: 1px solid var(--work); border-radius: 6px; background: none; color: var(--work);
+  font-weight: 700; font-size: 12px; padding: 4px 10px; cursor: pointer; font-family: inherit;
+}
+.dandori-board .unset-row button:hover { background: var(--work); color: #fff; }

@@ -119,7 +119,7 @@ export default function AppLayout() {
       </nav>
 
       {/* メインコンテンツ */}
-      <main style={{ flex: 1, padding: 24, background: '#f8fafc' }}>
+      <main style={{ flex: 1, minWidth: 0, padding: 24, background: '#f8fafc' }}>
         <Outlet />
       </main>
     </div>

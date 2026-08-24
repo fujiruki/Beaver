@@ -126,6 +126,14 @@ interface ProjectLike {
   effective_estimated_hours?: number | null;
 }
 
+/** 開始日未設定の案件のうち、表示対象のもの（完了・キャンセル系はshowDoneに従う） */
+export function unstartedProjects<T extends { start_date: string | null; status: string }>(
+  projects: T[],
+  showDone: boolean,
+): T[] {
+  return projects.filter(p => !p.start_date && (showDone || statusCategory(p.status) !== 'done'));
+}
+
 export function buildBar(project: ProjectLike, hoursPerDay: number): DandoriBar {
   const hours = project.effective_estimated_hours ?? null;
   const workdays = workdaysFromHours(hours, hoursPerDay);

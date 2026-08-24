@@ -10,6 +10,7 @@ import {
   buildBar,
   rangeForPreset,
   todayISOLocal,
+  unstartedProjects,
   PRESET_DEFAULT_PX_PER_DAY,
   PRESET_LABELS,
   type RangePreset,
@@ -80,6 +81,7 @@ export default function DandoriBoard() {
   );
   const visibleBars = useMemo(() => allBars.filter(b => showDone || b.category !== 'done'), [allBars, showDone]);
   const overCount = visibleBars.filter(b => b.delivery && b.end > b.delivery).length;
+  const unsetProjects = useMemo(() => unstartedProjects(projects, showDone), [projects, showDone]);
 
   if (isLoading) return <div className="p-6">読み込み中...</div>;
   if (error) return <div className="p-6 text-red-600">エラー: {String(error)}</div>;
@@ -153,6 +155,23 @@ export default function DandoriBoard() {
         />
       ) : (
         <WrapView bars={visibleBars} rangeStart={rangeStart} rangeEnd={rangeEnd} todayISO={todayISO} />
+      )}
+
+      {unsetProjects.length > 0 && (
+        <>
+          <h2 className="section-title">開始日未設定の案件（{unsetProjects.length}件）</h2>
+          <div className="unset-list">
+            {unsetProjects.map(p => (
+              <div className="unset-row" key={p.id}>
+                <span className="name">{p.name}</span>
+                <span className="cust">{p.customer_name}</span>
+                <span className="spacer" />
+                {p.delivery_date && <span className="delivery">納期 {p.delivery_date}</span>}
+                <button onClick={() => handleCommit(p.id, { start_date: todayISO })}>今日に置く</button>
+              </div>
+            ))}
+          </div>
+        </>
       )}
     </div>
   );
