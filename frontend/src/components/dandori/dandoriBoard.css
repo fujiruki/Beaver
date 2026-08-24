@@ -93,6 +93,13 @@
   background: repeating-linear-gradient(45deg, var(--danger) 0 8px, #a03329 8px 16px);
   border-radius: 0 5px 5px 0; pointer-events: none;
 }
+/* F5: バー内に収まらないラベルは地の文字色で右外側に表示（ドラッグの邪魔をしない） */
+.dandori-board .bar-label-outside {
+  position: absolute; top: 2px; height: calc(26px * var(--scale));
+  display: flex; align-items: center;
+  color: var(--ink); font-weight: 700; font-size: calc(14px * var(--scale));
+  white-space: nowrap; pointer-events: none;
+}
 .dandori-board .deadline {
   position: absolute; top: 2px; bottom: 2px; width: 3px;
   background: var(--danger); border-radius: 2px; cursor: ew-resize; touch-action: none;

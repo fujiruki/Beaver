@@ -6,6 +6,7 @@ import AppLayout from '../AppLayout';
 vi.mock('react-router-dom', () => ({
   NavLink: ({ children }: { children: React.ReactNode }) => <a>{children}</a>,
   Outlet: () => <div />,
+  useLocation: () => ({ pathname: '/' }),
 }));
 
 vi.mock('../../../contexts/AppSettingsContext', () => ({

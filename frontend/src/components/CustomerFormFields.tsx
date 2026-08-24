@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { FieldErrors, UseFormRegister, UseFormSetValue, UseFormWatch } from 'react-hook-form';
 import type { CustomerInput } from '../types/customer';
+import { nextKanaValue } from '../lib/kanaAutoFill';
 
 const CUTOFF_OPTIONS = [
   { label: '5日',  value: 5  },
@@ -48,7 +49,9 @@ export default function CustomerFormFields({ register, errors, setValue, watch, 
                 if (/^[぀-ゟ]+$/.test(e.data)) kanaRef.current = e.data;
               }}
               onCompositionEnd={() => {
-                if (!kanaLocked && kanaRef.current) setValue('name_kana', kanaRef.current);
+                // R-0113: 直前の確定分を上書きせず、既存のよみに追記する
+                setValue('name_kana', nextKanaValue(watch('name_kana') ?? '', kanaRef.current, kanaLocked));
+                kanaRef.current = '';
               }}
             />
           </Field>

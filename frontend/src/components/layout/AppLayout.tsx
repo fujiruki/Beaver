@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { useAppSettings } from '../../contexts/AppSettingsContext';
 import { useMe } from '../../api/me';
@@ -50,11 +50,18 @@ export default function AppLayout() {
   const { data: me } = useMe();
   const buildTime = new Date(__BUILD_TIME__);
   const [now, setNow] = useState(() => new Date());
+  const location = useLocation();
 
   useEffect(() => {
     const intervalId = window.setInterval(() => setNow(new Date()), 60_000);
     return () => window.clearInterval(intervalId);
   }, []);
+
+  useEffect(() => {
+    // R-0112: タブ名が「frontend」等になり分かりづらい問題への対応
+    const current = navItems.find(item => item.to === '/' ? location.pathname === '/' : location.pathname.startsWith(item.to));
+    document.title = current ? `${current.label} - Beaver` : 'Beaver';
+  }, [location.pathname]);
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', fontFamily: 'sans-serif', fontSize: settings.fontSize }}>

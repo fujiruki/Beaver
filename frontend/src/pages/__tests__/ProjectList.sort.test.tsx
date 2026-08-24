@@ -62,12 +62,27 @@ function renderPage() {
 }
 
 describe('ProjectList サーバソート (R-076 Part A)', () => {
-  it('初回表示時は sort/order パラメータを付けない', async () => {
+  it('R-0116: 新規ブラウザでの初回表示時はステータス（工程順）→納期の複合ソートが既定になる', async () => {
     renderPage();
     await waitFor(() => expect(requestedUrls.length).toBeGreaterThan(0));
     const first = new URL(requestedUrls[0], 'http://localhost');
-    expect(first.searchParams.has('sort')).toBe(false);
-    expect(first.searchParams.has('order')).toBe(false);
+    expect(first.searchParams.get('sort')).toBe('status,delivery_date');
+    expect(first.searchParams.get('order')).toBe('asc,asc');
+  });
+
+  it('R-0116: URLにsortパラメータが既にある場合は既定値より優先される', async () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <MemoryRouter initialEntries={['/projects?sort=name&order=asc']}>
+          <ProjectList />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    await waitFor(() => expect(requestedUrls.length).toBeGreaterThan(0));
+    const first = new URL(requestedUrls[0], 'http://localhost');
+    expect(first.searchParams.get('sort')).toBe('name');
+    expect(first.searchParams.get('order')).toBe('asc');
   });
 
   it('列見出し「案件名」をクリックすると sort=name&order=asc がURLに付与される', async () => {

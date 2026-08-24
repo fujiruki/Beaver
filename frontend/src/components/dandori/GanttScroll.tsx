@@ -25,6 +25,14 @@ function gridBgStyle(pxPerDay: number): React.CSSProperties {
   return { backgroundImage: images.join(', ') };
 }
 
+const CHAR_WIDTH_PX = 13; // 14px太字1文字あたりの概算幅（和文基準、余裕を持たせた概算）
+const LABEL_PADDING_PX = 20; // .bar の左右padding分
+
+/** F5: 厳密なmeasureTextは使わず文字数×概算幅でバー内に収まるか判定する */
+export function estimateLabelWidth(text: string): number {
+  return text.length * CHAR_WIDTH_PX + LABEL_PADDING_PX;
+}
+
 function barClassName(bar: DandoriBar): string {
   const category = bar.category === 'done' ? 'done' : bar.category === 'notstarted' ? 'notstarted' : 'working';
   return ['bar', category, bar.isShop && bar.category !== 'done' ? 'shop' : '', bar.unknownHours ? 'unknown-hours' : ''].filter(Boolean).join(' ');
@@ -178,6 +186,9 @@ function BarRow({ bar, rangeStart, pxPerDay, gridWidth, showBarLabel, todayLeftP
   const overDays = bar.delivery && bar.end > bar.delivery ? daysBetween(bar.delivery, bar.end) : 0;
   const deadlineLeftPx = bar.delivery ? daysBetween(rangeStart, bar.delivery) * pxPerDay + deadlineDrag.dragOffsetPx : null;
 
+  const labelText = `${bar.name}（${bar.hours ?? '?'}h）`;
+  const labelFitsInside = estimateLabelWidth(labelText) <= widthPx;
+
   return (
     <div className="row">
       <div className="label-col">
@@ -192,9 +203,12 @@ function BarRow({ bar, rangeStart, pxPerDay, gridWidth, showBarLabel, todayLeftP
           style={{ left: leftPx, width: widthPx }}
           {...barDrag.handlers}
         >
-          {showBarLabel && `${bar.name}（${bar.hours ?? '?'}h）`}
+          {showBarLabel && labelFitsInside && labelText}
           {overDays > 0 && <div className="over" style={{ width: overDays * pxPerDay }} />}
         </div>
+        {showBarLabel && !labelFitsInside && (
+          <span className="bar-label-outside" style={{ left: leftPx + widthPx + 6 }}>{labelText}</span>
+        )}
         {deadlineLeftPx !== null && (
           <div className="deadline" style={{ left: deadlineLeftPx }} {...deadlineDrag.handlers} />
         )}

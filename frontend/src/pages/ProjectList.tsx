@@ -11,8 +11,11 @@ import type { Project, ProjectStatus } from '../types/project';
 import { deadlineTierClassName, deadlineTierIcon, getDeadlineTier } from '../lib/dateHighlight';
 
 // R-0091: sort=a,b&order=asc,desc 形式のURLクエリを複合ソートキー配列に変換する
+// R-0116: URL・localStorageに未設定の新規ブラウザでは、ステータス（工程順）→納期の複合ソートを既定にする
+const DEFAULT_SORT_KEYS: SortState[] = [{ key: 'status', dir: 'asc' }, { key: 'delivery_date', dir: 'asc' }];
+
 function parseSortKeys(sortParam: string | null, orderParam: string | null): SortState[] {
-  if (!sortParam) return [];
+  if (!sortParam) return DEFAULT_SORT_KEYS;
   const keys = sortParam.split(',').filter(Boolean);
   const dirs = (orderParam ?? '').split(',');
   return keys.map((key, i) => ({ key, dir: dirs[i] === 'desc' ? 'desc' : 'asc' }));

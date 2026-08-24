@@ -31,8 +31,13 @@ export default function ComboSelect({ options, value, onChange, placeholder, dis
 
   const selected = value != null ? options.find(o => o.id === value) : null;
 
-  const filtered = query
-    ? options.filter(o => normalize(o.searchText).includes(normalize(query)))
+  // R-0115: スペース区切りの各トークンをAND条件でマッチ（かな正規化はnormalize側で対応済み）
+  const tokens = query.trim() ? query.trim().split(/[\s　]+/).filter(Boolean) : [];
+  const filtered = tokens.length
+    ? options.filter(o => {
+        const normalized = normalize(o.searchText);
+        return tokens.every(t => normalized.includes(normalize(t)));
+      })
     : options;
 
   useEffect(() => {
@@ -70,10 +75,12 @@ export default function ComboSelect({ options, value, onChange, placeholder, dis
       e.preventDefault();
       setHighlighted(h => Math.max(h - 1, 0));
     } else if (e.key === 'Enter') {
+      // R-0114: 漢字変換確定のEnterでは候補確定しない
+      if (e.nativeEvent.isComposing || e.keyCode === 229) return;
       e.preventDefault();
-      if (highlighted >= 0 && filtered[highlighted]) handleSelect(filtered[highlighted].id);
-      // R-0083: 候補が1件に絞られていれば、ハイライト操作なしでもEnterで選択する
-      else if (filtered.length === 1) handleSelect(filtered[0].id);
+      // R-0114: ハイライトがなければ、表示中候補の一番上で確定する
+      const target = highlighted >= 0 ? filtered[highlighted] : filtered[0];
+      if (target) handleSelect(target.id);
     } else if (e.key === 'Escape') {
       setOpen(false);
       setQuery('');

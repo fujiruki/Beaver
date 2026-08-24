@@ -11,3 +11,4 @@ api/tests/_server_bootstrap.php
 .codegraph/
 api/config.local.php
 .htpasswd
+.claude/secrets/
