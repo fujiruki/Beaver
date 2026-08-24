@@ -94,6 +94,13 @@ export function freeDayMarkers(load: Map<string, number>, todayISO: string): str
 - **F1: ページ全体の横スクロール禁止**: 原因は `AppLayout.tsx` の `<main style={{flex:1}}>` にflexアイテムの既定 `min-width:auto` が効き、中身のガント固定幅より縮まないこと。`minWidth: 0` を追加し、横スクロールはガント内（`.gantt-scroll`）のみに閉じる
 - **F2: 開始日未設定の案件の可視化**: 表示案件が少なく見えるのは開始日未入力の案件が「開始日未設定 n件」に集約されるため（仕様どおり）。対策として、ボード下に開始日未設定の案件一覧（案件名・得意先・納期、完了/キャンセル系は表示トグルに従う）を表示し、各行の「今日に置く」ボタンで `start_date=今日` を保存して即バー化できるようにする
 
+### 追加フィードバック（2026-08-24、F2確認後）
+
+原文（ローマ字入力）: 「iikangaeda. kyounioku botann no migigawani tuginotorikakareruhini oku botannwo tukete . soreto, kaisibimisetteinoanken mo hyoukeisikino moju-ru wo tukatte. sousitara so-tomodekiruyouninattebenridayone.sosite retunohabamo setteidekiruyouninarusi. sokoni kousuu no puropateli mo tukete.」
+
+- **F3: 「次の空きに置く」ボタン**: 「今日に置く」の右に「次の空きに置く」を追加。表示中のバー（完了/キャンセル除く）の稼働から、今日以降で稼働0の最初の平日を求めて `start_date` に保存する。純関数 `nextFreeDay(bars, todayISO)` として切り出しテストを書く（全バー終了後は最終バー翌営業日、バーが無ければ今日）
+- **F4: 開始日未設定一覧をDataTable化**: 既存の `DataTable` コンポーネント（ソート・列幅ドラッグ対応）で表示する。列: 案件名 / 得意先 / 納期 / 工数(h・右揃え、R-0106に倣う) / 操作（今日に置く・次の空きに置く）。既定ソートは納期昇順
+
 ## 受け入れ条件
 
 1. `/dandori` で開始日ありの案件がバー表示される（開始日・工数・納期は既存データをそのまま使用）

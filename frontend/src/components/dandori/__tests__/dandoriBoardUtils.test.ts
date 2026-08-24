@@ -11,6 +11,7 @@ import {
   monthBoundaries,
   buildBar,
   unstartedProjects,
+  nextFreeDay,
 } from '../dandoriBoardUtils';
 
 describe('statusCategory', () => {
@@ -119,6 +120,29 @@ describe('unstartedProjects', () => {
 
   it('showDone=trueなら完了・キャンセル系も含める', () => {
     expect(unstartedProjects(projects, true).map(p => p.id)).toEqual([1, 3]);
+  });
+});
+
+describe('nextFreeDay', () => {
+  it('連続したバーの直後（土日を挟む）翌営業日を返す', () => {
+    const bars = [{ start: '2024-01-01', end: '2024-01-05' }]; // 月〜金
+    expect(nextFreeDay(bars, '2024-01-01')).toBe('2024-01-08'); // 翌月曜
+  });
+
+  it('バーの途中に空きがあればその穴を返す', () => {
+    const bars = [
+      { start: '2024-01-01', end: '2024-01-02' },
+      { start: '2024-01-04', end: '2024-01-05' },
+    ];
+    expect(nextFreeDay(bars, '2024-01-01')).toBe('2024-01-03'); // 水曜が空き
+  });
+
+  it('バーが無ければ今日（平日）を返す', () => {
+    expect(nextFreeDay([], '2024-01-01')).toBe('2024-01-01'); // 月曜
+  });
+
+  it('バーが無く今日が土日なら次の月曜を返す', () => {
+    expect(nextFreeDay([], '2024-01-06')).toBe('2024-01-08'); // 土曜起点→翌月曜
   });
 });
 

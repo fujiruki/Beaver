@@ -6,11 +6,14 @@ import { api } from '../api/client';
 import type { Project } from '../types/project';
 import GanttScroll from '../components/dandori/GanttScroll';
 import WrapView from '../components/dandori/WrapView';
+import DataTable, { useSortState } from '../components/DataTable';
+import type { DataTableColumn } from '../components/DataTable';
 import {
   buildBar,
   rangeForPreset,
   todayISOLocal,
   unstartedProjects,
+  nextFreeDay,
   PRESET_DEFAULT_PX_PER_DAY,
   PRESET_LABELS,
   type RangePreset,
@@ -82,6 +85,47 @@ export default function DandoriBoard() {
   const visibleBars = useMemo(() => allBars.filter(b => showDone || b.category !== 'done'), [allBars, showDone]);
   const overCount = visibleBars.filter(b => b.delivery && b.end > b.delivery).length;
   const unsetProjects = useMemo(() => unstartedProjects(projects, showDone), [projects, showDone]);
+  const nextFree = useMemo(
+    () => nextFreeDay(visibleBars.map(b => ({ start: b.start, end: b.end })), todayISO),
+    [visibleBars, todayISO],
+  );
+
+  const [unsetSort, setUnsetSort] = useSortState('dandori-unset', { key: 'delivery_date', dir: 'asc' });
+  const sortedUnset = useMemo(() => {
+    const key = unsetSort?.key ?? 'delivery_date';
+    const dir = unsetSort?.dir ?? 'asc';
+    const valueOf = (p: Project) => {
+      if (key === 'hours') return p.effective_estimated_hours ?? -1;
+      if (key === 'name') return p.name;
+      if (key === 'customer_name') return p.customer_name ?? '';
+      return p.delivery_date ?? '9999-99-99';
+    };
+    return [...unsetProjects].sort((a, b) => {
+      const av = valueOf(a);
+      const bv = valueOf(b);
+      const cmp = av < bv ? -1 : av > bv ? 1 : 0;
+      return dir === 'desc' ? -cmp : cmp;
+    });
+  }, [unsetProjects, unsetSort]);
+
+  const unsetColumns: DataTableColumn<Project>[] = [
+    { key: 'name', label: '案件名', sortable: true, render: p => p.name },
+    { key: 'customer_name', label: '得意先', sortable: true, render: p => p.customer_name ?? '—' },
+    { key: 'delivery_date', label: '納期', sortable: true, render: p => p.delivery_date ?? '—' },
+    {
+      key: 'hours', label: '工数(h)', align: 'right', sortable: true,
+      render: p => (p.effective_estimated_hours != null ? `${p.effective_estimated_hours}h` : '—'),
+    },
+    {
+      key: 'actions', label: '', width: 190, stopRowClick: true,
+      render: p => (
+        <span className="dt-actions">
+          <button onClick={() => handleCommit(p.id, { start_date: todayISO })}>今日に置く</button>
+          <button onClick={() => handleCommit(p.id, { start_date: nextFree })}>次の空きに置く</button>
+        </span>
+      ),
+    },
+  ];
 
   if (isLoading) return <div className="p-6">読み込み中...</div>;
   if (error) return <div className="p-6 text-red-600">エラー: {String(error)}</div>;
@@ -160,17 +204,15 @@ export default function DandoriBoard() {
       {unsetProjects.length > 0 && (
         <>
           <h2 className="section-title">開始日未設定の案件（{unsetProjects.length}件）</h2>
-          <div className="unset-list">
-            {unsetProjects.map(p => (
-              <div className="unset-row" key={p.id}>
-                <span className="name">{p.name}</span>
-                <span className="cust">{p.customer_name}</span>
-                <span className="spacer" />
-                {p.delivery_date && <span className="delivery">納期 {p.delivery_date}</span>}
-                <button onClick={() => handleCommit(p.id, { start_date: todayISO })}>今日に置く</button>
-              </div>
-            ))}
-          </div>
+          <DataTable
+            tableId="dandori-unset"
+            columns={unsetColumns}
+            rows={sortedUnset}
+            rowKey={p => p.id}
+            sortKey={unsetSort?.key}
+            sortDir={unsetSort?.dir}
+            onSortChange={setUnsetSort}
+          />
         </>
       )}
     </div>

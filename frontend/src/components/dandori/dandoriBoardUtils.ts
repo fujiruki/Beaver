@@ -3,7 +3,7 @@
  * 案件単位の工数→バー期間計算は lib/dandoriCalc.ts に集約済みのためそちらを使う。
  * ここに置くのは画面のレイアウト・表示切替に関わる小さなロジックのみ。
  */
-import { freeDayMarkers, workdaysFromHours, barEndDate } from '../../lib/dandoriCalc';
+import { freeDayMarkers, workdaysFromHours, barEndDate, dailyLoad } from '../../lib/dandoriCalc';
 
 export type RangePreset = '8w' | '6m' | '1y';
 export type ViewMode = 'scroll' | 'wrap';
@@ -79,6 +79,17 @@ export function freeMarkerLabels(load: Map<string, number>, todayISO: string): {
     const multi = next ? next[1] === 0 : false;
     return { date, label: multi ? `${formatMD(date)} から空き` : `${formatMD(date)} 空き` };
   });
+}
+
+/**
+ * 今日以降で稼働0の最初の平日を返す（F3）。全バー終了後で空きが無ければ最終バー翌営業日、
+ * バーが無ければ今日（今日が土日なら次の月曜）相当になる。
+ */
+export function nextFreeDay(bars: { start: string; end: string }[], todayISO: string): string {
+  const maxEnd = bars.reduce((max, b) => (b.end > max ? b.end : max), todayISO);
+  const rangeEnd = addDaysISO(maxEnd, 7); // 全バー終了後にも必ず平日が1つ入るバッファ
+  const load = dailyLoad(bars, todayISO, rangeEnd);
+  return freeDayMarkers(load, todayISO)[0] ?? todayISO;
 }
 
 export function isWeekendISO(iso: string): boolean {
