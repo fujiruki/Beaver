@@ -1,0 +1,437 @@
+<title>Beaver 段取りボード</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700&display=swap">
+<style>
+  :root {
+    --bg: #f7f5f2;
+    --surface: #ffffff;
+    --ink: #2b2620;
+    --muted: #8a8177;
+    --line: #e7e2da;
+    --work: #2f7d6d;
+    --work-dark: #1d5a4e;
+    --work-tint: #d8eae5;
+    --shop: #b07a2e;
+    --danger: #c2453a;
+    --today-tint: #fdf3d8;
+    --today-ink: #96700f;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Zen Kaku Gothic New', 'Hiragino Kaku Gothic ProN', 'Yu Gothic', sans-serif;
+    font-weight: 500;
+    padding: 24px 32px 56px;
+  }
+  .board { max-width: 1640px; margin: 0 auto; }
+
+  header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
+  header h1 { font-size: 13px; font-weight: 500; color: var(--muted); letter-spacing: 0.04em; }
+  header .sub { color: var(--muted); font-size: 13px; }
+  .alert-badge {
+    margin-left: auto;
+    background: var(--danger); color: #fff;
+    font-weight: 700; font-size: 15px;
+    padding: 6px 14px; border-radius: 6px;
+  }
+
+  .toolbar {
+    display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+    padding: 10px 16px; margin: 10px 0 18px;
+    font-size: 14px;
+  }
+  .toggle { display: flex; border: 1px solid var(--work); border-radius: 6px; overflow: hidden; }
+  .toggle span { padding: 6px 12px; font-weight: 700; }
+  .toggle .on { background: var(--work); color: #fff; }
+  .toggle .off { color: var(--work); }
+  .toolbar .lbl { color: var(--muted); font-size: 12px; margin-right: -12px; }
+  .zoom { display: flex; align-items: center; gap: 10px; color: var(--muted); }
+  .zoom .track { position: relative; width: 130px; height: 4px; background: var(--line); border-radius: 2px; }
+  .zoom .knob { position: absolute; top: -6px; left: 45%; width: 16px; height: 16px; border-radius: 50%; background: var(--work); }
+  .filter { color: var(--muted); font-size: 13px; }
+  .filter b { color: var(--ink); }
+
+  h2 { font-size: 12px; font-weight: 500; color: var(--muted); letter-spacing: 0.06em; margin: 28px 0 8px; }
+
+  .gantt-scroll { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+  .gantt { position: relative; width: 1584px; padding-bottom: 6px; }
+
+  /* 8週間 = 56日 × 24px、ラベル列 240px。週初=月曜、土日は各週の6・7列目 */
+  .axis, .row, .load-row { display: flex; }
+  .label-col { flex: 0 0 240px; padding: 0 14px; display: flex; flex-direction: column; justify-content: center; border-right: 1px solid var(--line); }
+  .grid-col { position: relative; flex: 0 0 1344px; }
+  .grid-bg {
+    position: absolute; inset: 0;
+    background:
+      repeating-linear-gradient(to right, transparent 0 120px, rgba(138,129,119,0.10) 120px 168px),
+      repeating-linear-gradient(to right, var(--line) 0 1px, transparent 1px 24px);
+  }
+  .today-col { position: absolute; top: 0; bottom: 0; left: 168px; width: 24px; background: var(--today-tint); }
+
+  .axis { border-bottom: 2px solid var(--line); font-size: 11px; color: var(--muted); }
+  .axis .label-col { justify-content: flex-end; padding-bottom: 6px; font-size: 13px; color: var(--muted); }
+  .axis .grid-col { height: 44px; }
+  .axis .week { position: absolute; top: 4px; font-weight: 700; font-size: 12px; font-variant-numeric: tabular-nums; }
+  .axis .day-nums { position: absolute; bottom: 4px; left: 0; right: 0; display: flex; font-variant-numeric: tabular-nums; }
+  .axis .day-nums i { flex: 0 0 24px; text-align: center; font-style: normal; }
+  .axis .day-nums i.we { color: #b8a99a; }
+  .axis .today-label { position: absolute; top: -1px; left: 168px; width: 24px; text-align: center; font-weight: 700; color: var(--today-ink); font-size: 10px; }
+
+  .row { border-bottom: 1px solid var(--line); }
+  .row .grid-col { height: 30px; }
+  .row .label-col { flex-direction: row; align-items: center; gap: 8px; white-space: nowrap; overflow: hidden; }
+  .row .name { font-weight: 700; font-size: 14px; line-height: 1.1; }
+  .row .cust { font-size: 11px; color: var(--muted); }
+
+  .bar {
+    position: absolute; top: 2px; height: 26px;
+    border-radius: 5px;
+    display: flex; align-items: center;
+    padding: 0 10px;
+    color: #fff; font-weight: 700; font-size: 14px; white-space: nowrap; overflow: hidden;
+  }
+  .bar.working { background: var(--work); }
+  .bar.notstarted { background: var(--work-tint); color: var(--work-dark); border: 2px dashed var(--work); }
+  .bar.shop { background: var(--shop); }
+  .bar .over {
+    position: absolute; top: 0; bottom: 0; right: 0;
+    background: repeating-linear-gradient(45deg, var(--danger) 0 8px, #a03329 8px 16px);
+    border-radius: 0 5px 5px 0;
+  }
+  .deadline {
+    position: absolute; top: 2px; bottom: 2px; width: 3px;
+    background: var(--danger); border-radius: 2px;
+  }
+  .load-row { border-top: 2px solid var(--line); background: #fbfaf8; }
+  .load-row .label-col { font-size: 12px; color: var(--muted); }
+  .load-row .grid-col { height: 42px; }
+  .load-bars { position: absolute; bottom: 15px; left: 0; display: flex; align-items: flex-end; height: 24px; }
+  .load-bars i { flex: 0 0 24px; display: flex; align-items: flex-end; justify-content: center; }
+  .load-bars b { width: 14px; border-radius: 3px 3px 0 0; background: var(--work); opacity: 0.85; }
+  .load-bars b.h1 { height: 11px; }
+  .load-bars b.h2 { height: 22px; background: var(--work-dark); }
+  .free-marker { position: absolute; bottom: 0; font-size: 12px; font-weight: 700; color: var(--work-dark); white-space: nowrap; }
+  .free-marker::before { content: '▼ '; }
+
+  .callout {
+    position: absolute; z-index: 2;
+    background: var(--ink); color: #fff;
+    font-size: 12px; font-weight: 700;
+    width: 22px; height: 22px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  /* 6ヶ月ビュー: 1日=6px、日付数字なし・月の線だけ */
+  .span-scroll { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+  .span-view { position: relative; width: 1332px; }
+  .span-view .label-col { flex: 0 0 240px; }
+  .span-view .grid-col { flex: 0 0 1092px; }
+  .span-axis { display: flex; border-bottom: 2px solid var(--line); }
+  .span-axis .grid-col { height: 26px; }
+  .span-axis .month { position: absolute; top: 4px; font-weight: 700; font-size: 12px; color: var(--muted); }
+  .month-line { position: absolute; top: 0; bottom: 0; width: 1px; background: #d5cec3; }
+  .span-row { display: flex; border-bottom: 1px solid var(--line); }
+  .span-row:last-child { border-bottom: none; }
+  .span-row .grid-col { height: 24px; }
+  .span-row .label-col { flex-direction: row; align-items: center; gap: 8px; white-space: nowrap; overflow: hidden; }
+  .span-row .name { font-weight: 700; font-size: 13px; }
+  .span-row .cust { font-size: 11px; color: var(--muted); }
+  .sbar { position: absolute; top: 4px; height: 16px; border-radius: 3px; }
+  .sbar.working { background: var(--work); }
+  .sbar.notstarted { background: var(--work-tint); border: 1.5px dashed var(--work); }
+  .sbar.shop { background: var(--shop); }
+  .sbar .over { position: absolute; top: 0; bottom: 0; right: 0; background: repeating-linear-gradient(45deg, var(--danger) 0 5px, #a03329 5px 10px); border-radius: 0 3px 3px 0; }
+  .s-deadline { position: absolute; top: 3px; bottom: 3px; width: 2px; background: var(--danger); border-radius: 1px; }
+  .s-today { position: absolute; top: 0; bottom: 0; width: 6px; background: var(--today-tint); }
+
+  /* 折り返しモード */
+  .wrap-preview { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .wrap-week { position: relative; border-bottom: 1px solid var(--line); }
+  .wrap-week:last-child { border-bottom: none; }
+  .wrap-week .w-grid {
+    position: absolute; inset: 0;
+    background:
+      repeating-linear-gradient(to right, transparent 0 71.43%, rgba(138,129,119,0.10) 71.43% 100%),
+      repeating-linear-gradient(to right, var(--line) 0 1px, transparent 1px 14.28%);
+  }
+  .wrap-week .w-head { position: relative; padding: 8px 14px 2px; font-weight: 700; font-size: 13px; }
+  .wrap-week .w-days { position: relative; display: flex; font-size: 12px; color: var(--muted); padding: 0 0 4px; font-variant-numeric: tabular-nums; }
+  .wrap-week .w-days i { flex: 1; text-align: center; font-style: normal; }
+  .wrap-week .w-days i.we { color: #b8a99a; }
+  .wrap-lanes { position: relative; padding: 2px 0 8px; }
+  .wrap-bar {
+    position: relative; height: 26px; margin: 2px 0;
+    border-radius: 5px; color: #fff; font-weight: 700; font-size: 14px;
+    display: flex; align-items: center; padding: 0 10px; white-space: nowrap; overflow: hidden;
+  }
+  .wrap-bar.working { background: var(--work); }
+  .wrap-bar.notstarted { background: var(--work-tint); color: var(--work-dark); border: 2px dashed var(--work); }
+  .wrap-bar.cont-l { border-radius: 0 5px 5px 0; }
+  .wrap-bar.cont-r { border-radius: 5px 0 0 5px; }
+  .wrap-bar .cont-mark { font-size: 11px; opacity: 0.85; margin-left: auto; }
+  .w-deadline { position: absolute; top: 2px; bottom: 2px; width: 3px; background: var(--danger); border-radius: 2px; z-index: 1; }
+
+  .notes { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 32px; }
+  .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px 22px; }
+  .panel h3 { font-size: 12px; font-weight: 500; color: var(--muted); letter-spacing: 0.06em; margin-bottom: 10px; }
+  .panel ol, .panel ul { padding-left: 1.4em; font-size: 14px; line-height: 1.9; }
+  .legend-chip { display: inline-block; width: 34px; height: 15px; border-radius: 4px; vertical-align: -2px; margin-right: 6px; }
+  @media (max-width: 900px) { .notes { grid-template-columns: 1fr; } }
+</style>
+
+<div class="board">
+  <header>
+    <h1>段取りボード</h1>
+    <span class="sub">2026年8月17日 〜 10月11日（8週間）</span>
+    <span class="alert-badge">⚠ 納期注意 1件</span>
+  </header>
+
+  <div class="toolbar">
+    <span class="lbl">表示期間</span>
+    <div class="toggle"><span class="on">8週間</span><span class="off">6ヶ月</span><span class="off">1年</span></div>
+    <span class="lbl">モード</span>
+    <div class="toggle"><span class="on">横スクロール</span><span class="off">折り返し</span></div>
+    <div class="zoom">ズーム <div class="track"><div class="knob"></div></div></div>
+    <span class="lbl">文字</span>
+    <div class="toggle"><span class="off">A−</span><span class="on">A</span><span class="off">A＋</span></div>
+    <div class="filter">表示: <b>進行中・未着手</b>（完了は非表示）</div>
+    <div class="filter">1日 = <b>8時間</b>（設定で変更）</div>
+  </div>
+
+  <h2>横スクロールモード（既定・今日の週から8週間）</h2>
+  <div class="gantt-scroll">
+    <div class="gantt">
+      <div class="axis">
+        <div class="label-col">案件</div>
+        <div class="grid-col">
+          <div class="grid-bg"></div>
+          <div class="today-col"></div>
+          <span class="today-label">今日</span>
+          <span class="week" style="left:5px">8/17</span>
+          <span class="week" style="left:173px">8/24</span>
+          <span class="week" style="left:341px">8/31</span>
+          <span class="week" style="left:509px">9/7</span>
+          <span class="week" style="left:677px">9/14</span>
+          <span class="week" style="left:845px">9/21</span>
+          <span class="week" style="left:1013px">9/28</span>
+          <span class="week" style="left:1181px">10/5</span>
+          <div class="day-nums">
+            <i>17</i><i>18</i><i>19</i><i>20</i><i>21</i><i class="we">22</i><i class="we">23</i>
+            <i>24</i><i>25</i><i>26</i><i>27</i><i>28</i><i class="we">29</i><i class="we">30</i>
+            <i>31</i><i>1</i><i>2</i><i>3</i><i>4</i><i class="we">5</i><i class="we">6</i>
+            <i>7</i><i>8</i><i>9</i><i>10</i><i>11</i><i class="we">12</i><i class="we">13</i>
+            <i>14</i><i>15</i><i>16</i><i>17</i><i>18</i><i class="we">19</i><i class="we">20</i>
+            <i>21</i><i>22</i><i>23</i><i>24</i><i>25</i><i class="we">26</i><i class="we">27</i>
+            <i>28</i><i>29</i><i>30</i><i>1</i><i>2</i><i class="we">3</i><i class="we">4</i>
+            <i>5</i><i>6</i><i>7</i><i>8</i><i>9</i><i class="we">10</i><i class="we">11</i>
+          </div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="label-col"><span class="name">マンション建具 40本</span><span class="cust">山本工務店</span></div>
+        <div class="grid-col">
+          <div class="grid-bg"></div><div class="today-col"></div>
+          <div class="bar working" style="left:0; width:384px">建具40本（96h）<span class="over" style="width:96px"></span></div>
+          <div class="deadline" style="left:287px"></div>
+          <div class="callout" style="top:4px; left:396px">1</div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="label-col"><span class="name">玄関引戸 新調</span><span class="cust">田中様邸</span></div>
+        <div class="grid-col">
+          <div class="grid-bg"></div><div class="today-col"></div>
+          <div class="bar working" style="left:168px; width:72px">玄関引戸（24h）</div>
+          <div class="deadline" style="left:359px"></div>
+          <div class="callout" style="top:4px; left:112px">2</div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="label-col"><span class="name">障子張替 8本</span><span class="cust">佐藤様</span></div>
+        <div class="grid-col">
+          <div class="grid-bg"></div><div class="today-col"></div>
+          <div class="bar working" style="left:240px; width:48px">障子（16h）</div>
+          <div class="deadline" style="left:383px"></div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="label-col"><span class="name">引戸改修 6ヶ所</span><span class="cust">ひまわり保育園</span></div>
+        <div class="grid-col">
+          <div class="grid-bg"></div><div class="today-col"></div>
+          <div class="bar notstarted" style="left:384px; width:168px">引戸改修（40h）</div>
+          <div class="deadline" style="left:599px"></div>
+          <div class="callout" style="top:4px; left:560px">3</div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="label-col"><span class="name">網戸張替 5枚</span><span class="cust">鈴木様</span></div>
+        <div class="grid-col">
+          <div class="grid-bg"></div><div class="today-col"></div>
+          <div class="bar notstarted" style="left:552px; width:24px"></div>
+          <div class="deadline" style="left:623px"></div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="label-col"><span class="name">組子パネル制作</span><span class="cust">社内・展示会</span></div>
+        <div class="grid-col">
+          <div class="grid-bg"></div><div class="today-col"></div>
+          <div class="bar shop" style="left:576px; width:144px">展示会 組子（32h）</div>
+          <div class="callout" style="top:4px; left:728px">4</div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="label-col"><span class="name">食器棚扉 4枚</span><span class="cust">高橋様</span></div>
+        <div class="grid-col">
+          <div class="grid-bg"></div><div class="today-col"></div>
+          <div class="bar notstarted" style="left:744px; width:120px">食器棚扉（24h）</div>
+          <div class="deadline" style="left:959px"></div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="label-col"><span class="name">客室建具改修 12室</span><span class="cust">みどりやホテル</span></div>
+        <div class="grid-col">
+          <div class="grid-bg"></div><div class="today-col"></div>
+          <div class="bar notstarted" style="left:1008px; width:240px">客室建具（64h）</div>
+          <div class="deadline" style="left:1295px"></div>
+        </div>
+      </div>
+
+      <div class="load-row">
+        <div class="label-col">1日の稼働案件数</div>
+        <div class="grid-col">
+          <div class="grid-bg"></div><div class="today-col"></div>
+          <div class="load-bars">
+            <i><b class="h1"></b></i><i><b class="h1"></b></i><i><b class="h1"></b></i><i><b class="h1"></b></i><i><b class="h1"></b></i><i></i><i></i>
+            <i><b class="h2"></b></i><i><b class="h2"></b></i><i><b class="h2"></b></i><i><b class="h2"></b></i><i><b class="h2"></b></i><i></i><i></i>
+            <i><b class="h1"></b></i><i><b class="h1"></b></i><i><b class="h1"></b></i><i><b class="h1"></b></i><i><b class="h1"></b></i><i></i><i></i>
+            <i><b class="h1"></b></i><i><b class="h1"></b></i><i><b class="h1"></b></i><i><b class="h1"></b></i><i><b class="h1"></b></i><i></i><i></i>
+            <i><b class="h1"></b></i><i><b class="h1"></b></i><i></i><i><b class="h1"></b></i><i><b class="h1"></b></i><i></i><i></i>
+            <i><b class="h1"></b></i><i></i><i></i><i></i><i></i><i></i><i></i>
+            <i><b class="h1"></b></i><i><b class="h1"></b></i><i><b class="h1"></b></i><i><b class="h1"></b></i><i><b class="h1"></b></i><i></i><i></i>
+            <i><b class="h1"></b></i><i><b class="h1"></b></i><i><b class="h1"></b></i><i></i><i></i><i></i><i></i>
+          </div>
+          <div class="free-marker" style="left:722px">9/16 空き</div>
+          <div class="free-marker" style="left:866px">9/22 から空き</div>
+          <div class="callout" style="top:4px; left:1180px">5</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h2>6ヶ月ビュー（表示期間切り替え時。1年も同じ仕組みでさらに圧縮）</h2>
+  <div class="span-scroll">
+    <div class="span-view">
+      <div class="span-axis">
+        <div class="label-col"></div>
+        <div class="grid-col">
+          <span class="month" style="left:4px">8月</span>
+          <div class="month-line" style="left:90px"></div><span class="month" style="left:96px">9月</span>
+          <div class="month-line" style="left:270px"></div><span class="month" style="left:276px">10月</span>
+          <div class="month-line" style="left:456px"></div><span class="month" style="left:462px">11月</span>
+          <div class="month-line" style="left:636px"></div><span class="month" style="left:642px">12月</span>
+          <div class="month-line" style="left:822px"></div><span class="month" style="left:828px">1月</span>
+        </div>
+      </div>
+      <div class="span-row">
+        <div class="label-col"><span class="name">マンション建具 40本</span><span class="cust">山本工務店</span></div>
+        <div class="grid-col">
+          <div class="s-today" style="left:42px"></div>
+          <div class="month-line" style="left:90px"></div><div class="month-line" style="left:270px"></div><div class="month-line" style="left:456px"></div><div class="month-line" style="left:636px"></div><div class="month-line" style="left:822px"></div>
+          <div class="sbar working" style="left:0; width:96px"><span class="over" style="width:24px"></span></div>
+          <div class="s-deadline" style="left:71px"></div>
+        </div>
+      </div>
+      <div class="span-row">
+        <div class="label-col"><span class="name">引戸改修 6ヶ所</span><span class="cust">ひまわり保育園</span></div>
+        <div class="grid-col">
+          <div class="s-today" style="left:42px"></div>
+          <div class="month-line" style="left:90px"></div><div class="month-line" style="left:270px"></div><div class="month-line" style="left:456px"></div><div class="month-line" style="left:636px"></div><div class="month-line" style="left:822px"></div>
+          <div class="sbar notstarted" style="left:96px; width:42px"></div>
+          <div class="s-deadline" style="left:149px"></div>
+        </div>
+      </div>
+      <div class="span-row">
+        <div class="label-col"><span class="name">組子パネル制作</span><span class="cust">社内・展示会</span></div>
+        <div class="grid-col">
+          <div class="s-today" style="left:42px"></div>
+          <div class="month-line" style="left:90px"></div><div class="month-line" style="left:270px"></div><div class="month-line" style="left:456px"></div><div class="month-line" style="left:636px"></div><div class="month-line" style="left:822px"></div>
+          <div class="sbar shop" style="left:144px; width:36px"></div>
+        </div>
+      </div>
+      <div class="span-row">
+        <div class="label-col"><span class="name">客室建具改修 12室</span><span class="cust">みどりやホテル</span></div>
+        <div class="grid-col">
+          <div class="s-today" style="left:42px"></div>
+          <div class="month-line" style="left:90px"></div><div class="month-line" style="left:270px"></div><div class="month-line" style="left:456px"></div><div class="month-line" style="left:636px"></div><div class="month-line" style="left:822px"></div>
+          <div class="sbar notstarted" style="left:252px; width:60px"></div>
+          <div class="s-deadline" style="left:325px"></div>
+        </div>
+      </div>
+      <div class="span-row">
+        <div class="label-col"><span class="name">戸建リフォーム 建具一式</span><span class="cust">大和ハウジング</span></div>
+        <div class="grid-col">
+          <div class="s-today" style="left:42px"></div>
+          <div class="month-line" style="left:90px"></div><div class="month-line" style="left:270px"></div><div class="month-line" style="left:456px"></div><div class="month-line" style="left:636px"></div><div class="month-line" style="left:822px"></div>
+          <div class="sbar notstarted" style="left:504px; width:60px"></div>
+          <div class="s-deadline" style="left:583px"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h2>折り返しモード（同じデータを縦に読む）</h2>
+  <div class="wrap-preview">
+    <div class="wrap-week">
+      <div class="w-grid"></div>
+      <div class="w-head">8月24日の週</div>
+      <div class="w-days"><i>月 24</i><i>火 25</i><i>水 26</i><i>木 27</i><i>金 28</i><i class="we">土 29</i><i class="we">日 30</i></div>
+      <div class="wrap-lanes">
+        <div class="w-deadline" style="left:71.4%"></div>
+        <div class="wrap-bar working cont-l cont-r" style="margin-left:0; width:100%">◀ マンション建具 40本（山本工務店）<span class="cont-mark">次の週へ続く ▶</span></div>
+        <div class="wrap-bar working" style="margin-left:0; width:42.8%">玄関引戸（田中様邸）</div>
+        <div class="wrap-bar working" style="margin-left:42.8%; width:28.6%">障子張替（佐藤様）</div>
+      </div>
+    </div>
+    <div class="wrap-week">
+      <div class="w-grid"></div>
+      <div class="w-head">8月31日の週</div>
+      <div class="w-days"><i>月 31</i><i>火 1</i><i>水 2</i><i>木 3</i><i>金 4</i><i class="we">土 5</i><i class="we">日 6</i></div>
+      <div class="wrap-lanes">
+        <div class="wrap-bar working cont-l" style="margin-left:0; width:28.6%">◀ マンション建具 続き</div>
+        <div class="wrap-bar notstarted cont-r" style="margin-left:28.6%; width:71.4%">引戸改修（ひまわり保育園）<span class="cont-mark">続く ▶</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="notes">
+    <div class="panel">
+      <h3>丸数字の説明（画面上の ●1〜●5）</h3>
+      <ol>
+        <li>納期線を越える分は<b>赤い斜線</b>で塗る。上部の「⚠ 納期注意」バッジと連動。「間に合わないから連絡しなさい」の判断がここでできる</li>
+        <li>バーはドラッグで左右に動かせて、離した瞬間に保存。「これはあとでいいんじゃないか」をその場で反映できる</li>
+        <li>未着手の案件は<b>点線の薄いタイル</b>。まだ動かしやすい案件だと一目で分かる</li>
+        <li>展示会など社内の制作は<b>琥珀色</b>。「展示会のためにここを空けたい」が色で主張できる</li>
+        <li>下の帯は1日ごとの稼働案件数。濃い日は重なり。「次の仕事はここまで無理だね」はこの帯と空きマーカーで答える</li>
+      </ol>
+    </div>
+    <div class="panel">
+      <h3>色の言語と表示期間</h3>
+      <ul>
+        <li><span class="legend-chip" style="background:var(--work)"></span>深緑 = お客様の仕事（進行中）</li>
+        <li><span class="legend-chip" style="background:var(--work-tint); border:2px dashed var(--work)"></span>点線 = 未着手（まだ動かせる）</li>
+        <li><span class="legend-chip" style="background:var(--shop)"></span>琥珀 = 社内の仕事（展示会など）</li>
+        <li><span class="legend-chip" style="background:var(--danger)"></span>赤 = <b>納期のことだけ</b>に使う。赤が見えたら要相談</li>
+        <li><span class="legend-chip" style="background:var(--today-tint); border:1px solid var(--line)"></span>黄の列 = 今日。開いた瞬間ここが見える</li>
+      </ul>
+      <p style="font-size:13px; color:var(--muted); margin-top:10px; line-height:1.8">既定は今日の週から8週間。6ヶ月・1年に切り替えると日付の数字が消えて月の線だけになり、バーの文字はしまわれて左の案件名で読む。ズームスライダーはその間を無段階でつなぐ。文字サイズ（A−/A/A＋）は席で見るときは小さく、みんなで囲むときは大きく。</p>
+    </div>
+  </div>
+</div>

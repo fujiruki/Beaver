@@ -12,6 +12,7 @@ const TateguItemList       = lazy(() => import('./pages/TateguItemList'));
 const TateguItemDetail     = lazy(() => import('./pages/TateguItemDetail'));
 const ProjectList          = lazy(() => import('./pages/ProjectList'));
 const ProjectDetail        = lazy(() => import('./pages/ProjectDetail'));
+const DandoriBoard         = lazy(() => import('./pages/DandoriBoard'));
 const VoucherList          = lazy(() => import('./pages/VoucherList'));
 const VoucherEdit          = lazy(() => import('./pages/VoucherEdit'));
 const InvoiceList          = lazy(() => import('./pages/InvoiceList'));
@@ -49,6 +50,7 @@ export default function App() {
                 <Route path="projects" element={<ProjectList />} />
                 <Route path="projects/new" element={<ProjectDetail />} />
                 <Route path="projects/:id" element={<ProjectDetail />} />
+                <Route path="dandori" element={<DandoriBoard />} />
                 <Route path="vouchers" element={<VoucherList />} />
                 <Route path="vouchers/new" element={<VoucherEdit />} />
                 <Route path="vouchers/:id" element={<VoucherEdit />} />

@@ -1,0 +1,136 @@
+/* R-0111 段取りボード: 承認済みモック(docs/spec/R-0111_mockup.html v3)のCSSを移植。
+   幅・グリッド線などpxPerDayに依存する値はJS側でinline styleとして与える。 */
+.dandori-board {
+  --bg: #f7f5f2;
+  --surface: #ffffff;
+  --ink: #2b2620;
+  --muted: #8a8177;
+  --line: #e7e2da;
+  --work: #2f7d6d;
+  --work-dark: #1d5a4e;
+  --work-tint: #d8eae5;
+  --shop: #b07a2e;
+  --danger: #c2453a;
+  --today-tint: #fdf3d8;
+  --today-ink: #96700f;
+  --scale: 1;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'Zen Kaku Gothic New', 'Hiragino Kaku Gothic ProN', 'Yu Gothic', sans-serif;
+  font-weight: 500;
+  padding: 20px 24px 40px;
+  border-radius: 10px;
+}
+
+.dandori-board .db-header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
+.dandori-board .db-header h1 { font-size: 13px; font-weight: 500; color: var(--muted); letter-spacing: 0.04em; }
+.dandori-board .db-header .sub { color: var(--muted); font-size: 13px; }
+.dandori-board .alert-badge {
+  margin-left: auto; background: var(--danger); color: #fff;
+  font-weight: 700; font-size: 15px; padding: 6px 14px; border-radius: 6px;
+}
+.dandori-board .unset-note { color: var(--muted); font-size: 13px; }
+
+.dandori-board .toolbar {
+  display: flex; align-items: center; gap: 20px; flex-wrap: wrap;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+  padding: 10px 16px; margin: 10px 0 18px; font-size: 14px;
+}
+.dandori-board .toggle { display: flex; border: 1px solid var(--work); border-radius: 6px; overflow: hidden; }
+.dandori-board .toggle button { padding: 6px 12px; font-weight: 700; border: none; background: none; cursor: pointer; color: var(--work); font-family: inherit; font-size: 13px; }
+.dandori-board .toggle button.on { background: var(--work); color: #fff; }
+.dandori-board .toolbar .lbl { color: var(--muted); font-size: 12px; }
+.dandori-board .zoom { display: flex; align-items: center; gap: 8px; color: var(--muted); }
+.dandori-board .filter { color: var(--muted); font-size: 13px; display: flex; align-items: center; gap: 6px; }
+.dandori-board .filter b { color: var(--ink); }
+
+.dandori-board h2.section-title { font-size: 12px; font-weight: 500; color: var(--muted); letter-spacing: 0.06em; margin: 20px 0 8px; }
+
+.dandori-board .gantt-scroll { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+.dandori-board .gantt { position: relative; padding-bottom: 6px; }
+
+.dandori-board .axis, .dandori-board .row, .dandori-board .load-row { display: flex; }
+.dandori-board .label-col {
+  flex: 0 0 240px; padding: 0 14px; display: flex; flex-direction: column; justify-content: center;
+  border-right: 1px solid var(--line);
+}
+.dandori-board .grid-col { position: relative; flex: 0 0 auto; }
+.dandori-board .grid-bg { position: absolute; inset: 0; }
+.dandori-board .today-col { position: absolute; top: 0; bottom: 0; background: var(--today-tint); }
+
+.dandori-board .axis { border-bottom: 2px solid var(--line); font-size: 11px; color: var(--muted); }
+.dandori-board .axis .label-col { justify-content: flex-end; padding-bottom: 6px; font-size: calc(13px * var(--scale)); color: var(--muted); }
+.dandori-board .axis .grid-col { height: 44px; }
+.dandori-board .axis .week { position: absolute; top: 4px; font-weight: 700; font-size: 12px; font-variant-numeric: tabular-nums; }
+.dandori-board .axis .day-nums { position: absolute; bottom: 4px; left: 0; right: 0; display: flex; font-variant-numeric: tabular-nums; }
+.dandori-board .axis .day-nums i { text-align: center; font-style: normal; }
+.dandori-board .axis .day-nums i.we { color: #b8a99a; }
+.dandori-board .axis .today-label { position: absolute; top: -1px; text-align: center; font-weight: 700; color: var(--today-ink); font-size: 10px; }
+.dandori-board .month-line { position: absolute; top: 0; bottom: 0; width: 1px; background: #d5cec3; }
+.dandori-board .axis .month-label { position: absolute; top: 16px; font-weight: 700; font-size: 12px; color: var(--muted); }
+
+.dandori-board .row { border-bottom: 1px solid var(--line); }
+.dandori-board .row .grid-col, .dandori-board .row .label-col { height: calc(30px * var(--scale)); }
+.dandori-board .row .label-col { flex-direction: row; align-items: center; gap: 8px; white-space: nowrap; overflow: hidden; }
+.dandori-board .row .name { font-weight: 700; font-size: calc(14px * var(--scale)); line-height: 1.1; }
+.dandori-board .row .cust { font-size: calc(11px * var(--scale)); color: var(--muted); }
+
+.dandori-board .bar {
+  position: absolute; top: 2px; height: calc(26px * var(--scale));
+  border-radius: 5px; display: flex; align-items: center; padding: 0 10px;
+  color: #fff; font-weight: 700; font-size: calc(14px * var(--scale)); white-space: nowrap; overflow: hidden;
+  cursor: grab; touch-action: none;
+}
+.dandori-board .bar:active { cursor: grabbing; }
+.dandori-board .bar.working { background: var(--work); }
+.dandori-board .bar.notstarted { background: var(--work-tint); color: var(--work-dark); border: 2px dashed var(--work); }
+.dandori-board .bar.shop { background: var(--shop); }
+.dandori-board .bar.shop.notstarted { background: #f1e2c8; color: var(--shop); border: 2px dashed var(--shop); }
+.dandori-board .bar.done { background: #b7b0a4; color: #fff; border: none; }
+.dandori-board .bar.unknown-hours { opacity: 0.55; }
+.dandori-board .bar .over {
+  position: absolute; top: 0; bottom: 0; right: 0;
+  background: repeating-linear-gradient(45deg, var(--danger) 0 8px, #a03329 8px 16px);
+  border-radius: 0 5px 5px 0; pointer-events: none;
+}
+.dandori-board .deadline {
+  position: absolute; top: 2px; bottom: 2px; width: 3px;
+  background: var(--danger); border-radius: 2px; cursor: ew-resize; touch-action: none;
+}
+.dandori-board .deadline::before { content: ''; position: absolute; inset: 0 -6px; }
+
+.dandori-board .load-row { border-top: 2px solid var(--line); background: #fbfaf8; }
+.dandori-board .load-row .label-col { font-size: 12px; color: var(--muted); }
+.dandori-board .load-row .grid-col { height: 42px; }
+.dandori-board .load-bars { position: absolute; bottom: 15px; left: 0; display: flex; align-items: flex-end; height: 24px; }
+.dandori-board .load-bars i { display: flex; align-items: flex-end; justify-content: center; }
+.dandori-board .load-bars b { width: 70%; max-width: 14px; border-radius: 3px 3px 0 0; background: var(--work); opacity: 0.85; }
+.dandori-board .load-bars b.h1 { height: 11px; }
+.dandori-board .load-bars b.h2 { height: 22px; background: var(--work-dark); }
+.dandori-board .free-marker { position: absolute; bottom: 0; font-size: 12px; font-weight: 700; color: var(--work-dark); white-space: nowrap; }
+.dandori-board .free-marker::before { content: '▼ '; }
+
+/* 折り返しモード */
+.dandori-board .wrap-preview { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.dandori-board .wrap-week { position: relative; border-bottom: 1px solid var(--line); }
+.dandori-board .wrap-week:last-child { border-bottom: none; }
+.dandori-board .wrap-week .w-grid { position: absolute; inset: 0; }
+.dandori-board .wrap-week .w-head { position: relative; padding: 8px 14px 2px; font-weight: 700; font-size: 13px; }
+.dandori-board .wrap-week .w-days { position: relative; display: flex; font-size: 12px; color: var(--muted); padding: 0 0 4px; font-variant-numeric: tabular-nums; }
+.dandori-board .wrap-week .w-days i { flex: 1; text-align: center; font-style: normal; }
+.dandori-board .wrap-week .w-days i.we { color: #b8a99a; }
+.dandori-board .wrap-lanes { position: relative; padding: 2px 0 8px; }
+.dandori-board .wrap-bar {
+  position: relative; height: 26px; margin: 2px 0; border-radius: 5px; color: #fff; font-weight: 700; font-size: 14px;
+  display: flex; align-items: center; padding: 0 10px; white-space: nowrap; overflow: hidden;
+}
+.dandori-board .wrap-bar.working { background: var(--work); }
+.dandori-board .wrap-bar.notstarted { background: var(--work-tint); color: var(--work-dark); border: 2px dashed var(--work); }
+.dandori-board .wrap-bar.shop { background: var(--shop); }
+.dandori-board .wrap-bar.shop.notstarted { background: #f1e2c8; color: var(--shop); border: 2px dashed var(--shop); }
+.dandori-board .wrap-bar.done { background: #b7b0a4; color: #fff; border: none; }
+.dandori-board .wrap-bar.cont-l { border-radius: 0 5px 5px 0; }
+.dandori-board .wrap-bar.cont-r { border-radius: 5px 0 0 5px; }
+.dandori-board .wrap-bar .cont-mark { font-size: 11px; opacity: 0.85; margin-left: auto; }
+.dandori-board .w-deadline { position: absolute; top: 2px; bottom: 2px; width: 3px; background: var(--danger); border-radius: 2px; z-index: 1; }
+.dandori-board .w-today { position: absolute; top: 0; bottom: 0; background: var(--today-tint); z-index: 0; }

@@ -37,6 +37,7 @@ const navItems = [
   { to: '/',           label: 'ダッシュボード' },
   { to: '/customers',  label: '得意先' },
   { to: '/projects',   label: '案件' },
+  { to: '/dandori',    label: '段取り' },
   { to: '/vouchers',   label: '伝票' },
   { to: '/tategu',     label: '建具台帳' },
   { to: '/invoices',   label: '請求' },
