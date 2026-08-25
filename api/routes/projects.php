@@ -148,6 +148,69 @@ if ($method === 'GET' && isset($segments[1]) && $segments[1] === 'sync' && !isse
     exit;
 }
 
+// --- R-0118: Youkan容量判定プロキシ ---
+// GET /projects/{id}/capacity-check
+// Youkan障害でBeaver本体を巻き込まないため、Youkan側の失敗は常にHTTP 200の ok:false で縮退させる
+if ($resourceId && $subResource === 'capacity-check') {
+    if (isset($segments[3])) {
+        http_response_code(404);
+        echo json_encode(['error' => 'Not found', 'path' => $path]);
+        exit;
+    }
+    if ($method !== 'GET') {
+        http_response_code(405);
+        echo json_encode(['error' => 'Method not allowed']);
+        exit;
+    }
+    $stmt = $pdo->prepare('SELECT id FROM projects WHERE id = ?');
+    $stmt->execute([$resourceId]);
+    if (!$stmt->fetch()) {
+        http_response_code(404);
+        echo json_encode(['error' => 'Not found']);
+        exit;
+    }
+
+    $degrade = function (string $reason, string $message): void {
+        echo json_encode(['ok' => false, 'reason' => $reason, 'message' => $message], JSON_UNESCAPED_UNICODE);
+        exit;
+    };
+
+    // YoukanはB1再取得＋EDF計算を行うため timeout は余裕を持つ（契約 R-0118 §API）
+    $ctx = stream_context_create(['http' => [
+        'method'        => 'POST',
+        'header'        => "Content-Type: application/json\r\nAuthorization: Bearer " . BEAVER_CAPACITY_TOKEN . "\r\n",
+        'content'       => json_encode(['external_project_id' => $resourceId]),
+        'timeout'       => 15,
+        'ignore_errors' => true,
+    ]]);
+    $raw = @file_get_contents(YOUKAN_CAPACITY_URL, false, $ctx);
+    if ($raw === false) {
+        $degrade('unreachable', 'Youkanに接続できないため、容量判定は現在利用できません');
+    }
+
+    $statusLine = $http_response_header[0] ?? '';
+    $code = preg_match('#HTTP/\S+\s+(\d{3})#', $statusLine, $m) ? (int)$m[1] : 0;
+    $body = json_decode((string)$raw, true);
+
+    if ($code >= 200 && $code < 300) {
+        if (!is_array($body)) {
+            $degrade('unreachable', 'Youkanに接続できないため、容量判定は現在利用できません');
+        }
+        echo json_encode(['ok' => true, 'result' => $body], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    if ($code === 404) {
+        if (is_array($body) && ($body['reason'] ?? '') === 'excluded_status') {
+            $degrade('excluded_status', 'このステータスの案件はYoukanの負荷計算対象外です');
+        }
+        $degrade('not_found', 'Youkanが案件を見つけられませんでした');
+    }
+    if (in_array($code, [400, 401, 403, 503], true)) {
+        $degrade('config', 'Youkan連携の設定に問題があります（管理者に連絡してください）');
+    }
+    $degrade('unreachable', 'Youkanに接続できないため、容量判定は現在利用できません');
+}
+
 // --- 画像サブリソース ---
 if ($resourceId && $subResource === 'images') {
     $uploadDir = __DIR__ . '/../uploads/projects/' . $resourceId . '/';

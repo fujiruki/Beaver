@@ -37,3 +37,7 @@ if (!defined('BANTO_API_TOKEN')) define('BANTO_API_TOKEN', 'dev-local-banto-toke
 
 // R-0117: Youkan連携API向けトークン。config.local.php で未定義の場合のみ開発用フォールバック値を使う
 if (!defined('YOUKAN_API_TOKEN')) define('YOUKAN_API_TOKEN', 'dev-youkan-token-change-me');
+
+// R-0118: Youkan容量判定プロキシ用。config.local.php で未定義の場合のみ開発用フォールバック値を使う
+if (!defined('BEAVER_CAPACITY_TOKEN')) define('BEAVER_CAPACITY_TOKEN', 'dev-beaver-capacity-token-change-me');
+if (!defined('YOUKAN_CAPACITY_URL')) define('YOUKAN_CAPACITY_URL', 'http://localhost:8000/integrations/beaver/capacity-check');
