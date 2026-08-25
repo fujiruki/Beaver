@@ -2,9 +2,10 @@
 
 ## 進行中
 - [ ] R-0118: Beaver-Youkan連携 B2 — 案件詳細のYoukan容量判定表示（2026-08-26着手、Youkan Y1本番検証完了を受けて開始）。仕様: `docs/spec/R-0118_youkan_capacity_check_b2.md`。**B2完了で停止し、B3へは進まない**
-  - [ ] A: バックエンドプロキシ `GET /projects/{id}/capacity-check`（TDD、スタブYoukanで成功・縮退・エラーマッピング固定）
-  - [ ] B: フロント `CapacityCheckPanel`（結論優先表示・縮退表示、vitest）
-  - [ ] 検証: 回帰スイート🔵青 → 本番デプロイ → 本番疎通・実案件判定・Youkan停止縮退・通常業務非影響
+  - [x] A: バックエンドプロキシ `GET /projects/{id}/capacity-check`（TDD、スタブYoukanでPHPテスト10件、2026-08-26）
+  - [x] B: フロント `CapacityCheckPanel`（結論優先表示・縮退表示、vitest 6件、2026-08-26）
+  - [x] 検証（前半）: 回帰スイート🔵青（exit 0、新テスト2本をスイートへ登録）→ コミットe9abc34 → 本番デプロイ → Youkan未接続時の縮退表示・通常業務非影響を本番実機確認（2026-08-26）
+  - [ ] 検証（後半・**藤田晴樹さんのトークン設置待ち**）: Youkan側でBEAVER_CAPACITY_TOKEN発行 → Beaver本番 `api/config.local.php` に `BEAVER_CAPACITY_TOKEN`（Youkan発行値）と `YOUKAN_CAPACITY_URL`（`https://door-fujita.com/contents/Youkan/api/integrations/beaver/capacity-check`）を設置 → 本番疎通・実案件でのcapacity-check確認 → 台帳を完了へ
 - [x] R-0117: Beaver-Youkan連携 B1 — 完了（2026-08-25、本番デプロイ・疎通確認済み）。契約引き渡し物: `docs/spec/R-0117_youkan_api_contract.md` ＋ トークン（`.claude/secrets/youkan_api_token`）
 - [ ] R-0111: 段取りボード（案件ガントチャート）— 検証中（藤田晴樹さんの実機確認待ち）。仕様: `docs/spec/R-0111_dandori_board.md`、モック: `docs/spec/R-0111_mockup.html`
   - [x] A: `frontend/src/lib/dandoriCalc.ts` 純粋関数＋vitestテスト20件（TDD、2026-08-24）
