@@ -1,7 +1,7 @@
 # Beaver タスクキュー
 
 ## 進行中
-- [ ] R-0117: Beaver-Youkan連携 B1 — 実装・ローカル検証済み。残: 本番YOUKAN_API_TOKEN設置（藤田晴樹さん実行待ち）→デプロイ→本番疎通→完了化→**B1で停止しYoukan AIへ契約引き渡し**（`docs/spec/R-0117_youkan_api_contract.md`）。B2はYoukan Y1完了後
+- [x] R-0117: Beaver-Youkan連携 B1 — 完了（2026-08-25、本番デプロイ・疎通確認済み）。**計画どおりB1で停止中**。契約引き渡し物: `docs/spec/R-0117_youkan_api_contract.md` ＋ トークン（`.claude/secrets/youkan_api_token`）。次のBeaver作業（B2）は**Youkan Y1完了後**（計画書§7の前提条件を満たしてから）
 - [ ] R-0111: 段取りボード（案件ガントチャート）— 検証中（藤田晴樹さんの実機確認待ち）。仕様: `docs/spec/R-0111_dandori_board.md`、モック: `docs/spec/R-0111_mockup.html`
   - [x] A: `frontend/src/lib/dandoriCalc.ts` 純粋関数＋vitestテスト20件（TDD、2026-08-24）
   - [x] B: 1日あたり作業時間 → 既存`AppSettingsContext.hoursPerDay`を使用に方針変更（DB追加は撤回、バックエンド変更なし、2026-08-24）
