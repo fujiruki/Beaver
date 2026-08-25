@@ -51,10 +51,20 @@ try {
         exit;
     }
 
-    // --- 認証ゲート (R-0109 / R-0110) ---
-    // AUTH_DRIVER=none（ローカル開発既定）では従来通り認証なしで通す
-    // 番頭AI用の固定トークン（Bearer）が一致すればauth-hubログインなしでも通す
-    if (AUTH_DRIVER !== 'none' && !authGateIsExempt($path, $method) && !authGateHasValidBantoToken()) {
+    // --- 認証ゲート (R-0117): Youkan連携APIは専用トークン必須 ---
+    // BANTO_API_TOKEN・auth-hubログインとは独立した最小権限トークン。AUTH_DRIVER=noneでも省略しない。
+    if ($path === '/integrations/youkan' || strpos($path, '/integrations/youkan/') === 0) {
+        if (!authGateHasValidYoukanToken()) {
+            http_response_code(401);
+            echo json_encode(['error' => 'unauthenticated']);
+            exit;
+        }
+    } elseif (
+        // --- 認証ゲート (R-0109 / R-0110) ---
+        // AUTH_DRIVER=none（ローカル開発既定）では従来通り認証なしで通す
+        // 番頭AI用の固定トークン（Bearer）が一致すればauth-hubログインなしでも通す
+        AUTH_DRIVER !== 'none' && !authGateIsExempt($path, $method) && !authGateHasValidBantoToken()
+    ) {
         auth_require_user(json: true);
     }
 
@@ -85,6 +95,7 @@ try {
         'aggregation-categories'   => __DIR__ . '/routes/aggregation_categories.php',
         'feedback'                 => __DIR__ . '/routes/feedback.php',
         'admin/feedback'           => __DIR__ . '/routes/feedback.php',
+        'integrations/youkan'      => __DIR__ . '/routes/integrations_youkan.php',
     ];
 
     $matched = false;

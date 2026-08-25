@@ -23,3 +23,14 @@ function authGateHasValidBantoToken(): bool
     if (strncmp($auth, 'Bearer ', 7) !== 0) return false;
     return hash_equals(BANTO_API_TOKEN, substr($auth, 7));
 }
+
+/**
+ * R-0117: Youkan連携API向けの固定トークン認証（Authorization: Bearer <YOUKAN_API_TOKEN>）。
+ * BANTO_API_TOKENとは独立した最小権限のトークンで、/integrations/youkan/* のみを通す。
+ */
+function authGateHasValidYoukanToken(): bool
+{
+    $auth = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+    if (strncmp($auth, 'Bearer ', 7) !== 0) return false;
+    return hash_equals(YOUKAN_API_TOKEN, substr($auth, 7));
+}

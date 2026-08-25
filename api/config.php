@@ -34,3 +34,6 @@ if (!defined('AUTH_DRIVER')) define('AUTH_DRIVER', 'none');
 
 // R-0110: 番頭AI向けAPIトークン。config.local.php で未定義の場合のみ開発用フォールバック値を使う
 if (!defined('BANTO_API_TOKEN')) define('BANTO_API_TOKEN', 'dev-local-banto-token-change-me');
+
+// R-0117: Youkan連携API向けトークン。config.local.php で未定義の場合のみ開発用フォールバック値を使う
+if (!defined('YOUKAN_API_TOKEN')) define('YOUKAN_API_TOKEN', 'dev-youkan-token-change-me');
