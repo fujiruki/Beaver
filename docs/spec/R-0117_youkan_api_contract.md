@@ -27,7 +27,7 @@ Authorization: Bearer <YOUKAN_API_TOKEN>
 - backend-to-backend専用の固定トークン。ブラウザから直接呼ばないこと
 - トークンは Beaver本番の `api/config.local.php` に `YOUKAN_API_TOKEN` として定義（発行・共有は藤田晴樹さん経由。Git・本文書には値を書かない）
 - このトークンで通るのは `/integrations/youkan/*` のみ（他のBeaver APIには使えない）
-- トークンなし・不一致は `401 {"error":"unauthorized"}`
+- トークンなし・不一致は `401 {"error":"unauthenticated"}`（Beaver共通認証ゲートの文言）
 - テナント紐付けはYoukan側の連携設定で持つこと（「藤田建具店」を文字列ハードコードしない。計画書§12）
 
 ## 3. project IDの型
@@ -139,7 +139,7 @@ Authorization: Bearer <YOUKAN_API_TOKEN>
 }
 ```
 
-単体 `GET /integrations/youkan/projects/123` は上記オブジェクト単体を返す。存在しないIDは `404 {"error":"not found"}`。
+単体 `GET /integrations/youkan/projects/123` は上記オブジェクト単体を返す。存在しないIDは `404 {"error":"Not found"}`。
 
 ## B1に含まれないもの（今後の予定）
 

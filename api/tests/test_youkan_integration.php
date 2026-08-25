@@ -303,16 +303,19 @@ try {
     runTest('トークン不一致は401', function () use ($port) {
         $res = youkanGet($port, '/integrations/youkan/projects', ['Authorization: Bearer wrong-token']);
         assertTrue(str_contains($res['status'], '401'), 'expected 401 got: ' . $res['status']);
+        assertEq('unauthenticated', json_decode($res['body'], true)['error'] ?? null, 'error message');
     });
 
     runTest('トークンなしは401', function () use ($port) {
         $res = youkanGet($port, '/integrations/youkan/projects');
         assertTrue(str_contains($res['status'], '401'), 'expected 401 got: ' . $res['status']);
+        assertEq('unauthenticated', json_decode($res['body'], true)['error'] ?? null, 'error message');
     });
 
     runTest('BANTO_API_TOKENでは通らない（401）', function () use ($port) {
         $res = youkanGet($port, '/integrations/youkan/projects', ['Authorization: Bearer ' . BANTO_DEV_TOKEN]);
         assertTrue(str_contains($res['status'], '401'), 'BANTOトークンはYoukanパスを通さない。got: ' . $res['status']);
+        assertEq('unauthenticated', json_decode($res['body'], true)['error'] ?? null, 'error message');
     });
 
     // --- 契約フィールド ---
@@ -338,21 +341,25 @@ try {
     runTest('存在しないidは404', function () use ($port) {
         $res = youkanGet($port, '/integrations/youkan/projects/9999999', ['Authorization: Bearer ' . YOUKAN_DEV_TOKEN]);
         assertTrue(str_contains($res['status'], '404'), 'expected 404 got: ' . $res['status']);
+        assertEq('Not found', json_decode($res['body'], true)['error'] ?? null, 'error message');
     });
 
     runTest('余分なパスセグメントは404', function () use ($port, $contractPid) {
         $res = youkanGet($port, "/integrations/youkan/projects/$contractPid/extra", ['Authorization: Bearer ' . YOUKAN_DEV_TOKEN]);
         assertTrue(str_contains($res['status'], '404'), 'expected 404 got: ' . $res['status']);
+        assertEq('Not found', json_decode($res['body'], true)['error'] ?? null, 'error message');
     });
 
     runTest('数値でないidは404', function () use ($port) {
         $res = youkanGet($port, '/integrations/youkan/projects/abc', ['Authorization: Bearer ' . YOUKAN_DEV_TOKEN]);
         assertTrue(str_contains($res['status'], '404'), 'expected 404 got: ' . $res['status']);
+        assertEq('Not found', json_decode($res['body'], true)['error'] ?? null, 'error message');
     });
 
     runTest('未知のリソース名は404', function () use ($port) {
         $res = youkanGet($port, '/integrations/youkan/unknown', ['Authorization: Bearer ' . YOUKAN_DEV_TOKEN]);
         assertTrue(str_contains($res['status'], '404'), 'expected 404 got: ' . $res['status']);
+        assertEq('Not found', json_decode($res['body'], true)['error'] ?? null, 'error message');
     });
 
     // --- GET以外は405 ---
