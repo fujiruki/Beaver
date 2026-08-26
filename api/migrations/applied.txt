@@ -48,3 +48,5 @@
 025_record_history          2026-08-06  prod (backup: api/backups/database_20260806_*_pre_r0098_record_history.sqlite)
 026_voucher_line_tax_category_codes  2026-08-26  dev
 027_seed_aggregation_categories  2026-08-27  dev
+026_voucher_line_tax_category_codes  2026-08-27  prod (backup: api/backups/database_20260827_0034_pre_r0119.sqlite)
+027_seed_aggregation_categories  2026-08-27  prod (backup: 同上)

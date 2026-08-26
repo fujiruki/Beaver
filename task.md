@@ -9,8 +9,9 @@
   - [x] S2: LegacyRow廃止＋未同期時警告（2026-08-26、差し戻しで死コード完全削除を確認）
   - [x] 検証（ローカル）: 回帰スイート🔵青（vitest 323件・PHPテスト17ファイル）・R-0119 PHPテスト8/8・npm run build成功。指揮役が再実行して裏取り済み（2026-08-26）
   - [ ] S1: catalog-systemでtime型区分追加→Beaver同期（データ作業）。本番同期URL `localhost:8002` 固定の疎通検証、本番マスタの現状確認
-  - [ ] S1a/S1b/S1c追加実装（Codex実装中、2026-08-27）: CATALOG_API_BASE設定化・fallback変換コードの実マスタコード整合・migration 027（5区分シード）
-  - [ ] デプロイ（**藤田晴樹さん事前承認済み 2026-08-27**）: 本番DBバックアップ → コード一式デプロイ → migration 026/027適用 → 本番実機確認（時間列表示・旧伝票の値表示・税額計算）。本番tax_category分布は確認済み（課税24,348/非課税1,133/taxable 3、想定外なし）
+  - [x] S1a/S1b/S1c追加実装（2026-08-27、Codex TDD）: CATALOG_API_BASE設定化・fallback変換コードの実マスタコード整合（建具原価再計算・列マッピング・localStorage正規化含む）・migration 027（5区分シード）。コミット`50032fb`
+  - [x] デプロイ（2026-08-27、事前承認済み）: 本番DBバックアップ（`database_20260827_0034_pre_r0119.sqlite`）→ upload.ps1 → migration 026/027本番適用（taxable 24,351/non_taxable 1,133へクリーン変換・5区分シード確認）→ health/アプリ200確認
+  - [ ] 本番実機確認（**藤田晴樹さんの目視待ち**）: 伝票画面に工場時間(h)・現場時間(h)の入力列が出る／旧伝票の金額・時間がセルに表示される／品名編集が保存される／税額計算が正しい → OKなら台帳を完了へ
 - [ ] R-0118: Beaver-Youkan連携 B2 — 案件詳細のYoukan容量判定表示（2026-08-26着手、Youkan Y1本番検証完了を受けて開始）。仕様: `docs/spec/R-0118_youkan_capacity_check_b2.md`。**B2完了で停止し、B3へは進まない**
   - [x] A: バックエンドプロキシ `GET /projects/{id}/capacity-check`（TDD、スタブYoukanでPHPテスト10件、2026-08-26）
   - [x] B: フロント `CapacityCheckPanel`（結論優先表示・縮退表示、vitest 6件、2026-08-26）
