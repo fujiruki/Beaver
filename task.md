@@ -9,7 +9,8 @@
   - [x] S2: LegacyRow廃止＋未同期時警告（2026-08-26、差し戻しで死コード完全削除を確認）
   - [x] 検証（ローカル）: 回帰スイート🔵青（vitest 323件・PHPテスト17ファイル）・R-0119 PHPテスト8/8・npm run build成功。指揮役が再実行して裏取り済み（2026-08-26）
   - [ ] S1: catalog-systemでtime型区分追加→Beaver同期（データ作業）。本番同期URL `localhost:8002` 固定の疎通検証、本番マスタの現状確認
-  - [ ] デプロイ（藤田晴樹さんの承認待ち）: 本番 `voucher_lines.tax_category` の分布確認 → migration 026適用 → コード一式デプロイ → 本番動作確認
+  - [ ] S1a/S1b/S1c追加実装（Codex実装中、2026-08-27）: CATALOG_API_BASE設定化・fallback変換コードの実マスタコード整合・migration 027（5区分シード）
+  - [ ] デプロイ（**藤田晴樹さん事前承認済み 2026-08-27**）: 本番DBバックアップ → コード一式デプロイ → migration 026/027適用 → 本番実機確認（時間列表示・旧伝票の値表示・税額計算）。本番tax_category分布は確認済み（課税24,348/非課税1,133/taxable 3、想定外なし）
 - [ ] R-0118: Beaver-Youkan連携 B2 — 案件詳細のYoukan容量判定表示（2026-08-26着手、Youkan Y1本番検証完了を受けて開始）。仕様: `docs/spec/R-0118_youkan_capacity_check_b2.md`。**B2完了で停止し、B3へは進まない**
   - [x] A: バックエンドプロキシ `GET /projects/{id}/capacity-check`（TDD、スタブYoukanでPHPテスト10件、2026-08-26）
   - [x] B: フロント `CapacityCheckPanel`（結論優先表示・縮退表示、vitest 6件、2026-08-26）

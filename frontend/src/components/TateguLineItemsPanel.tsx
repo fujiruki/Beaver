@@ -18,17 +18,17 @@ interface LaborLinesProps {
 
 const inputCls = 'w-full px-2.5 py-1.5 border border-slate-300 rounded-md text-sm focus:outline-none focus:border-blue-400';
 const moneyCodes = ['body', 'hardware', 'glass'];
-const timeCodes = ['factory_hours', 'site_hours'];
+const timeCodes = ['FACTORY_TIME', 'SITE_TIME'];
 
 const fallbackMoneyCategories: Pick<AggregationCategoryMaster, 'code' | 'name' | 'measure_type' | 'sort_order'>[] = [
-  { code: 'body', name: '本体', measure_type: 'money', sort_order: 0 },
-  { code: 'hardware', name: '金物', measure_type: 'money', sort_order: 1 },
-  { code: 'glass', name: 'ガラス', measure_type: 'money', sort_order: 2 },
+  { code: 'MAIN', name: '本体', measure_type: 'money', sort_order: 1 },
+  { code: 'HARDWARE', name: '金物', measure_type: 'money', sort_order: 2 },
+  { code: 'GLASS', name: 'ガラス', measure_type: 'money', sort_order: 3 },
 ];
 
 const fallbackTimeCategories: Pick<AggregationCategoryMaster, 'code' | 'name' | 'measure_type' | 'sort_order'>[] = [
-  { code: 'factory_hours', name: '工場時間', measure_type: 'time', sort_order: 0 },
-  { code: 'site_hours', name: '現場時間', measure_type: 'time', sort_order: 1 },
+  { code: 'FACTORY_TIME', name: '工場時間', measure_type: 'time', sort_order: 4 },
+  { code: 'SITE_TIME', name: '現場時間', measure_type: 'time', sort_order: 5 },
 ];
 
 function categoryOptions(
@@ -87,7 +87,7 @@ export function TateguCostLinesPanel({ lines, onChange, categories }: CostLinesP
   function addLine() {
     const category = options[0];
     onChange(withCostOrders([...lines, {
-      category_code: category?.code ?? 'body',
+      category_code: category?.code ?? 'MAIN',
       name: '',
       quantity: 1,
       unit_cost: 0,
@@ -229,7 +229,7 @@ export function TateguLaborLinesPanel({ lines, onChange, categories }: LaborLine
     const category = options[0];
     onChange(withLaborOrders([...lines, {
       process_name: '',
-      category_code: category?.code ?? 'factory_hours',
+      category_code: category?.code ?? 'FACTORY_TIME',
       work_hours: 1,
       labor_rate: 0,
       amount: 0,

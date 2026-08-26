@@ -21,15 +21,32 @@ export interface AppSettings {
 const KEY = 'bv_app_settings';
 
 const DEFAULT_COLUMN_MAPPING: ColumnMapping = {
-  cost_body:          'body',
-  cost_hardware:      'hardware',
-  cost_glass:         'glass',
-  cost_factory_hours: 'factory_hours',
-  cost_site_hours:    'site_hours',
-  price_body:         'body',
-  price_hardware:     'hardware',
-  price_glass:        'glass',
+  cost_body:          'MAIN',
+  cost_hardware:      'HARDWARE',
+  cost_glass:         'GLASS',
+  cost_factory_hours: 'FACTORY_TIME',
+  cost_site_hours:    'SITE_TIME',
+  price_body:         'MAIN',
+  price_hardware:     'HARDWARE',
+  price_glass:        'GLASS',
 };
+
+const LEGACY_CATEGORY_CODES: Record<string, string> = {
+  body:          'MAIN',
+  hardware:      'HARDWARE',
+  glass:         'GLASS',
+  factory_hours: 'FACTORY_TIME',
+  site_hours:    'SITE_TIME',
+};
+
+function normalizeColumnMapping(columnMapping: ColumnMapping): ColumnMapping {
+  return Object.fromEntries(
+    Object.entries(columnMapping).map(([key, value]) => [
+      key,
+      LEGACY_CATEGORY_CODES[value] ?? value,
+    ]),
+  ) as unknown as ColumnMapping;
+}
 
 const DEFAULTS: AppSettings = {
   fontSize: 14,
@@ -51,7 +68,10 @@ export function AppSettingsProvider({ children }: { children: React.ReactNode })
     return {
       ...DEFAULTS,
       ...parsed,
-      columnMapping: { ...DEFAULT_COLUMN_MAPPING, ...(parsed.columnMapping ?? {}) },
+      columnMapping: normalizeColumnMapping({
+        ...DEFAULT_COLUMN_MAPPING,
+        ...(parsed.columnMapping ?? {}),
+      }),
       profitRatePresets: parsed.profitRatePresets ?? DEFAULTS.profitRatePresets,
     };
   });

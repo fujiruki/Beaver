@@ -317,14 +317,13 @@ function saveLinePrices(PDO $pdo, int $lineId, array $prices): void {
 // --- 固定列からのフォールバック変換 ---
 function fallbackCosts(array $line): array {
     $map = [
-        ['field' => 'cost_body',          'code' => 'body',          'name' => '本体',     'type' => 'money'],
-        ['field' => 'cost_hardware',      'code' => 'hardware',      'name' => '金物',     'type' => 'money'],
-        ['field' => 'cost_glass',         'code' => 'glass',         'name' => 'ガラス',   'type' => 'money'],
-        ['field' => 'cost_factory_hours', 'code' => 'factory_hours', 'name' => '工場時間', 'type' => 'time'],
-        ['field' => 'cost_site_hours',    'code' => 'site_hours',    'name' => '現場時間', 'type' => 'time'],
+        ['field' => 'cost_body',          'code' => 'MAIN',         'name' => '本体',     'type' => 'money', 'sort' => 1],
+        ['field' => 'cost_hardware',      'code' => 'HARDWARE',     'name' => '金物',     'type' => 'money', 'sort' => 2],
+        ['field' => 'cost_glass',         'code' => 'GLASS',        'name' => 'ガラス',   'type' => 'money', 'sort' => 3],
+        ['field' => 'cost_factory_hours', 'code' => 'FACTORY_TIME', 'name' => '工場時間', 'type' => 'time',  'sort' => 4],
+        ['field' => 'cost_site_hours',    'code' => 'SITE_TIME',    'name' => '現場時間', 'type' => 'time',  'sort' => 5],
     ];
     $costs = [];
-    $sort = 0;
     foreach ($map as $m) {
         $val = (float)($line[$m['field']] ?? 0);
         if ($val != 0) {
@@ -335,22 +334,20 @@ function fallbackCosts(array $line): array {
                 'category_name'   => $m['name'],
                 'measure_type'    => $m['type'],
                 'value'           => $val,
-                'sort_order'      => $sort,
+                'sort_order'      => $m['sort'],
             ];
         }
-        $sort++;
     }
     return $costs;
 }
 
 function fallbackPrices(array $line): array {
     $map = [
-        ['field' => 'price_body',     'code' => 'body',     'name' => '本体',   'type' => 'money'],
-        ['field' => 'price_hardware', 'code' => 'hardware', 'name' => '金物',   'type' => 'money'],
-        ['field' => 'price_glass',    'code' => 'glass',    'name' => 'ガラス', 'type' => 'money'],
+        ['field' => 'price_body',     'code' => 'MAIN',     'name' => '本体',   'type' => 'money', 'sort' => 1],
+        ['field' => 'price_hardware', 'code' => 'HARDWARE', 'name' => '金物',   'type' => 'money', 'sort' => 2],
+        ['field' => 'price_glass',    'code' => 'GLASS',    'name' => 'ガラス', 'type' => 'money', 'sort' => 3],
     ];
     $prices = [];
-    $sort = 0;
     foreach ($map as $m) {
         $val = (float)($line[$m['field']] ?? 0);
         if ($val != 0) {
@@ -361,10 +358,9 @@ function fallbackPrices(array $line): array {
                 'category_name'   => $m['name'],
                 'measure_type'    => $m['type'],
                 'value'           => $val,
-                'sort_order'      => $sort,
+                'sort_order'      => $m['sort'],
             ];
         }
-        $sort++;
     }
     return $prices;
 }

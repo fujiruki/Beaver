@@ -215,10 +215,10 @@ try {
         $id = createTateguItem($pdo, 'ADR003-COST');
 
         $r = putJson($port, "/tategu-items/$id/cost-lines", ['lines' => [
-            ['category_code' => 'body', 'name' => 'ヒノキ材', 'quantity' => 2.5, 'unit_cost' => 1200, 'amount' => 3000, 'source' => 'manual', 'sort_order' => 2],
-            ['category_code' => 'body', 'name' => '木材計算', 'quantity' => 1, 'unit_cost' => 2500, 'amount' => 2500, 'source' => 'wood_calc', 'sort_order' => 1],
-            ['category_code' => 'hardware', 'name' => '丁番', 'quantity' => 4, 'unit_cost' => 300, 'amount' => 1200, 'sort_order' => 3],
-            ['category_code' => 'glass', 'name' => '透明ガラス', 'quantity' => 1, 'unit_cost' => 1800, 'amount' => 1800, 'sort_order' => 4],
+            ['category_code' => 'MAIN', 'name' => 'ヒノキ材', 'quantity' => 2.5, 'unit_cost' => 1200, 'amount' => 3000, 'source' => 'manual', 'sort_order' => 2],
+            ['category_code' => 'MAIN', 'name' => '木材計算', 'quantity' => 1, 'unit_cost' => 2500, 'amount' => 2500, 'source' => 'wood_calc', 'sort_order' => 1],
+            ['category_code' => 'HARDWARE', 'name' => '丁番', 'quantity' => 4, 'unit_cost' => 300, 'amount' => 1200, 'sort_order' => 3],
+            ['category_code' => 'GLASS', 'name' => '透明ガラス', 'quantity' => 1, 'unit_cost' => 1800, 'amount' => 1800, 'sort_order' => 4],
         ]]);
         assertTrue(str_contains($r['status'], '200'), 'HTTP 200: ' . $r['status'] . ' body=' . $r['raw']);
         assertEq(true, $r['body']['ok'] ?? null, 'レスポンス ok');
@@ -237,8 +237,8 @@ try {
         $id = createTateguItem($pdo, 'ADR003-LABOR');
 
         $r = putJson($port, "/tategu-items/$id/labor-lines", ['lines' => [
-            ['category_code' => 'factory_hours', 'process_name' => '製作', 'work_hours' => 2.5, 'labor_rate' => 4000, 'amount' => 10000, 'sort_order' => 1],
-            ['category_code' => 'site_hours', 'process_name' => '取付', 'work_hours' => 1.0, 'labor_rate' => 6500, 'amount' => 6500, 'sort_order' => 2],
+            ['category_code' => 'FACTORY_TIME', 'process_name' => '製作', 'work_hours' => 2.5, 'labor_rate' => 4000, 'amount' => 10000, 'sort_order' => 1],
+            ['category_code' => 'SITE_TIME', 'process_name' => '取付', 'work_hours' => 1.0, 'labor_rate' => 6500, 'amount' => 6500, 'sort_order' => 2],
         ]]);
         assertTrue(str_contains($r['status'], '200'), 'HTTP 200: ' . $r['status'] . ' body=' . $r['raw']);
 
@@ -251,17 +251,17 @@ try {
     runTest('GET /tategu-items/{id} は cost_lines と labor_lines を返す', function () use (&$pdo, $port) {
         $id = createTateguItem($pdo, 'ADR003-GET');
         putJson($port, "/tategu-items/$id/cost-lines", ['lines' => [
-            ['category_code' => 'hardware', 'name' => '錠前', 'quantity' => 1, 'unit_cost' => 4200, 'amount' => 4200, 'sort_order' => 1],
+            ['category_code' => 'HARDWARE', 'name' => '錠前', 'quantity' => 1, 'unit_cost' => 4200, 'amount' => 4200, 'sort_order' => 1],
         ]]);
         putJson($port, "/tategu-items/$id/labor-lines", ['lines' => [
-            ['category_code' => 'factory_hours', 'process_name' => '見積', 'work_hours' => 0.5, 'labor_rate' => 5000, 'amount' => 2500, 'sort_order' => 1],
+            ['category_code' => 'FACTORY_TIME', 'process_name' => '見積', 'work_hours' => 0.5, 'labor_rate' => 5000, 'amount' => 2500, 'sort_order' => 1],
         ]]);
 
         $r = getJson($port, "/tategu-items/$id");
         assertTrue(str_contains($r['status'], '200'), 'HTTP 200: ' . $r['status']);
         assertEq(1, count($r['body']['cost_lines'] ?? []), 'cost_lines count');
         assertEq(1, count($r['body']['labor_lines'] ?? []), 'labor_lines count');
-        assertEq('hardware', $r['body']['cost_lines'][0]['category_code'] ?? null, 'cost_lines category');
+        assertEq('HARDWARE', $r['body']['cost_lines'][0]['category_code'] ?? null, 'cost_lines category');
         assertEq('見積', $r['body']['labor_lines'][0]['process_name'] ?? null, 'labor_lines process');
     });
 

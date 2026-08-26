@@ -50,7 +50,7 @@ try {
     $fetched = requestJson($port, 'GET', "/vouchers/$voucherId");
     same(null, $fetched['sales_category_id'], '更新時の sales_category_id');
 
-    $categoryValue = ['category_code' => 'body', 'category_name' => '本体', 'measure_type' => 'money', 'value' => 5000, 'sort_order' => 1];
+    $categoryValue = ['category_code' => 'MAIN', 'category_name' => '本体', 'measure_type' => 'money', 'value' => 5000, 'sort_order' => 1];
     $line = requestJson($port, 'POST', "/vouchers/$voucherId/lines", ['line_total' => 10000, 'tax_category' => 'taxable', 'costs' => [$categoryValue], 'prices' => [$categoryValue]]);
     $lineId = (int)$line['id'];
     $voucher = requestJson($port, 'GET', "/vouchers/$voucherId");
@@ -68,7 +68,19 @@ try {
     $sync = requestJson($port, 'GET', '/vouchers/sync');
     $syncVoucher = array_values(array_filter($sync['vouchers'], fn(array $v): bool => (int)$v['id'] === $syncVoucherId))[0];
     same('課税', $syncVoucher['lines'][0]['tax_category'], '同期応答の日本語値');
-    echo "R-0119 PHPテスト: 8 PASS / 0 FAIL\n";
+
+    $pdo->exec("INSERT INTO voucher_lines
+        (voucher_id, line_no, cost_body, cost_hardware, cost_glass, cost_factory_hours, cost_site_hours,
+         price_body, price_hardware, price_glass, tax_category)
+        VALUES ($voucherId, 99, 100, 200, 300, 4, 5, 1000, 2000, 3000, 'taxable')");
+    $fixedLineId = (int)$pdo->lastInsertId();
+    $fixedLines = requestJson($port, 'GET', "/vouchers/$voucherId/lines");
+    $fixedLine = array_values(array_filter($fixedLines, fn(array $line): bool => (int)$line['id'] === $fixedLineId))[0];
+    same(['MAIN', 'HARDWARE', 'GLASS', 'FACTORY_TIME', 'SITE_TIME'], array_column($fixedLine['costs'], 'category_code'), '固定原価列の実マスタコード');
+    same([1, 2, 3, 4, 5], array_map('intval', array_column($fixedLine['costs'], 'sort_order')), '固定原価列の表示順');
+    same(['MAIN', 'HARDWARE', 'GLASS'], array_column($fixedLine['prices'], 'category_code'), '固定売価列の実マスタコード');
+    same([1, 2, 3], array_map('intval', array_column($fixedLine['prices'], 'sort_order')), '固定売価列の表示順');
+    echo "R-0119 PHPテスト: 12 PASS / 0 FAIL\n";
 } finally {
     foreach ($pipes as $pipe) if (is_resource($pipe)) fclose($pipe);
     proc_terminate($proc);

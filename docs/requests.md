@@ -1,5 +1,9 @@
 # 要望・リクエスト
 
+## -10. 本番の集計区分同期がcatalog-system認証ゲートで機能しない（バックログ、2026-08-27発覚）
+
+R-0119の本番実測で判明: Beaverの `POST /aggregation-categories/sync` は本番サーバーからcatalog-system API（`https://door-fujita.com/contents/catalog-system/api/aggregation-categories`）を呼ぶと401（auth-hub認証ゲート）で失敗する。R-0119ではmigration 027によるシードで回避した（区分変更は稀のため実害小）。恒久対応にはcatalog-system側にサーバー間トークン認証の例外（BANTO_API_TOKEN/YOUKAN_API_TOKENと同パターン）を追加し、Beaver側の同期リクエストにトークンを付与する改修が必要（catalog-systemリポジトリをまたぐ）。集計区分を変更する運用が発生したら着手を検討。
+
 ## -9. AccessTategu連携用の同期APIに認証を追加してほしい（バックログ、2026-08-17発覚）
 
 R-0109（Beaverへのauth-hub組み込み・ログイン基盤導入）の仕様検討中に判明: `/projects/sync`・`/vouchers/sync`・`/aggregation-categories/sync`・`/vouchers/{id}/access-link` 等のAccessTategu連携用エンドポイントは、トークン等の認証機構が一切なく、本番では `.htaccess` Basic認証（R-0099、URLを知っていれば誰でも通る共有パスワード）でのみ保護されている。R-0109ではこれらのエンドポイントを画面系ログイン必須化の対象外としたため（人間のログインではなくAccess(VBA)からのシステム間連携のため）、この無防備状態は今回では解消されない。

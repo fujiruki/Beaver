@@ -16,12 +16,40 @@ Codexレビュー＋指揮役の裏取りで、症状の原因と関連バグを
 
 ## スコープ
 
-### S1: time型集計区分の導入（コード変更なし・データ作業＋検証）
+### S1: time型集計区分の導入
 
-- catalog-system の集計区分設定画面（`AggregationCategorySettingsPage`、measureType=time対応済み）でtime型区分（例: 製作時間・施工時間）を追加し、Beaver側で `POST /aggregation-categories/sync` を実行する
-- 動的UI側は `measure_type='time'` の区分があれば時間入力列を描画する実装済み（`LineItemRow.tsx:287`）のため、Beaverのコード変更は不要
-- **検証項目**: 本番の同期先URLが `http://localhost:8002/...` 固定（`api/routes/aggregation_categories.php:18`）で本番サーバー上で疎通するか確認。不通なら環境別URL対応を本Rの追加タスクとする
-- **検証項目**: 本番 `aggregation_category_master` の現状（件数・measure_type分布）を確認する
+**2026-08-27更新（藤田晴樹さん確認）**: catalog-systemの集計区分には既にtime型が存在する。新規追加は不要で、Beaver側への同期と対応付けが本作業となる。
+
+現行の集計区分（catalog-system、正）:
+
+| コード | 名称 | 単位タイプ | 表示順 |
+|:--|:--|:--|:--|
+| MAIN | 本体 | money | 1 |
+| HARDWARE | 金物 | money | 2 |
+| GLASS | ガラス | money | 3 |
+| FACTORY_TIME | 工場時間 | time | 4 |
+| SITE_TIME | 現場時間 | time | 5 |
+
+対応付け（藤田晴樹さん決定）: **製作時間（cost_factory_hours）＝工場時間（FACTORY_TIME）、施工時間（cost_site_hours）＝現場時間（SITE_TIME）**。
+
+#### S1a: 同期先URLの環境別設定化（コード変更）
+
+`api/routes/aggregation_categories.php:18` と `api/routes/catalog_proxy.php:7` のcatalog-systemベースURLが `http://localhost:8002/contents/catalog-system/api` 固定で、本番サーバーでは疎通しない。R-0118の`YOUKAN_CAPACITY_URL`と同じパターンで、`config.local.php` の定数（例: `CATALOG_API_BASE`、未定義時は現行のlocalhost:8002デフォルト）に一本化する。本番値は疎通確認の上で設定（候補: `https://door-fujita.com/contents/catalog-system/api`。catalog-system側の認証ゲートで401になる場合は対応方針を別途判断）。
+
+#### S1b: 旧固定列→動的形式変換のコード整合（コード変更・バグ修正）
+
+`api/routes/vouchers.php` の `fallbackCosts`/`fallbackPrices` が独自の小文字コード（`body`/`hardware`/`glass`/`factory_hours`/`site_hours`）で変換しているが、フロントは `getCostValue(cat.code)` の完全一致でセル表示するため、実マスタコード（MAIN/HARDWARE/GLASS/FACTORY_TIME/SITE_TIME）と不一致だと (1) 旧伝票の金額・時間がセルに表示されない、(2) 労務原価合計には乗る（time型は合算のため）ので「セル空欄なのに労務費あり」の混乱、(3) セルを編集すると実コードで別エントリが追加され**二重計上**になる。変換コードを実マスタコードへ修正する（名称・sort_orderもマスタに合わせる: 本体/金物/ガラス/工場時間/現場時間、1〜5）。
+
+#### S1c: マスタ投入は migration 027 によるシードで行う（2026-08-27変更）
+
+本番実測（2026-08-27）の結果:
+- 本番 `aggregation_category_master` は **0件**（本番は旧UI=LegacyRowが表示されていた。ヘッダーと入力セルの列ずれが症状の正体）
+- 本番サーバーから catalog-system API への疎通は **401**（auth-hub認証ゲート）。URL設定化（S1a）だけでは同期は通らない
+
+このため、同期実行ではなく **migration 027 で上記5区分を `INSERT OR REPLACE` シード**する（dev・本番とも空のため安全、SQLite 3.7.17互換）。catalog-system側の認証例外（サーバー間トークン等）による同期経路の復旧は別要望としてバックログへ記録（`docs/requests.md`）。
+
+- 本番 `voucher_lines.tax_category` 分布（2026-08-27実測): 課税 24,348 / 非課税 1,133 / taxable 3。想定外の値なし → **migration 026 の適用条件クリア**
+- 本番 `voucher_line_costs` は0行（全データ固定列方式）→ S1bの変換修正がそのまま効く
 
 ### S2: LegacyRow廃止
 

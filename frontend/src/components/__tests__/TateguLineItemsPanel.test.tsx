@@ -5,18 +5,18 @@ import type { AggregationCategoryMaster } from '../../api/aggregationCategories'
 import type { CostLineDraft, LaborLineDraft } from '../TateguLineItemsPanel';
 
 const categories: AggregationCategoryMaster[] = [
-  { id: 1, code: 'body', name: '本体', measure_type: 'money', sort_order: 0, is_active: 1, synced_at: '' },
-  { id: 2, code: 'hardware', name: '金物', measure_type: 'money', sort_order: 1, is_active: 1, synced_at: '' },
-  { id: 3, code: 'glass', name: 'ガラス', measure_type: 'money', sort_order: 2, is_active: 1, synced_at: '' },
-  { id: 4, code: 'factory_hours', name: '工場時間', measure_type: 'time', sort_order: 3, is_active: 1, synced_at: '' },
-  { id: 5, code: 'site_hours', name: '現場時間', measure_type: 'time', sort_order: 4, is_active: 1, synced_at: '' },
+  { id: 1, code: 'MAIN', name: '本体', measure_type: 'money', sort_order: 1, is_active: 1, synced_at: '' },
+  { id: 2, code: 'HARDWARE', name: '金物', measure_type: 'money', sort_order: 2, is_active: 1, synced_at: '' },
+  { id: 3, code: 'GLASS', name: 'ガラス', measure_type: 'money', sort_order: 3, is_active: 1, synced_at: '' },
+  { id: 4, code: 'FACTORY_TIME', name: '工場時間', measure_type: 'time', sort_order: 4, is_active: 1, synced_at: '' },
+  { id: 5, code: 'SITE_TIME', name: '現場時間', measure_type: 'time', sort_order: 5, is_active: 1, synced_at: '' },
 ];
 
 describe('TateguCostLinesPanel', () => {
   it('数量と単価から金額を自動計算し、変更内容を返す', () => {
     const onChange = vi.fn();
     const lines: CostLineDraft[] = [{
-      category_code: 'body',
+      category_code: 'MAIN',
       name: '框材',
       quantity: 2,
       unit_cost: 1000,
@@ -45,7 +45,7 @@ describe('TateguCostLinesPanel', () => {
     fireEvent.click(screen.getByText('+ 行追加'));
 
     expect(onChange).toHaveBeenCalledWith([{
-      category_code: 'body',
+      category_code: 'MAIN',
       name: '',
       quantity: 1,
       unit_cost: 0,
@@ -61,7 +61,7 @@ describe('TateguLaborLinesPanel', () => {
     const onChange = vi.fn();
     const lines: LaborLineDraft[] = [{
       process_name: '組立',
-      category_code: 'factory_hours',
+      category_code: 'FACTORY_TIME',
       work_hours: 1.5,
       labor_rate: 4000,
       amount: 6000,
@@ -85,7 +85,7 @@ describe('TateguLaborLinesPanel', () => {
     const onChange = vi.fn();
     const lines: LaborLineDraft[] = [{
       process_name: '取付',
-      category_code: 'site_hours',
+      category_code: 'SITE_TIME',
       work_hours: 1,
       labor_rate: 5000,
       amount: 5000,
@@ -95,6 +95,6 @@ describe('TateguLaborLinesPanel', () => {
     render(<TateguLaborLinesPanel lines={lines} onChange={onChange} categories={categories} />);
 
     const options = Array.from(screen.getByLabelText('労務区分').querySelectorAll('option')).map(option => option.value);
-    expect(options).toEqual(['factory_hours', 'site_hours']);
+    expect(options).toEqual(['FACTORY_TIME', 'SITE_TIME']);
   });
 });

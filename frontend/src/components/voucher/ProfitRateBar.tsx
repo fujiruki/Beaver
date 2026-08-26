@@ -82,8 +82,8 @@ export default function ProfitRateBar({ categories }: Props) {
           || (line.cost_body ?? 0) + (line.cost_hardware ?? 0) + (line.cost_glass ?? 0)
             + calcLaborCostDynamic(
               [
-                { category_code: 'factory_hours', category_name: '工場時間', measure_type: 'time', value: line.cost_factory_hours ?? 0, sort_order: 0 },
-                { category_code: 'site_hours',    category_name: '現場時間', measure_type: 'time', value: line.cost_site_hours    ?? 0, sort_order: 1 },
+                { category_code: 'FACTORY_TIME', category_name: '工場時間', measure_type: 'time', value: line.cost_factory_hours ?? 0, sort_order: 4 },
+                { category_code: 'SITE_TIME',    category_name: '現場時間', measure_type: 'time', value: line.cost_site_hours    ?? 0, sort_order: 5 },
               ],
               laborRate,
               1,

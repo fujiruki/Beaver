@@ -41,3 +41,5 @@ if (!defined('YOUKAN_API_TOKEN')) define('YOUKAN_API_TOKEN', 'dev-youkan-token-c
 // R-0118: Youkan容量判定プロキシ用。config.local.php で未定義の場合のみ開発用フォールバック値を使う
 if (!defined('BEAVER_CAPACITY_TOKEN')) define('BEAVER_CAPACITY_TOKEN', 'dev-beaver-capacity-token-change-me');
 if (!defined('YOUKAN_CAPACITY_URL')) define('YOUKAN_CAPACITY_URL', 'http://localhost:8000/integrations/beaver/capacity-check');
+
+if (!defined('CATALOG_API_BASE')) define('CATALOG_API_BASE', 'http://localhost:8002/contents/catalog-system/api');

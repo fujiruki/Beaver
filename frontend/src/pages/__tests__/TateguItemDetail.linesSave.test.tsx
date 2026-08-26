@@ -25,7 +25,7 @@ const baseItem = {
     {
       id: 3,
       tategu_item_id: 10,
-      category_code: 'body',
+      category_code: 'MAIN',
       category_name: 'Body',
       measure_type: 'money',
       value: 1200,
@@ -36,7 +36,7 @@ const baseItem = {
     {
       id: 1,
       tategu_item_id: 10,
-      category_code: 'body',
+      category_code: 'MAIN',
       name: 'Material A',
       quantity: 2,
       unit_cost: 600,
@@ -50,7 +50,7 @@ const baseItem = {
       id: 2,
       tategu_item_id: 10,
       process_name: 'Factory work',
-      category_code: 'factory_hours',
+      category_code: 'FACTORY_TIME',
       work_hours: 2,
       labor_rate: 4000,
       amount: 8000,
@@ -60,11 +60,11 @@ const baseItem = {
 };
 
 const categories = [
-  { id: 1, code: 'body', name: 'Body', measure_type: 'money', sort_order: 0, is_active: 1, synced_at: '' },
-  { id: 2, code: 'hardware', name: 'Hardware', measure_type: 'money', sort_order: 1, is_active: 1, synced_at: '' },
-  { id: 3, code: 'glass', name: 'Glass', measure_type: 'money', sort_order: 2, is_active: 1, synced_at: '' },
-  { id: 4, code: 'factory_hours', name: 'Factory', measure_type: 'time', sort_order: 3, is_active: 1, synced_at: '' },
-  { id: 5, code: 'site_hours', name: 'Site', measure_type: 'time', sort_order: 4, is_active: 1, synced_at: '' },
+  { id: 1, code: 'MAIN', name: 'Body', measure_type: 'money', sort_order: 1, is_active: 1, synced_at: '' },
+  { id: 2, code: 'HARDWARE', name: 'Hardware', measure_type: 'money', sort_order: 2, is_active: 1, synced_at: '' },
+  { id: 3, code: 'GLASS', name: 'Glass', measure_type: 'money', sort_order: 3, is_active: 1, synced_at: '' },
+  { id: 4, code: 'FACTORY_TIME', name: 'Factory', measure_type: 'time', sort_order: 4, is_active: 1, synced_at: '' },
+  { id: 5, code: 'SITE_TIME', name: 'Site', measure_type: 'time', sort_order: 5, is_active: 1, synced_at: '' },
 ];
 
 type ApiCall = {
@@ -167,7 +167,7 @@ describe('TateguItemDetail line item save order', () => {
     await waitFor(() => expect(apiCalls.some(call => call.path.endsWith('/tategu-items/10/cost-breakdown'))).toBe(true));
     expect(putCall('/tategu-items/10/cost-breakdown').body.lines).toEqual([
       {
-        category_code: 'body',
+        category_code: 'MAIN',
         category_name: 'Body',
         measure_type: 'money',
         value: 1200,
@@ -194,7 +194,7 @@ describe('TateguItemDetail line item save order', () => {
     expect(laborLinesIndex).toBeLessThan(itemIndex);
     expect(putCall('/tategu-items/10/cost-lines').body.lines).toEqual([
       {
-        category_code: 'body',
+        category_code: 'MAIN',
         name: 'Material A',
         quantity: 2,
         unit_cost: 600,
@@ -206,7 +206,7 @@ describe('TateguItemDetail line item save order', () => {
     expect(putCall('/tategu-items/10/labor-lines').body.lines).toEqual([
       {
         process_name: 'Factory work',
-        category_code: 'factory_hours',
+        category_code: 'FACTORY_TIME',
         work_hours: 2,
         labor_rate: 4000,
         amount: 8000,

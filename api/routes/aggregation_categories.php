@@ -15,7 +15,7 @@ if ($method === 'GET' && $subPath === '') {
 }
 
 if ($method === 'POST' && $subPath === '/sync') {
-    $catalogUrl = 'http://localhost:8002/contents/catalog-system/api/aggregation-categories';
+    $catalogUrl = CATALOG_API_BASE . '/aggregation-categories';
     $ctx = stream_context_create(['http' => ['timeout' => 5]]);
     $result = @file_get_contents($catalogUrl, false, $ctx);
 

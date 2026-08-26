@@ -36,7 +36,7 @@ function recalcTateguCost(PDO $pdo, int $id, bool $forceLineRecalc = false): voi
         return;
     }
 
-    $costs = ['body' => 0.0, 'hardware' => 0.0, 'glass' => 0.0];
+    $costs = ['MAIN' => 0.0, 'HARDWARE' => 0.0, 'GLASS' => 0.0];
     $costStmt = $pdo->prepare('
         SELECT category_code, COALESCE(SUM(amount), 0) AS amount
         FROM tategu_item_cost_lines
@@ -50,7 +50,7 @@ function recalcTateguCost(PDO $pdo, int $id, bool $forceLineRecalc = false): voi
         }
     }
 
-    $hours = ['factory_hours' => 0.0, 'site_hours' => 0.0];
+    $hours = ['FACTORY_TIME' => 0.0, 'SITE_TIME' => 0.0];
     $laborAmount = 0.0;
     $totalHours = 0.0;
     $laborStmt = $pdo->prepare('
@@ -86,11 +86,11 @@ function recalcTateguCost(PDO $pdo, int $id, bool $forceLineRecalc = false): voi
             updated_at = CURRENT_TIMESTAMP
         WHERE id = :id
     ')->execute([
-        ':cost_body'          => $costs['body'],
-        ':cost_hardware'      => $costs['hardware'],
-        ':cost_glass'         => $costs['glass'],
-        ':cost_factory_hours' => $hours['factory_hours'],
-        ':cost_site_hours'    => $hours['site_hours'],
+        ':cost_body'          => $costs['MAIN'],
+        ':cost_hardware'      => $costs['HARDWARE'],
+        ':cost_glass'         => $costs['GLASS'],
+        ':cost_factory_hours' => $hours['FACTORY_TIME'],
+        ':cost_site_hours'    => $hours['SITE_TIME'],
         ':cost_labor_rate'    => $laborRate,
         ':id'                 => $id,
     ]);

@@ -192,14 +192,14 @@ describe('calcPriceFromProfit', () => {
 // ---- 動的集計区分 ----
 
 const moneyOnly: LineCategoryValue[] = [
-  { category_code: 'body',     category_name: '本体',   measure_type: 'money', value: 30000, sort_order: 0 },
-  { category_code: 'hardware', category_name: '金物',   measure_type: 'money', value: 10000, sort_order: 1 },
-  { category_code: 'glass',    category_name: 'ガラス', measure_type: 'money', value: 5000,  sort_order: 2 },
+  { category_code: 'MAIN',     category_name: '本体',   measure_type: 'money', value: 30000, sort_order: 1 },
+  { category_code: 'HARDWARE', category_name: '金物',   measure_type: 'money', value: 10000, sort_order: 2 },
+  { category_code: 'GLASS',    category_name: 'ガラス', measure_type: 'money', value: 5000,  sort_order: 3 },
 ];
 
 const timeOnly: LineCategoryValue[] = [
-  { category_code: 'factory_hours', category_name: '工場時間', measure_type: 'time', value: 4, sort_order: 3 },
-  { category_code: 'site_hours',    category_name: '現場時間', measure_type: 'time', value: 2, sort_order: 4 },
+  { category_code: 'FACTORY_TIME', category_name: '工場時間', measure_type: 'time', value: 4, sort_order: 4 },
+  { category_code: 'SITE_TIME',    category_name: '現場時間', measure_type: 'time', value: 2, sort_order: 5 },
 ];
 
 const mixed: LineCategoryValue[] = [...moneyOnly, ...timeOnly];
@@ -246,8 +246,8 @@ describe('calcManufactureCostDynamic', () => {
 describe('calcLineTotalDynamic', () => {
   it('全value合計 × quantity', () => {
     const prices: LineCategoryValue[] = [
-      { category_code: 'body', category_name: '本体', measure_type: 'money', value: 50000, sort_order: 0 },
-      { category_code: 'glass', category_name: 'ガラス', measure_type: 'money', value: 10000, sort_order: 1 },
+      { category_code: 'MAIN', category_name: '本体', measure_type: 'money', value: 50000, sort_order: 1 },
+      { category_code: 'GLASS', category_name: 'ガラス', measure_type: 'money', value: 10000, sort_order: 3 },
     ];
     expect(calcLineTotalDynamic(prices, 3)).toBe(180000); // (50000+10000)*3
   });

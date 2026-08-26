@@ -56,7 +56,7 @@ describe('VoucherEdit R-0119', () => {
   });
 
   it('新規伝票はヘッダー作成後に画面上の明細を保存してから遷移する', async () => {
-    categories = [{ id: 1, code: 'body', name: '本体', measure_type: 'money', sort_order: 1 }];
+    categories = [{ id: 1, code: 'MAIN', name: '本体', measure_type: 'money', sort_order: 1 }];
     const user = userEvent.setup();
     renderNew();
     await screen.findByText('得意先A');
@@ -71,7 +71,7 @@ describe('VoucherEdit R-0119', () => {
   });
 
   it('新規伝票の明細保存に失敗したら遷移せずエラーを表示する', async () => {
-    categories = [{ id: 1, code: 'body', name: '本体', measure_type: 'money', sort_order: 1 }];
+    categories = [{ id: 1, code: 'MAIN', name: '本体', measure_type: 'money', sort_order: 1 }];
     lineSaveFails = true;
     const user = userEvent.setup();
     renderNew();
@@ -83,7 +83,7 @@ describe('VoucherEdit R-0119', () => {
   });
 
   it('明細保存の再試行では伝票と保存済み明細を二重作成せず失敗行から再開する', async () => {
-    categories = [{ id: 1, code: 'body', name: '本体', measure_type: 'money', sort_order: 1 }];
+    categories = [{ id: 1, code: 'MAIN', name: '本体', measure_type: 'money', sort_order: 1 }];
     failedItemName = '明細2';
     remainingFailures = 1;
     const user = userEvent.setup();
