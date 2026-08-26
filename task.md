@@ -1,6 +1,15 @@
 # Beaver タスクキュー
 
 ## 進行中
+- [ ] R-0119: 伝票明細の時間入力・保存不具合の一括修正（2026-08-26仕様確定）。仕様: `docs/spec/R-0119_voucher_line_fixes.md`
+  - [x] S3: 新規伝票作成時に明細も保存（2026-08-26、二重作成ガード含む。Codex TDD、差し戻し1回で修正）
+  - [x] S4: sales_category_id をAPIのINSERT/UPDATE許可リストへ（2026-08-26）
+  - [x] S5: 課税フラグ英語コード統一（2026-08-26。recalc比較・同期境界の相互変換・migration 026をdev適用。**本番適用は実データ分布確認後**）
+  - [x] S6: costs/prices空配列クリア（2026-08-26）
+  - [x] S2: LegacyRow廃止＋未同期時警告（2026-08-26、差し戻しで死コード完全削除を確認）
+  - [x] 検証（ローカル）: 回帰スイート🔵青（vitest 323件・PHPテスト17ファイル）・R-0119 PHPテスト8/8・npm run build成功。指揮役が再実行して裏取り済み（2026-08-26）
+  - [ ] S1: catalog-systemでtime型区分追加→Beaver同期（データ作業）。本番同期URL `localhost:8002` 固定の疎通検証、本番マスタの現状確認
+  - [ ] デプロイ（藤田晴樹さんの承認待ち）: 本番 `voucher_lines.tax_category` の分布確認 → migration 026適用 → コード一式デプロイ → 本番動作確認
 - [ ] R-0118: Beaver-Youkan連携 B2 — 案件詳細のYoukan容量判定表示（2026-08-26着手、Youkan Y1本番検証完了を受けて開始）。仕様: `docs/spec/R-0118_youkan_capacity_check_b2.md`。**B2完了で停止し、B3へは進まない**
   - [x] A: バックエンドプロキシ `GET /projects/{id}/capacity-check`（TDD、スタブYoukanでPHPテスト10件、2026-08-26）
   - [x] B: フロント `CapacityCheckPanel`（結論優先表示・縮退表示、vitest 6件、2026-08-26）

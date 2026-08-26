@@ -508,6 +508,7 @@ function insertSyncedLines(PDO $pdo, int $voucherId, array $lines): ?array {
         }
         $lineTotal = (float)$lineTotalRaw;
 
+        $dbTaxCategory = $taxCategory === '課税' ? 'taxable' : 'non_taxable';
         $ins->execute([
             ':voucher_id'    => $voucherId,
             ':line_no'       => isset($line['line_no']) ? (int)$line['line_no'] : $lineNo,
@@ -518,7 +519,7 @@ function insertSyncedLines(PDO $pdo, int $voucherId, array $lines): ?array {
             ':price_hardware' => isset($line['price_hardware']) ? (float)$line['price_hardware'] : 0.0,
             ':price_glass'   => isset($line['price_glass'])    ? (float)$line['price_glass']    : 0.0,
             ':line_total'    => $lineTotal,
-            ':tax_category'  => $taxCategory,
+            ':tax_category'  => $dbTaxCategory,
             ':memo'          => $line['memo'] ?? null,
             ':source'        => 'access',
             ':access_line_id' => isset($line['access_line_id']) ? (int)$line['access_line_id'] : null,

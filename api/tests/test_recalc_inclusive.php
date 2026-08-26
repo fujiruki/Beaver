@@ -65,7 +65,7 @@ function recalcVoucherTest(PDO $pdo, int $voucherId): void {
         $amt = (float)$l['line_total'];
         if ($l['line_type'] === 'discount') {
             $discount += $amt;
-        } elseif ($l['tax_category'] === '課税') {
+        } elseif ($l['tax_category'] === 'taxable') {
             $taxable += $amt;
         } else {
             $nontaxable += $amt;
@@ -145,7 +145,7 @@ function createTestVoucher(PDO $pdo, string $taxInputType): int {
 }
 
 $lineNoCounter = [];
-function addLine(PDO $pdo, int $voucherId, string $lineType, float $amount, string $taxCategory = '課税'): void {
+function addLine(PDO $pdo, int $voucherId, string $lineType, float $amount, string $taxCategory = 'taxable'): void {
     global $lineNoCounter;
     if (!isset($lineNoCounter[$voucherId])) {
         $lineNoCounter[$voucherId] = 0;
@@ -168,7 +168,7 @@ echo "=== recalcVoucher inclusive 分岐テスト ===\n\n";
 // T-01: 税込10005 → tax=909, subtotal_taxable=9096, total=10005
 runTest('T-01: 税込10005 → tax=909, subtotal_taxable=9096, total=10005', function () use ($pdo) {
     $id = createTestVoucher($pdo, 'inclusive');
-    addLine($pdo, $id, 'normal', 10005.0, '課税');
+    addLine($pdo, $id, 'normal', 10005.0, 'taxable');
     recalcVoucherTest($pdo, $id);
     $v = fetchVoucher($pdo, $id);
     assertEq(909, (int)$v['tax_amount'], 'tax_amount');
@@ -179,7 +179,7 @@ runTest('T-01: 税込10005 → tax=909, subtotal_taxable=9096, total=10005', fun
 // T-02: 税込110000 → tax=10000, subtotal_taxable=100000, total=110000
 runTest('T-02: 税込110000 → tax=10000, subtotal_taxable=100000, total=110000', function () use ($pdo) {
     $id = createTestVoucher($pdo, 'inclusive');
-    addLine($pdo, $id, 'normal', 110000.0, '課税');
+    addLine($pdo, $id, 'normal', 110000.0, 'taxable');
     recalcVoucherTest($pdo, $id);
     $v = fetchVoucher($pdo, $id);
     assertEq(10000, (int)$v['tax_amount'], 'tax_amount');
@@ -190,7 +190,7 @@ runTest('T-02: 税込110000 → tax=10000, subtotal_taxable=100000, total=110000
 // T-03: 税込110010 → tax=10000, subtotal_taxable=100010, total=110010
 runTest('T-03: 税込110010 → tax=10000, subtotal_taxable=100010, total=110010', function () use ($pdo) {
     $id = createTestVoucher($pdo, 'inclusive');
-    addLine($pdo, $id, 'normal', 110010.0, '課税');
+    addLine($pdo, $id, 'normal', 110010.0, 'taxable');
     recalcVoucherTest($pdo, $id);
     $v = fetchVoucher($pdo, $id);
     assertEq(10000, (int)$v['tax_amount'], 'tax_amount');
@@ -201,7 +201,7 @@ runTest('T-03: 税込110010 → tax=10000, subtotal_taxable=100010, total=110010
 // T-04: 税込100000 → tax=9090, subtotal_taxable=90910, total=100000
 runTest('T-04: 税込100000 → tax=9090, subtotal_taxable=90910, total=100000', function () use ($pdo) {
     $id = createTestVoucher($pdo, 'inclusive');
-    addLine($pdo, $id, 'normal', 100000.0, '課税');
+    addLine($pdo, $id, 'normal', 100000.0, 'taxable');
     recalcVoucherTest($pdo, $id);
     $v = fetchVoucher($pdo, $id);
     assertEq(9090, (int)$v['tax_amount'], 'tax_amount');
@@ -213,8 +213,8 @@ runTest('T-04: 税込100000 → tax=9090, subtotal_taxable=90910, total=100000',
 //   tax=floor(110000*10/110)=10000, taxable=100000, total=110000-5500=104500
 runTest('T-05: 割引あり 税込110000-5500 → tax=10000, taxable=100000, total=104500', function () use ($pdo) {
     $id = createTestVoucher($pdo, 'inclusive');
-    addLine($pdo, $id, 'normal',   110000.0, '課税');
-    addLine($pdo, $id, 'discount',   5500.0, '課税');
+    addLine($pdo, $id, 'normal',   110000.0, 'taxable');
+    addLine($pdo, $id, 'discount',   5500.0, 'taxable');
     recalcVoucherTest($pdo, $id);
     $v = fetchVoucher($pdo, $id);
     assertEq(10000, (int)$v['tax_amount'], 'tax_amount');
@@ -225,7 +225,7 @@ runTest('T-05: 割引あり 税込110000-5500 → tax=10000, taxable=100000, tot
 // T-06: exclusive 分岐は変更されていない（回帰防止） - 課税10万 → tax=10000, total=110000
 runTest('T-06: exclusive 分岐回帰防止 → tax=10000, total=110000', function () use ($pdo) {
     $id = createTestVoucher($pdo, 'exclusive');
-    addLine($pdo, $id, 'normal', 100000.0, '課税');
+    addLine($pdo, $id, 'normal', 100000.0, 'taxable');
     recalcVoucherTest($pdo, $id);
     $v = fetchVoucher($pdo, $id);
     assertEq(10000, (int)$v['tax_amount'], 'tax_amount');
@@ -236,8 +236,8 @@ runTest('T-06: exclusive 分岐回帰防止 → tax=10000, total=110000', functi
 // T-07: exclusive 割引あり（正本=割引前100000に課税、値引は合計でのみ減算）→ tax=10000, taxable=100000, total=100000
 runTest('T-07: exclusive 割引あり 課税100000-割引10000 → tax=10000, taxable=100000, total=100000', function () use ($pdo) {
     $id = createTestVoucher($pdo, 'exclusive');
-    addLine($pdo, $id, 'normal',   100000.0, '課税');
-    addLine($pdo, $id, 'discount',  10000.0, '課税');
+    addLine($pdo, $id, 'normal',   100000.0, 'taxable');
+    addLine($pdo, $id, 'discount',  10000.0, 'taxable');
     recalcVoucherTest($pdo, $id);
     $v = fetchVoucher($pdo, $id);
     assertEq(10000, (int)$v['tax_amount'], 'tax_amount');

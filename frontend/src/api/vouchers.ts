@@ -82,8 +82,10 @@ export function useUpdateVoucher(id: number) {
 export function useAddLine(voucherId: number) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: Partial<VoucherLine>) =>
-      api.post<VoucherLine>(`/vouchers/${voucherId}/lines`, data),
+    mutationFn: (data: Partial<VoucherLine>) => {
+      const targetVoucherId = data.voucher_id ?? voucherId;
+      return api.post<VoucherLine>(`/vouchers/${targetVoucherId}/lines`, data);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [KEY, voucherId] });
     },

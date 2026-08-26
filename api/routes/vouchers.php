@@ -140,6 +140,8 @@ if ($method === 'GET' && isset($segments[1]) && $segments[1] === 'sync' && !isse
             unset($lineRow['voucher_id']);
             $lineRow['access_line_id']   = $lineRow['access_line_id'] !== null ? (int)$lineRow['access_line_id'] : null;
             $lineRow['edited_in_beaver'] = (int)$lineRow['edited_in_beaver'];
+            if ($lineRow['tax_category'] === 'taxable') $lineRow['tax_category'] = '課税';
+            if ($lineRow['tax_category'] === 'non_taxable') $lineRow['tax_category'] = '非課税';
             // R-076 B1-1: 明細の updated_at も UTC→JST に統一する。
             $lineRow['updated_at']       = utcToJst($lineRow['updated_at']);
             $linesByVoucherId[$vid][] = $lineRow;
@@ -201,7 +203,7 @@ function recalcVoucher(PDO $pdo, int $voucherId): void {
         $amt = (float)$l['line_total'];
         if ($l['line_type'] === 'discount') {
             $discount += $amt;
-        } elseif ($l['tax_category'] === '課税') {
+        } elseif ($l['tax_category'] === 'taxable') {
             $taxable += $amt;
         } else {
             $nontaxable += $amt;
@@ -763,7 +765,7 @@ switch ($method) {
                 ':price_hardware'         => $data['price_hardware'] ?? 0,
                 ':price_glass'            => $data['price_glass'] ?? 0,
                 ':line_total'             => $data['line_total'] ?? 0,
-                ':tax_category'           => $data['tax_category'] ?? '課税',
+                ':tax_category'           => $data['tax_category'] ?? 'taxable',
                 ':memo'                   => $data['memo'] ?? null,
             ]);
             $lineId = (int)$pdo->lastInsertId();
@@ -799,14 +801,14 @@ switch ($method) {
                  cutoff_date, billing_date, override_billing_date,
                  trade_type, profit_rate, memo, description,
                  print_date_flag, print_tax_excl_flag, print_company_seal,
-                 validity_period)
+                 validity_period, sales_category_id)
             VALUES
                 (:voucher_no, :voucher_type, "draft", :project_id, :customer_id,
                  :voucher_date, :delivery_date, :tax_input_type, :consumption_tax_type,
                  :cutoff_date, :billing_date, :override_billing_date,
                  :trade_type, :profit_rate, :memo, :description,
                  :print_date_flag, :print_tax_excl_flag, :print_company_seal,
-                 :validity_period)
+                 :validity_period, :sales_category_id)
         ');
         $stmt->execute([
             ':voucher_no'           => $no,
@@ -828,6 +830,7 @@ switch ($method) {
             ':print_tax_excl_flag'  => $data['print_tax_excl_flag'] ?? 0,
             ':print_company_seal'   => $data['print_company_seal'] ?? 0,
             ':validity_period'      => $data['validity_period'] ?? null,
+            ':sales_category_id'    => $data['sales_category_id'] ?? null,
         ]);
         $id = (int)$pdo->lastInsertId();
         http_response_code(201);
@@ -862,10 +865,10 @@ switch ($method) {
                 }
                 recalcVoucher($pdo, $resourceId);
             }
-            if (!empty($data['costs']) && is_array($data['costs'])) {
+            if (array_key_exists('costs', $data) && is_array($data['costs'])) {
                 saveLineCosts($pdo, $subId, $data['costs']);
             }
-            if (!empty($data['prices']) && is_array($data['prices'])) {
+            if (array_key_exists('prices', $data) && is_array($data['prices'])) {
                 saveLinePrices($pdo, $subId, $data['prices']);
             }
 
@@ -883,7 +886,7 @@ switch ($method) {
                    'tax_input_type','consumption_tax_type','cutoff_date','billing_date','override_billing_date',
                    'trade_type','profit_rate','memo','description',
                    'print_date_flag','print_tax_excl_flag','print_company_seal',
-                   'validity_period'];
+                   'validity_period','sales_category_id'];
         $sets = []; $params = [];
         foreach ($fields as $f) {
             if (array_key_exists($f, $data)) { $sets[] = "$f = :$f"; $params[":$f"] = $data[$f]; }

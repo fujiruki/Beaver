@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useForm, FormProvider, useFieldArray, useWatch } from 'react-hook-form';
 import {
@@ -149,6 +149,8 @@ export default function VoucherEdit() {
 
   const { fields, append, remove, swap } = useFieldArray({ control, name: 'lines' });
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
+  const createdVoucherIdRef = useRef<number | null>(null);
+  const savedNewLineCountRef = useRef(0);
 
   useEffect(() => {
     if (voucher) {
@@ -240,12 +242,24 @@ export default function VoucherEdit() {
       sales_category_id: data.sales_category_id,
       validity_period: data.validity_period,
     };
-    if (isNew) {
-      const created = await createMutation.mutateAsync(header);
-      navigate(`/vouchers/${created.id}`);
-    } else {
-      await updateMutation.mutateAsync(header);
-      closeGoBack();
+    try {
+      if (isNew) {
+        if (createdVoucherIdRef.current === null) {
+          const created = await createMutation.mutateAsync(header);
+          createdVoucherIdRef.current = created.id;
+        }
+        const createdVoucherId = createdVoucherIdRef.current;
+        for (let index = savedNewLineCountRef.current; index < data.lines.length; index++) {
+          await addLineMutation.mutateAsync({ ...data.lines[index], voucher_id: createdVoucherId } as any);
+          savedNewLineCountRef.current = index + 1;
+        }
+        navigate(`/vouchers/${createdVoucherId}`);
+      } else {
+        await updateMutation.mutateAsync(header);
+        closeGoBack();
+      }
+    } catch {
+      return;
     }
   }
 
@@ -304,8 +318,8 @@ export default function VoucherEdit() {
 
   if (!isNew && isLoading) return <div>読み込み中...</div>;
 
-  const isPending = createMutation.isPending || updateMutation.isPending;
-  const mutError = createMutation.error || updateMutation.error;
+  const isPending = createMutation.isPending || updateMutation.isPending || addLineMutation.isPending;
+  const mutError = createMutation.error || updateMutation.error || addLineMutation.error;
 
   const voucherTypeLabel = voucher?.voucher_type === 'estimate' ? '見積' : '売上';
 
@@ -439,7 +453,11 @@ export default function VoucherEdit() {
           )}
           <div style={{ background: '#fff', borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
             marginBottom: 16, overflow: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            {categories.length === 0 ? (
+              <div role="alert" style={{ padding: 16, color: '#b45309', background: '#fffbeb' }}>
+                集計区分が未同期のため明細を編集できません。設定画面から同期してください
+              </div>
+            ) : <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
                 <tr style={{ background: '#f8fafc' }}>
                   <Th>No</Th>
@@ -489,8 +507,8 @@ export default function VoucherEdit() {
                   />
                 ))}
               </tbody>
-            </table>
-            {!isReadOnly && (
+            </table>}
+            {!isReadOnly && categories.length > 0 && (
               <div style={{ padding: '8px 12px', borderTop: '1px solid #f1f5f9' }}>
                 <button type="button" onClick={handleAddLine} style={addLineBtnStyle}>
                   + 行を追加
