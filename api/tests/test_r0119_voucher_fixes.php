@@ -6,6 +6,7 @@ $root = dirname(__DIR__);
 $dbPath = __DIR__ . '/test_r0119_' . getmypid() . '.sqlite';
 register_shutdown_function(function () use ($dbPath): void { @unlink($dbPath); });
 $pdo = new PDO('sqlite:' . $dbPath, null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC]);
+$pdo->exec('PRAGMA foreign_keys = ON');
 $pdo->exec(file_get_contents($root . '/schema.sql'));
 foreach (glob($root . '/migrations/*.sql') as $migration) {
     foreach (explode(';', (string)file_get_contents($migration)) as $sql) {
@@ -28,10 +29,15 @@ $proc = proc_open(['php', '-d', 'auto_prepend_file=' . $bootstrap, '-S', "127.0.
 if (!is_resource($proc)) throw new RuntimeException('テストサーバーを起動できません');
 
 function requestJson(int $port, string $method, string $path, ?array $body = null): array {
+    return requestJsonResponse($port, $method, $path, $body)['body'];
+}
+function requestJsonResponse(int $port, string $method, string $path, ?array $body = null): array {
     $options = ['method' => $method, 'ignore_errors' => true, 'timeout' => 5, 'header' => "Content-Type: application/json\r\nConnection: close\r\n"];
     if ($body !== null) $options['content'] = json_encode($body, JSON_UNESCAPED_UNICODE);
     $raw = @file_get_contents("http://127.0.0.1:$port/contents/Beaver/api$path", false, stream_context_create(['http' => $options]));
-    return json_decode((string)$raw, true) ?? [];
+    $statusLine = $http_response_header[0] ?? '';
+    preg_match('/\s(\d{3})\s/', $statusLine, $matches);
+    return ['status' => (int)($matches[1] ?? 0), 'body' => json_decode((string)$raw, true) ?? []];
 }
 function same($expected, $actual, string $message): void {
     if ($expected !== $actual) throw new RuntimeException("$message expected=" . var_export($expected, true) . ' actual=' . var_export($actual, true));
@@ -42,13 +48,25 @@ try {
         usleep(100000);
         if (@file_get_contents("http://127.0.0.1:$port/contents/Beaver/api/health") !== false) break;
     }
+    same(1, (int)$pdo->query('PRAGMA foreign_keys')->fetchColumn(), 'テストDBの外部キー制約');
+    $emptyCategoryCreated = requestJsonResponse($port, 'POST', '/vouchers', [
+        'voucher_type' => 'sales',
+        'customer_id' => $customerId,
+        'sales_category_id' => '',
+    ]);
+    same(201, $emptyCategoryCreated['status'], '売上種別が空文字の作成レスポンス');
+    $emptyCategoryVoucherId = (int)$emptyCategoryCreated['body']['id'];
+    $storedCategory = $pdo->query("SELECT sales_category_id FROM vouchers WHERE id = $emptyCategoryVoucherId")->fetchColumn();
+    same(null, $storedCategory, '売上種別が空文字の作成時DB格納値');
+
     $created = requestJson($port, 'POST', '/vouchers', ['voucher_type' => 'sales', 'customer_id' => $customerId, 'sales_category_id' => $salesCategoryId]);
     $voucherId = (int)$created['id'];
     $fetched = requestJson($port, 'GET', "/vouchers/$voucherId");
     same($salesCategoryId, (int)$fetched['sales_category_id'], '作成時の sales_category_id');
-    requestJson($port, 'PUT', "/vouchers/$voucherId", ['sales_category_id' => null]);
-    $fetched = requestJson($port, 'GET', "/vouchers/$voucherId");
-    same(null, $fetched['sales_category_id'], '更新時の sales_category_id');
+    $emptyCategoryUpdated = requestJsonResponse($port, 'PUT', "/vouchers/$voucherId", ['sales_category_id' => '']);
+    same(200, $emptyCategoryUpdated['status'], '売上種別が空文字の更新レスポンス');
+    $storedCategory = $pdo->query("SELECT sales_category_id FROM vouchers WHERE id = $voucherId")->fetchColumn();
+    same(null, $storedCategory, '売上種別が空文字の更新時DB格納値');
 
     $categoryValue = ['category_code' => 'MAIN', 'category_name' => '本体', 'measure_type' => 'money', 'value' => 5000, 'sort_order' => 1];
     $line = requestJson($port, 'POST', "/vouchers/$voucherId/lines", ['line_total' => 10000, 'tax_category' => 'taxable', 'costs' => [$categoryValue], 'prices' => [$categoryValue]]);
@@ -80,7 +98,7 @@ try {
     same([1, 2, 3, 4, 5], array_map('intval', array_column($fixedLine['costs'], 'sort_order')), '固定原価列の表示順');
     same(['MAIN', 'HARDWARE', 'GLASS'], array_column($fixedLine['prices'], 'category_code'), '固定売価列の実マスタコード');
     same([1, 2, 3], array_map('intval', array_column($fixedLine['prices'], 'sort_order')), '固定売価列の表示順');
-    echo "R-0119 PHPテスト: 12 PASS / 0 FAIL\n";
+    echo "R-0119 PHPテスト: 17 PASS / 0 FAIL\n";
 } finally {
     foreach ($pipes as $pipe) if (is_resource($pipe)) fclose($pipe);
     proc_terminate($proc);

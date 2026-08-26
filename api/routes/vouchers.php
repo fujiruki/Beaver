@@ -182,6 +182,13 @@ function nextVoucherNo(PDO $pdo, string $type): string {
     return $prefix . str_pad((string)$no, 5, '0', STR_PAD_LEFT);
 }
 
+function normalizeSalesCategoryId($value) {
+    if ($value === null || $value === '' || $value === 0 || $value === '0') {
+        return null;
+    }
+    return $value;
+}
+
 // --- 伝票合計を再計算して vouchers を更新 ---
 function recalcVoucher(PDO $pdo, int $voucherId): void {
     $stmt = $pdo->prepare('SELECT tax_input_type FROM vouchers WHERE id = ?');
@@ -826,7 +833,7 @@ switch ($method) {
             ':print_tax_excl_flag'  => $data['print_tax_excl_flag'] ?? 0,
             ':print_company_seal'   => $data['print_company_seal'] ?? 0,
             ':validity_period'      => $data['validity_period'] ?? null,
-            ':sales_category_id'    => $data['sales_category_id'] ?? null,
+            ':sales_category_id'    => normalizeSalesCategoryId($data['sales_category_id'] ?? null),
         ]);
         $id = (int)$pdo->lastInsertId();
         http_response_code(201);
@@ -885,7 +892,10 @@ switch ($method) {
                    'validity_period','sales_category_id'];
         $sets = []; $params = [];
         foreach ($fields as $f) {
-            if (array_key_exists($f, $data)) { $sets[] = "$f = :$f"; $params[":$f"] = $data[$f]; }
+            if (array_key_exists($f, $data)) {
+                $sets[] = "$f = :$f";
+                $params[":$f"] = $f === 'sales_category_id' ? normalizeSalesCategoryId($data[$f]) : $data[$f];
+            }
         }
         if (empty($sets)) { http_response_code(400); echo json_encode(['error' => 'No fields']); exit; }
         $sets[] = 'updated_at = CURRENT_TIMESTAMP';
