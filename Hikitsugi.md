@@ -26,9 +26,9 @@
 
 ---
 
-## 直近の作業（2026-08-26）: R-0118 Beaver-Youkan連携B2（案件詳細のYoukan容量判定表示）
+## 直近の作業（2026-08-27）: R-0118 Beaver-Youkan連携B2（案件詳細のYoukan容量判定表示） ✅ 完了・本番デプロイ済み
 
-### R-0118 — 検証中（実装・本番デプロイ済み、本番疎通は藤田晴樹さんのトークン設置待ち）
+### R-0118 — 完了（実装・本番デプロイ・本番検証まで完了）
 - Youkan Y1（R-153、capacity-check API）本番検証完了を受けてB2に着手。仕様: `docs/spec/R-0118_youkan_capacity_check_b2.md`、Y1契約: Youkanリポジトリ `docs/SPEC/R-153_capacity_check_api_contract.md`
 - 実装: `GET /projects/{id}/capacity-check`（BeaverバックエンドがYoukanへbackend-to-backendでPOST、障害時は常にHTTP200の`ok:false`で縮退）＋案件詳細の`CapacityCheckPanel`（Youkanのmessageを結論優先表示、feasible=緑/不足=赤/納期未設定=アンバー、縮退はグレー1行、再判定ボタン）
 - Agent（r0118-impl）へTDD委譲（修正ループ0周）。PHPテスト10件＋vitest6件。回帰スイートへ`test_youkan_integration.php`（B1、登録漏れ）と`test_capacity_check.php`を登録
@@ -36,11 +36,16 @@
 - 本番実機確認済み: 案件一覧・詳細正常、容量判定パネルはトークン未設置のため縮退表示（=Youkan障害時と同じ経路が本番で機能している）、Beaver本体非影響
 - 「Youkanで開く」ボタン: Y1契約にYoukanプロジェクトURL/IDが無く直接遷移を実装できないためB2では見送り（Y2以降の契約改版時に再評価、台帳に記録）
 
-### 次の一手（本番疎通の残り、トークン設置後）
-1. Youkan側でB2用api_token（BEAVER_CAPACITY_TOKEN）を発行（Y1検証用の一時トークンは失効済み。発行はYoukanセッションまたは藤田晴樹さん）
-2. Beaver本番 `api/config.local.php` に追記: `define('BEAVER_CAPACITY_TOKEN', '<Youkan発行値>');` と `define('YOUKAN_CAPACITY_URL', 'https://door-fujita.com/contents/Youkan/api/integrations/beaver/capacity-check');`
-3. 本番の案件詳細で実判定（結論メッセージ表示）を確認 → `docs/requests_log.md` のR-0118を「完了」へ更新
-4. **B3へは進まない**（藤田晴樹さんの明示指示。B3=見積内訳の作業パッケージ公開はB2完了報告後に別途指示を待つ）
+### 本番トークン設置・最終検証（2026-08-27）
+- 採用した本番設定箇所: `api/config.php`が`api/config.local.php`（Git管理外・SSH経由で直接編集）を読み込む既存方式のまま。`.env`方式は使っていない（Youkan側の`.env`表現とBeaver側は別方式）
+- `BEAVER_CAPACITY_TOKEN`（Youkan発行値）・`YOUKAN_CAPACITY_URL`（`https://door-fujita.com/contents/Youkan/api/integrations/beaver/capacity-check`）を本番`api/config.local.php`へ設置済み（値はSSH経由のみで扱い、Git・ログ・本記録には非出力）
+- 実案件検証: id=52（テスト案件、赤字「9/5納期では8h不足（10/2なら入る）」）、id=48（納期未設定、アンバー「納期未設定・残り24h」）、id=42（進行中案件、赤字「8/29納期では64h不足（9/23なら入る）」）で正常応答・パネル表示・「再判定」ボタンとも実機確認済み
+- excluded_status（完了/キャンセル案件）・Beaver側404（存在しない案件ID）のエラーマッピングも実API確認済み
+- baseline_source manual→estimate切替: テスト案件(id=52)の見積明細へ一時的に工場時間12hを設定→Youkan判定が8h不足→12h不足へ変化することを確認、検証後は明細を0へ復元し8h不足へ戻ることも確認（変更前に本番DBバックアップ取得: `api/backups/database_20260827_r0118_pre_baseline_test.sqlite`）
+- Youkan障害時の縮退: `YOUKAN_CAPACITY_URL`を一時的に到達不能アドレスへ切替えてcapacity-checkが200 `ok:false, reason:unreachable`で縮退し`/api/health`は200のまま保たれることを確認、検証後に実URLへ復元し正常応答が戻ることを確認
+- Beaver通常業務（案件一覧・詳細の閲覧編集、見積伝票一覧表示等）への影響なしを確認
+- `docs/requests_log.md` のR-0118を「完了」へ更新済み
+- **B3（見積内訳の作業パッケージ公開）へは着手せず停止**（藤田晴樹さんの明示指示。別途指示を待つ）
 
 ---
 

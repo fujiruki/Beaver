@@ -91,10 +91,11 @@ GET /projects/{id}/capacity-check
 
 ## 検証（B2終了条件、計画指示(12)）
 
-- [ ] 本番疎通（Beaver本番→Youkan本番 capacity-check が200）
-- [ ] 実案件でのcapacity-check結果確認
-- [ ] Youkan停止時の縮退動作確認
-- [ ] Beaver通常業務（案件登録・見積・請求）への非影響確認
+- [x] 本番疎通（Beaver本番→Youkan本番 capacity-check が200）（2026-08-27）
+- [x] 実案件でのcapacity-check結果確認（id=52/48/42、excluded_status・404も確認）
+- [x] Youkan停止時の縮退動作確認（URL到達不能を模擬、200 `ok:false, reason:unreachable`、`/api/health`は200のまま）
+- [x] Beaver通常業務（案件登録・見積・請求）への非影響確認
+- [x] baseline_source manual/estimate双方の判定結果確認、manual→estimate切替でYoukan判定工数が変化することを確認（検証後にテストデータを復元）
 
 ## 実装構成
 
