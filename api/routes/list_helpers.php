@@ -57,10 +57,67 @@ if (!function_exists('resolveSortClause')) {
     }
 }
 
+if (!function_exists('fetchEffectiveLineHours')) {
+    /**
+     * R-0121: 明細行の工場時間・現場時間の実効値を取得する。
+     * voucher_line_costs（FACTORY_TIME/SITE_TIME）を第一正本とし、カテゴリ単位で
+     * 行が存在すればその値（0でも採用）、存在しなければ固定列へフォールバックする。
+     *
+     * @param array<int> $voucherIds
+     * @return array<int,array<int,array{line_id:int,line_no:int,item_name:?string,quantity:float,factory_hours:float,site_hours:float,updated_at:?string}>>
+     */
+    function fetchEffectiveLineHours(PDO $pdo, array $voucherIds): array {
+        if (empty($voucherIds)) return [];
+        $placeholders = implode(',', array_fill(0, count($voucherIds), '?'));
+        $stmt = $pdo->prepare("
+            SELECT vl.voucher_id, vl.id AS line_id, vl.line_no, vl.item_name, vl.quantity,
+                   vl.cost_factory_hours, vl.cost_site_hours,
+                   COALESCE(vl.updated_at, v.updated_at) AS updated_at
+            FROM voucher_lines vl
+            INNER JOIN vouchers v ON v.id = vl.voucher_id
+            WHERE vl.voucher_id IN ($placeholders)
+            ORDER BY vl.voucher_id ASC, vl.line_no ASC
+        ");
+        $stmt->execute(array_values($voucherIds));
+        $lines = $stmt->fetchAll();
+        if (empty($lines)) return [];
+
+        $lineIds = array_column($lines, 'line_id');
+        $costPlaceholders = implode(',', array_fill(0, count($lineIds), '?'));
+        $costStmt = $pdo->prepare("
+            SELECT voucher_line_id, category_code, value
+            FROM voucher_line_costs
+            WHERE voucher_line_id IN ($costPlaceholders)
+              AND category_code IN ('FACTORY_TIME', 'SITE_TIME')
+        ");
+        $costStmt->execute(array_values($lineIds));
+        $costsByLineId = [];
+        foreach ($costStmt->fetchAll() as $row) {
+            $costsByLineId[(int)$row['voucher_line_id']][$row['category_code']] = (float)$row['value'];
+        }
+
+        $result = [];
+        foreach ($lines as $row) {
+            $lineId = (int)$row['line_id'];
+            $dynamic = $costsByLineId[$lineId] ?? [];
+            $result[(int)$row['voucher_id']][] = [
+                'line_id'       => $lineId,
+                'line_no'       => (int)$row['line_no'],
+                'item_name'     => $row['item_name'],
+                'quantity'      => (float)$row['quantity'],
+                'factory_hours' => array_key_exists('FACTORY_TIME', $dynamic) ? $dynamic['FACTORY_TIME'] : (float)$row['cost_factory_hours'],
+                'site_hours'    => array_key_exists('SITE_TIME', $dynamic) ? $dynamic['SITE_TIME'] : (float)$row['cost_site_hours'],
+                'updated_at'    => $row['updated_at'],
+            ];
+        }
+        return $result;
+    }
+}
+
 if (!function_exists('selectPlanningEstimateVouchers')) {
     /**
-     * R-0117: 指定した案件ID群について「計画基準見積」を選定する。
-     * 計画基準見積 = 工数明細（cost_factory_hours>0 または cost_site_hours>0 の行）を持つ
+     * R-0117/R-0121: 指定した案件ID群について「計画基準見積」を選定する。
+     * 計画基準見積 = 実効工数（fetchEffectiveLineHours、動的カテゴリ優先）を持つ
      * 非void見積のうち、voucher_date降順→id降順で最新の1件。
      * 複数の有効見積があっても合算せず、この1件だけを正本とする（R-0117設計ゲート）。
      *
@@ -70,36 +127,31 @@ if (!function_exists('selectPlanningEstimateVouchers')) {
     function selectPlanningEstimateVouchers(PDO $pdo, array $projectIds): array {
         if (empty($projectIds)) return [];
         $placeholders = implode(',', array_fill(0, count($projectIds), '?'));
-        $sql = "
-            WITH qualifying AS (
-                SELECT v.id, v.project_id, v.voucher_date, v.updated_at
-                FROM vouchers v
-                WHERE v.project_id IN ($placeholders)
-                  AND v.voucher_type = 'estimate'
-                  AND v.status != 'void'
-                  AND EXISTS (
-                      SELECT 1 FROM voucher_lines vl
-                      WHERE vl.voucher_id = v.id
-                        AND (vl.cost_factory_hours > 0 OR vl.cost_site_hours > 0)
-                  )
-            ),
-            ranked AS (
-                SELECT id, project_id, updated_at,
-                       ROW_NUMBER() OVER (
-                           PARTITION BY project_id ORDER BY voucher_date DESC, id DESC
-                       ) AS rn
-                FROM qualifying
-            )
-            SELECT project_id, id AS voucher_id, updated_at FROM ranked WHERE rn = 1
-        ";
-        $stmt = $pdo->prepare($sql);
+        $stmt = $pdo->prepare("
+            SELECT id, project_id, updated_at
+            FROM vouchers
+            WHERE project_id IN ($placeholders)
+              AND voucher_type = 'estimate'
+              AND status != 'void'
+            ORDER BY project_id ASC, voucher_date DESC, id DESC
+        ");
         $stmt->execute(array_values($projectIds));
+        $candidates = $stmt->fetchAll();
+        if (empty($candidates)) return [];
+
+        $linesByVoucherId = fetchEffectiveLineHours($pdo, array_map('intval', array_column($candidates, 'id')));
+
         $result = [];
-        foreach ($stmt->fetchAll() as $row) {
-            $result[(int)$row['project_id']] = [
-                'voucher_id' => (int)$row['voucher_id'],
-                'updated_at' => $row['updated_at'],
-            ];
+        foreach ($candidates as $row) {
+            $projectId = (int)$row['project_id'];
+            if (isset($result[$projectId])) continue;
+            $voucherId = (int)$row['id'];
+            $qualifies = false;
+            foreach ($linesByVoucherId[$voucherId] ?? [] as $line) {
+                if ($line['factory_hours'] > 0 || $line['site_hours'] > 0) { $qualifies = true; break; }
+            }
+            if (!$qualifies) continue;
+            $result[$projectId] = ['voucher_id' => $voucherId, 'updated_at' => $row['updated_at']];
         }
         return $result;
     }
@@ -109,19 +161,13 @@ if (!function_exists('sumHoursByVoucherIds')) {
     /** @param array<int> $voucherIds @return array<int,float> voucher_id => 工場時間+現場時間の合計 */
     function sumHoursByVoucherIds(PDO $pdo, array $voucherIds): array {
         if (empty($voucherIds)) return [];
-        $placeholders = implode(',', array_fill(0, count($voucherIds), '?'));
-        $stmt = $pdo->prepare("
-            SELECT voucher_id,
-                   COALESCE(SUM(cost_factory_hours * quantity), 0) AS total_factory_hours,
-                   COALESCE(SUM(cost_site_hours    * quantity), 0) AS total_site_hours
-            FROM voucher_lines
-            WHERE voucher_id IN ($placeholders)
-            GROUP BY voucher_id
-        ");
-        $stmt->execute(array_values($voucherIds));
         $result = [];
-        foreach ($stmt->fetchAll() as $row) {
-            $result[(int)$row['voucher_id']] = round((float)$row['total_factory_hours'] + (float)$row['total_site_hours'], 2);
+        foreach (fetchEffectiveLineHours($pdo, $voucherIds) as $voucherId => $lines) {
+            $total = 0.0;
+            foreach ($lines as $line) {
+                $total += ($line['factory_hours'] + $line['site_hours']) * $line['quantity'];
+            }
+            $result[$voucherId] = round($total, 2);
         }
         return $result;
     }
@@ -129,35 +175,14 @@ if (!function_exists('sumHoursByVoucherIds')) {
 
 if (!function_exists('fetchWorkPackagesByVoucherIds')) {
     /**
-     * R-0120: 選定済み計画基準見積の明細をwork_packages生成用に一括取得する。
+     * R-0120/R-0121: 選定済み計画基準見積の明細をwork_packages生成用に一括取得する。
      * 日時のISO8601整形やfactory/siteへの分解は契約境界側で行う。
      *
      * @param array<int> $voucherIds
-     * @return array<int,array<int,array<string,mixed>>> voucher_id => line_no昇順の生明細
+     * @return array<int,array<int,array{line_id:int,line_no:int,item_name:?string,quantity:float,factory_hours:float,site_hours:float,updated_at:?string}>>
      */
     function fetchWorkPackagesByVoucherIds(PDO $pdo, array $voucherIds): array {
-        if (empty($voucherIds)) return [];
-        $placeholders = implode(',', array_fill(0, count($voucherIds), '?'));
-        $stmt = $pdo->prepare("
-            SELECT vl.voucher_id,
-                   vl.id AS line_id,
-                   vl.line_no,
-                   vl.item_name,
-                   vl.quantity,
-                   vl.cost_factory_hours,
-                   vl.cost_site_hours,
-                   COALESCE(vl.updated_at, v.updated_at) AS updated_at
-            FROM voucher_lines vl
-            INNER JOIN vouchers v ON v.id = vl.voucher_id
-            WHERE vl.voucher_id IN ($placeholders)
-            ORDER BY vl.voucher_id ASC, vl.line_no ASC
-        ");
-        $stmt->execute(array_values($voucherIds));
-        $result = [];
-        foreach ($stmt->fetchAll() as $row) {
-            $result[(int)$row['voucher_id']][] = $row;
-        }
-        return $result;
+        return fetchEffectiveLineHours($pdo, $voucherIds);
     }
 }
 

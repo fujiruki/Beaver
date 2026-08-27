@@ -52,16 +52,15 @@ function youkanToIso8601(?string $utcValue): ?string {
     }
 }
 
-/** R-0120: 見積明細を行単位・カテゴリ単位のwork_packages契約へ整形する。 */
-function youkanWorkPackages(array $rows): array {
+/** R-0120/R-0121: 見積明細を行単位・カテゴリ単位のwork_packages契約へ整形する。 */
+function youkanWorkPackages(array $rows, int $voucherId): array {
     $packages = [];
     foreach ($rows as $row) {
-        $voucherId = (int)$row['voucher_id'];
         $lineId = (int)$row['line_id'];
         $label = trim((string)($row['item_name'] ?? ''));
         if ($label === '') $label = '明細' . (int)$row['line_no'];
 
-        foreach (['factory' => 'cost_factory_hours', 'site' => 'cost_site_hours'] as $category => $column) {
+        foreach (['factory' => 'factory_hours', 'site' => 'site_hours'] as $category => $column) {
             $estimatedHours = round((float)$row[$column] * (int)$row['quantity'], 2);
             if ($estimatedHours <= 0) continue;
             $packages[] = [
@@ -92,7 +91,7 @@ function youkanProjectRow(array $p, array $baseline, array $workPackageRows = []
         'baseline_source'     => $baseline['source'],
         'baseline_updated_at' => youkanToIso8601($baseline['updated_at']),
         'updated_at'          => youkanToIso8601($p['updated_at']),
-        'work_packages'       => $baseline['source'] === 'estimate' ? youkanWorkPackages($workPackageRows) : [],
+        'work_packages'       => $baseline['source'] === 'estimate' ? youkanWorkPackages($workPackageRows, (int)$baseline['voucher_id']) : [],
     ];
 }
 

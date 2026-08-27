@@ -112,11 +112,20 @@ function insertEstimateVoucher(PDO $pdo, int $projectId, int $customerId, string
     return (int)$pdo->lastInsertId();
 }
 
-function insertVoucherLine(PDO $pdo, int $voucherId, int $lineNo, float $factoryHours, float $siteHours, int $qty = 1): void {
+function insertVoucherLine(PDO $pdo, int $voucherId, int $lineNo, float $factoryHours, float $siteHours, int $qty = 1): int {
     $pdo->prepare('
         INSERT INTO voucher_lines (voucher_id, line_no, quantity, cost_factory_hours, cost_site_hours)
         VALUES (?, ?, ?, ?, ?)
     ')->execute([$voucherId, $lineNo, $qty, $factoryHours, $siteHours]);
+    return (int)$pdo->lastInsertId();
+}
+
+/** R-0121: voucher_line_costsへ直接工数カテゴリ行を投入する（動的カテゴリの第一正本を模す） */
+function insertVoucherLineCost(PDO $pdo, int $lineId, string $categoryCode, float $value): void {
+    $pdo->prepare('
+        INSERT INTO voucher_line_costs (voucher_line_id, category_code, category_name, measure_type, value, sort_order)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ')->execute([$lineId, $categoryCode, $categoryCode, 'time', $value, 0]);
 }
 
 function insertWorkPackageLine(PDO $pdo, int $voucherId, int $lineNo, ?string $itemName, float $factoryHours, float $siteHours, int $qty = 1, ?string $updatedAt = null): int {
@@ -183,6 +192,117 @@ runTest('工数明細（>0行）を持たない見積は候補にならない', 
 
     $hours = fetchEstimatedHoursByProjectIds($pdo, [$pid]);
     assertTrue(!array_key_exists($pid, $hours), '工数明細を持つ見積が無いためキーが存在しない');
+});
+
+// ============================================================
+// R-0121: 工数データ参照元の統一（voucher_line_costs優先・固定列フォールバック）
+// ============================================================
+echo "\n=== R-0121 fetchEffectiveLineHours: カテゴリ単位フォールバック ===\n";
+
+runTest('FACTORY_TIMEのみ動的カテゴリ（固定列は0）→ factory_hoursは動的値、site_hoursは固定列(0)へフォールバック', function () use ($pdo, $custId) {
+    $pid = insertProject($pdo, $custId, 'YK301', 'FACTORYのみ動的');
+    $v = insertEstimateVoucher($pdo, $pid, $custId, '2026-06-01');
+    $lineId = insertVoucherLine($pdo, $v, 1, 0, 0);
+    insertVoucherLineCost($pdo, $lineId, 'FACTORY_TIME', 5.0);
+
+    $rows = fetchEffectiveLineHours($pdo, [$v]);
+    assertEq(5.0, $rows[$v][0]['factory_hours'], 'factory_hours');
+    assertEq(0.0, $rows[$v][0]['site_hours'], 'site_hours(固定列フォールバック)');
+});
+
+runTest('SITE_TIMEのみ動的カテゴリ（固定列は0）→ site_hoursは動的値、factory_hoursは固定列(0)へフォールバック', function () use ($pdo, $custId) {
+    $pid = insertProject($pdo, $custId, 'YK302', 'SITEのみ動的');
+    $v = insertEstimateVoucher($pdo, $pid, $custId, '2026-06-01');
+    $lineId = insertVoucherLine($pdo, $v, 1, 0, 0);
+    insertVoucherLineCost($pdo, $lineId, 'SITE_TIME', 3.0);
+
+    $rows = fetchEffectiveLineHours($pdo, [$v]);
+    assertEq(0.0, $rows[$v][0]['factory_hours'], 'factory_hours(固定列フォールバック)');
+    assertEq(3.0, $rows[$v][0]['site_hours'], 'site_hours');
+});
+
+runTest('FACTORY_TIME・SITE_TIME両方が動的カテゴリ', function () use ($pdo, $custId) {
+    $pid = insertProject($pdo, $custId, 'YK303', '両方動的');
+    $v = insertEstimateVoucher($pdo, $pid, $custId, '2026-06-01');
+    $lineId = insertVoucherLine($pdo, $v, 1, 0, 0);
+    insertVoucherLineCost($pdo, $lineId, 'FACTORY_TIME', 4.0);
+    insertVoucherLineCost($pdo, $lineId, 'SITE_TIME', 1.5);
+
+    $rows = fetchEffectiveLineHours($pdo, [$v]);
+    assertEq(4.0, $rows[$v][0]['factory_hours'], 'factory_hours');
+    assertEq(1.5, $rows[$v][0]['site_hours'], 'site_hours');
+});
+
+runTest('動的カテゴリ値が明示的に0（固定列には非0の旧値がある）→ 実効値は0でフォールバックしない', function () use ($pdo, $custId) {
+    $pid = insertProject($pdo, $custId, 'YK304', '動的ゼロ明示');
+    $v = insertEstimateVoucher($pdo, $pid, $custId, '2026-06-01');
+    $lineId = insertVoucherLine($pdo, $v, 1, 10.0, 0);
+    insertVoucherLineCost($pdo, $lineId, 'FACTORY_TIME', 0.0);
+
+    $rows = fetchEffectiveLineHours($pdo, [$v]);
+    assertEq(0.0, $rows[$v][0]['factory_hours'], 'factory_hours(動的0を採用、固定列10へフォールバックしない)');
+});
+
+runTest('動的カテゴリ行なし＋旧固定列に値あり → 固定列の値へフォールバックする', function () use ($pdo, $custId) {
+    $pid = insertProject($pdo, $custId, 'YK305', '固定列フォールバック');
+    $v = insertEstimateVoucher($pdo, $pid, $custId, '2026-06-01');
+    insertVoucherLine($pdo, $v, 1, 7.0, 2.0);
+
+    $rows = fetchEffectiveLineHours($pdo, [$v]);
+    assertEq(7.0, $rows[$v][0]['factory_hours'], 'factory_hours(固定列)');
+    assertEq(2.0, $rows[$v][0]['site_hours'], 'site_hours(固定列)');
+});
+
+runTest('動的カテゴリと旧固定列に異なる値がある場合、動的側を正とする', function () use ($pdo, $custId) {
+    $pid = insertProject($pdo, $custId, 'YK306', '動的優先');
+    $v = insertEstimateVoucher($pdo, $pid, $custId, '2026-06-01');
+    $lineId = insertVoucherLine($pdo, $v, 1, 10.0, 10.0);
+    insertVoucherLineCost($pdo, $lineId, 'FACTORY_TIME', 3.0);
+    insertVoucherLineCost($pdo, $lineId, 'SITE_TIME', 1.0);
+
+    $rows = fetchEffectiveLineHours($pdo, [$v]);
+    assertEq(3.0, $rows[$v][0]['factory_hours'], 'factory_hours(動的3を採用、固定列10ではない)');
+    assertEq(1.0, $rows[$v][0]['site_hours'], 'site_hours(動的1を採用、固定列10ではない)');
+});
+
+echo "\n=== R-0121 sumHoursByVoucherIds: 動的カテゴリの数量掛け ===\n";
+
+runTest('数量1: 単位工数がそのまま合計になる', function () use ($pdo, $custId) {
+    $pid = insertProject($pdo, $custId, 'YK307', '数量1');
+    $v = insertEstimateVoucher($pdo, $pid, $custId, '2026-06-01');
+    $lineId = insertVoucherLine($pdo, $v, 1, 0, 0, 1);
+    insertVoucherLineCost($pdo, $lineId, 'FACTORY_TIME', 2.0);
+    insertVoucherLineCost($pdo, $lineId, 'SITE_TIME', 1.0);
+
+    $sums = sumHoursByVoucherIds($pdo, [$v]);
+    assertEq(3.0, $sums[$v], '(2+1)*1');
+});
+
+runTest('数量>1: 単位工数×数量が正しく合計へ反映される', function () use ($pdo, $custId) {
+    $pid = insertProject($pdo, $custId, 'YK308', '数量3');
+    $v = insertEstimateVoucher($pdo, $pid, $custId, '2026-06-01');
+    $lineId = insertVoucherLine($pdo, $v, 1, 0, 0, 3);
+    insertVoucherLineCost($pdo, $lineId, 'FACTORY_TIME', 2.0);
+    insertVoucherLineCost($pdo, $lineId, 'SITE_TIME', 1.0);
+
+    $sums = sumHoursByVoucherIds($pdo, [$v]);
+    assertEq(9.0, $sums[$v], '(2+1)*3');
+});
+
+echo "\n=== R-0121 plan-baseline: 動的カテゴリのみで工数を持つ見積の選定・manual→estimate切替 ===\n";
+
+runTest('動的カテゴリのみで工数を持つ見積が計画基準見積として正しく選定される（旧実装では固定列EXISTS判定漏れで除外されていた）', function () use ($pdo, $custId) {
+    $pid = insertProject($pdo, $custId, 'YK309', '動的カテゴリのみ計画基準', ['manual_estimated_hours' => 5.0]);
+    $v = insertEstimateVoucher($pdo, $pid, $custId, '2026-06-01');
+    $lineId = insertVoucherLine($pdo, $v, 1, 0, 0);
+    insertVoucherLineCost($pdo, $lineId, 'FACTORY_TIME', 8.0);
+
+    $hours = fetchEstimatedHoursByProjectIds($pdo, [$pid]);
+    assertEq(8.0, $hours[$pid] ?? null, '動的カテゴリのみの見積が候補として選定される');
+
+    $baselines = fetchProjectBaselines($pdo, [fetchProjectRow($pdo, $pid)]);
+    assertEq('estimate', $baselines[$pid]['source'], 'manual(5.0)ではなくestimateへ切替');
+    assertEq(8.0, $baselines[$pid]['hours'], 'baseline_hoursは動的カテゴリの合計');
 });
 
 // ============================================================
@@ -256,6 +376,18 @@ runTest('baseline算出対象とwork_packages取得対象が同じ選定済み�
     assertEq('新明細', $rows[$selectedVoucher][0]['item_name'], '旧見積・void見積の明細を含まない');
 });
 
+runTest('R-0121: fetchWorkPackagesByVoucherIdsが動的カテゴリの値をfactory_hours/site_hoursとして返す', function () use ($pdo, $custId) {
+    $pid = insertProject($pdo, $custId, 'YKWP004', '動的カテゴリwork_packages案件');
+    $v = insertEstimateVoucher($pdo, $pid, $custId, '2026-06-01');
+    $lineId = insertVoucherLine($pdo, $v, 1, 99.0, 99.0); // 固定列に旧値があってもフォールバックしないことを確認
+    insertVoucherLineCost($pdo, $lineId, 'FACTORY_TIME', 4.0);
+    insertVoucherLineCost($pdo, $lineId, 'SITE_TIME', 2.0);
+
+    $rows = fetchWorkPackagesByVoucherIds($pdo, [$v]);
+    assertEq(4.0, $rows[$v][0]['factory_hours'], 'factory_hoursキーで動的値を返す');
+    assertEq(2.0, $rows[$v][0]['site_hours'], 'site_hoursキーで動的値を返す');
+});
+
 // ============================================================
 // 既存 fetchEstimatedHoursByProjectIds の呼び出し側（一覧）を壊していないこと
 // ============================================================
@@ -300,6 +432,13 @@ insertWorkPackageLine($pdo, $workPackageVoucher, 50, 'ゼロ時間', 0, 0);
 insertWorkPackageLine($pdo, $workPackageVoucher, 60, '数量ゼロ', 8, 9, 0);
 $voidWorkPackageVoucher = insertEstimateVoucher($pdo, $workPackagePid, $custId, '2026-08-01', 'void');
 insertWorkPackageLine($pdo, $voidWorkPackageVoucher, 1, 'void明細', 99, 99);
+
+// R-0121 HTTP契約検証用。固定列は0で動的カテゴリ（voucher_line_costs）のみに工数がある案件。
+$dynamicHoursPid = insertProject($pdo, $custId, 'YKDYNAMIC', '動的カテゴリのみ案件');
+$dynamicHoursVoucher = insertEstimateVoucher($pdo, $dynamicHoursPid, $custId, '2026-07-01');
+$dynamicHoursLine = insertWorkPackageLine($pdo, $dynamicHoursVoucher, 1, '動的建具', 0, 0, 2);
+insertVoucherLineCost($pdo, $dynamicHoursLine, 'FACTORY_TIME', 3.0);
+insertVoucherLineCost($pdo, $dynamicHoursLine, 'SITE_TIME', 1.0);
 
 $bootstrap = __DIR__ . '/_youkan_server_bootstrap.php';
 file_put_contents($bootstrap, "<?php\ndefine('DB_PATH', " . var_export($testDbPath, true) . ");\n");
@@ -421,6 +560,20 @@ try {
             assertEq($workPackageVoucher, $package['source_voucher_id'], 'baseline対象見積とsource_voucher_idが一致');
             assertTrue(!array_key_exists('external_project_id', $package), '子要素にexternal_project_idを含めない');
         }
+    });
+
+    runTest('R-0121: 固定列が0で動的カテゴリのみに工数がある案件でもbaseline_hours/work_packagesがHTTPで正しく反映される', function () use ($port, $dynamicHoursPid, $dynamicHoursVoucher, $dynamicHoursLine) {
+        $res = youkanGet($port, "/integrations/youkan/projects/$dynamicHoursPid", ['Authorization: Bearer ' . YOUKAN_DEV_TOKEN]);
+        assertTrue(str_contains($res['status'], '200'), 'expected 200 got: ' . $res['status']);
+        $data = json_decode($res['body'], true);
+        assertEq('estimate', $data['baseline_source'], '動的カテゴリのみでも計画基準見積として選定されbaseline_source=estimate');
+        assertEq(8.0, (float)$data['baseline_hours'], 'baseline_hours=(3+1)*2');
+        $packages = $data['work_packages'];
+        assertEq([
+            "beaver:voucher:$dynamicHoursVoucher:line:$dynamicHoursLine:factory",
+            "beaver:voucher:$dynamicHoursVoucher:line:$dynamicHoursLine:site",
+        ], array_column($packages, 'external_work_package_id'), '動的カテゴリの工場・現場が両方work_packages化される');
+        assertEq([6.0, 2.0], array_map('floatval', array_column($packages, 'estimated_hours')), '単位工数(動的値)×数量');
     });
 
     runTest('見積改訂で旧work_packageが消え新見積のwork_packageへ切り替わる', function () use ($port, $pdo, $custId, $workPackagePid, $workPackageVoucher, $wpBothLine) {
