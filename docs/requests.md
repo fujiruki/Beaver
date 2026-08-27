@@ -1,5 +1,30 @@
 # 要望・リクエスト
 
+## -11. 【緊急・要優先着手】R-0119以降の時間入力がbaseline_hours/Youkan容量判定に反映されない（バグ、2026-08-27発覚）
+
+R-0120（B3, work_packages公開）の本番実機検証中に発覚。指揮役が本番テスト案件（id=52）の見積伝票で、藤田晴樹さんに実際にBeaver画面から工場時間・現場時間を入力してもらい、Youkan向けAPI（`/integrations/youkan/projects/52`）で確認したところ、入力値が一切反映されなかった（`baseline_source`が`manual`のまま、`baseline_hours`も変化なし）。
+
+### 原因（本番DBを読み取り専用で確認済み）
+- R-0119（2026-08-26〜27）でフロントエンドの時間入力欄が集計区分マスタ由来の動的カテゴリ方式（`voucher_line_costs`テーブル、`category_code=FACTORY_TIME/SITE_TIME`）へ切り替わった
+- `frontend/src/components/voucher/LineItemRow.tsx`の`saveLineToDb`は`costs`/`prices`配列のみをAPIへ送信するようになっており、`voucher_lines.cost_factory_hours`/`cost_site_hours`（固定列）を更新するフィールドを一切送らない
+- 一方、B1（R-0117）のbaseline_hours算出ロジック（`api/routes/list_helpers.php`の`sumHoursByVoucherIds`/`selectPlanningEstimateVouchers`）と、今回実装したB3のwork_packages生成（`fetchWorkPackagesByVoucherIds`）は、どちらもこの**固定列だけ**を参照している
+- 結果: **R-0119以降にBeaver画面から時間を入力した見積は、固定列が更新されないため、B1のbaseline_hours算出に一切反映されない**。本番実測（テスト案件id=52、伝票id=5806、明細id=25488/25489）で、`voucher_line_costs`には正しく値が入っている（どあ: FACTORY_TIME=8.0/SITE_TIME=2.0、わく: FACTORY_TIME=4.0/SITE_TIME=1.0）のに、`voucher_lines.cost_factory_hours`/`cost_site_hours`は両行とも0.0のままであることを確認した
+
+### 実害・影響範囲
+- **本番で稼働中のYoukan容量判定（R-0118 B2）が、R-0119以降に時間入力された案件について工数を過小評価（実質0扱い）している可能性がある**。容量が「入る」と誤判定されるリスクがあり、業務影響が大きいため緊急扱いとする
+- R-0120（B3）のwork_packagesも同じ理由で常に空配列になる（B3自体の実装は仕様どおりだが、参照元データが更新されていないため実質機能しない）
+- 影響を受けるのはR-0119の本番デプロイ（2026-08-27）以降、Beaver画面の時間欄（工場時間・現場時間）を編集/入力した見積明細のみ。それ以前に建具台帳選択（`loadSnapshot`経由）だけで確定した明細の固定列は生きている可能性がある（要確認）
+
+### 対応方針（検討要、着手時に仕様化）
+- `sumHoursByVoucherIds`・`selectPlanningEstimateVouchers`・`fetchWorkPackagesByVoucherIds`を、フロントエンドの表示ロジック（`api/routes/vouchers.php`の`attachLineSubtables`/`fallbackCosts`）と同じ方式に揃える: `voucher_line_costs`にFACTORY_TIME/SITE_TIMEの行があればそれを優先し、無ければ固定列（`cost_factory_hours`/`cost_site_hours`）へフォールバックする
+- 本番の既存データ（R-0119以降に編集されたが固定列に反映されていない明細）をどう扱うか（読み取りロジックの修正だけで解決するか、固定列自体を`voucher_line_costs`から再計算して同期するバッチが必要か）を要調査
+- 修正後、R-0120（B3）のwork_packages本番実機検証（テスト案件id=52）を再実施する
+
+### 優先順位
+**緊急・最優先**。Youkan容量判定という既に本番稼働中の意思決定支援機能の正確性に関わるため、次セッションの最優先事項とする。
+
+---
+
 ## -10. 本番の集計区分同期がcatalog-system認証ゲートで機能しない（バックログ、2026-08-27発覚）
 
 R-0119の本番実測で判明: Beaverの `POST /aggregation-categories/sync` は本番サーバーからcatalog-system API（`https://door-fujita.com/contents/catalog-system/api/aggregation-categories`）を呼ぶと401（auth-hub認証ゲート）で失敗する。R-0119ではmigration 027によるシードで回避した（区分変更は稀のため実害小）。恒久対応にはcatalog-system側にサーバー間トークン認証の例外（BANTO_API_TOKEN/YOUKAN_API_TOKENと同パターン）を追加し、Beaver側の同期リクエストにトークンを付与する改修が必要（catalog-systemリポジトリをまたぐ）。集計区分を変更する運用が発生したら着手を検討。

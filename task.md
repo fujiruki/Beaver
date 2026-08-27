@@ -1,12 +1,14 @@
 # Beaver タスクキュー
 
 ## 進行中
-- [ ] R-0120: Beaver-Youkan連携 B3 — 見積内訳の作業パッケージ公開（2026-08-27着手、B2完了を受けて開始）。仕様: `docs/spec/R-0120_youkan_work_packages_b3.md`。**B3完了で停止し、Y2へは進まない**
+- [ ] **【緊急・最優先】バグ修正（R-ID未採番）**: R-0119以降の時間入力（`voucher_line_costs`のFACTORY_TIME/SITE_TIME）が`voucher_lines.cost_factory_hours`/`cost_site_hours`固定列に反映されず、B1のbaseline_hours・Youkan容量判定（B2、本番稼働中）・B3のwork_packagesが工数を過小評価する。詳細: `docs/requests.md` -11。次セッションはこれを最優先で仕様化・修正すること
+- [x] R-0120: Beaver-Youkan連携 B3 — 見積内訳の作業パッケージ公開（2026-08-27完了・本番デプロイ済み。仕様: `docs/spec/R-0120_youkan_work_packages_b3.md`）。**Y2へは進まない**
   - [x] 調査: 見積明細構造・工数記録単位・identity安定性の調査（2026-08-27）
   - [x] 仕様化: `docs/spec/R-0120_youkan_work_packages_b3.md`＋Youkan向け契約更新 `docs/spec/R-0117_youkan_api_contract.md`（§10 work_packages、2026-08-27）
-  - [ ] 実装: `list_helpers.php`（`fetchProjectBaselines`拡張＋`fetchWorkPackagesByVoucherIds`新設）＋`integrations_youkan.php`（`work_packages`組み込み）
-  - [ ] TDD: `test_youkan_integration.php` へB3ケース追加
-  - [ ] 検証: 回帰スイート（vitest＋PHPテスト全体）🔵青、本番デプロイ・実案件確認
+  - [x] 実装: `list_helpers.php`（`fetchProjectBaselines`拡張＋`fetchWorkPackagesByVoucherIds`新設）＋`integrations_youkan.php`（`work_packages`組み込み）。Codex TDD委譲→指揮役が再実行で裏取り
+  - [x] TDD: `test_youkan_integration.php` へB3ケース追加（29 PASS / 0 FAIL）
+  - [x] 検証: 回帰スイート exit 0、本番デプロイ（コミット`2748f06`）、manual/none案件の後方互換を実機確認
+  - [ ] **保留**: estimate baseline（work_packages非空）の実機検証は上記バグ修正後に再実施
 - [x] R-0117: Beaver-Youkan連携 B1 — 完了（2026-08-25、本番デプロイ・疎通確認済み）。契約引き渡し物: `docs/spec/R-0117_youkan_api_contract.md` ＋ トークン（`.claude/secrets/youkan_api_token`）
 - [ ] R-0111: 段取りボード（案件ガントチャート）— 検証中（藤田晴樹さんの実機確認待ち）。仕様: `docs/spec/R-0111_dandori_board.md`、モック: `docs/spec/R-0111_mockup.html`
   - [x] A: `frontend/src/lib/dandoriCalc.ts` 純粋関数＋vitestテスト20件（TDD、2026-08-24）

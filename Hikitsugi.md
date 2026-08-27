@@ -1,6 +1,25 @@
 # 引き継ぎ資料 — Beaver
 
-**最終更新**: 2026-08-26
+**最終更新**: 2026-08-27
+
+---
+
+## 直近の作業（2026-08-27）: R-0120 Beaver-Youkan連携B3（見積内訳のwork_packages公開）実装・デプロイ済み／【緊急】前提バグ発覚で一旦停止
+
+### R-0120 — 実装完了・本番デプロイ済み（estimate baselineの実機検証は次項のバグ修正待ちで保留）
+- 藤田晴樹さんの指示「B1/Y1/B2は完了。今回は開発計画のB3だけをSdDDの手順で仕様化・実装。Y2以降には進まない」より着手。仕様: `docs/spec/R-0120_youkan_work_packages_b3.md`、Youkan向け契約更新: `docs/spec/R-0117_youkan_api_contract.md`（§10 work_packages追加）
+- 調査で判明した最重要点: 見積明細（`voucher_lines`）は1行に工場時間・現場時間の両方が乗りうる（計画書の想定図とは異なり列で分かれる）。work_packageは「明細行×工数種別（factory/site）」単位で生成し、識別子は`beaver:voucher:{voucher_id}:line:{line_id}:{category}`。baseline_hours算出（B1）と同一の選定済み計画基準見積からのみ生成し二重計上を防止
+- 実装はCodex（TDD）へ委譲、指揮役が差分・テスト・回帰スイートを再実行して裏取り: `test_youkan_integration.php` 29 PASS/0 FAIL、`regression-suite.sh` exit 0。コミット`2748f06`→push→本番デプロイ（DB事前バックアップ`database_20260827_1429_pre_r0120_work_packages.sqlite`）
+- 本番実機確認: manual/none案件（既存案件）で`work_packages: []`が正しく返り後方互換を確認済み
+
+### 【緊急・最優先】次セッションでやること: R-0119以降の時間入力がbaseline_hours/Youkan容量判定に反映されないバグ
+- R-0120のestimate baseline実機検証中に発覚。藤田晴樹さんがテスト案件（id=52）の見積伝票（id=5806、明細id=25488「どあ」・25489「わく」）にBeaver画面から工場時間・現場時間を入力（どあ8h/2h、わく4h/1h）したが、`/integrations/youkan/projects/52`に一切反映されず（`baseline_source`が`manual`のまま）
+- 本番DB読み取り専用調査で確認した原因: R-0119でフロントエンドの時間入力が動的カテゴリ方式（`voucher_line_costs`、`category_code=FACTORY_TIME/SITE_TIME`）に切り替わったが、`LineItemRow.tsx`の`saveLineToDb`は`costs`配列のみ送信し`voucher_lines.cost_factory_hours`/`cost_site_hours`（固定列）を更新しなくなった。一方B1（`sumHoursByVoucherIds`等）・B3（`fetchWorkPackagesByVoucherIds`）はこの固定列だけを参照している
+- **実害**: 本番稼働中のYoukan容量判定（B2）が、R-0119以降に時間入力された案件の工数を過小評価（実質0扱い）している可能性がある。業務判断に関わるため緊急扱い
+- 詳細・対応方針案（`voucher_line_costs`優先・固定列フォールバック方式、フロントの`attachLineSubtables`/`fallbackCosts`と同じ考え方）は`docs/requests.md` -11に記録済み
+- **本番テストデータ復元**: テスト案件id=52の明細（どあ・わく）の工場時間・現場時間は、藤田晴樹さんがBeaver画面から元の値（0/0）へ戻す予定（本セッション終了時点で復元未確認、次セッション冒頭で確認すること）
+- 修正後、R-0120のestimate baseline（work_packages非空パターン）の本番実機検証を再実施し、`docs/requests_log.md`のR-0120を完了へ更新すること
+- **B3完了後もY2へは進まない**（藤田晴樹さんの明示指示、継続して有効）
 
 ---
 
