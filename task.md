@@ -1,11 +1,12 @@
 # Beaver タスクキュー
 
 ## 進行中
-- [ ] R-0118: Beaver-Youkan連携 B2 — 案件詳細のYoukan容量判定表示（2026-08-26着手、Youkan Y1本番検証完了を受けて開始）。仕様: `docs/spec/R-0118_youkan_capacity_check_b2.md`。**B2完了で停止し、B3へは進まない**
-  - [x] A: バックエンドプロキシ `GET /projects/{id}/capacity-check`（TDD、スタブYoukanでPHPテスト10件、2026-08-26）
-  - [x] B: フロント `CapacityCheckPanel`（結論優先表示・縮退表示、vitest 6件、2026-08-26）
-  - [x] 検証（前半）: 回帰スイート🔵青（exit 0、新テスト2本をスイートへ登録）→ コミットe9abc34 → 本番デプロイ → Youkan未接続時の縮退表示・通常業務非影響を本番実機確認（2026-08-26）
-  - [ ] 検証（後半・**藤田晴樹さんのトークン設置待ち**）: Youkan側でBEAVER_CAPACITY_TOKEN発行 → Beaver本番 `api/config.local.php` に `BEAVER_CAPACITY_TOKEN`（Youkan発行値）と `YOUKAN_CAPACITY_URL`（`https://door-fujita.com/contents/Youkan/api/integrations/beaver/capacity-check`）を設置 → 本番疎通・実案件でのcapacity-check確認 → 台帳を完了へ
+- [ ] R-0120: Beaver-Youkan連携 B3 — 見積内訳の作業パッケージ公開（2026-08-27着手、B2完了を受けて開始）。仕様: `docs/spec/R-0120_youkan_work_packages_b3.md`。**B3完了で停止し、Y2へは進まない**
+  - [x] 調査: 見積明細構造・工数記録単位・identity安定性の調査（2026-08-27）
+  - [x] 仕様化: `docs/spec/R-0120_youkan_work_packages_b3.md`＋Youkan向け契約更新 `docs/spec/R-0117_youkan_api_contract.md`（§10 work_packages、2026-08-27）
+  - [ ] 実装: `list_helpers.php`（`fetchProjectBaselines`拡張＋`fetchWorkPackagesByVoucherIds`新設）＋`integrations_youkan.php`（`work_packages`組み込み）
+  - [ ] TDD: `test_youkan_integration.php` へB3ケース追加
+  - [ ] 検証: 回帰スイート（vitest＋PHPテスト全体）🔵青、本番デプロイ・実案件確認
 - [x] R-0117: Beaver-Youkan連携 B1 — 完了（2026-08-25、本番デプロイ・疎通確認済み）。契約引き渡し物: `docs/spec/R-0117_youkan_api_contract.md` ＋ トークン（`.claude/secrets/youkan_api_token`）
 - [ ] R-0111: 段取りボード（案件ガントチャート）— 検証中（藤田晴樹さんの実機確認待ち）。仕様: `docs/spec/R-0111_dandori_board.md`、モック: `docs/spec/R-0111_mockup.html`
   - [x] A: `frontend/src/lib/dandoriCalc.ts` 純粋関数＋vitestテスト20件（TDD、2026-08-24）
@@ -25,6 +26,7 @@
 - [ ] 権限管理（ユーザー認証）
 
 ## 完了
+- [x] R-0118: Beaver-Youkan連携 B2 — 案件詳細のYoukan容量判定表示（2026-08-27完了。本番トークン設置・実案件検証まで完了。`docs/spec/R-0118_youkan_capacity_check_b2.md`）
 - [x] R-0119: 伝票明細の時間入力・保存不具合の一括修正（2026-08-27完了。仕様: `docs/spec/R-0119_voucher_line_fixes.md`。S2〜S6実装＋S1a/S1b/S1c追加実装（catalog-system URL設定化・fallback変換コード整合・集計区分5件シード）→本番デプロイ→新規伝票作成500エラーのホットフィックス（コミット`3878ebf`）→藤田晴樹さん本番実機確認OK。詳細はrequests_log.md）
 - [x] R-0110: 番頭AI向けAPIトークン認証の追加（2026-08-18、本番デプロイ・トークン発行・HTTPS疎通確認済み、`docs/spec/R-0110_banto_api_token.md`）
 - [x] R-0109: auth-hub連携によるログイン基盤の導入（2026-08-17、本番デプロイ・実機確認・Basic認証撤去済み、`docs/spec/R-0109_auth_hub_integration.md`）

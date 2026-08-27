@@ -119,6 +119,14 @@ function insertVoucherLine(PDO $pdo, int $voucherId, int $lineNo, float $factory
     ')->execute([$voucherId, $lineNo, $qty, $factoryHours, $siteHours]);
 }
 
+function insertWorkPackageLine(PDO $pdo, int $voucherId, int $lineNo, ?string $itemName, float $factoryHours, float $siteHours, int $qty = 1, ?string $updatedAt = null): int {
+    $pdo->prepare('
+        INSERT INTO voucher_lines (voucher_id, line_no, item_name, quantity, cost_factory_hours, cost_site_hours, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    ')->execute([$voucherId, $lineNo, $itemName, $qty, $factoryHours, $siteHours, $updatedAt]);
+    return (int)$pdo->lastInsertId();
+}
+
 $custId = insertCustomer($pdo, 'Youkan連携テスト得意先');
 
 // ============================================================
@@ -217,6 +225,38 @@ runTest('見積もmanualも無い場合 baseline_source=none・baseline_hours=nu
 });
 
 // ============================================================
+// R-0120 work_packages（選定済み見積IDの共有・生明細取得）
+// ============================================================
+echo "\n=== R-0120 work_packages ===\n";
+
+runTest('manual/none baselineはvoucher_idを持たずwork_packages生成対象にならない', function () use ($pdo, $custId) {
+    $manualPid = insertProject($pdo, $custId, 'YKWP001', 'manual案件', ['manual_estimated_hours' => 4.0]);
+    $nonePid = insertProject($pdo, $custId, 'YKWP002', 'none案件');
+    $baselines = fetchProjectBaselines($pdo, [fetchProjectRow($pdo, $manualPid), fetchProjectRow($pdo, $nonePid)]);
+
+    assertEq(null, $baselines[$manualPid]['voucher_id'], 'manualのvoucher_id');
+    assertEq(null, $baselines[$nonePid]['voucher_id'], 'noneのvoucher_id');
+});
+
+runTest('baseline算出対象とwork_packages取得対象が同じ選定済み見積IDになる', function () use ($pdo, $custId) {
+    $pid = insertProject($pdo, $custId, 'YKWP003', '見積ID共有案件');
+    $oldVoucher = insertEstimateVoucher($pdo, $pid, $custId, '2026-06-01');
+    insertWorkPackageLine($pdo, $oldVoucher, 1, '旧明細', 20, 0);
+    $selectedVoucher = insertEstimateVoucher($pdo, $pid, $custId, '2026-07-01');
+    $selectedLine = insertWorkPackageLine($pdo, $selectedVoucher, 1, '新明細', 3, 2, 2, '2026-07-02 03:04:05');
+    $voidVoucher = insertEstimateVoucher($pdo, $pid, $custId, '2026-08-01', 'void');
+    insertWorkPackageLine($pdo, $voidVoucher, 1, 'void明細', 99, 0);
+
+    $baseline = fetchProjectBaselines($pdo, [fetchProjectRow($pdo, $pid)])[$pid];
+    assertEq($selectedVoucher, $baseline['voucher_id'], 'baselineが保持する選定済みvoucher_id');
+    assertEq(10.0, $baseline['hours'], '選定済み見積だけのbaseline_hours');
+
+    $rows = fetchWorkPackagesByVoucherIds($pdo, [$baseline['voucher_id']]);
+    assertEq([$selectedLine], array_map('intval', array_column($rows[$selectedVoucher], 'line_id')), '選定済み見積の行だけ取得');
+    assertEq('新明細', $rows[$selectedVoucher][0]['item_name'], '旧見積・void見積の明細を含まない');
+});
+
+// ============================================================
 // 既存 fetchEstimatedHoursByProjectIds の呼び出し側（一覧）を壊していないこと
 // ============================================================
 echo "\n=== R-0097 回帰: 一覧のeffective_estimated_hoursが引き続き機能する ===\n";
@@ -248,6 +288,18 @@ $contractPid = insertProject($pdo, $custId, 'YKCONTRACT', '契約フィールド
 ]);
 $contractVoucher = insertEstimateVoucher($pdo, $contractPid, $custId, '2026-06-01');
 insertVoucherLine($pdo, $contractVoucher, 1, 6, 2);
+
+// R-0120 HTTP契約検証用。新しいvoid見積は選定対象外で、approved見積だけが正本になる。
+$workPackagePid = insertProject($pdo, $custId, 'YKWORKPACKAGES', 'work_packages契約案件');
+$workPackageVoucher = insertEstimateVoucher($pdo, $workPackagePid, $custId, '2026-07-01');
+$wpBothLine = insertWorkPackageLine($pdo, $workPackageVoucher, 10, '建具A', 1.25, 0.5, 2, '2026-07-02 03:04:05');
+$wpFactoryLine1 = insertWorkPackageLine($pdo, $workPackageVoucher, 20, '同種作業', 3, 0);
+$wpFactoryLine2 = insertWorkPackageLine($pdo, $workPackageVoucher, 30, '同種作業', 4, 0);
+$wpSiteLine = insertWorkPackageLine($pdo, $workPackageVoucher, 40, '', 0, 2);
+insertWorkPackageLine($pdo, $workPackageVoucher, 50, 'ゼロ時間', 0, 0);
+insertWorkPackageLine($pdo, $workPackageVoucher, 60, '数量ゼロ', 8, 9, 0);
+$voidWorkPackageVoucher = insertEstimateVoucher($pdo, $workPackagePid, $custId, '2026-08-01', 'void');
+insertWorkPackageLine($pdo, $voidWorkPackageVoucher, 1, 'void明細', 99, 99);
 
 $bootstrap = __DIR__ . '/_youkan_server_bootstrap.php';
 file_put_contents($bootstrap, "<?php\ndefine('DB_PATH', " . var_export($testDbPath, true) . ");\n");
@@ -335,6 +387,53 @@ try {
         assertEq(8.0, (float)$data['baseline_hours'], 'baseline_hours');
         assertTrue($data['baseline_updated_at'] !== null, 'baseline_updated_atが非null');
         assertTrue(str_contains((string)$data['baseline_updated_at'], '+09:00'), 'baseline_updated_atがJSTオフセット付き');
+    });
+
+    runTest('manual/none案件はHTTPでwork_packagesが空配列になる', function () use ($port) {
+        foreach (['YKWP001', 'YKWP002'] as $code) {
+            $res = youkanGet($port, '/integrations/youkan/projects?limit=1000', ['Authorization: Bearer ' . YOUKAN_DEV_TOKEN]);
+            $rows = array_values(array_filter(json_decode($res['body'], true)['data'], fn($row) => $row['project_code'] === $code));
+            assertEq(1, count($rows), "$code が一覧に存在");
+            assertEq([], $rows[0]['work_packages'] ?? null, "$code のwork_packages");
+        }
+    });
+
+    runTest('estimate案件の明細を行別・factory→site順でHTTP契約どおり返す', function () use ($port, $workPackagePid, $workPackageVoucher, $wpBothLine, $wpFactoryLine1, $wpFactoryLine2, $wpSiteLine) {
+        $res = youkanGet($port, "/integrations/youkan/projects/$workPackagePid", ['Authorization: Bearer ' . YOUKAN_DEV_TOKEN]);
+        assertTrue(str_contains($res['status'], '200'), 'expected 200 got: ' . $res['status']);
+        $data = json_decode($res['body'], true);
+        assertTrue(array_key_exists('work_packages', $data), 'work_packagesフィールドが存在');
+        $packages = $data['work_packages'];
+        assertEq(5, count($packages), '両方2件+factoryのみ2件+siteのみ1件（0時間・数量0は除外）');
+        assertEq([
+            "beaver:voucher:$workPackageVoucher:line:$wpBothLine:factory",
+            "beaver:voucher:$workPackageVoucher:line:$wpBothLine:site",
+            "beaver:voucher:$workPackageVoucher:line:$wpFactoryLine1:factory",
+            "beaver:voucher:$workPackageVoucher:line:$wpFactoryLine2:factory",
+            "beaver:voucher:$workPackageVoucher:line:$wpSiteLine:site",
+        ], array_column($packages, 'external_work_package_id'), 'line_no昇順・同一行factory→site順で統合しない');
+        assertEq([2.5, 1.0, 3.0, 4.0, 2.0], array_map('floatval', array_column($packages, 'estimated_hours')), '単位工数×数量');
+        assertEq('明細40', $packages[4]['label'], '空item_nameのフォールバック');
+        assertTrue(str_contains((string)$packages[0]['updated_at'], '2026-07-02T12:04:05+09:00'), '明細updated_atをJST ISO8601化');
+        assertTrue($packages[2]['updated_at'] !== null, '明細updated_at NULL時は伝票updated_atへフォールバック');
+        foreach ($packages as $package) {
+            assertEq(['external_work_package_id', 'label', 'category', 'estimated_hours', 'source_voucher_id', 'source_line_id', 'updated_at'], array_keys($package), 'work_packageのキー');
+            assertEq($workPackageVoucher, $package['source_voucher_id'], 'baseline対象見積とsource_voucher_idが一致');
+            assertTrue(!array_key_exists('external_project_id', $package), '子要素にexternal_project_idを含めない');
+        }
+    });
+
+    runTest('見積改訂で旧work_packageが消え新見積のwork_packageへ切り替わる', function () use ($port, $pdo, $custId, $workPackagePid, $workPackageVoucher, $wpBothLine) {
+        $beforeId = "beaver:voucher:$workPackageVoucher:line:$wpBothLine:factory";
+        $newVoucher = insertEstimateVoucher($pdo, $workPackagePid, $custId, '2026-09-01');
+        $newLine = insertWorkPackageLine($pdo, $newVoucher, 1, '改訂明細', 7, 0);
+
+        $res = youkanGet($port, "/integrations/youkan/projects/$workPackagePid", ['Authorization: Bearer ' . YOUKAN_DEV_TOKEN]);
+        $packages = json_decode($res['body'], true)['work_packages'];
+        assertEq(["beaver:voucher:$newVoucher:line:$newLine:factory"], array_column($packages, 'external_work_package_id'), '新見積だけが現れる');
+        assertTrue(!in_array($beforeId, array_column($packages, 'external_work_package_id'), true), '旧見積のpackageは消える');
+        assertEq(7.0, (float)json_decode($res['body'], true)['baseline_hours'], 'baselineも同じ新見積へ切替');
+        assertEq($newVoucher, $packages[0]['source_voucher_id'], 'baseline対象とpackage対象が一致');
     });
 
     // --- 完全一致ガード ---

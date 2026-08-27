@@ -127,6 +127,40 @@ if (!function_exists('sumHoursByVoucherIds')) {
     }
 }
 
+if (!function_exists('fetchWorkPackagesByVoucherIds')) {
+    /**
+     * R-0120: 選定済み計画基準見積の明細をwork_packages生成用に一括取得する。
+     * 日時のISO8601整形やfactory/siteへの分解は契約境界側で行う。
+     *
+     * @param array<int> $voucherIds
+     * @return array<int,array<int,array<string,mixed>>> voucher_id => line_no昇順の生明細
+     */
+    function fetchWorkPackagesByVoucherIds(PDO $pdo, array $voucherIds): array {
+        if (empty($voucherIds)) return [];
+        $placeholders = implode(',', array_fill(0, count($voucherIds), '?'));
+        $stmt = $pdo->prepare("
+            SELECT vl.voucher_id,
+                   vl.id AS line_id,
+                   vl.line_no,
+                   vl.item_name,
+                   vl.quantity,
+                   vl.cost_factory_hours,
+                   vl.cost_site_hours,
+                   COALESCE(vl.updated_at, v.updated_at) AS updated_at
+            FROM voucher_lines vl
+            INNER JOIN vouchers v ON v.id = vl.voucher_id
+            WHERE vl.voucher_id IN ($placeholders)
+            ORDER BY vl.voucher_id ASC, vl.line_no ASC
+        ");
+        $stmt->execute(array_values($voucherIds));
+        $result = [];
+        foreach ($stmt->fetchAll() as $row) {
+            $result[(int)$row['voucher_id']][] = $row;
+        }
+        return $result;
+    }
+}
+
 if (!function_exists('fetchEstimatedHoursByProjectIds')) {
     /**
      * R-0097 / R-0117: 指定した案件ID群について、計画基準見積（selectPlanningEstimateVouchers）の
@@ -155,7 +189,7 @@ if (!function_exists('fetchProjectBaselines')) {
      * どちらも無ければnone。
      *
      * @param array<array{id:int|string,manual_estimated_hours:mixed,updated_at:?string}> $projectRows
-     * @return array<int,array{hours:?float,source:string,updated_at:?string}> project_id => baseline情報
+     * @return array<int,array{hours:?float,source:string,updated_at:?string,voucher_id:?int}> project_id => baseline情報
      */
     function fetchProjectBaselines(PDO $pdo, array $projectRows): array {
         $ids = array_map('intval', array_column($projectRows, 'id'));
@@ -171,15 +205,17 @@ if (!function_exists('fetchProjectBaselines')) {
                     'hours'      => $hoursByVoucherId[$voucherId] ?? 0.0,
                     'source'     => 'estimate',
                     'updated_at' => $selected[$pid]['updated_at'],
+                    'voucher_id' => $voucherId,
                 ];
             } elseif ($p['manual_estimated_hours'] !== null) {
                 $result[$pid] = [
                     'hours'      => (float)$p['manual_estimated_hours'],
                     'source'     => 'manual',
                     'updated_at' => $p['updated_at'],
+                    'voucher_id' => null,
                 ];
             } else {
-                $result[$pid] = ['hours' => null, 'source' => 'none', 'updated_at' => null];
+                $result[$pid] = ['hours' => null, 'source' => 'none', 'updated_at' => null, 'voucher_id' => null];
             }
         }
         return $result;

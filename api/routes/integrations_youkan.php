@@ -52,8 +52,34 @@ function youkanToIso8601(?string $utcValue): ?string {
     }
 }
 
+/** R-0120: 見積明細を行単位・カテゴリ単位のwork_packages契約へ整形する。 */
+function youkanWorkPackages(array $rows): array {
+    $packages = [];
+    foreach ($rows as $row) {
+        $voucherId = (int)$row['voucher_id'];
+        $lineId = (int)$row['line_id'];
+        $label = trim((string)($row['item_name'] ?? ''));
+        if ($label === '') $label = '明細' . (int)$row['line_no'];
+
+        foreach (['factory' => 'cost_factory_hours', 'site' => 'cost_site_hours'] as $category => $column) {
+            $estimatedHours = round((float)$row[$column] * (int)$row['quantity'], 2);
+            if ($estimatedHours <= 0) continue;
+            $packages[] = [
+                'external_work_package_id' => "beaver:voucher:$voucherId:line:$lineId:$category",
+                'label'                    => $label,
+                'category'                 => $category,
+                'estimated_hours'          => $estimatedHours,
+                'source_voucher_id'        => $voucherId,
+                'source_line_id'           => $lineId,
+                'updated_at'               => youkanToIso8601($row['updated_at']),
+            ];
+        }
+    }
+    return $packages;
+}
+
 /** 契約フィールドへ整形する（計画書§4.3 / 仕様書のサンプルJSON準拠）。 */
-function youkanProjectRow(array $p, array $baseline): array {
+function youkanProjectRow(array $p, array $baseline, array $workPackageRows = []): array {
     return [
         'source'              => 'beaver',
         'external_project_id' => (int)$p['id'],
@@ -66,6 +92,7 @@ function youkanProjectRow(array $p, array $baseline): array {
         'baseline_source'     => $baseline['source'],
         'baseline_updated_at' => youkanToIso8601($baseline['updated_at']),
         'updated_at'          => youkanToIso8601($p['updated_at']),
+        'work_packages'       => $baseline['source'] === 'estimate' ? youkanWorkPackages($workPackageRows) : [],
     ];
 }
 
@@ -86,7 +113,11 @@ if ($resourceId !== null) {
         exit;
     }
     $baselines = fetchProjectBaselines($pdo, [$row]);
-    echo json_encode(youkanProjectRow($row, $baselines[(int)$row['id']]));
+    $baseline = $baselines[(int)$row['id']];
+    $workPackagesByVoucherId = $baseline['voucher_id'] === null
+        ? []
+        : fetchWorkPackagesByVoucherIds($pdo, [$baseline['voucher_id']]);
+    echo json_encode(youkanProjectRow($row, $baseline, $workPackagesByVoucherId[$baseline['voucher_id']] ?? []));
     exit;
 }
 
@@ -150,9 +181,12 @@ if (count($rows) > $limit) {
 }
 
 $baselines = fetchProjectBaselines($pdo, $rows);
+$voucherIds = array_values(array_filter(array_column($baselines, 'voucher_id'), fn($id) => $id !== null));
+$workPackagesByVoucherId = fetchWorkPackagesByVoucherIds($pdo, $voucherIds);
 $data = [];
 foreach ($rows as $row) {
-    $data[] = youkanProjectRow($row, $baselines[(int)$row['id']]);
+    $baseline = $baselines[(int)$row['id']];
+    $data[] = youkanProjectRow($row, $baseline, $workPackagesByVoucherId[$baseline['voucher_id']] ?? []);
 }
 
 echo json_encode(['data' => $data, 'next_cursor' => $nextCursor]);
