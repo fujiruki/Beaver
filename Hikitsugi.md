@@ -4,7 +4,29 @@
 
 ---
 
-## 直近の作業（2026-08-27）: R-0120 Beaver-Youkan連携B3（見積内訳のwork_packages公開）実装・デプロイ済み／【緊急】前提バグ発覚で一旦停止
+## 直近の作業（2026-08-27）: R-0121 工数データ参照元の統一（緊急バグ修正）— コード修正・本番デプロイ済み／実案件での最終確認は藤田晴樹さん待ち
+
+### R-0121 — コード修正・回帰・本番デプロイ完了、実案件確認のみ保留
+- `docs/requests.md` -11（緊急）として記録されていたバグ（R-0119以降にBeaver画面で入力した工場時間・現場時間がbaseline_hours/Youkan容量判定/B3work_packagesへ反映されない）をR-0121として仕様化。仕様: `docs/spec/R-0121_hours_source_of_truth_unification.md`
+- 根本原因: R-0119でフロントエンドの工数入力が動的カテゴリ方式（`voucher_line_costs`、`category_code=FACTORY_TIME/SITE_TIME`）へ切り替わったが、B1の`selectPlanningEstimateVouchers`/`sumHoursByVoucherIds`とB3の`fetchWorkPackagesByVoucherIds`（`api/routes/list_helpers.php`）は旧固定列（`cost_factory_hours`/`cost_site_hours`）のみを参照し続けていた
+- 修正方針: `voucher_line_costs`を正規データ源とし、共通関数`fetchEffectiveLineHours`を新設。**カテゴリ単位**（行単位ではない）で「動的カテゴリ行が存在すれば値0でも採用、存在しなければ固定列へフォールバック」を判定。二重書き方式（保存時に固定列へも書く）は不採用
+- 実装はAgent（r0121-impl）にTDD委譲。新規PHPテスト11件、指揮役が再実行して裏取り: `test_youkan_integration.php` 40/0、回帰スイート(`bash .claude/regression-suite.sh`) exit 0（vitest59ファイル324件＋PHPテスト13本）
+- コミット`1db0ec4`→push→本番デプロイ済み（DB事前バックアップ`api/backups/database_20260827_1621_pre_r0121_hours_fix.sqlite`、本番側）。`/api/health`・アプリ200を確認済み
+- frontend/index.htmlのWuunuスニペット（未コミットのローカル変更）はデプロイ時に一時stash→ビルド→復元済み（本番には持ち込んでいない）
+
+### 【次セッション最優先】実案件（id=52）での本番最終確認
+このセッションはYOUKAN_API_TOKEN等の認証情報を保持していないため、`/integrations/youkan/projects/52`をcurlで直接確認できなかった。また本番DBへの直接SQL読み取り（SSH経由sqlite3）は権限クラス分類器にブロックされたため実行していない（意図的な安全策、無理に回避していない）。**藤田晴樹さんに以下の実機確認をお願いすること**:
+1. テスト案件（id=52）の見積伝票（id=5806、明細id=25488「どあ」・25489「わく」）を開き、現在の工場時間・現場時間の値を確認する（前回セッションで0/0へ復元予定だったが未確認のまま終了している）
+2. 工場時間・現場時間を入力する（例: どあ8h/2h、わく4h/1h。前回R-0120検証時と同じ値で構わない）
+3. 案件詳細画面の「Youkan容量判定」パネルで「再判定」ボタンを押し、不足時間が入力工数に応じて変化することを確認する（前回はこの反映が起きなかった箇所）
+4. 可能であれば`YOUKAN_API_TOKEN`を使って`/integrations/youkan/projects/52`をcurl等で直接確認し、`baseline_source=estimate`・`baseline_hours`が正しい値・`work_packages`が工場/現場に分離して返ることを確認する
+5. 検証後、入力した値はBeaver画面から元の値へ復元する（次に何かのテストで混乱しないよう）
+6. 確認が取れたら`docs/requests_log.md`のR-0121を「完了」へ更新し、R-0120（B3のestimate baseline実機検証）も合わせて完了へ更新する
+- **B3完了後もY2へは進まない**（藤田晴樹さんの明示指示、継続して有効）
+
+---
+
+## 過去の作業（2026-08-27）: R-0120 Beaver-Youkan連携B3（見積内訳のwork_packages公開）実装・デプロイ済み／【緊急】前提バグ発覚で一旦停止
 
 ### R-0120 — 実装完了・本番デプロイ済み（estimate baselineの実機検証は次項のバグ修正待ちで保留）
 - 藤田晴樹さんの指示「B1/Y1/B2は完了。今回は開発計画のB3だけをSdDDの手順で仕様化・実装。Y2以降には進まない」より着手。仕様: `docs/spec/R-0120_youkan_work_packages_b3.md`、Youkan向け契約更新: `docs/spec/R-0117_youkan_api_contract.md`（§10 work_packages追加）
