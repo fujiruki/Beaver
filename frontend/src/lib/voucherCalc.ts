@@ -25,6 +25,11 @@ export type PriceResult = {
   line_total: number;
 };
 
+/** 金額を100円単位で四捨五入する */
+export function roundToHundred(value: number): number {
+  return Math.round(value / 100) * 100;
+}
+
 /** 製造原価（固定列版・後方互換） */
 export function calcManufactureCost(line: CostFields): number {
   const body = line.cost_body || 0;

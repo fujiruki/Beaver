@@ -36,7 +36,7 @@ export default function VoucherHeader({ customers, projects, readOnly = false }:
       }}>
         <Field label="得意先 *" error={errors.customer_id?.message}>
           <select
-            {...register('customer_id', { valueAsNumber: true, required: '必須です' })}
+            {...register('customer_id', { validate: v => v !== '0' || '必須です' })}
             style={selStyle}
             disabled={readOnly}
           >
@@ -49,7 +49,7 @@ export default function VoucherHeader({ customers, projects, readOnly = false }:
 
         <Field label="案件">
           <select
-            {...register('project_id', { setValueAs: v => v === '' || v === '0' ? null : Number(v) })}
+            {...register('project_id')}
             style={selStyle}
             disabled={readOnly}
           >

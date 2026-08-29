@@ -8,6 +8,7 @@ import {
   calcManufactureCostDynamic,
   calcLineTotalDynamic,
   calcProfitSummaryDynamic,
+  roundToHundred,
 } from '../voucherCalc';
 import type { LineCategoryValue } from '../../types/voucher';
 
@@ -42,6 +43,16 @@ describe('calcManufactureCost', () => {
       cost_site_hours: 0,
       cost_labor_rate: 0,
     })).toBe(5000);
+  });
+});
+
+describe('roundToHundred', () => {
+  it.each([
+    [12345, 12300],
+    [12350, 12400],
+    [12399, 12400],
+  ])('%i円を100円単位に四捨五入して%i円にする', (value, expected) => {
+    expect(roundToHundred(value)).toBe(expected);
   });
 });
 

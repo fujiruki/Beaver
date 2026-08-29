@@ -13,13 +13,15 @@ import LineItemRow from '../components/voucher/LineItemRow';
 import ProfitRateBar from '../components/voucher/ProfitRateBar';
 import TotalSummary from '../components/voucher/TotalSummary';
 import { useSmartBack } from '../hooks/useSmartBack';
+import { useAppSettings } from '../contexts/AppSettingsContext';
 import type { VoucherType, VoucherStatus, TaxInputType, LineCategoryValue } from '../types/voucher';
 
 export type VoucherFormValues = {
   voucher_type: VoucherType;
   status: VoucherStatus;
-  customer_id: number;
-  project_id: number | null;
+  // select要素のDOM値は常に文字列のため、フォーム内部では文字列として扱い送受信時にNumberへ変換する
+  customer_id: string;
+  project_id: string;
   voucher_date: string;
   delivery_date: string | null;
   tax_input_type: TaxInputType;
@@ -93,8 +95,8 @@ export const defaultLine: LineFormValues = {
 const defaultValues: VoucherFormValues = {
   voucher_type: 'estimate',
   status: 'draft',
-  customer_id: 0,
-  project_id: null,
+  customer_id: '0',
+  project_id: '',
   voucher_date: new Date().toISOString().split('T')[0],
   delivery_date: null,
   tax_input_type: 'exclusive',
@@ -109,7 +111,19 @@ const defaultValues: VoucherFormValues = {
   lines: [{ ...defaultLine }],
 };
 
+type VoucherEditState = Pick<import('../types/voucher').Voucher, 'voucher_type' | 'status' | 'converted_sales'>;
+
+export function getVoucherEditBlockReason(voucher?: Partial<VoucherEditState>): string | null {
+  if (voucher?.status === 'billed') return '請求済み';
+  if (voucher?.status === 'void') return '無効化済み';
+  if (voucher?.voucher_type === 'estimate' && (voucher.converted_sales?.length ?? 0) > 0) {
+    return '売上に引用済み';
+  }
+  return null;
+}
+
 export default function VoucherEdit() {
+  const { settings } = useAppSettings();
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
@@ -117,8 +131,9 @@ export default function VoucherEdit() {
   const voucherId = id ? Number(id) : 0;
   const isNew = !id;
 
-  const initProjectId  = searchParams.get('project_id') ? Number(searchParams.get('project_id')) : null;
-  const initCustomerId = searchParams.get('customer_id') ? Number(searchParams.get('customer_id')) : null;
+  const initProjectIdParam  = searchParams.get('project_id');
+  const initCustomerIdParam = searchParams.get('customer_id');
+  const initProjectId  = initProjectIdParam ? Number(initProjectIdParam) : null;
   const initType       = (searchParams.get('type') ?? 'estimate') as VoucherType;
 
   const { data: voucher, isLoading } = useVoucher(voucherId);
@@ -140,12 +155,13 @@ export default function VoucherEdit() {
   const form = useForm<VoucherFormValues>({
     defaultValues: {
       ...defaultValues,
-      ...(isNew && initProjectId ? { project_id: initProjectId } : {}),
-      ...(isNew && initCustomerId ? { customer_id: initCustomerId } : {}),
+      ...(isNew && initProjectIdParam ? { project_id: initProjectIdParam } : {}),
+      ...(isNew && initCustomerIdParam ? { customer_id: initCustomerIdParam } : {}),
       ...(isNew ? { voucher_type: initType } : {}),
+      ...(isNew ? { lines: [{ ...defaultLine, cost_labor_rate: settings.defaultLaborRate }] } : {}),
     },
   });
-  const { control, handleSubmit, reset, watch } = form;
+  const { control, handleSubmit, reset, watch, setValue } = form;
 
   const { fields, append, remove, swap } = useFieldArray({ control, name: 'lines' });
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
@@ -157,8 +173,8 @@ export default function VoucherEdit() {
       reset({
         voucher_type: voucher.voucher_type,
         status: voucher.status,
-        customer_id: voucher.customer_id,
-        project_id: voucher.project_id,
+        customer_id: String(voucher.customer_id),
+        project_id: voucher.project_id != null ? String(voucher.project_id) : '',
         voucher_date: voucher.voucher_date,
         delivery_date: voucher.delivery_date,
         tax_input_type: voucher.tax_input_type,
@@ -200,15 +216,23 @@ export default function VoucherEdit() {
     }
   }, [voucher, reset]);
 
+  useEffect(() => {
+    if (isNew && initProjectIdParam && projects.some(project => String(project.id) === initProjectIdParam)) {
+      setValue('project_id', initProjectIdParam);
+    }
+  }, [initProjectIdParam, isNew, projects, setValue]);
+
+  useEffect(() => {
+    if (isNew && initCustomerIdParam && customers.some(c => String(c.id) === initCustomerIdParam)) {
+      setValue('customer_id', initCustomerIdParam);
+    }
+  }, [initCustomerIdParam, isNew, customers, setValue]);
+
   const watchedLines = useWatch({ control, name: 'lines' });
   const watchedTaxInputType = watch('tax_input_type');
 
-  const canEdit = ['draft', 'submitted', 'approved'].includes(voucher?.status ?? '');
-  const editBlockReason = voucher?.status === 'billed'
-    ? '請求済み'
-    : voucher?.status === 'void'
-    ? '無効化済み'
-    : null;
+  const editBlockReason = getVoucherEditBlockReason(voucher);
+  const canEdit = ['draft', 'submitted', 'approved'].includes(voucher?.status ?? '') && editBlockReason === null;
 
   const linesForCalc = (watchedLines ?? []).map(l => ({
     line_type: (l?.line_type ?? 'normal') as 'normal' | 'discount' | 'subtotal',
@@ -228,8 +252,8 @@ export default function VoucherEdit() {
     const header = {
       voucher_type: data.voucher_type,
       status: data.status,
-      customer_id: data.customer_id,
-      project_id: data.project_id,
+      customer_id: Number(data.customer_id),
+      project_id: data.project_id ? Number(data.project_id) : null,
       voucher_date: data.voucher_date,
       delivery_date: data.delivery_date,
       tax_input_type: data.tax_input_type,
@@ -266,7 +290,7 @@ export default function VoucherEdit() {
   function handleAddLine() {
     const nextNo = (watchedLines?.length ?? 0) + 1;
     if (isNew) {
-      append({ ...defaultLine, line_no: nextNo });
+      append({ ...defaultLine, line_no: nextNo, cost_labor_rate: settings.defaultLaborRate });
     } else {
       addLineMutation.mutate({ ...defaultLine, line_no: nextNo, voucher_id: voucherId } as any);
     }
@@ -289,7 +313,7 @@ export default function VoucherEdit() {
     const insertAt = selectedIdx !== null ? selectedIdx + 1 : (watchedLines?.length ?? 0);
     const nextNo = insertAt + 1;
     if (isNew) {
-      append({ ...defaultLine, line_no: nextNo });
+      append({ ...defaultLine, line_no: nextNo, cost_labor_rate: settings.defaultLaborRate });
     } else {
       addLineMutation.mutate({ ...defaultLine, line_no: nextNo, voucher_id: voucherId } as any);
     }

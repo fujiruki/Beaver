@@ -239,6 +239,32 @@ try {
         );
     });
 
+    echo "\n=== R-0126 引用済み見積の編集拒否 ===\n";
+
+    runTest('売上へ引用済みの見積はヘッダーPUTを409で拒否する', function () use (&$pdo, $port, $customerId) {
+        $voucherId = createVoucher($pdo, $customerId, 'E-TEST-CONVERTED-001');
+        $pdo->prepare("INSERT INTO vouchers (voucher_no, voucher_type, status, customer_id, voucher_date, tax_input_type, source_estimate_no) VALUES ('S-TEST-001', 'sales', 'draft', ?, '2026-07-01', 'exclusive', 'E-TEST-CONVERTED-001')")
+            ->execute([$customerId]);
+
+        $r = putJson($port, "/vouchers/$voucherId", ['memo' => '変更されない']);
+        assertTrue(str_contains($r['status'], '409'), 'HTTP 409: ' . $r['status']);
+        assertEq('売上に引用済みの見積は編集できません', $r['body']['error'] ?? null, '拒否理由');
+        $memo = $pdo->query("SELECT memo FROM vouchers WHERE id = $voucherId")->fetchColumn();
+        assertEq(null, $memo, 'ヘッダーが変更されていない');
+    });
+
+    runTest('売上へ引用済みの見積は明細PUTを409で拒否する', function () use (&$pdo, $port, $customerId) {
+        $voucherId = createVoucher($pdo, $customerId, 'E-TEST-CONVERTED-002');
+        $lineId = createLine($pdo, $voucherId, 1);
+        $pdo->prepare("INSERT INTO vouchers (voucher_no, voucher_type, status, customer_id, voucher_date, tax_input_type, source_estimate_no) VALUES ('S-TEST-002', 'sales', 'draft', ?, '2026-07-01', 'exclusive', 'E-TEST-CONVERTED-002')")
+            ->execute([$customerId]);
+
+        $r = putJson($port, "/vouchers/$voucherId/lines/$lineId", ['item_name' => '変更されない']);
+        assertTrue(str_contains($r['status'], '409'), 'HTTP 409: ' . $r['status']);
+        $itemName = $pdo->query("SELECT item_name FROM voucher_lines WHERE id = $lineId")->fetchColumn();
+        assertEq('編集前', $itemName, '明細が変更されていない');
+    });
+
 } finally {
     if (is_resource($serverProc)) {
         foreach ($serverPipes as $p) { if (is_resource($p)) fclose($p); }

@@ -36,4 +36,13 @@ describe('AppSettingsContext', () => {
       price_glass: 'GLASS',
     });
   });
+
+  it('旧設定に既定労務単価が無ければ0で補完する', () => {
+    localStorage.setItem('bv_app_settings', JSON.stringify({ hoursPerDay: 7 }));
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <AppSettingsProvider>{children}</AppSettingsProvider>
+    );
+    const { result } = renderHook(() => useAppSettings(), { wrapper });
+    expect(result.current.settings.defaultLaborRate).toBe(0);
+  });
 });

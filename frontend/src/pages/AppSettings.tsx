@@ -66,6 +66,22 @@ export default function AppSettings() {
           </div>
         </div>
 
+        {/* 既定労務単価 */}
+        <div>
+          <label className="block text-xs font-semibold text-slate-500 mb-2">既定労務単価</label>
+          <div className="flex items-center gap-3">
+            <input
+              type="number"
+              min={0}
+              step={100}
+              value={settings.defaultLaborRate}
+              onChange={e => update({ defaultLaborRate: Math.max(0, Number(e.target.value) || 0) })}
+              className="w-32 px-2 py-1.5 border border-slate-300 rounded text-sm font-mono text-right"
+            />
+            <span className="text-sm text-slate-500">円／時間</span>
+          </div>
+        </div>
+
         {/* 利益率プリセット */}
         <div className="border-t border-slate-100 pt-4">
           <label className="block text-xs font-semibold text-slate-500 mb-2">利益率プリセット</label>

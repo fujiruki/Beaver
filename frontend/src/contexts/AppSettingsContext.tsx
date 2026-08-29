@@ -14,6 +14,7 @@ export interface ColumnMapping {
 export interface AppSettings {
   fontSize: number;
   hoursPerDay: number;
+  defaultLaborRate: number;
   profitRatePresets: number[];
   columnMapping: ColumnMapping;
 }
@@ -51,6 +52,7 @@ function normalizeColumnMapping(columnMapping: ColumnMapping): ColumnMapping {
 const DEFAULTS: AppSettings = {
   fontSize: 14,
   hoursPerDay: 8,
+  defaultLaborRate: 0,
   profitRatePresets: [0.10, 0.20, 0.25, 0.30, 0.35, 0.40],
   columnMapping: DEFAULT_COLUMN_MAPPING,
 };

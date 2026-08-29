@@ -385,6 +385,31 @@ function attachLineSubtables(PDO $pdo, array &$line): void {
     $line['prices'] = !empty($prices) ? $prices : fallbackPrices($line);
 }
 
+function assertVoucherEditable(PDO $pdo, int $voucherId): void {
+    $stmt = $pdo->prepare('SELECT voucher_no, voucher_type, status FROM vouchers WHERE id = ?');
+    $stmt->execute([$voucherId]);
+    $voucher = $stmt->fetch();
+    if (!$voucher) {
+        http_response_code(404);
+        echo json_encode(['error' => 'Not found']);
+        exit;
+    }
+    if ($voucher['status'] === 'billed' || $voucher['status'] === 'void') {
+        http_response_code(409);
+        echo json_encode(['error' => $voucher['status'] === 'billed' ? '請求済みの伝票は編集できません' : '無効化済みの伝票は編集できません']);
+        exit;
+    }
+    if ($voucher['voucher_type'] === 'estimate') {
+        $converted = $pdo->prepare('SELECT 1 FROM vouchers WHERE voucher_type = "sales" AND source_estimate_no = ? LIMIT 1');
+        $converted->execute([$voucher['voucher_no']]);
+        if ($converted->fetchColumn()) {
+            http_response_code(409);
+            echo json_encode(['error' => '売上に引用済みの見積は編集できません']);
+            exit;
+        }
+    }
+}
+
 // ---- POST /vouchers/migrate-fixed-columns ----
 // 固定列のデータを costs/prices サブテーブルへ一括移行する
 if ($method === 'POST' && !$resourceId && $path === '/vouchers/migrate-fixed-columns') {
@@ -732,6 +757,7 @@ switch ($method) {
 
         // ---- 明細追加 ----
         if ($resourceId && $subAction === 'lines') {
+            assertVoucherEditable($pdo, $resourceId);
             $data = json_decode(file_get_contents('php://input'), true) ?? [];
             $maxStmt = $pdo->prepare('SELECT COALESCE(MAX(line_no), 0) + 1 FROM voucher_lines WHERE voucher_id = ?');
             $maxStmt->execute([$resourceId]);
@@ -845,6 +871,7 @@ switch ($method) {
     case 'PUT':
         // ---- 明細更新 ----
         if ($resourceId && $subAction === 'lines' && $subId) {
+            assertVoucherEditable($pdo, $resourceId);
             $data = json_decode(file_get_contents('php://input'), true) ?? [];
             $fields = ['line_type','location_no','location_name','tategu_item_id','source_catalog_item_id',
                        'item_name','quantity',
@@ -884,6 +911,7 @@ switch ($method) {
         }
         // ---- 伝票ヘッダー更新 ----
         if (!$resourceId) { http_response_code(400); echo json_encode(['error' => 'ID required']); exit; }
+        assertVoucherEditable($pdo, $resourceId);
         $data = json_decode(file_get_contents('php://input'), true) ?? [];
         $fields = ['status','project_id','customer_id','voucher_date','delivery_date',
                    'tax_input_type','consumption_tax_type','cutoff_date','billing_date','override_billing_date',

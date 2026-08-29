@@ -1,7 +1,7 @@
 import { useFormContext } from 'react-hook-form';
 import { useVoucherStore } from '../../stores/voucherStore';
 import { useAppSettings } from '../../contexts/AppSettingsContext';
-import { calcManufactureCostDynamic, calcLaborCostDynamic } from '../../lib/voucherCalc';
+import { calcManufactureCostDynamic, calcLaborCostDynamic, roundToHundred } from '../../lib/voucherCalc';
 import type { VoucherFormValues } from '../../pages/VoucherEdit';
 import type { AggregationCategoryMaster } from '../../api/aggregationCategories';
 import type { LineCategoryValue } from '../../types/voucher';
@@ -34,7 +34,7 @@ export default function ProfitRateBar({ categories }: Props) {
         for (const cat of moneyCats) {
           const costVal = costs.find(c => c.category_code === cat.code)?.value ?? 0;
           if (costVal === 0) continue;
-          const sellVal = profitRate >= 1 ? costVal : Math.ceil(costVal / (1 - profitRate));
+          const sellVal = roundToHundred(profitRate >= 1 ? costVal : Math.ceil(costVal / (1 - profitRate)));
           newPrices.push({
             category_code: cat.code,
             category_name: cat.name,
@@ -49,7 +49,7 @@ export default function ProfitRateBar({ categories }: Props) {
           const hours = costs.find(c => c.category_code === cat.code)?.value ?? 0;
           if (hours === 0) continue;
           const laborAmt = hours * laborRate;
-          const laborSell = profitRate >= 1 ? laborAmt : Math.ceil(laborAmt / (1 - profitRate));
+          const laborSell = roundToHundred(profitRate >= 1 ? laborAmt : Math.ceil(laborAmt / (1 - profitRate)));
           const mergeCode = (cat as any).merge_into_price_code as string | null;
           if (mergeCode) {
             const existing = newPrices.find(p => p.category_code === mergeCode);
@@ -89,7 +89,7 @@ export default function ProfitRateBar({ categories }: Props) {
               1,
             );
         if (mfgCost === 0) return;
-        const lineTotal = profitRate >= 1 ? mfgCost : Math.ceil(mfgCost / (1 - profitRate));
+        const lineTotal = roundToHundred(profitRate >= 1 ? mfgCost : Math.ceil(mfgCost / (1 - profitRate)));
         setValue(`lines.${index}.line_total`, lineTotal);
         setValue(`lines.${index}.price_body`, lineTotal);
         setValue(`lines.${index}.price_hardware`, 0);

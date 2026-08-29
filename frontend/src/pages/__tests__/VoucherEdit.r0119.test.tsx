@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import VoucherEdit from '../VoucherEdit';
+import { AppSettingsProvider } from '../../contexts/AppSettingsContext';
 
 const requests: Array<{ url: string; method: string; body: any }> = [];
 let categories: any[] = [];
@@ -12,6 +13,7 @@ let failedItemName: string | null = null;
 let remainingFailures = 0;
 
 beforeEach(() => {
+  localStorage.clear();
   requests.length = 0;
   categories = [];
   lineSaveFails = false;
@@ -23,7 +25,7 @@ beforeEach(() => {
     const body = init?.body ? JSON.parse(String(init.body)) : null;
     requests.push({ url, method, body });
     if (url.endsWith('/customers')) return new Response(JSON.stringify([{ id: 1, name: '得意先A' }]));
-    if (url.endsWith('/projects')) return new Response('[]');
+    if (url.endsWith('/projects')) return new Response(JSON.stringify([{ id: 42, name: '案件A', customer_id: 1 }]));
     if (url.endsWith('/aggregation-categories')) return new Response(JSON.stringify(categories));
     if (url.endsWith('/sales-categories')) return new Response('[]');
     if (method === 'POST' && url.endsWith('/vouchers')) return new Response(JSON.stringify({ id: 77 }), { status: 201 });
@@ -37,18 +39,42 @@ beforeEach(() => {
   }));
 });
 
-function renderNew() {
+function renderNew(entry = '/vouchers/new') {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <MemoryRouter initialEntries={['/vouchers/new']}>
-        <Routes><Route path="/vouchers/new" element={<VoucherEdit />} /><Route path="/vouchers/:id" element={<div>保存後</div>} /></Routes>
-      </MemoryRouter>
+      <AppSettingsProvider>
+        <MemoryRouter initialEntries={[entry]}>
+          <Routes><Route path="/vouchers/new" element={<VoucherEdit />} /><Route path="/vouchers/:id" element={<div>保存後</div>} /></Routes>
+        </MemoryRouter>
+      </AppSettingsProvider>
     </QueryClientProvider>,
   );
 }
 
 describe('VoucherEdit R-0119', () => {
+  it('案件詳細から渡されたproject_id・customer_id・typeを新規伝票へ引き継ぐ', async () => {
+    renderNew('/vouchers/new?project_id=42&customer_id=1&type=estimate');
+    await screen.findByText('案件A');
+    await waitFor(() => {
+      expect((document.querySelector('select[name="project_id"]') as HTMLSelectElement).value).toBe('42');
+      expect((document.querySelector('select[name="customer_id"]') as HTMLSelectElement).value).toBe('1');
+    });
+  });
+
+  it('新規伝票の初期行と追加行に設定の既定労務単価を適用する', async () => {
+    localStorage.setItem('bv_app_settings', JSON.stringify({ defaultLaborRate: 4500 }));
+    categories = [{ id: 1, code: 'MAIN', name: '本体', measure_type: 'money', sort_order: 1 }];
+    const user = userEvent.setup();
+    renderNew();
+    await screen.findByText('得意先A');
+    await user.selectOptions(document.querySelector('select[name="customer_id"]') as HTMLSelectElement, '1');
+    await user.click(screen.getByRole('button', { name: '+ 行を追加' }));
+    await user.click(screen.getByRole('button', { name: '保存' }));
+    await screen.findByText('保存後');
+    const lineBodies = requests.filter(r => r.method === 'POST' && r.url.endsWith('/vouchers/77/lines')).map(r => r.body);
+    expect(lineBodies.map(line => line.cost_labor_rate)).toEqual([4500, 4500]);
+  });
   it('集計区分が0件なら警告を表示し、明細入力UIを表示しない', async () => {
     renderNew();
     expect((await screen.findByRole('alert')).textContent).toContain('集計区分が未同期のため明細を編集できません。設定画面から同期してください');
