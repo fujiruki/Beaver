@@ -83,9 +83,10 @@ interface GanttScrollProps {
   pxPerDay: number;
   todayISO: string;
   onCommit: (id: number, patch: { start_date?: string; delivery_date?: string }) => void;
+  onProjectDoubleClick: (id: number) => void;
 }
 
-export default function GanttScroll({ bars, rangeStart, rangeEnd, pxPerDay, todayISO, onCommit }: GanttScrollProps) {
+export default function GanttScroll({ bars, rangeStart, rangeEnd, pxPerDay, todayISO, onCommit, onProjectDoubleClick }: GanttScrollProps) {
   const totalDays = daysBetween(rangeStart, rangeEnd) + 1;
   const gridWidth = totalDays * pxPerDay;
   const showDayNumbers = pxPerDay >= DETAIL_THRESHOLD_PX;
@@ -140,6 +141,7 @@ export default function GanttScroll({ bars, rangeStart, rangeEnd, pxPerDay, toda
             showBarLabel={showBarLabel}
             todayLeftPx={todayLeftPx}
             onCommit={onCommit}
+            onProjectDoubleClick={onProjectDoubleClick}
           />
         ))}
 
@@ -169,7 +171,7 @@ export default function GanttScroll({ bars, rangeStart, rangeEnd, pxPerDay, toda
   );
 }
 
-function BarRow({ bar, rangeStart, pxPerDay, gridWidth, showBarLabel, todayLeftPx, onCommit }: {
+function BarRow({ bar, rangeStart, pxPerDay, gridWidth, showBarLabel, todayLeftPx, onCommit, onProjectDoubleClick }: {
   bar: DandoriBar;
   rangeStart: string;
   pxPerDay: number;
@@ -177,6 +179,7 @@ function BarRow({ bar, rangeStart, pxPerDay, gridWidth, showBarLabel, todayLeftP
   showBarLabel: boolean;
   todayLeftPx: number | null;
   onCommit: (id: number, patch: { start_date?: string; delivery_date?: string }) => void;
+  onProjectDoubleClick: (id: number) => void;
 }) {
   const barDrag = useDayDrag(pxPerDay, deltaDays => onCommit(bar.id, { start_date: addDaysISO(bar.start, deltaDays) }));
   const deadlineDrag = useDayDrag(pxPerDay, deltaDays => bar.delivery && onCommit(bar.id, { delivery_date: addDaysISO(bar.delivery, deltaDays) }));
@@ -202,6 +205,7 @@ function BarRow({ bar, rangeStart, pxPerDay, gridWidth, showBarLabel, todayLeftP
           className={barClassName(bar)}
           style={{ left: leftPx, width: widthPx }}
           {...barDrag.handlers}
+          onDoubleClick={e => { e.stopPropagation(); onProjectDoubleClick(bar.id); }}
         >
           {showBarLabel && labelFitsInside && labelText}
           {overDays > 0 && <div className="over" style={{ width: overDays * pxPerDay }} />}

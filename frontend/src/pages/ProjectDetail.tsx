@@ -60,6 +60,7 @@ export default function ProjectDetail() {
     defaultValues: { status: '問い合わせ' },
   });
   const currentStatus = watch('status');
+  const manualEstimatedHours = watch('manual_estimated_hours');
 
   useEffect(() => {
     if (project) {
@@ -292,6 +293,9 @@ export default function ProjectDetail() {
                   {...register('manual_estimated_hours', { valueAsNumber: true })}
                   className={hoursInputCls}
                 />
+                <span className="text-sm text-slate-500">
+                  {((Number(manualEstimatedHours) || 0) / settings.hoursPerDay).toFixed(1)}日
+                </span>
                 <div className="flex items-center gap-1 flex-wrap">
                   <button
                     type="button"

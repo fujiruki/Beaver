@@ -416,7 +416,7 @@ switch ($method) {
     case 'PUT':
         if (!$resourceId) { http_response_code(400); echo json_encode(['error' => 'ID required']); exit; }
         $data = json_decode(file_get_contents('php://input'), true) ?? [];
-        $fields = ['customer_id','name','description','status','start_date','end_date','delivery_date','address','memo','order_date','owner_name','general_contractor_name','site_contact','manual_estimated_hours'];
+        $fields = ['project_code','customer_id','name','description','status','start_date','end_date','delivery_date','address','memo','order_date','owner_name','general_contractor_name','site_contact','manual_estimated_hours'];
         $sets = []; $params = [];
         foreach ($fields as $f) {
             if (array_key_exists($f, $data)) { $sets[] = "$f = :$f"; $params[":$f"] = $data[$f]; }

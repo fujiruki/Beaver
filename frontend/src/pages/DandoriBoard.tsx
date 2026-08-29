@@ -6,6 +6,7 @@ import { api } from '../api/client';
 import type { Project } from '../types/project';
 import GanttScroll from '../components/dandori/GanttScroll';
 import WrapView from '../components/dandori/WrapView';
+import ProjectQuickEditModal from '../components/dandori/ProjectQuickEditModal';
 import DataTable, { useSortState } from '../components/DataTable';
 import type { DataTableColumn } from '../components/DataTable';
 import {
@@ -43,6 +44,7 @@ export default function DandoriBoard() {
   const [fontScale, setFontScale] = useState(loadFontScale);
   const [showDone, setShowDone] = useState(false);
   const [dragError, setDragError] = useState<string | null>(null);
+  const [editingProjectId, setEditingProjectId] = useState<number | null>(null);
 
   const todayISO = todayISOLocal();
   const { start: rangeStart, end: rangeEnd } = useMemo(() => rangeForPreset(todayISO, preset), [todayISO, preset]);
@@ -109,7 +111,7 @@ export default function DandoriBoard() {
   }, [unsetProjects, unsetSort]);
 
   const unsetColumns: DataTableColumn<Project>[] = [
-    { key: 'name', label: '案件名', sortable: true, render: p => p.name },
+    { key: 'name', label: '案件名', sortable: true, render: p => <span onDoubleClick={() => setEditingProjectId(p.id)}>{p.name}</span> },
     { key: 'customer_name', label: '得意先', sortable: true, render: p => p.customer_name ?? '—' },
     { key: 'delivery_date', label: '納期', sortable: true, render: p => p.delivery_date ?? '—' },
     {
@@ -196,9 +198,10 @@ export default function DandoriBoard() {
           pxPerDay={pxPerDay}
           todayISO={todayISO}
           onCommit={handleCommit}
+          onProjectDoubleClick={setEditingProjectId}
         />
       ) : (
-        <WrapView bars={visibleBars} rangeStart={rangeStart} rangeEnd={rangeEnd} todayISO={todayISO} />
+        <WrapView bars={visibleBars} rangeStart={rangeStart} rangeEnd={rangeEnd} todayISO={todayISO} onProjectDoubleClick={setEditingProjectId} />
       )}
 
       {unsetProjects.length > 0 && (
@@ -214,6 +217,13 @@ export default function DandoriBoard() {
             onSortChange={setUnsetSort}
           />
         </>
+      )}
+      {editingProjectId !== null && (
+        <ProjectQuickEditModal
+          projectId={editingProjectId}
+          onClose={() => setEditingProjectId(null)}
+          onSaved={() => setEditingProjectId(null)}
+        />
       )}
     </div>
   );

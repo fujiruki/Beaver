@@ -15,10 +15,11 @@ interface WrapViewProps {
   rangeStart: string;
   rangeEnd: string;
   todayISO: string;
+  onProjectDoubleClick: (id: number) => void;
 }
 
 /** 週単位で時間軸を折り返す閲覧専用ビュー（v1はドラッグ不可） */
-export default function WrapView({ bars, rangeStart, rangeEnd, todayISO }: WrapViewProps) {
+export default function WrapView({ bars, rangeStart, rangeEnd, todayISO, onProjectDoubleClick }: WrapViewProps) {
   const weeks: { start: string; end: string }[] = [];
   for (let cur = rangeStart; cur <= rangeEnd; cur = addDaysISO(cur, 7)) {
     weeks.push({ start: cur, end: addDaysISO(cur, 6) });
@@ -62,6 +63,7 @@ export default function WrapView({ bars, rangeStart, rangeEnd, todayISO }: WrapV
                     key={bar.id}
                     className={barClassName(bar, contL, contR)}
                     style={{ marginLeft: `${leftPct}%`, width: `${widthPct}%` }}
+                    onDoubleClick={() => onProjectDoubleClick(bar.id)}
                   >
                     {contL && '◀ '}{bar.name}（{bar.customerName}）
                     {contR && <span className="cont-mark">続く ▶</span>}

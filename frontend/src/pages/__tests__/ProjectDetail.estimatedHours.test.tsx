@@ -86,9 +86,11 @@ describe('ProjectDetail 工数目安 (R-0097)', () => {
     const input = await screen.findByLabelText('工数目安（h）') as HTMLInputElement;
     expect(input.value).toBe('4.5');
     expect(input.step).toBe('0.1');
+    expect(screen.getByText('0.6日')).toBeTruthy();
 
     await user.clear(input);
     await user.type(input, '6.5');
+    expect(screen.getByText('0.8日')).toBeTruthy();
     await user.click(screen.getByRole('button', { name: '保存' }));
 
     await waitFor(() => expect(putBodies.length).toBeGreaterThan(0));

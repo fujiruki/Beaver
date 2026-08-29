@@ -48,6 +48,7 @@ export interface Project {
 }
 
 export type ProjectInput = {
+  project_code?: string | null;
   customer_id: number;
   name: string;
   description?: string | null;
