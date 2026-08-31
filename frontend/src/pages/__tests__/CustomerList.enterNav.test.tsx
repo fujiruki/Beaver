@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import CustomerList from '../CustomerList';
@@ -51,7 +51,8 @@ describe('CustomerList 検索結果1件時のEnter遷移 (R-0083)', () => {
   it('検索結果が複数件のままEnterを押しても遷移しない', async () => {
     renderPage();
     const input = await screen.findByPlaceholderText('得意先名・コードで検索') as HTMLInputElement;
-    await waitFor(() => expect(screen.getAllByText(/田中商店|鈴木製作所/).length).toBe(2));
+    const table = await screen.findByTestId('customer-desktop-table');
+    await waitFor(() => expect(within(table).getAllByText(/田中商店|鈴木製作所/).length).toBe(2));
 
     fireEvent.keyDown(input, { key: 'Enter' });
 

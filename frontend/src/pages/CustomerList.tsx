@@ -140,16 +140,48 @@ export default function CustomerList() {
       </div>
 
       <div style={{ background: '#fff', borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
-        <DataTable
-          tableId="customers"
-          columns={columns}
-          rows={customers}
-          rowKey={c => c.id}
-          onRowClick={c => navigate(`/customers/${c.id}`)}
-          sortKey={sort?.key}
-          sortDir={sort?.dir}
-          onSortChange={handleSortChange}
-        />
+        <div className="md:hidden" data-testid="customer-mobile-list">
+          {customers.map(c => {
+            const address = `${c.address1 ?? ''} ${c.address2 ?? ''}`.trim() || '—';
+            return (
+              <div
+                key={c.id}
+                data-testid="customer-mobile-row"
+                onClick={() => navigate(`/customers/${c.id}`)}
+                className="p-3 border-b border-slate-100 last:border-0 cursor-pointer"
+                style={{ minHeight: 44 }}
+              >
+                <div className="font-bold text-sm">
+                  {c.name}
+                  <span className="text-slate-400 text-xs ml-2">{c.code}</span>
+                </div>
+                <div className="flex items-center gap-2 mt-1 text-sm text-slate-500" style={{ overflow: 'hidden' }}>
+                  {c.tel && (
+                    <a href={`tel:${c.tel}`} onClick={e => e.stopPropagation()} className="text-blue-600">
+                      {c.tel}
+                    </a>
+                  )}
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {address}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="hidden md:block" data-testid="customer-desktop-table">
+          <DataTable
+            tableId="customers"
+            columns={columns}
+            rows={customers}
+            rowKey={c => c.id}
+            onRowClick={c => navigate(`/customers/${c.id}`)}
+            sortKey={sort?.key}
+            sortDir={sort?.dir}
+            onSortChange={handleSortChange}
+          />
+        </div>
         {meta && (
           <Pagination
             page={meta.page}

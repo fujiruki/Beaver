@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import ProjectList from '../ProjectList';
@@ -47,10 +47,11 @@ function renderPage() {
 describe('ProjectList 納期列 (R-0086)', () => {
   it('「納期」列見出しと各行の納期値が表示される（未設定は—）', async () => {
     renderPage();
-    await screen.findByText('田中邸新築');
-    expect(screen.getByText('納期')).toBeTruthy();
-    expect(screen.getByText('2026-03-01')).toBeTruthy();
-    const row2 = screen.getByText('鈴木邸改修').closest('tr');
+    const table = await screen.findByTestId('project-desktop-table');
+    await within(table).findByText('田中邸新築');
+    expect(within(table).getByText('納期')).toBeTruthy();
+    expect(within(table).getByText('2026-03-01')).toBeTruthy();
+    const row2 = within(table).getByText('鈴木邸改修').closest('tr');
     expect(row2?.textContent).toContain('—');
   });
 

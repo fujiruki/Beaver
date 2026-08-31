@@ -1,6 +1,12 @@
 # Beaver タスクキュー
 
 ## 進行中
+- [ ] R-0129: ダッシュボード・案件一覧・得意先一覧のスマホ最適化（レスポンシブ対応）。仕様: `docs/spec/R-0129_mobile_responsive_ui.md`、設計議事録: `docs/kaigi/2026-08-31-スマホ最適化UI設計.md`
+  - [ ] サイドバー（`AppLayout.tsx`）: `md`未満でハンバーガーメニュー化（オーバーレイ開閉）
+  - [ ] ダッシュボード（`Dashboard.tsx`）: `md`未満でKPIカード2×2グリッド・案件リスト縦積み
+  - [ ] 案件一覧（`ProjectList.tsx`）: `md`未満で簡素リスト行に切替（DataTable本体は無改修）
+  - [ ] 得意先一覧（`CustomerList.tsx`）: `md`未満で簡素リスト行に切替（DataTable本体は無改修）
+  - [ ] TDD: 仕様書の受け入れ条件・テスト項目に沿って実装、指揮役が回帰スイート・build再実行で裏取り
 - [ ] **【緊急・最優先】バグ修正（R-ID未採番）**: R-0119以降の時間入力（`voucher_line_costs`のFACTORY_TIME/SITE_TIME）が`voucher_lines.cost_factory_hours`/`cost_site_hours`固定列に反映されず、B1のbaseline_hours・Youkan容量判定（B2、本番稼働中）・B3のwork_packagesが工数を過小評価する。詳細: `docs/requests.md` -11。次セッションはこれを最優先で仕様化・修正すること
 - [x] R-0120: Beaver-Youkan連携 B3 — 見積内訳の作業パッケージ公開（2026-08-27完了・本番デプロイ済み。仕様: `docs/spec/R-0120_youkan_work_packages_b3.md`）。**Y2へは進まない**
   - [x] 調査: 見積明細構造・工数記録単位・identity安定性の調査（2026-08-27）

@@ -50,6 +50,7 @@ export default function AppLayout() {
   const { data: me } = useMe();
   const buildTime = new Date(__BUILD_TIME__);
   const [now, setNow] = useState(() => new Date());
+  const [navOpen, setNavOpen] = useState(false);
   const location = useLocation();
 
   useEffect(() => {
@@ -65,16 +66,49 @@ export default function AppLayout() {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', fontFamily: 'sans-serif', fontSize: settings.fontSize }}>
+      {/* スマホ向けヘッダーバー */}
+      <div
+        className="md:hidden"
+        style={{
+          position: 'fixed', top: 0, left: 0, right: 0, zIndex: 30,
+          display: 'flex', alignItems: 'center', gap: 12,
+          padding: '10px 16px', background: '#1e293b', color: '#f1f5f9',
+        }}
+      >
+        <button
+          aria-label="メニューを開閉"
+          aria-expanded={navOpen}
+          onClick={() => setNavOpen(o => !o)}
+          style={{ background: 'transparent', border: 'none', color: '#f1f5f9', fontSize: 22, cursor: 'pointer', padding: 0 }}
+        >
+          ☰
+        </button>
+        <span style={{ fontWeight: 'bold', fontSize: 14 }}>Beaver</span>
+      </div>
+
+      {navOpen && (
+        <div
+          className="md:hidden"
+          data-testid="sidebar-overlay"
+          onClick={() => setNavOpen(false)}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 40 }}
+        />
+      )}
+
       {/* サイドバー */}
-      <nav style={{
-        width: 180,
-        background: '#1e293b',
-        color: '#f1f5f9',
-        flexShrink: 0,
-        padding: '16px 0',
-        display: 'flex',
-        flexDirection: 'column',
-      }}>
+      <nav
+        className={`fixed inset-y-0 left-0 z-50 md:static md:z-auto md:translate-x-0 ${navOpen ? 'translate-x-0' : '-translate-x-full'}`}
+        style={{
+          width: 180,
+          background: '#1e293b',
+          color: '#f1f5f9',
+          flexShrink: 0,
+          padding: '16px 0',
+          display: 'flex',
+          flexDirection: 'column',
+          transition: 'transform 0.2s',
+        }}
+      >
         <div style={{ padding: '8px 16px 20px', fontWeight: 'bold', fontSize: 14, color: '#94a3b8' }}>
           Beaver
         </div>
@@ -83,6 +117,7 @@ export default function AppLayout() {
             key={to}
             to={to}
             end={to === '/'}
+            onClick={() => setNavOpen(false)}
             style={({ isActive }) => ({
               display: 'block',
               padding: '10px 16px',
@@ -126,7 +161,7 @@ export default function AppLayout() {
       </nav>
 
       {/* メインコンテンツ */}
-      <main style={{ flex: 1, minWidth: 0, padding: 24, background: '#f8fafc' }}>
+      <main className="pt-14 md:pt-0" style={{ flex: 1, minWidth: 0, padding: 24, background: '#f8fafc' }}>
         <Outlet />
       </main>
     </div>

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import ProjectList from '../ProjectList';
@@ -38,7 +38,8 @@ function renderPage() {
 describe('ProjectList 未知ステータスの色フォールバック (R-0085)', () => {
   it('固定7色マップに無いステータス名は既定色(bg-slate-100 text-slate-600)で表示される', async () => {
     renderPage();
-    const badge = await waitFor(() => screen.getByText('キャンセル'));
+    const table = await screen.findByTestId('project-desktop-table');
+    const badge = await waitFor(() => within(table).getByText('キャンセル'));
     expect(badge.className).toContain('bg-slate-100');
     expect(badge.className).toContain('text-slate-600');
   });

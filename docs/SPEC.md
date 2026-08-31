@@ -45,6 +45,7 @@
 | [R-0108_date_deadline_highlight.md](spec/R-0108_date_deadline_highlight.md) | 納期・伝票日付の期限接近度による強調表示 | 2026-08-07 |
 | [R-0084_search_multi_property_phase2.md](spec/R-0084_search_multi_property_phase2.md) | 検索の複数プロパティ対応 Phase2（建具台帳・伝票・請求書一覧） | 2026-08-11 |
 | [R-0093_test_sqlite_temp_file_isolation.md](spec/R-0093_test_sqlite_temp_file_isolation.md) | PHPテスト用一時SQLiteファイルの競合対策 | 2026-08-11 |
+| [R-0129_mobile_responsive_ui.md](spec/R-0129_mobile_responsive_ui.md) | ダッシュボード・案件一覧・得意先一覧のスマホ最適化（レスポンシブ対応） | 2026-08-31 |
 
 ---
 

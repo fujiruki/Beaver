@@ -44,7 +44,7 @@ export default function Dashboard() {
       <h1 style={{ margin: '0 0 20px', fontSize: 20, fontWeight: 'bold' }}>ダッシュボード</h1>
 
       {/* KPIカード */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 24 }}>
+      <div className="grid grid-cols-2 md:grid-cols-4" style={{ gap: 14, marginBottom: 24 }}>
         <KpiCard
           label={`${currentMonth}月 売上合計`}
           value={`¥${monthSales.toLocaleString()}`}
@@ -93,7 +93,7 @@ export default function Dashboard() {
       </div>
 
       {/* 案件リスト 2列 */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+      <div className="grid grid-cols-1 md:grid-cols-2" style={{ gap: 16, marginBottom: 16 }}>
         <ProjectList
           title="進行中の案件"
           projects={activeProjects}

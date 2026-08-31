@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import ProjectList from '../ProjectList';
@@ -37,11 +37,12 @@ function renderPage() {
 describe('ProjectList 工数目安列 (R-0097)', () => {
   it('「工数目安」列見出しと、日数換算した値が表示される（未設定は—）', async () => {
     renderPage();
-    await screen.findByText('田中邸新築');
-    expect(screen.getByText('工数目安')).toBeTruthy();
+    const table = await screen.findByTestId('project-desktop-table');
+    await within(table).findByText('田中邸新築');
+    expect(within(table).getByText('工数目安')).toBeTruthy();
     // hoursPerDay デフォルト8h → 40h/8=5.0日
-    expect(screen.getByText('5.0日')).toBeTruthy();
-    const row2 = screen.getByText('鈴木邸改修').closest('tr');
+    expect(within(table).getByText('5.0日')).toBeTruthy();
+    const row2 = within(table).getByText('鈴木邸改修').closest('tr');
     expect(row2?.textContent).toContain('—');
   });
 });

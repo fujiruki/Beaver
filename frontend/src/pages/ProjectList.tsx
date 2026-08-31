@@ -216,16 +216,52 @@ export default function ProjectList() {
       </div>
 
       <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-        <DataTable
-          tableId="projects"
-          columns={columns}
-          rows={projects}
-          rowKey={p => p.id}
-          onRowClick={p => navigate(`/projects/${p.id}`)}
-          multiSort
-          sortKeys={sortKeys}
-          onMultiSortChange={handleMultiSortChange}
-        />
+        <div className="md:hidden" data-testid="project-mobile-list">
+          {projects.map(p => {
+            const tier = getDeadlineTier(p.delivery_date, new Date());
+            return (
+              <div
+                key={p.id}
+                onClick={() => navigate(`/projects/${p.id}`)}
+                className="p-3 border-b border-slate-100 last:border-0 cursor-pointer"
+                style={{ minHeight: 44 }}
+              >
+                <div className="font-bold text-sm">
+                  {p.name}
+                  <span className="text-slate-400 text-xs font-mono ml-2">#{p.project_code ?? '—'}</span>
+                </div>
+                <div className="flex items-center gap-2 mt-1 text-sm text-slate-500">
+                  <span>{p.customer_name ?? `ID:${p.customer_id}`}</span>
+                  {p.status && statusColor[p.status as ProjectStatus] ? (
+                    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${statusColor[p.status as ProjectStatus]}`}>
+                      {statusLabel[p.status as ProjectStatus]}
+                    </span>
+                  ) : (
+                    <span className="inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600">
+                      {p.status}
+                    </span>
+                  )}
+                  <span className={deadlineTierClassName(tier)}>
+                    {deadlineTierIcon(tier)}{p.delivery_date ?? '—'}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="hidden md:block" data-testid="project-desktop-table">
+          <DataTable
+            tableId="projects"
+            columns={columns}
+            rows={projects}
+            rowKey={p => p.id}
+            onRowClick={p => navigate(`/projects/${p.id}`)}
+            multiSort
+            sortKeys={sortKeys}
+            onMultiSortChange={handleMultiSortChange}
+          />
+        </div>
         {meta && (
           <Pagination
             page={meta.page}
