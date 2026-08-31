@@ -1,5 +1,24 @@
 # 要望・リクエスト
 
+## 23. R-0132: PWAインストール時のアイコンが適切に設定されていない（2026-08-31発覚、優先度中）
+
+/readyoubouで本番フィードバックid=36を確認（iPhone Safari、原文一部判読不能箇所あり）:
+
+> 「ダッシュボードをPWAインストールした時にアイコンがダサくなってる。ファビコン設定がされてないからかな?」
+
+### 調査結果
+`frontend/index.html`には`<link rel="icon" type="image/svg+xml" href="/favicon.svg">`のみで、`apple-touch-icon`（iOSホーム画面用PNG）も`manifest.json`（Android/デスクトップPWA用アイコン定義）も存在しない。iOSでホーム画面に追加すると、専用アイコンが無いためOSが生成する簡易サムネイルが使われ、見た目が悪くなっていると推測される。
+
+### 対応方針（未着手、次回セッション候補）
+- 各サイズのPNGアイコン（180x180のapple-touch-icon、192x192/512x512等）を用意し`index.html`に`<link rel="apple-touch-icon">`を追加
+- `manifest.json`を新設しicons配列を定義、`index.html`に`<link rel="manifest">`を追加
+- 素材（ロゴ画像）が無ければ藤田晴樹さんに確認が必要
+
+### 優先度
+中（機能に支障はなく見た目の問題）。
+
+---
+
 ## -10. 本番の集計区分同期がcatalog-system認証ゲートで機能しない（バックログ、2026-08-27発覚）
 
 R-0119の本番実測で判明: Beaverの `POST /aggregation-categories/sync` は本番サーバーからcatalog-system API（`https://door-fujita.com/contents/catalog-system/api/aggregation-categories`）を呼ぶと401（auth-hub認証ゲート）で失敗する。R-0119ではmigration 027によるシードで回避した（区分変更は稀のため実害小）。恒久対応にはcatalog-system側にサーバー間トークン認証の例外（BANTO_API_TOKEN/YOUKAN_API_TOKENと同パターン）を追加し、Beaver側の同期リクエストにトークンを付与する改修が必要（catalog-systemリポジトリをまたぐ）。集計区分を変更する運用が発生したら着手を検討。

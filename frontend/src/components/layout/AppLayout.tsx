@@ -161,7 +161,7 @@ export default function AppLayout() {
       </nav>
 
       {/* メインコンテンツ */}
-      <main className="pt-14 md:pt-0" style={{ flex: 1, minWidth: 0, padding: 24, background: '#f8fafc' }}>
+      <main className="pt-14 md:pt-6" style={{ flex: 1, minWidth: 0, paddingLeft: 24, paddingRight: 24, paddingBottom: 24, background: '#f8fafc' }}>
         <Outlet />
       </main>
     </div>

@@ -47,6 +47,7 @@
 | [R-0093_test_sqlite_temp_file_isolation.md](spec/R-0093_test_sqlite_temp_file_isolation.md) | PHPテスト用一時SQLiteファイルの競合対策 | 2026-08-11 |
 | [R-0129_mobile_responsive_ui.md](spec/R-0129_mobile_responsive_ui.md) | ダッシュボード・案件一覧・得意先一覧のスマホ最適化（レスポンシブ対応） | 2026-08-31 |
 | [R-0130_youkan_link_button.md](spec/R-0130_youkan_link_button.md) | 案件編集画面・案件一覧に「Youkanで見る」ボタン（Youkan側新規API前提） | 2026-08-31 |
+| [R-0131_mobile_header_padding_regression.md](spec/R-0131_mobile_header_padding_regression.md) | 【緊急】スマホ表示で上部のボタン・行がヘッダーに隠れる（R-0129リグレッション修正） | 2026-08-31 |
 
 ---
 
