@@ -1,10 +1,10 @@
 # Beaver タスクキュー
 
 ## 進行中
-- [ ] R-0131【緊急】: スマホ表示で上部のボタン・行がヘッダーに隠れる（R-0129リグレッション）。/readyoubouで本番id=37・38を確認、原因特定済み（`AppLayout.tsx`の`<main>`インラインstyle`padding:24`がTailwindクラスpt-14を上書き）。仕様: `docs/spec/R-0131_mobile_header_padding_regression.md`。fixerへ委譲中
 - [ ] R-0132: PWAインストール時のアイコン未設定（favicon/apple-touch-icon/manifest.json不足）。/readyoubouで本番id=36を確認。素材（ロゴ画像）待ちのため未着手、次回セッション候補
 
 ## 完了（本セッション）
+- [x] R-0131【緊急】: スマホ表示で上部のボタン・行がヘッダーに隠れる（R-0129リグレッション）。/readyoubouで本番id=37・38を確認、fixerへ委譲・指揮役が再実行して裏取り（vitest 67ファイル354件、build成功、モバイル/デスクトップ双方をChrome DevTools Protocolエミュレーションで目視確認）。コミット`a055a31`→push→本番デプロイ済み（DB事前バックアップ`database_20260831_1612.sqlite`）、`/api/health`・アプリとも200確認済み
 - [x] R-0130: 案件編集画面・案件一覧に「Youkanで見る」ボタン。仕様: `docs/spec/R-0130_youkan_link_button.md`。Youkan側新規API（R-0160、Youkanリポジトリ `docs/SPEC/13_Beaver連携プロジェクトURL.md`）と合わせて実装・検証完了（PHPテスト9/9、vitest 66ファイル352件、build成功、回帰スイートexit 0）。未コミット
 - [x] R-0129: ダッシュボード・案件一覧・得意先一覧のスマホ最適化（レスポンシブ対応）。仕様: `docs/spec/R-0129_mobile_responsive_ui.md`、設計議事録: `docs/kaigi/2026-08-31-スマホ最適化UI設計.md`。実装・テスト・build・回帰スイート確認済み、コミット`ec1d290`
 - [ ] **【緊急・最優先】バグ修正（R-ID未採番）**: R-0119以降の時間入力（`voucher_line_costs`のFACTORY_TIME/SITE_TIME）が`voucher_lines.cost_factory_hours`/`cost_site_hours`固定列に反映されず、B1のbaseline_hours・Youkan容量判定（B2、本番稼働中）・B3のwork_packagesが工数を過小評価する。詳細: `docs/requests.md` -11。次セッションはこれを最優先で仕様化・修正すること
