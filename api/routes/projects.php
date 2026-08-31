@@ -211,6 +211,69 @@ if ($resourceId && $subResource === 'capacity-check') {
     $degrade('unreachable', 'Youkanに接続できないため、容量判定は現在利用できません');
 }
 
+// --- R-0130: Youkanプロジェクトリンク取得プロキシ ---
+// GET /projects/{id}/youkan-link
+// capacity-checkと同じ縮退方針: Youkan未連携・障害でBeaver本体を巻き込まないため常にHTTP 200で応答する
+if ($resourceId && $subResource === 'youkan-link') {
+    if (isset($segments[3])) {
+        http_response_code(404);
+        echo json_encode(['error' => 'Not found', 'path' => $path]);
+        exit;
+    }
+    if ($method !== 'GET') {
+        http_response_code(405);
+        echo json_encode(['error' => 'Method not allowed']);
+        exit;
+    }
+    $stmt = $pdo->prepare('SELECT id FROM projects WHERE id = ?');
+    $stmt->execute([$resourceId]);
+    if (!$stmt->fetch()) {
+        http_response_code(404);
+        echo json_encode(['error' => 'Not found']);
+        exit;
+    }
+
+    $degradeLink = function (string $reason, string $message): void {
+        echo json_encode(['ok' => false, 'reason' => $reason, 'message' => $message], JSON_UNESCAPED_UNICODE);
+        exit;
+    };
+
+    $ctx = stream_context_create(['http' => [
+        'method'        => 'GET',
+        'header'        => "Authorization: Bearer " . BEAVER_CAPACITY_TOKEN . "\r\n",
+        'timeout'       => 15,
+        'ignore_errors' => true,
+    ]]);
+    $raw = @file_get_contents(YOUKAN_PROJECT_LINK_BASE_URL . '/' . $resourceId, false, $ctx);
+    if ($raw === false) {
+        $degradeLink('unreachable', 'Youkanに接続できないため、Youkanへのリンクは現在利用できません');
+    }
+
+    $statusLine = $http_response_header[0] ?? '';
+    $code = preg_match('#HTTP/\S+\s+(\d{3})#', $statusLine, $m) ? (int)$m[1] : 0;
+    $body = json_decode((string)$raw, true);
+
+    if ($code >= 200 && $code < 300) {
+        if (!is_array($body) || !isset($body['youkan_project_id'])) {
+            $degradeLink('unreachable', 'Youkanに接続できないため、Youkanへのリンクは現在利用できません');
+        }
+        $url = YOUKAN_FRONTEND_BASE_URL . 'Focus?' . http_build_query([
+            'projectId' => $body['youkan_project_id'],
+            'title'     => $body['title'] ?? '',
+            'tenantId'  => $body['tenant_id'] ?? '',
+        ]);
+        echo json_encode(['ok' => true, 'url' => $url], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    if ($code === 404) {
+        $degradeLink('not_found', 'この案件はまだYoukanと連携されていません');
+    }
+    if (in_array($code, [400, 401, 403, 503], true)) {
+        $degradeLink('config', 'Youkan連携の設定に問題があります（管理者に連絡してください）');
+    }
+    $degradeLink('unreachable', 'Youkanに接続できないため、Youkanへのリンクは現在利用できません');
+}
+
 // --- 画像サブリソース ---
 if ($resourceId && $subResource === 'images') {
     $uploadDir = __DIR__ . '/../uploads/projects/' . $resourceId . '/';

@@ -8,6 +8,7 @@ import ComboSelect from '../components/ComboSelect';
 import type { ComboOption } from '../components/ComboSelect';
 import NewCustomerModal from '../components/NewCustomerModal';
 import CapacityCheckPanel from '../components/CapacityCheckPanel';
+import YoukanLinkButton from '../components/YoukanLinkButton';
 import HardDeleteProjectModal from '../components/HardDeleteProjectModal';
 import { useAppSettings } from '../contexts/AppSettingsContext';
 import { useSmartBack } from '../hooks/useSmartBack';
@@ -488,6 +489,13 @@ export default function ProjectDetail() {
 
         {/* Youkan容量判定（編集時のみ、R-0118） */}
         {!isNew && <CapacityCheckPanel projectId={projectId} />}
+
+        {/* Youkanで見る（編集時のみ、R-0130） */}
+        {!isNew && (
+          <div className="bg-white rounded-lg shadow-sm p-5">
+            <YoukanLinkButton projectId={projectId} />
+          </div>
+        )}
 
         {/* 完全削除（編集時のみ、R-0095） */}
         {!isNew && (

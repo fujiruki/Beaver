@@ -42,4 +42,8 @@ if (!defined('YOUKAN_API_TOKEN')) define('YOUKAN_API_TOKEN', 'dev-youkan-token-c
 if (!defined('BEAVER_CAPACITY_TOKEN')) define('BEAVER_CAPACITY_TOKEN', 'dev-beaver-capacity-token-change-me');
 if (!defined('YOUKAN_CAPACITY_URL')) define('YOUKAN_CAPACITY_URL', 'http://localhost:8000/integrations/beaver/capacity-check');
 
+// R-0130: Youkanプロジェクトリンク取得プロキシ用。BEAVER_CAPACITY_TOKENを再利用する
+if (!defined('YOUKAN_PROJECT_LINK_BASE_URL')) define('YOUKAN_PROJECT_LINK_BASE_URL', 'http://localhost:8000/integrations/beaver/project-link');
+if (!defined('YOUKAN_FRONTEND_BASE_URL'))     define('YOUKAN_FRONTEND_BASE_URL', 'http://localhost:5173/contents/Youkan/');
+
 if (!defined('CATALOG_API_BASE')) define('CATALOG_API_BASE', 'http://localhost:8002/contents/catalog-system/api');

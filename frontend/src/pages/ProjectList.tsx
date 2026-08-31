@@ -7,6 +7,7 @@ import Pagination from '../components/Pagination';
 import DataTable from '../components/DataTable';
 import { useMultiSortState } from '../components/DataTable';
 import type { DataTableColumn, SortState } from '../components/DataTable';
+import YoukanLinkButton from '../components/YoukanLinkButton';
 import type { Project, ProjectStatus } from '../types/project';
 import { deadlineTierClassName, deadlineTierIcon, getDeadlineTier } from '../lib/dateHighlight';
 
@@ -163,12 +164,13 @@ export default function ProjectList() {
     {
       key: 'actions',
       label: '',
-      width: 100,
+      width: 220,
       align: 'right',
       stopRowClick: true,
       render: p => (
         <>
-          <button onClick={() => navigate(`/projects/${p.id}`)} className="px-2.5 py-1 bg-slate-500 text-white rounded text-xs mr-1 hover:bg-slate-600">編集</button>
+          <YoukanLinkButton projectId={p.id} />
+          <button onClick={() => navigate(`/projects/${p.id}`)} className="px-2.5 py-1 bg-slate-500 text-white rounded text-xs mr-1 ml-1 hover:bg-slate-600">編集</button>
           <button
             onClick={() => handleDelete(p.id, p.name)}
             className="px-2.5 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700"
