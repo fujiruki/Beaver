@@ -16,8 +16,36 @@ interface Props {
   headers?: [string, string];
 }
 
+const halfWidthKana = '｡｢｣､･ｦｧｨｩｪｫｬｭｮｯｰｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝﾞﾟ';
+const fullWidthKana = '。「」、・ヲァィゥェォャュョッーアイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワン゛゜';
+const voicedHalfWidthKana = 'ｳｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾊﾋﾌﾍﾎ';
+const voicedFullWidthKana = 'ヴガギグゲゴザジズゼゾダヂヅデドバビブベボ';
+const semiVoicedHalfWidthKana = 'ﾊﾋﾌﾍﾎ';
+const semiVoicedFullWidthKana = 'パピプペポ';
+
+function toFullWidthKatakana(s: string): string {
+  let converted = '';
+  for (let i = 0; i < s.length; i++) {
+    const current = s[i];
+    const next = s[i + 1];
+    const voicedIndex = voicedHalfWidthKana.indexOf(current);
+    const semiVoicedIndex = semiVoicedHalfWidthKana.indexOf(current);
+    if (next === 'ﾞ' && voicedIndex >= 0) {
+      converted += voicedFullWidthKana[voicedIndex];
+      i++;
+    } else if (next === 'ﾟ' && semiVoicedIndex >= 0) {
+      converted += semiVoicedFullWidthKana[semiVoicedIndex];
+      i++;
+    } else {
+      const index = halfWidthKana.indexOf(current);
+      converted += index >= 0 ? fullWidthKana[index] : current;
+    }
+  }
+  return converted;
+}
+
 function normalize(s: string): string {
-  return s.toLowerCase()
+  return toFullWidthKatakana(s).toLowerCase()
     .replace(/[Ａ-Ｚａ-ｚ０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
     .replace(/[\u30A1-\u30F6]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x60));
 }

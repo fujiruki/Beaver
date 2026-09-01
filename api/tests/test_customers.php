@@ -587,6 +587,18 @@ runTest('T-22: R-0090 全角スペース区切りでもAND条件が機能する'
     );
 });
 
+// T-23: R-0135 ひらがな入力で半角カタカナ表記のname_kanaにマッチする
+runTest('T-23: R-0135 ひらがな入力で半角カタカナのname_kanaにヒットする', function () use ($pdo) {
+    $res = customerPost($pdo, ['name' => '門田組', 'name_kana' => 'ｶﾄﾞﾀｸﾞﾐ']);
+    assertEq(201, $res['code'], '事前登録');
+
+    $hits = customerSearch($pdo, 'かどた');
+    assertTrue(
+        in_array((int)$res['body']['id'], array_map(fn($r) => (int)$r['id'], $hits), true),
+        'ひらがな入力で半角カタカナのname_kanaにヒットする'
+    );
+});
+
 // ============================================================
 // 結果サマリ
 // ============================================================

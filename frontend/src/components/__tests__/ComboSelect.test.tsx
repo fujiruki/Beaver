@@ -102,3 +102,38 @@ describe('ComboSelect スペース区切りAND検索 (R-0115)', () => {
     expect(selected).toBe(1);
   });
 });
+
+describe('ComboSelect 半角カタカナ検索 (R-0135)', () => {
+  const kanaOptions: ComboOption[] = [
+    { id: 1, primaryText: '門田組', searchText: '門田組 ｶﾄﾞﾀｸﾞﾐ' },
+  ];
+
+  function renderKanaCombo() {
+    let selected: number | null = null;
+    render(<ComboSelect options={kanaOptions} value={null} onChange={id => { selected = id; }} placeholder="選択" />);
+    return {
+      input: screen.getByPlaceholderText('選択') as HTMLInputElement,
+      getSelected: () => selected,
+    };
+  }
+
+  it('半角カタカナのsearchTextがひらがな検索語にヒットする', () => {
+    const { input, getSelected } = renderKanaCombo();
+
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: 'かどた' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(getSelected()).toBe(1);
+  });
+
+  it('半角カタカナのsearchTextが全角カタカナ検索語にヒットする', () => {
+    const { input, getSelected } = renderKanaCombo();
+
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: 'カドタ' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(getSelected()).toBe(1);
+  });
+});

@@ -20,7 +20,8 @@ if (!function_exists('buildMultiColumnSearchClause')) {
         $andClauses = [];
         $params = [];
         foreach ($tokens as $token) {
-            $variants = array_unique([$token, mb_convert_kana($token, 'c'), mb_convert_kana($token, 'C')]);
+            $kata = mb_convert_kana($token, 'KVC');
+            $variants = array_unique([$token, $kata, mb_convert_kana($kata, 'c'), mb_convert_kana($kata, 'k')]);
             $orClauses = [];
             foreach ($columns as $col) {
                 foreach ($variants as $v) {
