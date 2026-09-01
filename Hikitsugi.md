@@ -1,6 +1,35 @@
 # 引き継ぎ資料 — Beaver
 
-**最終更新**: 2026-08-29
+**最終更新**: 2026-09-01
+
+---
+
+## 直近の作業（2026-09-01）: 新設`/readyoubou`コマンド初回実行、本番フィードバックid=39〜42対応・デプロイ済み
+
+### 概要
+今回のセッションでまず`.claude/commands/readyoubou.md`を新設（`docs/wiki/knowledge/readyoubou.md`の既存運用メモをコマンド化）。その後`/readyoubou`を実行し、`GET /admin/feedback`で新着4件（id=39〜42、id=36〜38は既に対応済み）を取得。3件（R-0133/R-0134/R-0136）を仕様化・Agent（worktree隔離）へTDD実装委譲・本番デプロイ済み。1件（R-0135）は再現手順未特定のため保留。
+
+### 実装した3件（いずれも実装・本番デプロイ済み）
+- **R-0133**: 「Youkanで見る」ボタンの文言を`Youkanで見る ↗`→`Youkan↗`へ短縮し、案件一覧の編集・削除ボタンとの折り返りを解消
+- **R-0134**: 改善要望を送るモーダルの表示位置バグ。R-0129でサイドバー(`<nav>`)に付与された`translate-x-0`/`-translate-x-full`が、値が恒等変換でもCSS上は`transform`ありとみなされ、子孫の`position: fixed`要素（FeedbackModalのオーバーレイ）のcontaining blockをnavに変えてしまっていた。`ReactDOM.createPortal`で`document.body`直下へ描画する形に修正
+- **R-0136**: 「原価から売値を設定」ボタンの二重丸めバグ。本体原価分と労務費分をそれぞれ独立に`roundToHundred()`で百円丸めしてから合算していたため、合算後に1回だけ丸める場合と結果がずれていた（例: 利益率30%・本体原価1230円・労務費340円で期待値2200円のところ2300円になっていた）。`calcCategorySellPrices()`として切り出し、合算後に1回だけ丸める形へ修正。藤田晴樹さんの承認を得て仕様化
+
+### 保留（次回セッション候補）
+- **R-0135**: 案件新規作成画面の得意先検索。コード上はR-0083で名前・かな・電話・住所・備考すべて検索対象になっているが、藤田晴樹さんから「読みがなの表記ゆれ（例: カドタグミ）も対象にして」と回答あり。実際に入力してヒットしなかった検索語がまだ特定できていないため、再現手順を確認してから着手する
+
+### 重要な技術的発見（次回同種の不具合に遭遇したら参照）
+CSSの`position: fixed`要素は、祖先要素に`transform`（`translateX(0)`のような恒等変換でも該当）・`filter`・`perspective`・`will-change: transform`等があると、その祖先がcontaining blockになりviewport基準の配置が崩れる。Tailwindの`translate-x-*`ユーティリティは常にこの`transform`を発生させるため、モーダル等のオーバーレイをtransform付き祖先（今回はレスポンシブ対応済みのサイドバーnav）の子孫に置くと発生する。`createPortal(..., document.body)`で回避するのが確実。
+
+### 実装体制・検証
+- 仕様: `docs/spec/R-0133_R-0134_ui_fixes.md`、`docs/spec/R-0136_profit_rate_double_rounding.md`
+- Agent（`general-purpose`、worktree隔離で並行実行、各TDD必須）に実装委譲 → 両方とも修正ループ0周で完了報告
+- 指揮役が両worktreeの差分を確認しメインリポジトリへ`git apply`で統合、vitest(68ファイル357件全PASS)・`npm run build`・`bash .claude/regression-suite.sh`（exit 0、vitest＋PHPテスト15本）を再実行して裏取り
+- コミット: `f56677d`（R-0133/R-0134）、`cb59443`（R-0136）
+- 本番デプロイ済み（`frontend/index.html`にWuunuスニペットは無かったためstash不要）、`/api/health`・アプリ200確認済み
+- 番頭AI（`BantoAI`）へデプロイ完了を通知済み
+
+### 未着手のまま残っている既知の積み残し（今回は対象外）
+`task.md`に「R-0119以降の時間入力が`voucher_lines`固定列へ反映されず、Youkan容量判定（本番稼働中）が工数を過小評価する」バグが「次セッション最優先」として記載されたまま残っている（詳細: `docs/requests.md` -11）。今回のreadyoubou対象（id=39〜42）とは無関係のため着手していない。
 
 ---
 
