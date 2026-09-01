@@ -2,9 +2,11 @@
 
 ## 進行中
 - [ ] R-0132: PWAインストール時のアイコン未設定（favicon/apple-touch-icon/manifest.json不足）。/readyoubouで本番id=36を確認。素材（ロゴ画像）待ちのため未着手、次回セッション候補
-- [ ] R-0137（要確認）: 上部の保存ボタンが隠れる。/readyoubouで本番id=44を確認。R-0131の修正はコード上維持されており原因未特定（PWAキャッシュ／画面固有の固定要素／iOS Safari実機固有の見え方のいずれかを疑うが再現手順待ち）。今回は着手せず。`docs/requests.md`参照
 
 ## 完了（本セッション）
+- [x] R-0138: 段取りボードの案件名・得意先名を2列表示＋列幅ドラッグ調整＋幅記憶。/readyoubouで本番id=46を確認、藤田晴樹さん確認済み。仕様: `docs/spec/R-0138_dandori_label_columns.md`。Agent（worktree）にTDD委譲、指揮役が再実行して裏取り（vitest全PASS・build成功）
+- [x] R-0139: PC表示時のナビゲーションをサイドバーから上部ヘッダーのタブへ変更＋アイコン追加。/readyoubouで本番id=45を確認、藤田晴樹さん確認済み。仕様: `docs/spec/R-0139_pc_header_tab_nav.md`。実装過程で発見した既存バグ（モバイルヘッダーのインラインstyleがTailwindの`md:hidden`を上書きしPC幅でも表示され続ける）もあわせて修正。指揮役が実ブラウザ（1920px幅）で見た目確認・vitest全PASS・build成功・回帰スイート🔵青を確認
+- [x] R-0137: 上部の保存ボタンが隠れる。本番id=44を確認。R-0139の実装過程で真因判明（モバイルヘッダーのインラインstyleがTailwindのレスポンシブ非表示を上書きしPC幅でも表示され続けていた）、R-0139の修正で解消
 - [x] R-0135: 得意先検索が半角カタカナ表記の読みがなにヒットしない（本番id=41・43、原因確定・藤田晴樹さん承認済み）。仕様: `docs/spec/R-0135_kana_search_hankaku_katakana.md`。実装はCodex（codex:codex-rescue、worktree隔離）にTDD委譲、指揮役が再実行して裏取り（vitest全PASS・PHPテスト24/24・build成功・回帰スイート🔵青）。コミット`4be2522`→本番デプロイ済み。本番DB直接確認でid=50以外の半角カタカナ表記の得意先（id=62, 199, 403, 707等）も検索ヒットするようになったことを確認済み
 - [x] R-0133: 「Youkanで見る」ボタンの表示改善（文言短縮・折り返り解消）。/readyoubouで本番id=39を確認。仕様: `docs/spec/R-0133_R-0134_ui_fixes.md`。Agent（worktree）へ委譲・指揮役が再実行して裏取り（vitest全PASS、build成功）
 - [x] R-0134: 改善要望を送るモーダルの表示位置バグ（サイドバーのCSS transformがFeedbackModalのfixedオーバーレイのcontaining blockになっていた）。/readyoubouで本番id=40を確認。`createPortal`でdocument.body直下へ描画する形に修正。仕様: `docs/spec/R-0133_R-0134_ui_fixes.md`。コミット`f56677d`→本番デプロイ済み

@@ -49,7 +49,9 @@ describe('R-0109: AppLayoutのログイン情報表示・ログアウト導線',
 
     renderWithQueryClient();
 
-    expect(await screen.findByText('藤田晴樹')).toBeTruthy();
+    // R-0139: PCヘッダーとモバイル用サイドバーの両方に表示されるため複数マッチになる
+    const names = await screen.findAllByText('藤田晴樹');
+    expect(names.length).toBeGreaterThan(0);
   });
 
   it('ログアウトボタンを押すとauth-hubのログアウト画面へ遷移する', async () => {
@@ -58,9 +60,9 @@ describe('R-0109: AppLayoutのログイン情報表示・ログアウト導線',
     ));
 
     renderWithQueryClient();
-    await screen.findByText('藤田晴樹');
+    await screen.findAllByText('藤田晴樹');
 
-    fireEvent.click(screen.getByText('ログアウト'));
+    fireEvent.click(screen.getAllByText('ログアウト')[0]);
 
     await waitFor(() => expect(window.location.href).toBe(
       'https://door-fujita.com/contents/auth/logout?redirect=' + encodeURIComponent('https://door-fujita.com/contents/Beaver/customers'),

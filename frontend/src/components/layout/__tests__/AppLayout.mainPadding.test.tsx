@@ -35,10 +35,10 @@ describe('R-0131: mainのpadding-topがTailwindクラスに委譲されている
     expect(main.style.paddingTop).toBe('');
   });
 
-  it('mainのclassNameにpt-14とmd:pt-6が含まれる', () => {
+  it('mainのclassNameにpt-14とmd:pt-0が含まれる', () => {
     const { container } = renderWithQueryClient();
     const main = container.querySelector('main') as HTMLElement;
     expect(main.className).toContain('pt-14');
-    expect(main.className).toContain('md:pt-6');
+    expect(main.className).toContain('md:pt-0');
   });
 });

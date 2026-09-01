@@ -44,6 +44,7 @@ describe('AppLayout build time', () => {
       </QueryClientProvider>,
     );
 
-    expect(screen.getByText('ビルド: 2026-08-07 09:00')).toBeTruthy();
+    // R-0139: PCヘッダーとモバイル用サイドバーの両方に表示されるため複数マッチになる
+    expect(screen.getAllByText('ビルド: 2026-08-07 09:00').length).toBeGreaterThan(0);
   });
 });

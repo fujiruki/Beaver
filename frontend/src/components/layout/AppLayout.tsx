@@ -34,16 +34,20 @@ function formatBuildTime(buildTime: Date): string {
 }
 
 const navItems = [
-  { to: '/',           label: 'ダッシュボード' },
-  { to: '/customers',  label: '得意先' },
-  { to: '/projects',   label: '案件' },
-  { to: '/dandori',    label: '段取り' },
-  { to: '/vouchers',   label: '伝票' },
-  { to: '/tategu',     label: '建具台帳' },
-  { to: '/invoices',   label: '請求' },
-  { to: '/settings/app', label: 'アプリ設定' },
-  { to: '/help',       label: '? ヘルプ' },
+  { to: '/',           icon: '📊', label: 'ダッシュボード' },
+  { to: '/customers',  icon: '👥', label: '得意先' },
+  { to: '/projects',   icon: '📁', label: '案件' },
+  { to: '/dandori',    icon: '📅', label: '段取り' },
+  { to: '/vouchers',   icon: '🧾', label: '伝票' },
+  { to: '/tategu',     icon: '🚪', label: '建具台帳' },
+  { to: '/invoices',   icon: '💰', label: '請求' },
+  { to: '/settings/app', icon: '⚙️', label: 'アプリ設定' },
+  { to: '/help',       icon: '❓', label: 'ヘルプ' },
 ];
+
+function isNavItemActive(pathname: string, item: { to: string }): boolean {
+  return item.to === '/' ? pathname === '/' : pathname.startsWith(item.to);
+}
 
 export default function AppLayout() {
   const { settings } = useAppSettings();
@@ -60,18 +64,68 @@ export default function AppLayout() {
 
   useEffect(() => {
     // R-0112: タブ名が「frontend」等になり分かりづらい問題への対応
-    const current = navItems.find(item => item.to === '/' ? location.pathname === '/' : location.pathname.startsWith(item.to));
+    const current = navItems.find(item => isNavItemActive(location.pathname, item));
     document.title = current ? `${current.label} - Beaver` : 'Beaver';
   }, [location.pathname]);
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', fontFamily: 'sans-serif', fontSize: settings.fontSize }}>
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', fontFamily: 'sans-serif', fontSize: settings.fontSize }}>
+      {/* PC向けヘッダー（R-0139） */}
+      <header
+        className="hidden md:flex"
+        style={{
+          alignItems: 'center', gap: 20,
+          padding: '0 24px', height: 56, flexShrink: 0,
+          background: '#1e293b', color: '#f1f5f9',
+        }}
+      >
+        <span style={{ fontWeight: 'bold', fontSize: 14, color: '#94a3b8' }}>Beaver</span>
+        <nav style={{ display: 'flex', gap: 4 }}>
+          {navItems.map((item) => {
+            const active = isNavItemActive(location.pathname, item);
+            return (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.to === '/'}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  padding: '8px 12px', borderRadius: 6,
+                  color: active ? '#fff' : '#cbd5e1',
+                  background: active ? '#334155' : 'transparent',
+                  textDecoration: 'none', fontSize: 13, whiteSpace: 'nowrap',
+                }}
+              >
+                {item.icon} {item.label}
+              </NavLink>
+            );
+          })}
+        </nav>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 14 }}>
+          {me && (
+            <>
+              <span style={{ fontSize: 13, color: '#cbd5e1' }}>{me.name}</span>
+              <button
+                onClick={handleLogout}
+                style={{ background: 'transparent', border: 'none', color: '#94a3b8', fontSize: 12, cursor: 'pointer', padding: 0 }}
+              >
+                ログアウト
+              </button>
+            </>
+          )}
+          <FeedbackModal />
+          <span style={{ fontSize: 11, color: getBuildTimeColor(buildTime, now) }}>
+            ビルド: {formatBuildTime(buildTime)}
+          </span>
+        </div>
+      </header>
+
       {/* スマホ向けヘッダーバー */}
       <div
-        className="md:hidden"
+        className="flex md:hidden"
         style={{
           position: 'fixed', top: 0, left: 0, right: 0, zIndex: 30,
-          display: 'flex', alignItems: 'center', gap: 12,
+          alignItems: 'center', gap: 12,
           padding: '10px 16px', background: '#1e293b', color: '#f1f5f9',
         }}
       >
@@ -95,75 +149,76 @@ export default function AppLayout() {
         />
       )}
 
-      {/* サイドバー */}
-      <nav
-        className={`fixed inset-y-0 left-0 z-50 md:static md:z-auto md:translate-x-0 ${navOpen ? 'translate-x-0' : '-translate-x-full'}`}
-        style={{
-          width: 180,
-          background: '#1e293b',
-          color: '#f1f5f9',
-          flexShrink: 0,
-          padding: '16px 0',
-          display: 'flex',
-          flexDirection: 'column',
-          transition: 'transform 0.2s',
-        }}
-      >
-        <div style={{ padding: '8px 16px 20px', fontWeight: 'bold', fontSize: 14, color: '#94a3b8' }}>
-          Beaver
-        </div>
-        {navItems.map(({ to, label }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={to === '/'}
-            onClick={() => setNavOpen(false)}
-            style={({ isActive }) => ({
-              display: 'block',
-              padding: '10px 16px',
-              color: isActive ? '#fff' : '#cbd5e1',
-              background: isActive ? '#334155' : 'transparent',
-              textDecoration: 'none',
-              fontSize: 14,
-            })}
-          >
-            {label}
-          </NavLink>
-        ))}
+      <div style={{ display: 'flex', flex: 1 }}>
+        {/* サイドバー（モバイル専用、R-0139でPC表示時は非表示） */}
+        <nav
+          className={`fixed inset-y-0 left-0 z-50 flex md:hidden ${navOpen ? 'translate-x-0' : '-translate-x-full'}`}
+          style={{
+            width: 180,
+            background: '#1e293b',
+            color: '#f1f5f9',
+            flexShrink: 0,
+            padding: '16px 0',
+            flexDirection: 'column',
+            transition: 'transform 0.2s',
+          }}
+        >
+          <div style={{ padding: '8px 16px 20px', fontWeight: 'bold', fontSize: 14, color: '#94a3b8' }}>
+            Beaver
+          </div>
+          {navItems.map(({ to, label }) => (
+            <NavLink
+              key={to}
+              to={to}
+              end={to === '/'}
+              onClick={() => setNavOpen(false)}
+              style={({ isActive }) => ({
+                display: 'block',
+                padding: '10px 16px',
+                color: isActive ? '#fff' : '#cbd5e1',
+                background: isActive ? '#334155' : 'transparent',
+                textDecoration: 'none',
+                fontSize: 14,
+              })}
+            >
+              {label}
+            </NavLink>
+          ))}
 
-        <div style={{ marginTop: 'auto' }}>
-          {me && (
-            <div style={{ padding: '10px 16px 0', fontSize: 13, color: '#cbd5e1' }}>
-              <div>{me.name}</div>
-              <button
-                onClick={handleLogout}
-                style={{
-                  marginTop: 4,
-                  background: 'transparent',
-                  border: 'none',
-                  color: '#94a3b8',
-                  fontSize: 12,
-                  cursor: 'pointer',
-                  padding: 0,
-                }}
-              >
-                ログアウト
-              </button>
+          <div style={{ marginTop: 'auto' }}>
+            {me && (
+              <div style={{ padding: '10px 16px 0', fontSize: 13, color: '#cbd5e1' }}>
+                <div>{me.name}</div>
+                <button
+                  onClick={handleLogout}
+                  style={{
+                    marginTop: 4,
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#94a3b8',
+                    fontSize: 12,
+                    cursor: 'pointer',
+                    padding: 0,
+                  }}
+                >
+                  ログアウト
+                </button>
+              </div>
+            )}
+            <div style={{ padding: '16px 16px 0' }}>
+              <FeedbackModal />
             </div>
-          )}
-          <div style={{ padding: '16px 16px 0' }}>
-            <FeedbackModal />
+            <div style={{ padding: '10px 16px 0', fontSize: 11, color: getBuildTimeColor(buildTime, now) }}>
+              ビルド: {formatBuildTime(buildTime)}
+            </div>
           </div>
-          <div style={{ padding: '10px 16px 0', fontSize: 11, color: getBuildTimeColor(buildTime, now) }}>
-            ビルド: {formatBuildTime(buildTime)}
-          </div>
-        </div>
-      </nav>
+        </nav>
 
-      {/* メインコンテンツ */}
-      <main className="pt-14 md:pt-6" style={{ flex: 1, minWidth: 0, paddingLeft: 24, paddingRight: 24, paddingBottom: 24, background: '#f8fafc' }}>
-        <Outlet />
-      </main>
+        {/* メインコンテンツ */}
+        <main className="pt-14 md:pt-0" style={{ flex: 1, minWidth: 0, paddingLeft: 24, paddingRight: 24, paddingBottom: 24, background: '#f8fafc' }}>
+          <Outlet />
+        </main>
+      </div>
     </div>
   );
 }
