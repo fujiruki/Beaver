@@ -10,6 +10,50 @@ type Props = {
   categories: AggregationCategoryMaster[];
 };
 
+/**
+ * 動的モードの売値計算: money型区分ごとに「原価＋mergeされる労務費」を合算してから
+ * 利益率をのせて一度だけ丸める（原価分・労務費分を個別に丸めてから加算しない）
+ */
+export function calcCategorySellPrices(
+  costs: LineCategoryValue[],
+  categories: AggregationCategoryMaster[],
+  laborRate: number,
+  profitRate: number,
+): LineCategoryValue[] {
+  const moneyCats = categories.filter(c => c.measure_type === 'money');
+  const timeCats  = categories.filter(c => c.measure_type === 'time');
+
+  const totalCosts = new Map<string, number>();
+  for (const cat of moneyCats) {
+    const costVal = costs.find(c => c.category_code === cat.code)?.value ?? 0;
+    if (costVal === 0) continue;
+    totalCosts.set(cat.code, (totalCosts.get(cat.code) ?? 0) + costVal);
+  }
+  for (const cat of timeCats) {
+    const hours = costs.find(c => c.category_code === cat.code)?.value ?? 0;
+    if (hours === 0) continue;
+    const mergeCode = (cat as any).merge_into_price_code as string | null;
+    if (!mergeCode) continue;
+    const laborAmt = hours * laborRate;
+    totalCosts.set(mergeCode, (totalCosts.get(mergeCode) ?? 0) + laborAmt);
+  }
+
+  const newPrices: LineCategoryValue[] = [];
+  for (const [code, totalCost] of totalCosts) {
+    const cat = categories.find(c => c.code === code);
+    if (!cat) continue;
+    const sellVal = roundToHundred(profitRate >= 1 ? totalCost : Math.ceil(totalCost / (1 - profitRate)));
+    newPrices.push({
+      category_code: cat.code,
+      category_name: cat.name,
+      measure_type: 'money',
+      value: sellVal,
+      sort_order: cat.sort_order,
+    });
+  }
+  return newPrices;
+}
+
 export default function ProfitRateBar({ categories }: Props) {
   const { profitRate, setProfitRate } = useVoucherStore();
   const { getValues, setValue } = useFormContext<VoucherFormValues>();
@@ -25,50 +69,7 @@ export default function ProfitRateBar({ categories }: Props) {
 
       if (costs.length > 0) {
         // 動的モード: costs[] を元に各 money型区分の売値を計算
-        const moneyCats = categories.filter(c => c.measure_type === 'money');
-        const timeCats  = categories.filter(c => c.measure_type === 'time');
-
-        const newPrices: LineCategoryValue[] = [];
-
-        // money型原価 → 利益率で売値計算
-        for (const cat of moneyCats) {
-          const costVal = costs.find(c => c.category_code === cat.code)?.value ?? 0;
-          if (costVal === 0) continue;
-          const sellVal = roundToHundred(profitRate >= 1 ? costVal : Math.ceil(costVal / (1 - profitRate)));
-          newPrices.push({
-            category_code: cat.code,
-            category_name: cat.name,
-            measure_type: 'money',
-            value: sellVal,
-            sort_order: cat.sort_order,
-          });
-        }
-
-        // time型原価 → 労務費を merge_into_price_code の区分に加算
-        for (const cat of timeCats) {
-          const hours = costs.find(c => c.category_code === cat.code)?.value ?? 0;
-          if (hours === 0) continue;
-          const laborAmt = hours * laborRate;
-          const laborSell = roundToHundred(profitRate >= 1 ? laborAmt : Math.ceil(laborAmt / (1 - profitRate)));
-          const mergeCode = (cat as any).merge_into_price_code as string | null;
-          if (mergeCode) {
-            const existing = newPrices.find(p => p.category_code === mergeCode);
-            if (existing) {
-              existing.value += laborSell;
-            } else {
-              const mergeCat = categories.find(c => c.code === mergeCode);
-              if (mergeCat) {
-                newPrices.push({
-                  category_code: mergeCode,
-                  category_name: mergeCat.name,
-                  measure_type: 'money',
-                  value: laborSell,
-                  sort_order: mergeCat.sort_order,
-                });
-              }
-            }
-          }
-        }
+        const newPrices = calcCategorySellPrices(costs, categories, laborRate, profitRate);
 
         if (newPrices.length > 0) {
           newPrices.sort((a, b) => a.sort_order - b.sort_order);
