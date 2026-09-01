@@ -4,32 +4,40 @@
 
 ---
 
-## 直近の作業（2026-09-01）: 新設`/readyoubou`コマンド初回実行、本番フィードバックid=39〜42対応・デプロイ済み
+## 直近の作業（2026-09-01）: 新設`/readyoubou`コマンドを2回実行、本番フィードバックid=39〜44対応・デプロイ済み
 
 ### 概要
-今回のセッションでまず`.claude/commands/readyoubou.md`を新設（`docs/wiki/knowledge/readyoubou.md`の既存運用メモをコマンド化）。その後`/readyoubou`を実行し、`GET /admin/feedback`で新着4件（id=39〜42、id=36〜38は既に対応済み）を取得。3件（R-0133/R-0134/R-0136）を仕様化・Agent（worktree隔離）へTDD実装委譲・本番デプロイ済み。1件（R-0135）は再現手順未特定のため保留。
+今回のセッションでまず`.claude/commands/readyoubou.md`を新設（`docs/wiki/knowledge/readyoubou.md`の既存運用メモをコマンド化）。その後`/readyoubou`を2回実行:
+- 1回目: `GET /admin/feedback`で新着4件（id=39〜42）を取得。3件（R-0133/R-0134/R-0136）を仕様化・実装・本番デプロイ済み。1件（R-0135）は再現手順未特定のため保留
+- 2回目: 新着2件（id=43・44）を取得。id=43がR-0135の具体的な再現例となり原因確定・実装・本番デプロイ済み。id=44（R-0137）は再現手順未特定のため保留
 
-### 実装した3件（いずれも実装・本番デプロイ済み）
+途中から藤田晴樹さんの指示でトークン節約のためCodex（`codex:codex-rescue`）への実装委譲に切り替えた（R-0135はCodexが実装、約31kトークンで完了）。
+
+### 実装した4件（いずれも実装・本番デプロイ済み）
 - **R-0133**: 「Youkanで見る」ボタンの文言を`Youkanで見る ↗`→`Youkan↗`へ短縮し、案件一覧の編集・削除ボタンとの折り返りを解消
 - **R-0134**: 改善要望を送るモーダルの表示位置バグ。R-0129でサイドバー(`<nav>`)に付与された`translate-x-0`/`-translate-x-full`が、値が恒等変換でもCSS上は`transform`ありとみなされ、子孫の`position: fixed`要素（FeedbackModalのオーバーレイ）のcontaining blockをnavに変えてしまっていた。`ReactDOM.createPortal`で`document.body`直下へ描画する形に修正
 - **R-0136**: 「原価から売値を設定」ボタンの二重丸めバグ。本体原価分と労務費分をそれぞれ独立に`roundToHundred()`で百円丸めしてから合算していたため、合算後に1回だけ丸める場合と結果がずれていた（例: 利益率30%・本体原価1230円・労務費340円で期待値2200円のところ2300円になっていた）。`calcCategorySellPrices()`として切り出し、合算後に1回だけ丸める形へ修正。藤田晴樹さんの承認を得て仕様化
+- **R-0135**: 得意先検索が半角カタカナ表記の読みがなにヒットしないバグ。指揮役が本番DBを読み取り専用SSHで直接確認し、得意先id=50の`name_kana`が半角カタカナ「ｶﾄﾞﾀｸﾞﾐ」で登録されていることを特定（id=41・id=43は同一原因のため統合）。バックエンド`search_helpers.php`・フロントエンド`ComboSelect.tsx`いずれも半角カタカナを正規化対象にしていなかったため、`mb_convert_kana($token,'KVC')`を基準にひらがな・全角カタカナ・半角カタカナの3バリアントを生成する方式へ修正。本番DBには他にも半角カタカナ表記の得意先（id=62, 199, 403, 707等）が複数あり、それらも合わせて検索可能になったことを確認済み
 
 ### 保留（次回セッション候補）
-- **R-0135**: 案件新規作成画面の得意先検索。コード上はR-0083で名前・かな・電話・住所・備考すべて検索対象になっているが、藤田晴樹さんから「読みがなの表記ゆれ（例: カドタグミ）も対象にして」と回答あり。実際に入力してヒットしなかった検索語がまだ特定できていないため、再現手順を確認してから着手する
+- **R-0137**: 「上部の保存ボタンが隠れる」（本番id=44、案件一覧画面）。指揮役がコードを確認したところR-0131の修正（`AppLayout.tsx`の`<main className="pt-14 md:pt-6">`）は現在も維持されておりリグレッションは見当たらない。PWA/ブラウザキャッシュ、画面固有の固定要素、iOS Safari実機固有の見え方（`viewport-fit=cover`・`safe-area-inset`未対応）のいずれかを疑っているが再現手順が無く未着手。次回、発生画面・ブラウザ直接orPWA・スクリーンショットを藤田晴樹さんに確認してから着手する
 
 ### 重要な技術的発見（次回同種の不具合に遭遇したら参照）
-CSSの`position: fixed`要素は、祖先要素に`transform`（`translateX(0)`のような恒等変換でも該当）・`filter`・`perspective`・`will-change: transform`等があると、その祖先がcontaining blockになりviewport基準の配置が崩れる。Tailwindの`translate-x-*`ユーティリティは常にこの`transform`を発生させるため、モーダル等のオーバーレイをtransform付き祖先（今回はレスポンシブ対応済みのサイドバーnav）の子孫に置くと発生する。`createPortal(..., document.body)`で回避するのが確実。
+- CSSの`position: fixed`要素は、祖先要素に`transform`（`translateX(0)`のような恒等変換でも該当）・`filter`・`perspective`・`will-change: transform`等があると、その祖先がcontaining blockになりviewport基準の配置が崩れる。Tailwindの`translate-x-*`ユーティリティは常にこの`transform`を発生させるため、モーダル等のオーバーレイをtransform付き祖先（今回はレスポンシブ対応済みのサイドバーnav）の子孫に置くと発生する。`createPortal(..., document.body)`で回避するのが確実
+- Access同期の`name_kana`には半角カタカナ表記が混在している（本番DBで複数件確認済み）。PHPの`mb_convert_kana()`は`'c'`/`'C'`だけでは半角カタカナを扱えない。`mb_convert_kana($token, 'KVC')`で任意のかな表記（ひらがな/全角カタカナ/半角カタカナ）を濁点結合込みの全角カタカナへ正規化できる。JS側（`normalize()`等）には同等の組み込み関数が無いため、半角カタカナ→全角カタカナの変換テーブル＋濁点結合ロジックを自前で用意する必要がある
+- 本番DBの直接調査（`GET /admin/feedback`の`X-Admin-Token`とは別に、`upload.ps1`と同じSSH鍵で`sqlite3`を読み取り専用実行）は、フィードバック原文だけでは特定できない実データ起因のバグ（表記ゆれ等）の根本原因を掴むのに有効。書き込みは行っていない
 
 ### 実装体制・検証
-- 仕様: `docs/spec/R-0133_R-0134_ui_fixes.md`、`docs/spec/R-0136_profit_rate_double_rounding.md`
-- Agent（`general-purpose`、worktree隔離で並行実行、各TDD必須）に実装委譲 → 両方とも修正ループ0周で完了報告
-- 指揮役が両worktreeの差分を確認しメインリポジトリへ`git apply`で統合、vitest(68ファイル357件全PASS)・`npm run build`・`bash .claude/regression-suite.sh`（exit 0、vitest＋PHPテスト15本）を再実行して裏取り
-- コミット: `f56677d`（R-0133/R-0134）、`cb59443`（R-0136）
-- 本番デプロイ済み（`frontend/index.html`にWuunuスニペットは無かったためstash不要）、`/api/health`・アプリ200確認済み
-- 番頭AI（`BantoAI`）へデプロイ完了を通知済み
+- 仕様: `docs/spec/R-0133_R-0134_ui_fixes.md`、`docs/spec/R-0136_profit_rate_double_rounding.md`、`docs/spec/R-0135_kana_search_hankaku_katakana.md`
+- R-0133/R-0134/R-0136: Agent（`general-purpose`、worktree隔離で並行実行、各TDD必須）に実装委譲 → 両方とも修正ループ0周で完了報告
+- R-0135: Codex（`codex:codex-rescue`、worktree隔離）にTDD実装委譲（トークン節約のため藤田晴樹さんの指示で切り替え）→ 修正ループ0周で完了報告
+- いずれも指揮役がworktreeの差分を確認しメインリポジトリへ`git apply`で統合、vitest・`npm run build`・`bash .claude/regression-suite.sh`（vitest全PASS＋PHPテスト15本、exit 0）を再実行して裏取り
+- コミット: `f56677d`（R-0133/R-0134）、`cb59443`（R-0136）、`4be2522`（R-0135）
+- 本番デプロイ2回済み（`frontend/index.html`にWuunuスニペットは無かったためstash不要）、いずれも`/api/health`・アプリ200確認済み
+- 番頭AI（`BantoAI`）へデプロイ完了を2回通知済み
 
 ### 未着手のまま残っている既知の積み残し（今回は対象外）
-`task.md`に「R-0119以降の時間入力が`voucher_lines`固定列へ反映されず、Youkan容量判定（本番稼働中）が工数を過小評価する」バグが「次セッション最優先」として記載されたまま残っている（詳細: `docs/requests.md` -11）。今回のreadyoubou対象（id=39〜42）とは無関係のため着手していない。
+`task.md`に「R-0119以降の時間入力が`voucher_lines`固定列へ反映されず、Youkan容量判定（本番稼働中）が工数を過小評価する」バグが「次セッション最優先」として記載されたまま残っている（詳細: `docs/requests.md` -11）。今回のreadyoubou対象（id=39〜44）とは無関係のため着手していない。
 
 ---
 
