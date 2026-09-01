@@ -2,12 +2,13 @@
 
 ## 進行中
 - [ ] R-0132: PWAインストール時のアイコン未設定（favicon/apple-touch-icon/manifest.json不足）。/readyoubouで本番id=36を確認。素材（ロゴ画像）待ちのため未着手、次回セッション候補
-- [ ] R-0133: 「Youkanで見る」ボタンの表示改善（文言短縮・折り返り解消）。/readyoubouで本番id=39を確認。仕様: `docs/spec/R-0133_R-0134_ui_fixes.md`。Agentへ委譲
-- [ ] R-0134: 改善要望を送るモーダルの表示位置バグ（サイドバーのtransformがcontaining blockになっている）。/readyoubouで本番id=40を確認。仕様: `docs/spec/R-0133_R-0134_ui_fixes.md`。Agentへ委譲
-- [ ] R-0136: 「原価から売値を設定」ボタンの二重丸めバグ。/readyoubouで本番id=42を確認、藤田晴樹さん承認済み。仕様: `docs/spec/R-0136_profit_rate_double_rounding.md`。Agentへ委譲
 - [ ] R-0135（要確認）: 案件新規作成画面の得意先検索、藤田晴樹さんから「読みがなの表記ゆれ（カドタグミ等）も対象にして」と回答あり。具体的な再現手順（実際に入力した検索語）が未特定のため今回は着手せず。`docs/requests.md`参照
 
 ## 完了（本セッション）
+- [x] R-0133: 「Youkanで見る」ボタンの表示改善（文言短縮・折り返り解消）。/readyoubouで本番id=39を確認。仕様: `docs/spec/R-0133_R-0134_ui_fixes.md`。Agent（worktree）へ委譲・指揮役が再実行して裏取り（vitest全PASS、build成功）
+- [x] R-0134: 改善要望を送るモーダルの表示位置バグ（サイドバーのCSS transformがFeedbackModalのfixedオーバーレイのcontaining blockになっていた）。/readyoubouで本番id=40を確認。`createPortal`でdocument.body直下へ描画する形に修正。仕様: `docs/spec/R-0133_R-0134_ui_fixes.md`。コミット`f56677d`→本番デプロイ済み
+- [x] R-0136: 「原価から売値を設定」ボタンの二重丸めバグ。/readyoubouで本番id=42を確認、藤田晴樹さん承認済み。本体原価＋mergeされる労務費を合算後に1回だけ丸める形へ修正（`calcCategorySellPrices()`）。TDD（Red→Green）で固定。仕様: `docs/spec/R-0136_profit_rate_double_rounding.md`。コミット`cb59443`→本番デプロイ済み
+- [x] R-0133/R-0134/R-0136 共通: 回帰スイート🔵青（vitest全PASS＋PHPテスト15本）、`upload.ps1`で本番デプロイ、`/api/health`・アプリ本体とも200確認済み（2026-09-01）
 - [x] R-0131【緊急】: スマホ表示で上部のボタン・行がヘッダーに隠れる（R-0129リグレッション）。/readyoubouで本番id=37・38を確認、fixerへ委譲・指揮役が再実行して裏取り（vitest 67ファイル354件、build成功、モバイル/デスクトップ双方をChrome DevTools Protocolエミュレーションで目視確認）。コミット`a055a31`→push→本番デプロイ済み（DB事前バックアップ`database_20260831_1612.sqlite`）、`/api/health`・アプリとも200確認済み
 - [x] R-0130: 案件編集画面・案件一覧に「Youkanで見る」ボタン。仕様: `docs/spec/R-0130_youkan_link_button.md`。Youkan側新規API（R-0160、Youkanリポジトリ `docs/SPEC/13_Beaver連携プロジェクトURL.md`）と合わせて実装・検証完了（PHPテスト9/9、vitest 66ファイル352件、build成功、回帰スイートexit 0）。未コミット
 - [x] R-0129: ダッシュボード・案件一覧・得意先一覧のスマホ最適化（レスポンシブ対応）。仕様: `docs/spec/R-0129_mobile_responsive_ui.md`、設計議事録: `docs/kaigi/2026-08-31-スマホ最適化UI設計.md`。実装・テスト・build・回帰スイート確認済み、コミット`ec1d290`
