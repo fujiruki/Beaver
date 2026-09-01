@@ -50,6 +50,7 @@
 | [R-0131_mobile_header_padding_regression.md](spec/R-0131_mobile_header_padding_regression.md) | 【緊急】スマホ表示で上部のボタン・行がヘッダーに隠れる（R-0129リグレッション修正） | 2026-08-31 |
 | [R-0133_R-0134_ui_fixes.md](spec/R-0133_R-0134_ui_fixes.md) | Youkanボタン文言短縮、改善要望モーダルのtransform containing block修正 | 2026-09-01 |
 | [R-0136_profit_rate_double_rounding.md](spec/R-0136_profit_rate_double_rounding.md) | 「原価から売値を設定」ボタンの二重丸めバグ修正 | 2026-09-01 |
+| [R-0135_kana_search_hankaku_katakana.md](spec/R-0135_kana_search_hankaku_katakana.md) | 得意先検索が半角カタカナ表記の読みがなにヒットしない問題の修正 | 2026-09-01 |
 
 ---
 
