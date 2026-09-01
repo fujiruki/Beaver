@@ -33,7 +33,7 @@ export default function YoukanLinkButton({ projectId }: { projectId: number }) {
         disabled={loading}
         className="px-2.5 py-1 bg-white border border-slate-300 text-slate-600 rounded text-xs hover:bg-slate-50 disabled:opacity-50"
       >
-        {loading ? '確認中...' : 'Youkanで見る ↗'}
+        {loading ? '確認中...' : 'Youkan↗'}
       </button>
       {error && <span className="ml-2 text-xs text-red-600">{error}</span>}
     </span>

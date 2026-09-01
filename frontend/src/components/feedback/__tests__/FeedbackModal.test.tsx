@@ -13,6 +13,17 @@ function renderModal() {
   );
 }
 
+function renderModalInsideNav() {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+  return render(
+    <QueryClientProvider client={qc}>
+      <nav data-testid="nav">
+        <FeedbackModal />
+      </nav>
+    </QueryClientProvider>,
+  );
+}
+
 function makeImageFile(name: string): File {
   return new File(['dummy-image-bytes'], name, { type: 'image/png' });
 }
@@ -172,6 +183,19 @@ describe('FeedbackModal (R-0080)', () => {
     });
 
     expect(await screen.findAllByRole('img')).toHaveLength(1);
+  });
+
+  it('nav要素内に配置されていても、モーダルのオーバーレイはdocument.body直下に描画される（R-0134）', async () => {
+    const user = userEvent.setup();
+    renderModalInsideNav();
+
+    const nav = screen.getByTestId('nav');
+    await user.click(screen.getByRole('button', { name: '改善要望を送る' }));
+
+    const dialog = screen.getByRole('dialog');
+    expect(nav.contains(dialog)).toBe(false);
+    expect(dialog.closest('[data-testid="nav"]')).toBeNull();
+    expect(document.body.contains(dialog)).toBe(true);
   });
 
   it('モーダルを開くと本文入力欄に自動でフォーカスが当たる（R-0094）', async () => {

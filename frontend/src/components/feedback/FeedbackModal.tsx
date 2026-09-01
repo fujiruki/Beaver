@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useSubmitFeedback } from '../../api/feedback';
 
 const MAX_IMAGES = 5;
@@ -129,13 +130,14 @@ export default function FeedbackModal() {
         改善要望を送る
       </button>
 
-      {showCompleted && (
+      {showCompleted && createPortal(
         <div className="fixed bottom-4 right-4 z-50 px-4 py-3 bg-green-50 border border-green-300 text-green-700 text-sm rounded shadow">
           送信しました。ご協力ありがとうございます。
-        </div>
+        </div>,
+        document.body,
       )}
 
-      {isOpen && (
+      {isOpen && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-6">
           <div role="dialog" aria-modal="true" aria-label="改善要望を送る" className="bg-white rounded-lg shadow-xl w-full max-w-lg p-6">
             <h2 className="text-base font-bold text-slate-900 mb-4">改善要望を送る</h2>
@@ -228,7 +230,8 @@ export default function FeedbackModal() {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </>
   );

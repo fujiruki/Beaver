@@ -48,6 +48,8 @@
 | [R-0129_mobile_responsive_ui.md](spec/R-0129_mobile_responsive_ui.md) | ダッシュボード・案件一覧・得意先一覧のスマホ最適化（レスポンシブ対応） | 2026-08-31 |
 | [R-0130_youkan_link_button.md](spec/R-0130_youkan_link_button.md) | 案件編集画面・案件一覧に「Youkanで見る」ボタン（Youkan側新規API前提） | 2026-08-31 |
 | [R-0131_mobile_header_padding_regression.md](spec/R-0131_mobile_header_padding_regression.md) | 【緊急】スマホ表示で上部のボタン・行がヘッダーに隠れる（R-0129リグレッション修正） | 2026-08-31 |
+| [R-0133_R-0134_ui_fixes.md](spec/R-0133_R-0134_ui_fixes.md) | Youkanボタン文言短縮、改善要望モーダルのtransform containing block修正 | 2026-09-01 |
+| [R-0136_profit_rate_double_rounding.md](spec/R-0136_profit_rate_double_rounding.md) | 「原価から売値を設定」ボタンの二重丸めバグ修正 | 2026-09-01 |
 
 ---
 

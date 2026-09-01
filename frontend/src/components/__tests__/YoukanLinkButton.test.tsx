@@ -12,6 +12,11 @@ afterEach(() => {
 });
 
 describe('YoukanLinkButton (R-0130)', () => {
+  it('ボタン文言が「Youkan↗」に短縮されている（R-0133）', () => {
+    render(<YoukanLinkButton projectId={5} />);
+    expect(screen.getByRole('button', { name: 'Youkan↗' })).not.toBeNull();
+  });
+
   it('ok:true応答時、window.openが正しいURLで新規タブとして呼ばれる', async () => {
     stubFetch({ ok: true, url: 'https://door-fujita.com/contents/Youkan/Focus?projectId=abc' });
     const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);

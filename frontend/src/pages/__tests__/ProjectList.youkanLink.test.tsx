@@ -49,7 +49,7 @@ describe('R-0130: ProjectList Youkanで見るボタン', () => {
 
     renderPage();
     const desktopTable = await screen.findByTestId('project-desktop-table');
-    const btn = within(desktopTable).getByRole('button', { name: /Youkanで見る/ });
+    const btn = within(desktopTable).getByRole('button', { name: /^Youkan↗$/ });
 
     fireEvent.click(btn);
 
