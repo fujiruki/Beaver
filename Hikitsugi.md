@@ -16,6 +16,10 @@
 - **R-0139**: PC表示時のナビゲーションをサイドバーから上部ヘッダーのタブへ変更＋アイコン追加。`AppLayout.tsx`のトップレベルを`flex-direction:column`にし、PC（md以上）専用の新規`<header>`をタブナビとして追加（絵文字アイコン、新規依存追加なし）。モバイルのハンバーガー+サイドバーオーバーレイは維持。仕様: `docs/spec/R-0139_pc_header_tab_nav.md`
 - **R-0137**: 上部の保存ボタンが隠れる（前回保留・要確認だった要望）。R-0139の実装・実ブラウザ検証の過程で真因判明: モバイル向けヘッダーバー・モバイル用サイドバーの`className`に`md:hidden`があるにもかかわらず、インラインstyleに`display:'flex'`を直接指定しており、CSSのレスポンシブ非表示をインラインstyleが常に上書きしていた。**PC幅でもモバイルヘッダーバーが画面最上部に表示され続け、コンテンツ上部を覆い隠していた**（既存のR-0129由来のバグ、今回のR-0139実装で表面化・発覚）。R-0139の修正（`className`側に`flex`を追加しインラインの`display`指定を削除）で解消、単独実装は不要と判断しR-0139のコミットに含めた
 
+### ⚠️ 事故と復旧（worktree削除でメインのnode_modulesが消えた）
+本セッション終了直前、Stopフックの回帰ゲートが`ERR_MODULE_NOT_FOUND`で黒判定。調査したところ`frontend/node_modules`が完全に空になっていた。原因はほぼ確実に、R-0138実装Agentがworktree内で作成したWindowsジャンクション（`worktree/frontend/node_modules → メインリポジトリのfrontend/node_modules`）を、統合後に指揮役が`git worktree remove --force`で削除した際、ジャンクションをディレクトリとして辿ってリンク先（メイン側の実体）の中身まで再帰的に削除してしまったこと。`npm ci`で復元し、回帰スイート🔵青まで再確認済み（Git管理下のファイルには影響なし、node_modulesは元々Git管理外）。
+**教訓**: worktree内でAgentがnode_modulesをジャンクション/シンボリックリンクで用意した形跡がないか、`git worktree remove`の前に必ず確認すること（Agentの完了報告に「junctionを作成した」旨の記載がないか読む、または`Get-Item <path>/node_modules | Select LinkType`で確認する）。ジャンクションがある場合は、`git worktree remove`の前にジャンクション自体を先に削除する（`rmdir`でジャンクションだけを外す、中身には触れない）か、`git worktree remove`を避けて手動で`.git/worktrees/`エントリの整理とディレクトリの単純削除を検討する。
+
 ### 重要な技術的発見（次回同種の不具合に遭遇したら参照）
 - Reactのインラインstyleは常にCSSクラスより優先度が高い。`className="md:hidden"`のようなTailwindレスポンシブユーティリティと、同じ要素のインラインstyleに`display`プロパティを直接指定するのを併用すると、インラインstyleが常に勝ってしまいレスポンシブ制御が完全に無効化される。`AppLayout.tsx`のモバイルヘッダーバー・モバイル用サイドバーがこのパターンで、PC幅でも`display:'flex'`のまま表示され続けていた（`className`側に`flex`を移し、インラインstyleからは`display`を削除するのが正しい書き方）。これは本番の実ブラウザで`getComputedStyle`を確認しないと気づけない種類のバグで、jsdomベースのvitestテストでは検出できない（jsdomはメディアクエリを評価しないため）
 - 今回、Chrome DevTools系ツールの`resize_window`はこの開発環境では実際のビューポート幅（`window.innerWidth`）に反映されなかった（1920px固定のまま変化せず）。モバイル幅のレイアウトをローカルで検証する際は、`resize_window`に過度に頼らず、実際に`window.innerWidth`をJavaScript実行で確認してから判断すること
