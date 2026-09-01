@@ -51,15 +51,22 @@
 
 .dandori-board .axis, .dandori-board .row, .dandori-board .load-row { display: flex; }
 .dandori-board .label-col {
-  flex: 0 0 240px; padding: 0 14px; display: flex; flex-direction: column; justify-content: center;
-  border-right: 1px solid var(--line);
+  flex: 0 0 auto; padding: 0 14px; display: flex; flex-direction: row; align-items: center;
+  border-right: 1px solid var(--line); position: relative;
 }
 .dandori-board .grid-col { position: relative; flex: 0 0 auto; }
 .dandori-board .grid-bg { position: absolute; inset: 0; }
 .dandori-board .today-col { position: absolute; top: 0; bottom: 0; background: var(--today-tint); }
 
+/* R-0138: 案件名列・得意先名列（左寄せ、はみ出す分は隠す） */
+.dandori-board .name-col, .dandori-board .cust-col { box-sizing: border-box; overflow: hidden; white-space: nowrap; text-align: left; position: relative; }
+.dandori-board .cust-col { border-left: 1px solid var(--line); padding-left: 8px; }
+.dandori-board .resize-handle { position: absolute; top: 0; bottom: 0; width: 6px; cursor: col-resize; touch-action: none; z-index: 1; }
+.dandori-board .resize-handle-name { right: 0; }
+.dandori-board .resize-handle-total { right: 0; }
+
 .dandori-board .axis { border-bottom: 2px solid var(--line); font-size: 11px; color: var(--muted); }
-.dandori-board .axis .label-col { justify-content: flex-end; padding-bottom: 6px; font-size: calc(13px * var(--scale)); color: var(--muted); }
+.dandori-board .axis .label-col { align-items: flex-end; padding-bottom: 6px; font-size: calc(13px * var(--scale)); color: var(--muted); }
 .dandori-board .axis .grid-col { height: 44px; }
 .dandori-board .axis .week { position: absolute; top: 4px; font-weight: 700; font-size: 12px; font-variant-numeric: tabular-nums; }
 .dandori-board .axis .day-nums { position: absolute; bottom: 4px; left: 0; right: 0; display: flex; font-variant-numeric: tabular-nums; }
@@ -71,7 +78,6 @@
 
 .dandori-board .row { border-bottom: 1px solid var(--line); }
 .dandori-board .row .grid-col, .dandori-board .row .label-col { height: calc(30px * var(--scale)); }
-.dandori-board .row .label-col { flex-direction: row; align-items: center; gap: 8px; white-space: nowrap; overflow: hidden; }
 .dandori-board .row .name { font-weight: 700; font-size: calc(14px * var(--scale)); line-height: 1.1; }
 .dandori-board .row .cust { font-size: calc(11px * var(--scale)); color: var(--muted); }
 

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { dailyLoad } from '../../lib/dandoriCalc';
 import {
   addDaysISO,
@@ -11,9 +11,95 @@ import {
   type DandoriBar,
 } from './dandoriBoardUtils';
 
-const LABEL_WIDTH = 240;
 const DETAIL_THRESHOLD_PX = 12; // これ未満は日付数字を消して月境界表示にする
 const LABEL_THRESHOLD_PX = 10;  // これ未満はバー内ラベルを消す
+
+// R-0138: 案件名列・得意先名列の幅
+const LABEL_WIDTHS_STORAGE_KEY = 'bv_dandori_label_widths';
+const NAME_COL_MIN_WIDTH = 60;
+const CUST_COL_MIN_WIDTH = 60;
+const LABEL_TOTAL_MIN_WIDTH = NAME_COL_MIN_WIDTH + CUST_COL_MIN_WIDTH;
+const DEFAULT_NAME_COL_WIDTH = 160;
+const DEFAULT_LABEL_TOTAL_WIDTH = 240;
+
+interface LabelWidths {
+  name: number;
+  total: number;
+}
+
+function loadLabelWidths(): LabelWidths {
+  const defaults: LabelWidths = { name: DEFAULT_NAME_COL_WIDTH, total: DEFAULT_LABEL_TOTAL_WIDTH };
+  try {
+    const raw = localStorage.getItem(LABEL_WIDTHS_STORAGE_KEY);
+    if (!raw) return defaults;
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return defaults;
+    const name = (parsed as Record<string, unknown>).name;
+    const total = (parsed as Record<string, unknown>).total;
+    return {
+      name: typeof name === 'number' && Number.isFinite(name) ? name : defaults.name,
+      total: typeof total === 'number' && Number.isFinite(total) ? total : defaults.total,
+    };
+  } catch {
+    return defaults;
+  }
+}
+
+function clampLabelWidths(name: number, total: number): LabelWidths {
+  const clampedTotal = Math.max(LABEL_TOTAL_MIN_WIDTH, total);
+  const clampedName = Math.min(Math.max(NAME_COL_MIN_WIDTH, name), clampedTotal - CUST_COL_MIN_WIDTH);
+  return { name: clampedName, total: clampedTotal };
+}
+
+/** R-0138: 案件名列/得意先名列の境界・ラベル全体/ガント本体の境界の2つのドラッグハンドルを扱う */
+function useLabelWidths() {
+  const [widths, setWidths] = useState<LabelWidths>(() => {
+    const loaded = loadLabelWidths();
+    return clampLabelWidths(loaded.name, loaded.total);
+  });
+
+  const persist = useCallback((next: LabelWidths) => {
+    try {
+      localStorage.setItem(LABEL_WIDTHS_STORAGE_KEY, JSON.stringify(next));
+    } catch {
+      // localStorage が使えない環境（プライベートモード等）では保存を諦める
+    }
+  }, []);
+
+  const startDrag = useCallback((e: React.PointerEvent, axis: 'name' | 'total') => {
+    e.stopPropagation();
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidths = widths;
+    e.currentTarget.setPointerCapture?.(e.pointerId);
+    let latest = startWidths;
+
+    function handleMove(ev: PointerEvent) {
+      const delta = ev.clientX - startX;
+      latest = axis === 'name'
+        ? clampLabelWidths(startWidths.name + delta, startWidths.total)
+        : clampLabelWidths(startWidths.name, startWidths.total + delta);
+      setWidths(latest);
+    }
+
+    function handleUp() {
+      window.removeEventListener('pointermove', handleMove);
+      window.removeEventListener('pointerup', handleUp);
+      persist(latest);
+    }
+
+    window.addEventListener('pointermove', handleMove);
+    window.addEventListener('pointerup', handleUp);
+  }, [widths, persist]);
+
+  return {
+    nameColWidth: widths.name,
+    custColWidth: widths.total - widths.name,
+    labelTotalWidth: widths.total,
+    onNameHandleDown: (e: React.PointerEvent) => startDrag(e, 'name'),
+    onTotalHandleDown: (e: React.PointerEvent) => startDrag(e, 'total'),
+  };
+}
 
 function gridBgStyle(pxPerDay: number): React.CSSProperties {
   const cycle = 7 * pxPerDay;
@@ -93,6 +179,7 @@ export default function GanttScroll({ bars, rangeStart, rangeEnd, pxPerDay, toda
   const showBarLabel = pxPerDay >= LABEL_THRESHOLD_PX;
   const todayInRange = todayISO >= rangeStart && todayISO <= rangeEnd;
   const todayLeftPx = todayInRange ? daysBetween(rangeStart, todayISO) * pxPerDay : null;
+  const { nameColWidth, custColWidth, labelTotalWidth, onNameHandleDown, onTotalHandleDown } = useLabelWidths();
 
   const sortedBars = [...bars].sort((a, b) => a.start.localeCompare(b.start));
   const load = dailyLoad(sortedBars.map(b => ({ start: b.start, end: b.end })), rangeStart, rangeEnd);
@@ -101,9 +188,18 @@ export default function GanttScroll({ bars, rangeStart, rangeEnd, pxPerDay, toda
 
   return (
     <div className="gantt-scroll">
-      <div className="gantt" style={{ width: LABEL_WIDTH + gridWidth }}>
+      <div className="gantt" style={{ width: labelTotalWidth + gridWidth }}>
         <div className="axis">
-          <div className="label-col">案件</div>
+          <div className="label-col" style={{ width: labelTotalWidth }}>
+            <div className="name-col" style={{ width: nameColWidth, textAlign: 'left' }}>
+              案件名
+              <div className="resize-handle resize-handle-name" onPointerDown={onNameHandleDown} />
+            </div>
+            <div className="cust-col" style={{ width: custColWidth, textAlign: 'left' }}>
+              得意先
+            </div>
+            <div className="resize-handle resize-handle-total" onPointerDown={onTotalHandleDown} />
+          </div>
           <div className="grid-col" style={{ width: gridWidth }}>
             <div className="grid-bg" style={gridBgStyle(pxPerDay)} />
             <TodayCol leftPx={todayLeftPx} pxPerDay={pxPerDay} label />
@@ -140,13 +236,16 @@ export default function GanttScroll({ bars, rangeStart, rangeEnd, pxPerDay, toda
             gridWidth={gridWidth}
             showBarLabel={showBarLabel}
             todayLeftPx={todayLeftPx}
+            nameColWidth={nameColWidth}
+            custColWidth={custColWidth}
+            labelTotalWidth={labelTotalWidth}
             onCommit={onCommit}
             onProjectDoubleClick={onProjectDoubleClick}
           />
         ))}
 
         <div className="load-row">
-          <div className="label-col">1日の稼働案件数</div>
+          <div className="label-col" style={{ width: labelTotalWidth }}>1日の稼働案件数</div>
           <div className="grid-col" style={{ width: gridWidth }}>
             <div className="grid-bg" style={gridBgStyle(pxPerDay)} />
             <TodayCol leftPx={todayLeftPx} pxPerDay={pxPerDay} />
@@ -171,13 +270,16 @@ export default function GanttScroll({ bars, rangeStart, rangeEnd, pxPerDay, toda
   );
 }
 
-function BarRow({ bar, rangeStart, pxPerDay, gridWidth, showBarLabel, todayLeftPx, onCommit, onProjectDoubleClick }: {
+function BarRow({ bar, rangeStart, pxPerDay, gridWidth, showBarLabel, todayLeftPx, nameColWidth, custColWidth, labelTotalWidth, onCommit, onProjectDoubleClick }: {
   bar: DandoriBar;
   rangeStart: string;
   pxPerDay: number;
   gridWidth: number;
   showBarLabel: boolean;
   todayLeftPx: number | null;
+  nameColWidth: number;
+  custColWidth: number;
+  labelTotalWidth: number;
   onCommit: (id: number, patch: { start_date?: string; delivery_date?: string }) => void;
   onProjectDoubleClick: (id: number) => void;
 }) {
@@ -194,9 +296,13 @@ function BarRow({ bar, rangeStart, pxPerDay, gridWidth, showBarLabel, todayLeftP
 
   return (
     <div className="row">
-      <div className="label-col">
-        <span className="name">{bar.name}</span>
-        <span className="cust">{bar.customerName}</span>
+      <div className="label-col" style={{ width: labelTotalWidth }}>
+        <div className="name-col" style={{ width: nameColWidth, textAlign: 'left' }}>
+          <span className="name">{bar.name}</span>
+        </div>
+        <div className="cust-col" style={{ width: custColWidth, textAlign: 'left' }}>
+          <span className="cust">{bar.customerName}</span>
+        </div>
       </div>
       <div className="grid-col" style={{ width: gridWidth }}>
         <div className="grid-bg" style={gridBgStyle(pxPerDay)} />
