@@ -4,6 +4,18 @@
 
 ---
 
+## AccessTategu 側からの依頼（2026-09-06、frontPC の指揮役が登録）: R-0140・R-0141
+
+Beaver 側の開発は backpc で行う（藤田晴樹さん方針 2026-09-06）。frontPC 側は Access の R-086 ベータを進めており、Beaver に必要な変更を**連携契約**として仕様化して push した。着手前に `git pull` すること。
+
+- `docs/spec/R-0140_accesstategu_r086_integration.md`: quantity REAL 化・負数許容、`PATCH /customers/{id}/access-link` 新設、同期再開前の基準線 SQL、売上種別突合（一致確認済み）、見積番号 +10000 変換。各項目に入力→期待の受入条件表があり、検体 JSON（`docs/spec/fixtures/accesstategu_r086/`）は Access ベータの実データから書き出したもの
+- `docs/spec/R-0141_beaver_beta_environment.md`: 別 AppID `Beaver_beta` のベータ環境
+- Access 側の設計資料の写しは `docs/from_access/20260906_*`（API の入出力は対応表 §3 が正）
+- 7 月にこの PC で作った同期 API 実装 5 コミットは `backup/local-access-sync-20260905` に退避済み。master には入れていない。R-0140 (2) の参考にはなるが、そのまま取り込まない
+- 完了報告は「テスト名・実行コマンドと生ログ・変更ファイル一覧」で。契約書の受入条件表にテスト名を書き足す
+
+---
+
 ## 直近の作業（2026-09-01、続き）: 3回目の`/readyoubou`実行 — R-0138/R-0139実装・本番デプロイ済み、R-0137真因判明・解消
 
 ### 概要

@@ -1,0 +1,40 @@
+{
+  "_source": "AccessTategu beta BE vouchers id=12962（R-086 後に Access で新規作成した売上、legacy_no NULL）と voucher_lines 1 行。2026-09-06 取得",
+  "_usage": "POST /vouchers/sync の入力。access_voucher_id は vouchers.id をそのまま送る（見積・売上とも共通 COUNTER、12317 以降）。source_estimate_no は Access の source_estimate_id を文字列化した値",
+  "_note": "売上日 11/26・納品日 11/25・締日 25 で請求日は 12/25（AccessTategu F-08: 請求日は売上日基準）",
+  "access_voucher_id": 12962,
+  "access_voucher_no": "12962",
+  "voucher_type": "sales",
+  "customer_access_no": "755",
+  "project_access_no": null,
+  "voucher_date": "2026-11-26",
+  "delivery_date": "2026-11-25",
+  "billing_date": "2026-12-25",
+  "total_amount": 1000,
+  "status": "approved",
+  "description": "テストくみこ１１２５",
+  "memo": null,
+  "trade_type": "掛売上",
+  "consumption_tax_type": "外税/伝票計",
+  "print_date_flag": false,
+  "print_tax_excl_flag": false,
+  "print_company_seal": false,
+  "sales_category_id": 1,
+  "source_estimate_no": null,
+  "lines_mode": "replace",
+  "lines": [
+    {
+      "access_line_id": 26990,
+      "line_no": 1,
+      "line_type": "normal",
+      "item_name": "たてぐ１",
+      "quantity": 1,
+      "price_body": 1000,
+      "price_hardware": 0,
+      "price_glass": 0,
+      "line_total": 1000,
+      "tax_category": "課税",
+      "memo": "５"
+    }
+  ]
+}

@@ -1,37 +1,5 @@
 # 要望・リクエスト
 
-## 32. AccessTategu ベータ用の Beaver ベータ環境（2026-09-05、藤田晴樹要望）
-
-AccessTategu の R-086（Dodaikun 統合テーブル）ベータ環境から Beaver 同期を再開するとき、同期先がいきなり本番 Beaver（`/contents/Beaver/api/`）になるのは怖い。AccessTategu 側 R-108 と対で、Beaver にベータ用のデプロイ先を用意したい。
-
-- 候補: 別 AppID（例 `Beaver_beta`、`/contents/Beaver_beta/`）で本番と同じコードを別 SQLite に対して動かす。`docs/development_env.md` と `CLAUDE.md` のポート表・AppID 表に追記
-- Access 側は Beaver URL 設定をベータ用に切り替える手順を `beta_build.ps1` 系に組み込む（AccessTategu R-108）
-- 時期: AccessTategu P4（同期の早期再開、AccessTategu R-105）の前。下記 33 と同じデプロイ計画に載せる
-- Access との連携部分は、backpc ではなく AccessTategu と同じ PC（本リポジトリのクローン）で開発する方針（2026-09-05 晴樹さん）。着手前に必ず `git pull`
-
-### 優先順位
-未整理（高）。仕様化はこれから。
-
----
-
-## 33. AccessTategu R-086 連携の Beaver 側対応（2026-09-04 起票、2026-09-05 再登録）
-
-AccessTategu の R-086（見積・売上を `vouchers`/`voucher_lines` に統合、見積番号は +10000 オフセット）に合わせて Beaver 側で必要になる対応。詳細な原文は本リポジトリの退避ブランチ `backup/local-access-sync-20260905` の `docs/requests.md` §18（R-098 として起票）にある。要点:
-
-1. `voucher_lines.quantity` を INTEGER→REAL に変更し、負数拒否バリデーションを撤廃（Access 側は数量が小数・負数になり得る）
-2. `PATCH /customers/{id}/access-link` の新設（得意先の Access 側 ID 紐付け。`vouchers` の access-link と同型）
-3. 同期の基準線（G-14〜G-18）を再開前に記録
-4. `sales_categories` の ID 突合（Access の `sales_category_id` と Beaver のマスタ）
-5. `source_estimate_no` の変換（Access の見積番号 +10000 に追従）と `access_voucher_id` の +10000 更新、全件再 push
-
-### 補足
-- 2026-07 にこの PC で作った同期 API 実装（得意先同期エンドポイント、R-076 Phase4 明細マージ等、5 コミット）は master に取り込まず `backup/local-access-sync-20260905` に退避した。リモートの R-076 B2 系（`lines_mode=replace`、`PATCH /vouchers/{id}/access-link`）が同じ領域を別実装しているため。得意先同期エンドポイントだけはリモートに無い可能性があり、上記 2 と合わせて要確認
-
-### 優先順位
-未整理（高）。仕様化はこれから。
-
----
-
 ## 30. auth-hub連携: `auth_client.php`をv1.2.0に更新し、アプリ単位のアクセス許可判定（`app_id`指定）に対応する（2026-09-01、auth-hub側からの依頼）
 
 auth-hub（社内共通認証基盤）にアプリ単位のアクセス許可管理機能が追加された（auth-hub R-0003、2026-09-01本番デプロイ済み。仕様: `C:\Fujiruki\Projects\auth-hub\docs\SPEC\01_認証仕様.md` §10）。

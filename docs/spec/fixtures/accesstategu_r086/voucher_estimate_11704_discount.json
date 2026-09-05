@@ -1,0 +1,30 @@
+{
+  "_source": "AccessTategu beta BE vouchers id=11704（移行済みの旧見積 №1704 → id は +10000）と voucher_lines 5 行。2026-09-06 取得",
+  "_usage": "POST /vouchers/sync の入力。数量 0 の行と、数量 -1・line_total 負の値引行（line_type='discount'、tax_category='非課税'）を含む。quantity REAL 化と負数許容の受入テストに使う",
+  "_note": "旧見積は access_voucher_id = 旧見積伝票№ + 10000。旧売上は据え置き（例: 旧売上 №4635 → id 4635）",
+  "access_voucher_id": 11704,
+  "access_voucher_no": "11704",
+  "voucher_type": "estimate",
+  "customer_access_no": "733",
+  "project_access_no": null,
+  "voucher_date": "2024-04-14",
+  "total_amount": 25440,
+  "status": "approved",
+  "description": "障子張替え",
+  "memo": null,
+  "trade_type": "現金売上",
+  "consumption_tax_type": "外税/伝票計",
+  "print_date_flag": false,
+  "print_tax_excl_flag": false,
+  "print_company_seal": false,
+  "sales_category_id": null,
+  "validity_period": null,
+  "lines_mode": "replace",
+  "lines": [
+    { "line_no": 1, "line_type": "normal", "item_name": "障子張替　大　普通紙", "quantity": 2, "price_body": 3600, "price_hardware": 0, "price_glass": 0, "line_total": 7200, "tax_category": "課税", "memo": null },
+    { "line_no": 2, "line_type": "normal", "item_name": "障子張替　大　強化紙", "quantity": 4, "price_body": 4100, "price_hardware": 0, "price_glass": 0, "line_total": 16400, "tax_category": "課税", "memo": null },
+    { "line_no": 3, "line_type": "normal", "item_name": "運搬・取付費", "quantity": 1, "price_body": 2000, "price_hardware": 0, "price_glass": 0, "line_total": 2000, "tax_category": "課税", "memo": null },
+    { "line_no": 4, "line_type": "normal", "item_name": null, "quantity": 0, "price_body": 0, "price_hardware": 0, "price_glass": 0, "line_total": 0, "tax_category": "課税", "memo": null },
+    { "line_no": 5, "line_type": "discount", "item_name": "値引", "quantity": -1, "price_body": 0, "price_hardware": 0, "price_glass": 0, "line_total": -160, "tax_category": "非課税", "memo": null }
+  ]
+}

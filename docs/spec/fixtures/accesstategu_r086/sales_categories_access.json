@@ -1,0 +1,10 @@
+{
+  "_source": "AccessTategu beta BE tbl売上種別 全行。2026-09-06 取得",
+  "_usage": "Beaver sales_categories（api/migrations/014_seed_sales_categories.sql）との突合。ID・名称とも一致することを 2026-09-06 に確認済み",
+  "rows": [
+    { "id": 1, "name": "1地元建具" },
+    { "id": 2, "name": "2地元組子" },
+    { "id": 3, "name": "3県外組子" },
+    { "id": 4, "name": "4小物" }
+  ]
+}

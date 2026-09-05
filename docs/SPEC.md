@@ -51,6 +51,8 @@
 | [R-0133_R-0134_ui_fixes.md](spec/R-0133_R-0134_ui_fixes.md) | Youkanボタン文言短縮、改善要望モーダルのtransform containing block修正 | 2026-09-01 |
 | [R-0136_profit_rate_double_rounding.md](spec/R-0136_profit_rate_double_rounding.md) | 「原価から売値を設定」ボタンの二重丸めバグ修正 | 2026-09-01 |
 | [R-0135_kana_search_hankaku_katakana.md](spec/R-0135_kana_search_hankaku_katakana.md) | 得意先検索が半角カタカナ表記の読みがなにヒットしない問題の修正 | 2026-09-01 |
+| [R-0140_accesstategu_r086_integration.md](spec/R-0140_accesstategu_r086_integration.md) | AccessTategu R-086 連携の Beaver 側対応（連携契約: quantity REAL 化、customers access-link、基準線、売上種別突合、見積番号 +10000 追従。検体 JSON 付き） | 2026-09-06 |
+| [R-0141_beaver_beta_environment.md](spec/R-0141_beaver_beta_environment.md) | AccessTategu ベータ用の Beaver ベータ環境（別 AppID Beaver_beta、別 SQLite） | 2026-09-06 |
 
 ---
 

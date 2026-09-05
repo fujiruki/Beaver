@@ -1,0 +1,22 @@
+{
+  "_source": "AccessTategu beta BE tbl得意先M 得意先№=755（テスト得意先、2026-09-06 取得）",
+  "_usage": "POST /customers（customer_upsert）の入力と、PATCH /customers/{id}/access-link の access_customer_no の値",
+  "access_customer_no": "755",
+  "code": "755",
+  "name": "テスト太郎",
+  "name_kana": "ﾃｽﾄﾀﾛｳ",
+  "honorific_type": "様",
+  "gender": "その他",
+  "postal_code": null,
+  "address1": null,
+  "address2": null,
+  "tel": null,
+  "mobile": null,
+  "fax": null,
+  "email": null,
+  "memo": "テスト太郎",
+  "billing_date_print": false,
+  "cutoff_day": 25,
+  "carry_forward_balance": 240010,
+  "is_active": true
+}
