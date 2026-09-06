@@ -22,7 +22,7 @@
 作業開始前に以下を確認すること：
 
 1. **このファイル（CLAUDE.md）** — 環境・ルール
-2. **`Hikitsugi.md`** — 直前の作業内容・現在地・次のタスク
+2. **`docs/handover/Hikitsugi_LATEST.md`** — 直前の作業内容・現在地・次のタスク（過去の引き継ぎは同ディレクトリに `YYYYMMDD_Hikitsugi.md` として日付別保管）
 3. **`docs/`** — 設計ドキュメント（DB設計・画面設計・フロー解説）
 
 ## システム概要
@@ -126,10 +126,14 @@ cd frontend && npx vitest run
 
 `frontend/src/lib/__tests__/voucherCalc.test.ts` に計算ロジックのテストあり。新しい計算関数を追加したら必ずテストを書くこと。
 
+テスト本数が多くログが長くなる場合は `~/.claude/scripts/test-quiet.sh <テストコマンド...>` でラップする（成功時は要約1行のみ、失敗時のみ全出力）。例: `~/.claude/scripts/test-quiet.sh npx vitest run`
+
 ## 引き継ぎ
 
-セッション開始時: `Hikitsugi.md` を確認する。
-セッション終了時: `Hikitsugi.md` を更新する（何をした・何が残っているか）。
+セッション開始時: `docs/handover/Hikitsugi_LATEST.md` を確認する。
+セッション終了時: `docs/handover/Hikitsugi_LATEST.md` を更新する（何をした・何が残っているか）。
+
+肥大化してきたら、古いセクションを `docs/handover/YYYYMMDD_Hikitsugi.md`（作業日付を先頭に付与）としてアーカイブへ切り出し、`Hikitsugi_LATEST.md` には直近の状況とプロジェクト概要・アーキテクチャ概要等の静的リファレンスのみ残す（2026-09-07に実施した再構成を参照）。
 
 ## ループエンジニアリング協議（黒/青ゲートの取り決め）
 

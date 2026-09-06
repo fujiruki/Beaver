@@ -95,4 +95,4 @@ SQLite、HTML、ダッシュボード、CodeGraphは検索・表示・影響調�
 
 引継書には、要望ID、ブランチ・worktree・コミットSHA、未コミット変更、読んだ仕様、テスト、既知の問題、次の一手を残す。新担当はそれを読んで理解したスコープと最初の検証を報告してから再開する。
 
-Beaverでは `Hikitsugi.md` が引継書の役割を兼ねる。
+Beaverでは `docs/handover/Hikitsugi_LATEST.md` が引継書の役割を兼ねる（過去分は同ディレクトリに日付別でアーカイブ）。
