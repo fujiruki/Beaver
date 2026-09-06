@@ -1,6 +1,23 @@
 # 引き継ぎ資料 — Beaver
 
-**最終更新**: 2026-09-06（続き12）
+**最終更新**: 2026-09-06（続き13）
+
+---
+
+## R-0143 A-B-03 price訂正 完了（2026-09-06）
+
+Dodaikun指摘のprice仕様訂正を反映（コミット`d32925e`）。誤って追加していた単一`price`キーを削除、既存の`price_body`/`price_hardware`/`price_glass`/`line_total`/`tax_category`/`memo`/`updated_at`（+`line_no`/`item_name`/`quantity`で計10列）で往復一致することを`test_vouchers_sync_lines.php`で検証し直した。POST側（`insertSyncedLines`）はもともとこれら全列を正しく受信済みと確認（修正不要）。
+
+Beaver_betaで実機確認: `price`キーが応答から消え、10列すべて正しく含まれることを確認済み。本番`/api/health`→200で無事。
+
+### Dodaikunからの優先順位指示（2026-09-06）
+A-B-04（migration031/032、invoices/payments sync）→A-B-06（バッジ・sync-state等）→A-B-03price訂正、の順で進めるよう指示があった（A-B-03は既に着手済みだったためそのまま完了させ、A-B-04も並行で着手中）。
+
+### 次にやること
+- A-B-04（`POST /invoices/sync`・`POST /payments/sync`）はAgentで実装中
+- A-B-04完了後、A-B-06（同期バッジ・ロック表示・`sync-state`・`/sync/status`・`/sync/heartbeat`）に着手
+
+---
 
 ---
 
