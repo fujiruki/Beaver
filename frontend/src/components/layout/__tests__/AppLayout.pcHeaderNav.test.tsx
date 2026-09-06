@@ -63,12 +63,43 @@ describe('R-0139: PCヘッダーのタブナビゲーション', () => {
     const otherLink = links.find((a) => a.textContent?.includes('得意先'));
 
     expect(activeLink?.style.background).toBe('#334155');
-    expect(otherLink?.style.background).toBe('transparent');
+    expect(otherLink?.style.background).toBe('');
   });
 
   it('サイドバー（モバイル用nav）にmd:hiddenが付与されている', () => {
     renderAt('/');
     const sidebar = getSidebarNav();
     expect(sidebar.className).toContain('md:hidden');
+  });
+});
+
+describe('R-0142: PCヘッダータブの区切り線とホバーアニメーション', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('null', { status: 200 })));
+  });
+
+  it('タブの数-1個の区切り線が表示される', () => {
+    renderAt('/');
+    const header = document.querySelector('header') as HTMLElement;
+    const links = header.querySelectorAll('a');
+    const dividers = header.querySelectorAll('[data-testid="nav-divider"]');
+    expect(dividers.length).toBe(links.length - 1);
+  });
+
+  it('非アクティブタブにはホバー用クラスが付与される', () => {
+    renderAt('/projects');
+    const header = document.querySelector('header') as HTMLElement;
+    const links = Array.from(header.querySelectorAll('a'));
+    const otherLink = links.find((a) => a.textContent?.includes('得意先'));
+    expect(otherLink?.className).toContain('hover:bg-white/10');
+    expect(otherLink?.className).toContain('transition-colors');
+  });
+
+  it('アクティブタブにはホバー用クラスもインライン背景も付与されない', () => {
+    renderAt('/projects');
+    const header = document.querySelector('header') as HTMLElement;
+    const links = Array.from(header.querySelectorAll('a'));
+    const activeLink = links.find((a) => a.textContent?.includes('案件'));
+    expect(activeLink?.className ?? '').not.toContain('hover:bg-white/10');
   });
 });

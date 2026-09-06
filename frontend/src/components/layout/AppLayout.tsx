@@ -80,24 +80,33 @@ export default function AppLayout() {
         }}
       >
         <span style={{ fontWeight: 'bold', fontSize: 14, color: '#94a3b8' }}>Beaver</span>
-        <nav style={{ display: 'flex', gap: 4 }}>
-          {navItems.map((item) => {
+        <nav style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          {navItems.map((item, index) => {
             const active = isNavItemActive(location.pathname, item);
             return (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.to === '/'}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 6,
-                  padding: '8px 12px', borderRadius: 6,
-                  color: active ? '#fff' : '#cbd5e1',
-                  background: active ? '#334155' : 'transparent',
-                  textDecoration: 'none', fontSize: 13, whiteSpace: 'nowrap',
-                }}
-              >
-                {item.icon} {item.label}
-              </NavLink>
+              <div key={item.to} style={{ display: 'flex', alignItems: 'center' }}>
+                {index > 0 && (
+                  <span
+                    aria-hidden="true"
+                    data-testid="nav-divider"
+                    style={{ width: 1, height: 20, background: 'rgba(255,255,255,0.12)', margin: '0 4px' }}
+                  />
+                )}
+                <NavLink
+                  to={item.to}
+                  end={item.to === '/'}
+                  className={active ? undefined : 'transition-colors duration-150 hover:bg-white/10'}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    padding: '8px 12px', borderRadius: 6,
+                    color: active ? '#fff' : '#cbd5e1',
+                    background: active ? '#334155' : undefined,
+                    textDecoration: 'none', fontSize: 13, whiteSpace: 'nowrap',
+                  }}
+                >
+                  {item.icon} {item.label}
+                </NavLink>
+              </div>
             );
           })}
         </nav>
