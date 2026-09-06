@@ -375,13 +375,8 @@ function syncVoucherUpsert(PDO $pdo, ?int $projectId): void {
             $voucherId = (int)$pdo->lastInsertId();
         }
 
-        // R-066(c) Phase1: payload に lines がある場合、当該伝票の voucher_lines が
-        // 0件のときのみ Access 明細を INSERT する（Beaver 編集済み明細を保護）。
-        // INSERT 経路（新規伝票）も UPDATE 経路（既存伝票）も同じ条件でガードする。
-        $lineError = replaceSyncedLinesFromPayload($pdo, $voucherId, $data);
-        if ($lineError === null && ($data['lines_mode'] ?? null) !== 'replace' && !empty($data['lines']) && is_array($data['lines'])) {
-            $lineError = insertSyncedLinesIfEmpty($pdo, $voucherId, $data['lines']);
-        }
+        // R-0143 A-B-03: lines_mode を自動判定して同期する（Beaver 編集済み明細を保護）。
+        $lineError = syncLinesAutoMode($pdo, $voucherId, $data);
         if ($lineError !== null) {
             $pdo->rollBack();
             respond(422, $lineError);
@@ -420,17 +415,33 @@ function syncVoucherUpsert(PDO $pdo, ?int $projectId): void {
 }
 
 /**
- * R-066(c) Phase1: 当該 voucher_id の voucher_lines が 0 件のときのみ
- * Access 明細を INSERT する。既に 1 件でも明細がある場合は何もしない（保護）。
+ * R-0143 A-B-03: 明細同期モードの自動判定。
+ * lines_mode='replace' が明示されていれば常に全置換（優先度最高、既存動作を維持）。
+ * 未指定なら edited_in_beaver=1 の行が1件も無いときのみ自動的に全置換し、
+ * 1件でもあれば Beaver 編集済み明細を保護して何もしない（R-066由来の保護の意図を維持）。
  * 戻り値は insertSyncedLines と同じ: 不正値があれば配列、正常系は null。
  */
-function insertSyncedLinesIfEmpty(PDO $pdo, int $voucherId, array $lines): ?array {
-    $countStmt = $pdo->prepare('SELECT COUNT(*) FROM voucher_lines WHERE voucher_id = ?');
-    $countStmt->execute([$voucherId]);
-    if ((int)$countStmt->fetchColumn() > 0) {
+function syncLinesAutoMode(PDO $pdo, int $voucherId, array $data): ?array {
+    if (($data['lines_mode'] ?? null) === 'replace') {
+        return replaceSyncedLinesFromPayload($pdo, $voucherId, $data);
+    }
+    if (empty($data['lines']) || !is_array($data['lines'])) {
         return null;
     }
-    return insertSyncedLines($pdo, $voucherId, $lines);
+    if (hasEditedInBeaverLines($pdo, $voucherId)) {
+        return null;
+    }
+    $pdo->prepare('DELETE FROM voucher_lines WHERE voucher_id = ?')->execute([$voucherId]);
+    return insertSyncedLines($pdo, $voucherId, $data['lines']);
+}
+
+/**
+ * 当該伝票に Beaver 編集済み（edited_in_beaver=1）の明細行が1件でもあるか判定する。
+ */
+function hasEditedInBeaverLines(PDO $pdo, int $voucherId): bool {
+    $stmt = $pdo->prepare('SELECT EXISTS(SELECT 1 FROM voucher_lines WHERE voucher_id = ? AND edited_in_beaver = 1)');
+    $stmt->execute([$voucherId]);
+    return (bool)$stmt->fetchColumn();
 }
 
 /**
