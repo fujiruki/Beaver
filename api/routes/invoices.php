@@ -6,9 +6,11 @@ require_once dirname(__DIR__) . '/search_helpers.php';
  * GET    /invoices/{id}              詳細（紐づく伝票・入金含む）
  * POST   /invoices                   請求書新規作成
  * DELETE /invoices/{id}              削除（発行済みは不可）
+ * POST   /invoices/sync              R-0143 A-B-04: AccessTategu からの請求書 push 受信
  */
 
 require_once __DIR__ . '/history_helpers.php';
+require_once __DIR__ . '/sync_helpers.php';
 
 $segments   = explode('/', trim($path, '/'));
 $resourceId = isset($segments[1]) && is_numeric($segments[1]) ? (int)$segments[1] : null;
@@ -20,6 +22,153 @@ function nextInvoiceNo(PDO $pdo): string {
     $no = (int)$stmt->fetchColumn() + 1;
     $pdo->prepare('UPDATE sequences SET last_no = ? WHERE key = "invoice"')->execute([$no]);
     return 'I' . str_pad((string)$no, 5, '0', STR_PAD_LEFT);
+}
+
+/**
+ * R-0143 A-B-04: POST /invoices/sync
+ * access_receivable_id で upsert する。BILLING_EDIT_ENABLED の対象外
+ * （Access からの一方向pushであり、Beaver UI発の編集封印とは無関係）。
+ *
+ * ponytail: ON CONFLICT(access_receivable_id) DO UPDATE も検討したが、部分UNIQUEインデックス
+ * （access_receivable_id IS NOT NULL）への conflict target には WHERE 句が必要で複雑になるため、
+ * トランザクション内 SELECT→INSERT/UPDATE 分岐にした。同期元は Access 単体で同時書き込みが
+ * 起きない前提。将来 Access が並列pushするようになったら ON CONFLICT へ寄せる。
+ */
+function syncInvoiceUpsert(PDO $pdo): void {
+    $data = readJsonBody();
+
+    $accessReceivableId = isset($data['access_receivable_id']) && is_numeric($data['access_receivable_id'])
+        ? (int)$data['access_receivable_id']
+        : 0;
+    if ($accessReceivableId <= 0) {
+        respond(400, ['error' => 'access_receivable_id は必須です']);
+        return;
+    }
+
+    $accessCustomerNo = isset($data['customer_access_no']) ? (string)$data['customer_access_no'] : '';
+    $customerId = resolveCustomerId($pdo, $accessCustomerNo);
+    if ($customerId === null) {
+        respond(422, [
+            'error' => 'customer_access_no が customers.access_customer_no に存在しません',
+            'customer_access_no' => $accessCustomerNo,
+        ]);
+        return;
+    }
+
+    $cutoffDate       = isset($data['cutoff_day'])          ? (string)$data['cutoff_day']          : date('Y-m-d');
+    $billingDate      = isset($data['billing_date'])        ? (string)$data['billing_date']        : date('Y-m-d');
+    $carryForward     = isset($data['carry_forward'])       ? (float)$data['carry_forward']        : 0.0;
+    $salesTotal       = isset($data['sales_total'])         ? (float)$data['sales_total']          : 0.0;
+    $taxTotal         = isset($data['tax_total'])           ? (float)$data['tax_total']            : 0.0;
+    $paymentReceived  = isset($data['payment_received'])    ? (float)$data['payment_received']     : 0.0;
+    $invoiceTotal     = isset($data['invoice_total'])       ? (float)$data['invoice_total']        : 0.0;
+    $nextCarryForward = isset($data['next_carry_forward'])  ? (float)$data['next_carry_forward']   : 0.0;
+    // access_cancelled_at: 取消状態を保持するだけで、この列は削除しない
+    $cancelledAt      = (isset($data['cancelled_at']) && $data['cancelled_at'] !== '') ? (string)$data['cancelled_at'] : null;
+
+    $cStmt = $pdo->prepare('SELECT billing_name, name FROM customers WHERE id = ?');
+    $cStmt->execute([$customerId]);
+    $cust = $cStmt->fetch();
+    $billingName = ($cust && $cust['billing_name']) ? $cust['billing_name'] : ($cust ? $cust['name'] : '');
+
+    $pdo->beginTransaction();
+    try {
+        $existsStmt = $pdo->prepare('SELECT id FROM invoices WHERE access_receivable_id = ?');
+        $existsStmt->execute([$accessReceivableId]);
+        $existing = $existsStmt->fetch();
+
+        if ($existing) {
+            $invoiceId = (int)$existing['id'];
+            $pdo->prepare('
+                UPDATE invoices SET
+                    customer_id = :customer_id,
+                    cutoff_date = :cutoff_date,
+                    billing_date = :billing_date,
+                    carry_forward = :carry_forward,
+                    sales_total = :sales_total,
+                    tax_total = :tax_total,
+                    payment_received = :payment_received,
+                    invoice_total = :invoice_total,
+                    next_carry_forward = :next_carry_forward,
+                    billing_name_print = :billing_name_print,
+                    access_cancelled_at = :access_cancelled_at
+                WHERE id = :id
+            ')->execute([
+                ':customer_id'         => $customerId,
+                ':cutoff_date'         => $cutoffDate,
+                ':billing_date'        => $billingDate,
+                ':carry_forward'       => $carryForward,
+                ':sales_total'         => $salesTotal,
+                ':tax_total'           => $taxTotal,
+                ':payment_received'    => $paymentReceived,
+                ':invoice_total'       => $invoiceTotal,
+                ':next_carry_forward'  => $nextCarryForward,
+                ':billing_name_print'  => $billingName,
+                ':access_cancelled_at' => $cancelledAt,
+                ':id'                  => $invoiceId,
+            ]);
+        } else {
+            $invoiceNo = nextInvoiceNo($pdo);
+            $pdo->prepare('
+                INSERT INTO invoices
+                    (invoice_no, customer_id, invoice_date, cutoff_date, billing_date,
+                     carry_forward, sales_total, tax_total, payment_received,
+                     invoice_total, next_carry_forward, billing_name_print,
+                     access_receivable_id, access_cancelled_at)
+                VALUES
+                    (:invoice_no, :customer_id, :invoice_date, :cutoff_date, :billing_date,
+                     :carry_forward, :sales_total, :tax_total, :payment_received,
+                     :invoice_total, :next_carry_forward, :billing_name_print,
+                     :access_receivable_id, :access_cancelled_at)
+            ')->execute([
+                ':invoice_no'          => $invoiceNo,
+                ':customer_id'         => $customerId,
+                ':invoice_date'        => date('Y-m-d'),
+                ':cutoff_date'         => $cutoffDate,
+                ':billing_date'        => $billingDate,
+                ':carry_forward'       => $carryForward,
+                ':sales_total'         => $salesTotal,
+                ':tax_total'           => $taxTotal,
+                ':payment_received'    => $paymentReceived,
+                ':invoice_total'       => $invoiceTotal,
+                ':next_carry_forward'  => $nextCarryForward,
+                ':billing_name_print'  => $billingName,
+                ':access_receivable_id' => $accessReceivableId,
+                ':access_cancelled_at'  => $cancelledAt,
+            ]);
+            $invoiceId = (int)$pdo->lastInsertId();
+        }
+
+        // voucher_access_ids[] -> invoice_vouchers。既存分を一旦削除してから登録し直す
+        if (array_key_exists('voucher_access_ids', $data) && is_array($data['voucher_access_ids'])) {
+            $pdo->prepare('DELETE FROM invoice_vouchers WHERE invoice_id = ?')->execute([$invoiceId]);
+            $ivStmt = $pdo->prepare('INSERT OR IGNORE INTO invoice_vouchers (invoice_id, voucher_id) VALUES (?, ?)');
+            $vStmt  = $pdo->prepare('SELECT id FROM vouchers WHERE access_voucher_id = ?');
+            foreach ($data['voucher_access_ids'] as $accessVoucherId) {
+                $vStmt->execute([(int)$accessVoucherId]);
+                $voucherId = $vStmt->fetchColumn();
+                if ($voucherId) {
+                    $ivStmt->execute([$invoiceId, (int)$voucherId]);
+                }
+            }
+        }
+
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        respondInternalError($e, 'syncInvoiceUpsert');
+        return;
+    }
+
+    $s = $pdo->prepare('SELECT * FROM invoices WHERE id = ?');
+    $s->execute([$invoiceId]);
+    respond(200, $s->fetch());
+}
+
+// POST /invoices/sync（R-0143 A-B-04）
+if ($method === 'POST' && isset($segments[1]) && $segments[1] === 'sync' && !$resourceId) {
+    syncInvoiceUpsert($pdo);
+    exit;
 }
 
 switch ($method) {

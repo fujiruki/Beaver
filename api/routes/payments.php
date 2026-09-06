@@ -5,9 +5,11 @@
  * GET    /payments/{id}      詳細
  * POST   /payments           入金登録
  * DELETE /payments/{id}      削除
+ * POST   /payments/sync      R-0143 A-B-04: AccessTategu からの入金 push 受信
  */
 
 require_once __DIR__ . '/history_helpers.php';
+require_once __DIR__ . '/sync_helpers.php';
 
 $segments   = explode('/', trim($path, '/'));
 $resourceId = isset($segments[1]) && is_numeric($segments[1]) ? (int)$segments[1] : null;
@@ -18,6 +20,112 @@ function nextPaymentNo(PDO $pdo): string {
     $no = (int)$stmt->fetchColumn() + 1;
     $pdo->prepare('UPDATE sequences SET last_no = ? WHERE key = "payment"')->execute([$no]);
     return 'P' . str_pad((string)$no, 5, '0', STR_PAD_LEFT);
+}
+
+/**
+ * R-0143 A-B-04: POST /payments/sync
+ * access_payment_no で upsert する。BILLING_EDIT_ENABLED の対象外
+ * （Access からの一方向pushであり、Beaver UI発の編集封印とは無関係）。
+ * receivable_id が解決できない場合はエラーにせず invoice_id=NULL で保存する。
+ */
+function syncPaymentUpsert(PDO $pdo): void {
+    $data = readJsonBody();
+
+    $accessPaymentNo = isset($data['access_payment_no']) && is_numeric($data['access_payment_no'])
+        ? (int)$data['access_payment_no']
+        : 0;
+    if ($accessPaymentNo <= 0) {
+        respond(400, ['error' => 'access_payment_no は必須です']);
+        return;
+    }
+
+    $accessCustomerNo = isset($data['customer_access_no']) ? (string)$data['customer_access_no'] : '';
+    $customerId = resolveCustomerId($pdo, $accessCustomerNo);
+    if ($customerId === null) {
+        respond(422, [
+            'error' => 'customer_access_no が customers.access_customer_no に存在しません',
+            'customer_access_no' => $accessCustomerNo,
+        ]);
+        return;
+    }
+
+    $paymentDate = isset($data['payment_date']) ? (string)$data['payment_date'] : date('Y-m-d');
+    $amount      = isset($data['amount']) ? (float)$data['amount'] : 0.0;
+    $memo        = $data['memo'] ?? null;
+
+    $invoiceId = null;
+    if (isset($data['receivable_id']) && is_numeric($data['receivable_id'])) {
+        $invStmt = $pdo->prepare('SELECT id FROM invoices WHERE access_receivable_id = ?');
+        $invStmt->execute([(int)$data['receivable_id']]);
+        $found = $invStmt->fetchColumn();
+        $invoiceId = $found ? (int)$found : null;
+    }
+
+    $pdo->beginTransaction();
+    try {
+        $existsStmt = $pdo->prepare('SELECT id FROM payments WHERE access_payment_no = ?');
+        $existsStmt->execute([$accessPaymentNo]);
+        $existing = $existsStmt->fetch();
+
+        if ($existing) {
+            $paymentId = (int)$existing['id'];
+            $pdo->prepare('
+                UPDATE payments SET
+                    customer_id  = :customer_id,
+                    invoice_id   = :invoice_id,
+                    payment_date = :payment_date,
+                    amount       = :amount,
+                    memo         = :memo,
+                    origin       = :origin
+                WHERE id = :id
+            ')->execute([
+                ':customer_id'  => $customerId,
+                ':invoice_id'   => $invoiceId,
+                ':payment_date' => $paymentDate,
+                ':amount'       => $amount,
+                ':memo'         => $memo,
+                ':origin'       => 'access',
+                ':id'           => $paymentId,
+            ]);
+        } else {
+            $paymentNo = nextPaymentNo($pdo);
+            $pdo->prepare('
+                INSERT INTO payments
+                    (payment_no, customer_id, invoice_id, payment_date, amount, payment_type, memo,
+                     access_payment_no, origin)
+                VALUES
+                    (:payment_no, :customer_id, :invoice_id, :payment_date, :amount, :payment_type, :memo,
+                     :access_payment_no, :origin)
+            ')->execute([
+                ':payment_no'        => $paymentNo,
+                ':customer_id'       => $customerId,
+                ':invoice_id'        => $invoiceId,
+                ':payment_date'      => $paymentDate,
+                ':amount'            => $amount,
+                ':payment_type'      => '現金',
+                ':memo'              => $memo,
+                ':access_payment_no' => $accessPaymentNo,
+                ':origin'            => 'access',
+            ]);
+            $paymentId = (int)$pdo->lastInsertId();
+        }
+
+        $pdo->commit();
+    } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        respondInternalError($e, 'syncPaymentUpsert');
+        return;
+    }
+
+    $s = $pdo->prepare('SELECT * FROM payments WHERE id = ?');
+    $s->execute([$paymentId]);
+    respond(200, $s->fetch());
+}
+
+// POST /payments/sync（R-0143 A-B-04）
+if ($method === 'POST' && isset($segments[1]) && $segments[1] === 'sync' && !$resourceId) {
+    syncPaymentUpsert($pdo);
+    exit;
 }
 
 switch ($method) {
@@ -58,8 +166,8 @@ switch ($method) {
         $data = json_decode(file_get_contents('php://input'), true) ?? [];
         $no = nextPaymentNo($pdo);
         $stmt = $pdo->prepare('
-            INSERT INTO payments (payment_no, customer_id, invoice_id, payment_date, amount, payment_type, memo)
-            VALUES (:payment_no, :customer_id, :invoice_id, :payment_date, :amount, :payment_type, :memo)
+            INSERT INTO payments (payment_no, customer_id, invoice_id, payment_date, amount, payment_type, memo, origin)
+            VALUES (:payment_no, :customer_id, :invoice_id, :payment_date, :amount, :payment_type, :memo, :origin)
         ');
         $stmt->execute([
             ':payment_no'   => $no,
@@ -69,6 +177,7 @@ switch ($method) {
             ':amount'       => $data['amount'] ?? 0,
             ':payment_type' => $data['payment_type'] ?? '現金',
             ':memo'         => $data['memo'] ?? null,
+            ':origin'       => 'beaver',
         ]);
         $id = (int)$pdo->lastInsertId();
 

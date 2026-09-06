@@ -37,6 +37,8 @@ php "$root/api/tests/test_app_id_config.php"     >/tmp/bv_app_id_config.log 2>&1
 php "$root/api/tests/test_vouchers_billed_lock.php" >/tmp/bv_vouchers_billed_lock.log 2>&1 || fail "[test_vouchers_billed_lock] $(tail -n 8 /tmp/bv_vouchers_billed_lock.log)"
 php "$root/api/tests/test_vouchers_sync_lines.php" >/tmp/bv_vouchers_sync_lines.log 2>&1 || fail "[test_vouchers_sync_lines] $(tail -n 8 /tmp/bv_vouchers_sync_lines.log)"
 php "$root/api/tests/test_billing_edit_disabled.php" >/tmp/bv_billing_edit_disabled.log 2>&1 || fail "[test_billing_edit_disabled] $(tail -n 8 /tmp/bv_billing_edit_disabled.log)"
+php "$root/api/tests/test_invoices_sync.php"     >/tmp/bv_invoices_sync.log 2>&1 || fail "[test_invoices_sync] $(tail -n 8 /tmp/bv_invoices_sync.log)"
+php "$root/api/tests/test_payments_sync.php"     >/tmp/bv_payments_sync.log 2>&1 || fail "[test_payments_sync] $(tail -n 8 /tmp/bv_payments_sync.log)"
 
 rm -f "$root"/api/tests/*.sqlite 2>/dev/null
 exit 0

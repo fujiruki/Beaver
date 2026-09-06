@@ -56,3 +56,7 @@
 034_projects_deleted_at       未適用      beaver_beta (R-0143 A-B-07。指揮役が別途適用)
 030_vouchers_access_billed_flag  未適用   dev (R-0143 A-B-02。worktree作業のためdatabase.sqliteが存在せず未適用。schema.sql+migrations適用のテスト専用DBで動作確認済み)
 030_vouchers_access_billed_flag  未適用   beaver_beta (R-0143 A-B-02。指揮役が別途dev/Beaver_betaへ適用)
+031_invoices_access_fields  未適用   dev (R-0143 A-B-04。worktree作業のためdatabase.sqliteが存在せず未適用。schema.sql+migrations適用のテスト専用DBで動作確認済み)
+031_invoices_access_fields  未適用   beaver_beta (R-0143 A-B-04。指揮役が別途dev/Beaver_betaへ適用)
+032_payments_access_fields  未適用   dev (R-0143 A-B-04。worktree作業のためdatabase.sqliteが存在せず未適用。schema.sql+migrations適用のテスト専用DBで動作確認済み)
+032_payments_access_fields  未適用   beaver_beta (R-0143 A-B-04。指揮役が別途dev/Beaver_betaへ適用)
