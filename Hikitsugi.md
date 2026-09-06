@@ -1,6 +1,25 @@
 # 引き継ぎ資料 — Beaver
 
-**最終更新**: 2026-09-06（続き5）
+**最終更新**: 2026-09-06（続き6）
+
+---
+
+## A-B-01追補: customers/sync応答に4列追加（2026-09-06）
+
+Dodaikun側の合格確認後、Access側`ApplyBeaverCustomer`が読んでいる`gender`・`mobile`・`fax`・`is_active`が応答に無いと既定値で上書きしてしまう問題への追加対応（コミット`8c4f31b`）。`GET /customers/sync`のSELECT文に4列追加、`carry_forward_balance`は引き続き除外。テスト2件追加（`test_customers_sync.php`、全12ケースPASS）、回帰スイート🔵青。
+
+Beaver_betaへデプロイし実機確認:
+```
+$ curl ".../Beaver_beta/api/customers/sync?limit=1"
+{...,"gender":null,...,"mobile":null,"fax":null,...,"is_active":0,...}
+```
+4列とも含まれ、`carry_forward_balance`は含まれないことを確認。本番は無事（`/api/health`→200）。
+
+### 次にやること
+- Dodaikunの再確認待ち
+- 設計書レビュー反映後、R-0143契約（A-B-02〜07）を受領予定。それまで大きな実装は待機
+
+---
 
 ---
 
