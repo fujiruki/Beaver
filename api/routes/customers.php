@@ -330,6 +330,7 @@ switch ($method) {
                 $sets[] = 'access_customer_no = :access_customer_no';
                 $params[':access_customer_no'] = $accessCustomerNo;
                 $sets[] = 'updated_at = CURRENT_TIMESTAMP';
+                $sets[] = 'last_synced_at = CURRENT_TIMESTAMP';
                 $params[':id'] = (int)$existingId;
                 $pdo->prepare('UPDATE customers SET ' . implode(', ', $sets) . ' WHERE id = :id')->execute($params);
                 $stmt2 = $pdo->prepare('SELECT * FROM customers WHERE id = ?');
@@ -355,13 +356,13 @@ switch ($method) {
                      postal_code, address1, address2, tel, mobile, fax, email,
                      memo, billing_name, billing_date_print,
                      cutoff_day, billing_offset_days, payment_due_days,
-                     carry_forward_balance, is_active, access_customer_no)
+                     carry_forward_balance, is_active, access_customer_no, last_synced_at)
                 VALUES
                     (:code, :name, :name_kana, :honorific_type, :gender,
                      :postal_code, :address1, :address2, :tel, :mobile, :fax, :email,
                      :memo, :billing_name, :billing_date_print,
                      :cutoff_day, :billing_offset_days, :payment_due_days,
-                     :carry_forward_balance, 1, :access_customer_no)
+                     :carry_forward_balance, 1, :access_customer_no, CURRENT_TIMESTAMP)
             ');
             $stmt->execute([
                 ':code'                 => $code,

@@ -388,10 +388,16 @@ function syncVoucherUpsert(PDO $pdo, ?int $projectId): void {
         return;
     }
 
+    // A-B-09: pushしたAccess側が自分のpushを競合と誤検知しないよう、応答にlast_synced_atを含める。
+    $lastSyncedAtStmt = $pdo->prepare('SELECT last_synced_at FROM vouchers WHERE id = ?');
+    $lastSyncedAtStmt->execute([$voucherId]);
+    $lastSyncedAt = $lastSyncedAtStmt->fetchColumn();
+
     respond(200, [
-        'voucher_id' => $voucherId,
-        'voucher_no' => $voucherNo,
-        'status'     => 'synced',
+        'voucher_id'      => $voucherId,
+        'voucher_no'      => $voucherNo,
+        'status'          => 'synced',
+        'last_synced_at'  => utcToJst($lastSyncedAt !== false ? $lastSyncedAt : null),
     ]);
 }
 
@@ -803,7 +809,8 @@ function syncVoucherShipped(PDO $pdo, int $projectId, string $accessVoucherNo): 
 
     try {
         $pdo->prepare('
-            UPDATE vouchers SET shipped = :shipped, shipped_at = :shipped_at, updated_at = CURRENT_TIMESTAMP
+            UPDATE vouchers SET shipped = :shipped, shipped_at = :shipped_at,
+                updated_at = CURRENT_TIMESTAMP, last_synced_at = CURRENT_TIMESTAMP
             WHERE id = :id
         ')->execute([
             ':shipped'    => $shipped,
@@ -815,7 +822,17 @@ function syncVoucherShipped(PDO $pdo, int $projectId, string $accessVoucherNo): 
         return;
     }
 
-    respond(200, ['voucher_id' => (int)$id, 'shipped' => (bool)$shipped, 'shipped_at' => $shippedAt]);
+    // A-B-09: pushしたAccess側が自分のpushを競合と誤検知しないよう、応答にlast_synced_atを含める。
+    $lastSyncedAtStmt = $pdo->prepare('SELECT last_synced_at FROM vouchers WHERE id = ?');
+    $lastSyncedAtStmt->execute([(int)$id]);
+    $lastSyncedAt = $lastSyncedAtStmt->fetchColumn();
+
+    respond(200, [
+        'voucher_id'     => (int)$id,
+        'shipped'        => (bool)$shipped,
+        'shipped_at'     => $shippedAt,
+        'last_synced_at' => utcToJst($lastSyncedAt !== false ? $lastSyncedAt : null),
+    ]);
 }
 
 /**
@@ -943,9 +960,14 @@ function syncProjectCustomer(PDO $pdo, int $projectId): void {
         return;
     }
 
+    // A-B-09: projectsテーブルにlast_synced_at列が無いため永続化はせず、
+    // サーバ現在時刻(JST)をそのまま応答に含める。
+    $lastSyncedAt = (new DateTime('now', new DateTimeZone('Asia/Tokyo')))->format('Y-m-d H:i:s');
+
     respond(200, [
-        'project_id'  => $projectId,
-        'customer_id' => $customerId,
-        'status'      => 'updated',
+        'project_id'     => $projectId,
+        'customer_id'    => $customerId,
+        'status'         => 'updated',
+        'last_synced_at' => $lastSyncedAt,
     ]);
 }

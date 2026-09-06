@@ -28,6 +28,7 @@ php "$root/api/tests/test_history.php"           >/tmp/bv_history.log 2>&1 || fa
 php "$root/api/tests/test_auth_gate_unit.php"    >/tmp/bv_auth_gate_unit.log 2>&1 || fail "[test_auth_gate_unit] $(tail -n 8 /tmp/bv_auth_gate_unit.log)"
 php "$root/api/tests/test_auth_gate.php"         >/tmp/bv_auth_gate.log 2>&1 || fail "[test_auth_gate] $(tail -n 8 /tmp/bv_auth_gate.log)"
 php "$root/api/tests/test_auth_gate_sync.php"    >/tmp/bv_auth_gate_sync.log 2>&1 || fail "[test_auth_gate_sync] $(tail -n 8 /tmp/bv_auth_gate_sync.log)"
+php "$root/api/tests/test_push_responses_last_synced_at.php" >/tmp/bv_push_last_synced_at.log 2>&1 || fail "[test_push_responses_last_synced_at] $(tail -n 8 /tmp/bv_push_last_synced_at.log)"
 php "$root/api/tests/test_youkan_integration.php" >/tmp/bv_youkan.log  2>&1 || fail "[test_youkan_integration] $(tail -n 8 /tmp/bv_youkan.log)"
 php "$root/api/tests/test_capacity_check.php"    >/tmp/bv_capacity.log 2>&1 || fail "[test_capacity_check] $(tail -n 8 /tmp/bv_capacity.log)"
 php "$root/api/tests/test_youkan_link.php"       >/tmp/bv_youkan_link.log 2>&1 || fail "[test_youkan_link] $(tail -n 8 /tmp/bv_youkan_link.log)"
