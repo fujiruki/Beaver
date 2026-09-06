@@ -1,6 +1,35 @@
 # 引き継ぎ資料 — Beaver
 
-**最終更新**: 2026-09-06（続き4）
+**最終更新**: 2026-09-06（続き5）
+
+---
+
+## A-B-01: GET /customers/sync 新設・Beaver_betaへデプロイ完了（2026-09-06）
+
+Dodaikun側の連携設計書ドラフトから先行して渡された、依存なしタスク。Access側`SyncCustomersFromBeaver`が呼んでいたが存在しなかったエンドポイントを新設（コミット`20de0a2`）。
+
+### 実装
+`GET /customers/sync`を`GET /vouchers/sync`と同じ設計パターン（keysetページング、+1件取得でnext_cursor判定）で`api/routes/customers.php`に追加。
+- 応答: `{synced_at, customers, next_cursor, next_cursor_at}`
+- `carry_forward_balance`は正本がAccess側のため応答から除外（SELECT文自体に含めない）
+- 依頼元が期待していた`tax_type`・`trade_type`列は`customers`テーブルに実在しないため応答から省略（Dodaikunへ申し送り済み）。`honorific`→`honorific_type`、`address`→`address1`/`address2`としてそのまま返す
+- `next_cursor_at`は「次ページ先頭になるはずのレコード（limit+1件目）」の`updated_at`をJST変換して返す設計
+
+### 検証
+Agent（worktree、TDD）に実装委譲、新規テスト`api/tests/test_customers_sync.php`（10ケース全PASS）。指揮役がメインリポジトリで`bash .claude/regression-suite.sh`（vitest含む全体）を再実行し🔵青を確認（Agent側worktreeではnode_modules不在で見かけ上vitestが失敗していたが、統合後のメインでは問題なし）。
+
+### デプロイ・実機確認（Beaver_betaのみ、本番は未配置）
+```
+$ curl "https://door-fujita.com/contents/Beaver_beta/api/customers/sync?limit=2"
+{"synced_at":"2026-09-06T15:29:21+09:00","customers":[...2件...],"next_cursor":2,"next_cursor_at":"2026-06-16 19:21:51"}
+```
+`carry_forward_balance`・`tax_type`・`trade_type`いずれも応答に含まれないことを実データで確認。本番Beaverの同エンドポイントは意図通り旧仕様（全件配列）のまま、`/api/health`も200で無傷。
+
+### 次にやること
+- Dodaikunが本エンドポイントをcurlで再確認する予定（先方確認待ち）
+- 残りの連携タスク（migration 030〜032、請求済みロック、明細lines、同期バッジUI等）はDodaikun側の連携設計書確定後にR-0143契約として受領予定。設計書ができるまで大きな実装は待機
+
+---
 
 ---
 
