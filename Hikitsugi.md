@@ -12,12 +12,24 @@ frontPC側（Access連携の相手、セッション"Dodaikun"）からの依頼
 1. `upload.ps1 -Beta` でBeaver_betaディレクトリを新規作成・コード一式デプロイ（既存の本番Beaverには一切触れず、新規ディレクトリのみへの書き込み）
 2. 本番の`api/database.sqlite`・`api/config.local.php`をBeaver_beta用に複製（SSH `cp`、コピー元は読み取りのみ。auto mode classifierにブロックされたため藤田晴樹さんに`!`直接実行を依頼）
 3. 実機疎通確認（実行コマンド・実データ）:
-   - `curl https://door-fujita.com/contents/Beaver_beta/api/nonexistent` → `{"error":"Not found","path":"/nonexistent"}`（BASE_PATHが`/contents/Beaver_beta/api`として正しく除去されている＝`SetEnv BEAVER_APP_ID`がConoHa WINGのPHPに正しく反映されることを確認。R-0141仕様書で「未確認」としていた懸念点はクリア）
+   - `curl https://door-fujita.com/contents/Beaver_beta/api/nonexistent` → （config.local.php複製**前**の一時的状態で）`{"error":"Not found","path":"/nonexistent"}`。※これはBASE_PATH剥がしの証拠として不適切だった。下記「食い違いの発覚と訂正」参照
    - Beaver_betaのJSバンドル（`assets/index-*.js`）に文字列`"Beaver_beta"`が実際に埋め込まれていることを確認（`VITE_APP_ID`のビルド時埋め込みが機能）
    - `curl https://door-fujita.com/contents/Beaver_beta/api/projects` → 401 `unauthenticated`、`loginUrl`が`redirect=%2Fcontents%2FBeaver_beta%2Fapi%2Fprojects`（Beaver_beta用に正しく生成）
    - ブラウザ（Chrome自動化）で`https://door-fujita.com/contents/Beaver_beta/`にアクセス→社内共通ログインCookie（`df_session`、path=/）が効いて未ログイン操作なしでダッシュボードが表示され、本番複製データ（進行中12件・未受注26件等、本番と同規模）が見えることを確認
    - 本番Beaver（`/api/health`）は作業前後で200のまま無傷なことを複数回確認
 4. ファイルサイズ照合でDB（8159232バイト）・config.local.php（889バイト）とも複製元と一致することを確認
+
+### 食い違いの発覚と訂正（frontPC側"Dodaikun"との裏取りで発覚）
+frontPC側が独立にcurlで裏取りしたところ、`/api/nonexistent`がCookie無しで401（`unauthenticated`）を返し、報告した404と食い違うと指摘された。調査の結果、**報告時の404確認はconfig.local.phpをBeaver_betaへ複製する前のタイミングで実行したもの**と判明: `upload.ps1`は`config.local.php`を配置対象から除外する仕様のため、複製前は`AUTH_DRIVER`が未定義（`none`相当）になり、`api/index.php`の認証ゲート条件`AUTH_DRIVER !== 'none' && ...`が成立せず認証チェック自体がスキップされて404まで到達していた。config.local.php複製後は正しく認証ゲートが機能し、未認証パスは一律401になる（frontPC側の確認が正）。
+
+BASE_PATH剥がし自体の証拠は、認証除外パス（`authGateIsExempt()`の`/sync`ルール）で再取得した:
+```
+curl -s "https://door-fujita.com/contents/Beaver_beta/api/projects/sync?limit=1"
+→ 200、{"projects":[{"id":1,"name":"大野様邸",...}],...}（本番Beaverの同エンドポイントと同一レコード）
+```
+未認証のまま実ルーティング処理まで到達し実データを返すことを確認。本番と同一レコードが返ったことはBeaver_betaのDBが本番複製であることの追加裏取りにもなった。
+
+**教訓**: ベータ環境の疎通確認で「認証が必要なはずのエンドポイントが通ってしまう／404になる」場合、`config.local.php`（`AUTH_DRIVER`等）がまだ複製されていない一時的な状態でないか疑うこと。複製前後で確認結果が変わりうる。他セッションとの独立した裏取りが実装バグではなく確認手順の見落としを検出した好例。
 
 ### 軽微な発見（実害なし、次回直すとよい）
 `api/index.php`の`/health`エンドポイントが`{"status":"ok","app":"Beaver"}`と固定文字列を返しており、Beaver_betaでも`"Beaver"`のまま（`APP_ID`定数を使っていない）。ルーティング自体はBASE_PATH経由で正しく動作しているため実害はないが、疎通確認時に紛らわしい。`'app' => APP_ID`に直すのが望ましい。
