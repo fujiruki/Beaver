@@ -1,6 +1,33 @@
 # 引き継ぎ資料 — Beaver
 
-**最終更新**: 2026-09-06（続き14）
+**最終更新**: 2026-09-06（続き15）
+
+---
+
+## R-0143 A-B-06 完了・backpc側タスク全完了（2026-09-06）
+
+`PATCH /vouchers/{id}/sync-state`・`POST /sync/heartbeat`・`GET /sync/status`（通常認証）を新設、伝票詳細・得意先詳細に同期バッジ、伝票詳細に請求済みロックバナー（保存ボタン無効化含む）・確認待ちバナー、設定画面に同期先AppID・最終同期時刻表示（コミット`0f2d493`）。migration 035（`vouchers.sync_pending`、単一行`sync_heartbeats`テーブル）。`test_sync_state.php`4件・`test_sync_status.php`4件・フロントvitest全PASS、`npm run build`成功。
+
+### Beaver_beta実機確認
+```
+POST /sync/heartbeat → 200
+GET /sync/status（SYNC_API_TOKEN） → 401（仕様通り。/sync/statusは免除リスト対象外）
+GET /sync/status（BANTO_API_TOKEN） → 200、{"app_id":"Beaver_beta","last_synced_at":"2026-09-06 19:00:00","source":"access"}（UTC→JST変換も正常、10:00→19:00）
+PATCH /vouchers/{id}/sync-state → 200、sync_pending更新成功
+```
+本番`/api/health`→200で無事。`reset_beta_db.ps1`にmigration035も登録済み（コミット`dca8a37`）、試走で`[1/5]〜[5/5]`成功。
+
+### R-0143 Phase A（backpc側）全タスク完了
+A-B-01〜09すべてdone。Dodaikunより「A-B-06完了後は状況整理してAccess側のA-F-04〜07に集中する」旨の連絡あり。次にBeaver側で新規タスクの依頼が来るまでは、他の作業（通常のreadyoubouフロー等）に戻ってよい。
+
+### 累積の教訓（次回セッション・今後のR-0143系タスクへの参考）
+- Agent実装検証には`npx vitest run`だけでなく`npm run build`（tsc型チェック）も必須で含めること。過去2回、この検証漏れでビルドエラーを本番デプロイ直前に発見する事態になった
+- worktree統合後は`bash .claude/regression-suite.sh`を実行する前に必ず`pwd`でカレントディレクトリを確認すること。`cd`の効果がBashツール呼び出しをまたいで持続しない場合がある
+- `reset_beta_db.ps1`試走のたびにBeaver_betaのDBは本番複製に巻き戻る。実機確認は都度、本番に実在するID（access_customer_no等）を確認してから行うこと
+- 秘密トークンを扱うcurl確認では`-v`（verbose）を絶対に使わない。値がログに出力される事故が過去に発生した
+- 日本語を含むJSONペイロードはWindows環境のcurlコマンドライン引数だとエンコーディングが崩れる。PHPスクリプト経由（`json_encode`+`curl_exec`）で送信すること
+
+---
 
 ---
 
