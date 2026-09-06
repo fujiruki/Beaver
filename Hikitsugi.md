@@ -1,6 +1,33 @@
 # 引き継ぎ資料 — Beaver
 
-**最終更新**: 2026-09-06
+**最終更新**: 2026-09-06（続き）
+
+---
+
+## R-0141 本番サーバー側構築・実機疎通確認 完了（2026-09-06）
+
+frontPC側（Access連携の相手、セッション"Dodaikun"）からの依頼を藤田晴樹さんの承認を得て実施。「スコープ外」としていた本番サーバー側の残作業を完了した。
+
+### 実施内容
+1. `upload.ps1 -Beta` でBeaver_betaディレクトリを新規作成・コード一式デプロイ（既存の本番Beaverには一切触れず、新規ディレクトリのみへの書き込み）
+2. 本番の`api/database.sqlite`・`api/config.local.php`をBeaver_beta用に複製（SSH `cp`、コピー元は読み取りのみ。auto mode classifierにブロックされたため藤田晴樹さんに`!`直接実行を依頼）
+3. 実機疎通確認（実行コマンド・実データ）:
+   - `curl https://door-fujita.com/contents/Beaver_beta/api/nonexistent` → `{"error":"Not found","path":"/nonexistent"}`（BASE_PATHが`/contents/Beaver_beta/api`として正しく除去されている＝`SetEnv BEAVER_APP_ID`がConoHa WINGのPHPに正しく反映されることを確認。R-0141仕様書で「未確認」としていた懸念点はクリア）
+   - Beaver_betaのJSバンドル（`assets/index-*.js`）に文字列`"Beaver_beta"`が実際に埋め込まれていることを確認（`VITE_APP_ID`のビルド時埋め込みが機能）
+   - `curl https://door-fujita.com/contents/Beaver_beta/api/projects` → 401 `unauthenticated`、`loginUrl`が`redirect=%2Fcontents%2FBeaver_beta%2Fapi%2Fprojects`（Beaver_beta用に正しく生成）
+   - ブラウザ（Chrome自動化）で`https://door-fujita.com/contents/Beaver_beta/`にアクセス→社内共通ログインCookie（`df_session`、path=/）が効いて未ログイン操作なしでダッシュボードが表示され、本番複製データ（進行中12件・未受注26件等、本番と同規模）が見えることを確認
+   - 本番Beaver（`/api/health`）は作業前後で200のまま無傷なことを複数回確認
+4. ファイルサイズ照合でDB（8159232バイト）・config.local.php（889バイト）とも複製元と一致することを確認
+
+### 軽微な発見（実害なし、次回直すとよい）
+`api/index.php`の`/health`エンドポイントが`{"status":"ok","app":"Beaver"}`と固定文字列を返しており、Beaver_betaでも`"Beaver"`のまま（`APP_ID`定数を使っていない）。ルーティング自体はBASE_PATH経由で正しく動作しているため実害はないが、疎通確認時に紛らわしい。`'app' => APP_ID`に直すのが望ましい。
+
+### Access側へ渡す情報（`docs/spec/R-0141_beaver_beta_environment.md`末尾にも追記予定）
+- ベータAPIベースURL: `https://door-fujita.com/contents/Beaver_beta/api/`
+- 認証: 本番と同じauth-hub（`df_session`共有、Cookie path=/のため追加登録不要）
+- DB再複製手順: 本番`api/database.sqlite`をSSHで`Beaver_beta/api/database.sqlite`へ`cp`（権限666に戻すこと）
+
+---
 
 ---
 

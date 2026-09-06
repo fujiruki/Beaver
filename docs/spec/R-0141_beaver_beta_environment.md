@@ -39,10 +39,21 @@ AccessTategu の R-086 ベータ（`beta\tate202403_beta_dev.accdb`）から Bea
 - `frontend/vite.config.ts`: `VITE_APP_ID`（`.env`またはシェル環境変数）から `base` とdevプロキシを導出
 - `frontend/src/lib/appId.ts`: `APP_ID`・`APP_STORAGE_PREFIX`を一元管理。本番AppID（`Beaver`）のみ既存の`bv_`を維持し、それ以外は`{AppID}_`にする後方互換ルール
 - `upload.ps1`: `-Beta`スイッチで配置先・ビルド時AppID・`.htaccess`の`RewriteBase`/`SetEnv BEAVER_APP_ID`を切替。引数省略時の本番向け配置先文字列は変更なし
-- 受入条件1〜3・5の実機確認（ベータ用ディレクトリ・SQLite複製を含む本番サーバー作業）は本セッションのスコープ外
+## 本番サーバー側構築・実機疎通確認（2026-09-06完了）
 
-## Access 側に渡す情報（本番サーバー側のベータ環境構築後に追記）
+- `upload.ps1 -Beta` でBeaver_betaディレクトリを新規作成・コード一式デプロイ（既存の本番Beaverには一切触れず）
+- 本番`api/database.sqlite`・`api/config.local.php`をSSH `cp`でBeaver_beta用に複製（ファイルサイズ一致確認済み: DB 8159232バイト、config.local.php 889バイト）
+- 受入条件1: `curl https://door-fujita.com/contents/Beaver_beta/api/health` → 200確認済み（レスポンス本文の`'app':'Beaver'`は固定文字列のバグ、後述）
+- 受入条件2: ブラウザ（Chrome自動化）で`https://door-fujita.com/contents/Beaver_beta/`にアクセスし、`df_session`共有Cookieでログイン状態のまま自動的にダッシュボードが開くことを確認。本番複製データ（進行中12件等）が表示され、本番Beaverの`/api/health`は作業前後で200のまま無傷なことを確認
+- 受入条件4: `Beaver_beta`のJSバンドルに文字列`"Beaver_beta"`が実際に埋め込まれていることを確認（LocalStorageキーの`Beaver_beta_`プレフィックスはコード上保証済み、実データでの確認は次回ページ操作時に）
+- 受入条件3・5は未実施（(3)はR-0140(5)関連でAccess側のタイミング調整待ち、(5)は`upload.ps1`を本番向けに実行するテストは今回省略）
+- BASE_PATH切替の実機確認: `curl https://door-fujita.com/contents/Beaver_beta/api/nonexistent` → `{"error":"Not found","path":"/nonexistent"}`。`SetEnv BEAVER_APP_ID`がConoHa WINGのPHPに正しく反映されることを確認（この仕様書§受入条件1で「未確認」としていた懸念点はクリア）
 
-- ベータ API のベース URL: `https://door-fujita.com/contents/Beaver_beta/api`（サーバー側配置完了後に疎通確認して確定）
+### 発見したバグ（実害なし、次回修正）
+`api/index.php`の`/health`エンドポイントが`{"status":"ok","app":"Beaver"}`と固定文字列を返す（`APP_ID`定数を使っていない）。ルーティング自体はBASE_PATH経由で正しく動作しているため実害はないが、`'app' => APP_ID`に直すのが望ましい。
+
+## Access 側に渡す情報
+
+- ベータ API のベース URL: `https://door-fujita.com/contents/Beaver_beta/api`（疎通確認済み）
 - 認証方式: auth-hub driver=shared、`df_session` Cookie（本番と共通。上表「認証」参照）
-- SQLite を本番から再複製する手順: 未整備（本番サーバー作業のため今回のスコープ外。次回、指揮役がベータ用ディレクトリ作成時に手順を確定しここへ追記する）
+- SQLite を本番から再複製する手順: `ssh`で本番サーバーに接続し、`cp public_html/door-fujita.com/contents/Beaver/api/database.sqlite public_html/door-fujita.com/contents/Beaver_beta/api/database.sqlite && chmod 666 .../Beaver_beta/api/database.sqlite`
