@@ -1,6 +1,32 @@
 # 引き継ぎ資料 — Beaver
 
-**最終更新**: 2026-09-06（続き13）
+**最終更新**: 2026-09-06（続き14）
+
+---
+
+## R-0143 A-B-04 完了（2026-09-06）
+
+`POST /invoices/sync`・`POST /payments/sync`を新設（コミット`5f72c26`）。migration 031（`invoices.access_receivable_id`/`access_cancelled_at`、部分UNIQUEインデックス）・032（`payments.access_payment_no`/`origin`、同）。ON CONFLICTではなくトランザクション内SELECT→INSERT/UPDATE分岐を採用（部分UNIQUEインデックスへのON CONFLICTはconflict targetにWHERE句が必要で複雑なため。Access単体からの同期で並列書き込みが無い前提、`ponytail:`コメントで判断根拠を明記）。既存のUI経由`POST /payments`には`origin='beaver'`を明示。いずれも`BILLING_EDIT_ENABLED`封印の対象外（Accessからの一方向push）。`test_invoices_sync.php`5件・`test_payments_sync.php`4件全PASS。
+
+### Beaver_betaへのmigration適用・reset_beta_db.ps1試走
+`$betaOnlyMigrations`に031/032を追加（コミット`1673351`）、試走で`[1/5]〜[5/5]`成功。**注意: reset_beta_db.ps1試走のたびにBeaver_betaのDBは本番の複製に巻き戻るため、それ以前にAPI経由で作成したテストデータ（顧客・伝票等）は消える。** 実機確認時は本番に実在するaccess_customer_no（今回は"1"＝大石工務店）を使うこと。
+
+### 実機確認（Beaver_beta、PHPスクリプト経由）
+```
+POST /invoices/sync（access_receivable_id=88001）→ 200、id=1新規作成
+POST /invoices/sync 再送（同じaccess_receivable_id、cancelled_at付き）→ 200、id=1のまま更新（冪等性確認）、access_cancelled_atが反映
+POST /payments/sync（receivable_id=88001）→ 200、invoice_id=1に正しく解決、origin="access"
+
+POST /vouchers/sync（access_voucher_id=88501）→ voucher_id=5809作成
+POST /invoices/sync（voucher_access_ids=[88501]）→ invoice_vouchers(invoice_id=2, voucher_id=5809)が正しく作成される
+```
+本番`/api/health`→200で無事。
+
+### 次にやること
+- A-B-06（同期バッジ・ロック表示・`sync-state`・`/sync/status`・`/sync/heartbeat`）に着手予定
+- R-0143全体でA-B-01〜05・07〜09が完了。残るはA-B-06のみ
+
+---
 
 ---
 
