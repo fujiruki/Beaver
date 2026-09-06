@@ -19,6 +19,7 @@ php "$root/api/tests/test_customers.php"         >/tmp/bv_cust.log  2>&1 || fail
 php "$root/api/tests/test_customers_sync.php"    >/tmp/bv_cust_sync.log 2>&1 || fail "[test_customers_sync] $(tail -n 8 /tmp/bv_cust_sync.log)"
 php "$root/api/tests/test_voucher_lines_edit.php" >/tmp/bv_lines.log 2>&1 || fail "[test_voucher_lines_edit] $(tail -n 8 /tmp/bv_lines.log)"
 php "$root/api/tests/test_projects.php"          >/tmp/bv_projects.log 2>&1 || fail "[test_projects] $(tail -n 8 /tmp/bv_projects.log)"
+php "$root/api/tests/test_projects_sync.php"     >/tmp/bv_projects_sync.log 2>&1 || fail "[test_projects_sync] $(tail -n 8 /tmp/bv_projects_sync.log)"
 php "$root/api/tests/test_list_sort.php"         >/tmp/bv_list_sort.log 2>&1 || fail "[test_list_sort] $(tail -n 8 /tmp/bv_list_sort.log)"
 php "$root/api/tests/test_tategu_cost_lines.php" >/tmp/bv_tategu_cost_lines.log 2>&1 || fail "[test_tategu_cost_lines] $(tail -n 8 /tmp/bv_tategu_cost_lines.log)"
 php "$root/api/tests/test_feedback.php"          >/tmp/bv_feedback.log 2>&1 || fail "[test_feedback] $(tail -n 8 /tmp/bv_feedback.log)"

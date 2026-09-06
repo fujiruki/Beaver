@@ -95,7 +95,7 @@ if ($method === 'GET' && isset($segments[1]) && $segments[1] === 'sync' && !isse
 
     $sql = 'SELECT p.id, p.project_code, p.name,
                    c.access_customer_no AS customer_access_no,
-                   p.status, p.delivery_date, p.address, p.updated_at
+                   p.status, p.delivery_date, p.address, p.updated_at, p.deleted_at
             FROM projects p
             LEFT JOIN customers c ON c.id = p.customer_id
             WHERE 1=1';
@@ -122,6 +122,10 @@ if ($method === 'GET' && isset($segments[1]) && $segments[1] === 'sync' && !isse
     }
     $stmt->execute();
     $rows = $stmt->fetchAll();
+    foreach ($rows as &$row) {
+        $row['deleted_at'] = utcToJst($row['deleted_at']);
+    }
+    unset($row);
 
     $nextCursor = null;
     if (count($rows) > $limit) {
@@ -502,7 +506,7 @@ switch ($method) {
             echo json_encode($result['body']);
             break;
         }
-        $pdo->prepare('UPDATE projects SET status = "キャンセル", updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+        $pdo->prepare('UPDATE projects SET status = "キャンセル", updated_at = CURRENT_TIMESTAMP, deleted_at = CURRENT_TIMESTAMP WHERE id = ?')
             ->execute([$resourceId]);
         echo json_encode(['cancelled' => true]);
         break;

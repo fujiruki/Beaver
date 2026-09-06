@@ -52,3 +52,5 @@
 027_seed_aggregation_categories  2026-08-27  prod (backup: 同上)
 028_voucher_lines_quantity_real  2026-09-06  dev (backup: api/backups/database_20260906_0335_pre_r0140_migrations.sqlite)
 029_customers_last_synced_at  2026-09-06  dev (backup: 同上)
+034_projects_deleted_at       未適用      dev (worktree作業のためdatabase.sqliteが存在せず未適用。schema.sql+migrations適用のテスト専用DBで動作確認済み)
+034_projects_deleted_at       未適用      beaver_beta (R-0143 A-B-07。指揮役が別途適用)
