@@ -3,11 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { useAppSettings } from '../contexts/AppSettingsContext';
 import { useAggregationCategories, useSyncAggregationCategories } from '../api/aggregationCategories';
 import { useMigrateFixedColumns } from '../api/vouchers';
+import { useSyncStatus } from '../api/sync';
 
 export default function AppSettings() {
   const navigate = useNavigate();
   const { settings, update } = useAppSettings();
   const { data: categories } = useAggregationCategories();
+  const { data: syncStatus } = useSyncStatus();
   const syncMutation = useSyncAggregationCategories();
   const migrateMutation = useMigrateFixedColumns();
   const [migrateResult, setMigrateResult] = useState<{ migrated_costs: number; migrated_prices: number } | null>(null);
@@ -101,6 +103,15 @@ export default function AppSettings() {
             </button>
           </div>
           <p className="text-xs text-slate-400 mt-1">カンマ区切りで % を入力（例: 10, 25, 30）</p>
+        </div>
+
+        {/* R-0143 A-B-06: AccessTategu連携の同期状態 */}
+        <div className="border-t border-slate-100 pt-4">
+          <h2 className="text-xs font-semibold text-slate-500 mb-2">AccessTategu連携</h2>
+          <div className="text-xs text-slate-500 space-y-1">
+            <div>同期先AppID: <span className="font-mono">{syncStatus?.app_id ?? '-'}</span></div>
+            <div>最終同期時刻: {syncStatus?.last_synced_at ?? '未同期'}</div>
+          </div>
         </div>
 
         {/* 売上種別 */}

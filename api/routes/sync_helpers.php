@@ -955,6 +955,37 @@ function syncVoucherAccessLink(PDO $pdo, int $voucherId): void {
 }
 
 /**
+ * PATCH /vouchers/{id}/sync-state
+ * Access側で競合待ちの伝票に sync_pending の印を付ける。
+ */
+function syncVoucherSyncState(PDO $pdo, int $voucherId): void {
+    $data = readJsonBody();
+
+    if (!array_key_exists('sync_pending', $data)) {
+        respond(400, ['error' => 'sync_pending は必須です']);
+        return;
+    }
+
+    $stmt = $pdo->prepare('SELECT id FROM vouchers WHERE id = ?');
+    $stmt->execute([$voucherId]);
+    if (!$stmt->fetchColumn()) {
+        respond(404, ['error' => 'voucher_id が Beaver に存在しません', 'voucher_id' => $voucherId]);
+        return;
+    }
+
+    $syncPending = $data['sync_pending'] ? 1 : 0;
+    try {
+        $pdo->prepare('UPDATE vouchers SET sync_pending = :sync_pending WHERE id = :id')
+            ->execute([':sync_pending' => $syncPending, ':id' => $voucherId]);
+    } catch (Throwable $e) {
+        respondInternalError($e, 'syncVoucherSyncState');
+        return;
+    }
+
+    respond(200, ['voucher_id' => $voucherId, 'sync_pending' => (bool)$syncPending]);
+}
+
+/**
  * PATCH /projects/{id}/customer
  * 案件マスタの得意先変更を受信。Body: {customer_access_no: "456"}
  */

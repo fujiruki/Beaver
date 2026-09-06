@@ -30,6 +30,13 @@ if ($method === 'PATCH' && $resourceId && $subAction === 'access-link') {
     exit;
 }
 
+// --- R-0143 A-B-06: Access側で競合待ちの伝票に印を付ける ---
+// PATCH /vouchers/{id}/sync-state
+if ($method === 'PATCH' && $resourceId && $subAction === 'sync-state') {
+    syncVoucherSyncState($pdo, $resourceId);
+    exit;
+}
+
 // --- R-025 Step E-Beaver: 案件番号なしの過去伝票 push 受信 ---
 // POST /vouchers/sync
 if ($method === 'POST' && isset($segments[1]) && $segments[1] === 'sync' && !$resourceId) {

@@ -52,6 +52,17 @@ export interface Voucher {
   project_name?: string;
   /** 引用先売上の一覧（見積伝票のみ、詳細取得時に付加） */
   converted_sales?: ConvertedSalesSummary[];
+  // R-0143 A-B-06: AccessTategu連携の同期状態
+  /** Access採番の伝票ID。非nullなら「Access由来」、nullなら「Beaver作成」 */
+  access_voucher_id?: number | null;
+  /** Accessで請求済みか（1=請求済み・編集不可） */
+  access_billed_flag?: number;
+  /** Accessでの請求日（access_billed_flag=1のとき） */
+  access_billing_date?: string | null;
+  /** サーバでの最終同期時刻 */
+  last_synced_at?: string | null;
+  /** Access側で確認待ち（競合の可能性あり）の印 */
+  sync_pending?: number;
 }
 
 export interface VoucherLine {

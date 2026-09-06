@@ -63,6 +63,17 @@ export default function CustomerDetail() {
         <h1 style={{ margin: 0, fontSize: 20, fontWeight: 'bold' }}>
           {isNew ? '得意先 新規登録' : '得意先 編集'}
         </h1>
+        {/* R-0143 A-B-06: 同期バッジ */}
+        {!isNew && (
+          <span style={{
+            fontSize: 11, padding: '2px 8px', borderRadius: 4,
+            background: customer?.access_customer_no != null ? '#eff6ff' : '#f0fdf4',
+            color: customer?.access_customer_no != null ? '#1e40af' : '#166534',
+            border: `1px solid ${customer?.access_customer_no != null ? '#bfdbfe' : '#bbf7d0'}`,
+          }}>
+            {customer?.access_customer_no != null ? 'Access由来' : 'Beaver作成'}
+          </span>
+        )}
         {!isNew && (
           <button onClick={() => setShowHistory(true)} style={{ ...backBtnStyle, marginLeft: 'auto' }}>
             変更履歴

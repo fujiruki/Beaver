@@ -105,6 +105,7 @@ try {
         'feedback'                 => __DIR__ . '/routes/feedback.php',
         'admin/feedback'           => __DIR__ . '/routes/feedback.php',
         'integrations/youkan'      => __DIR__ . '/routes/integrations_youkan.php',
+        'sync'                     => __DIR__ . '/routes/sync.php',
     ];
 
     $matched = false;

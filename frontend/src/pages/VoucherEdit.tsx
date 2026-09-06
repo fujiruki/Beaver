@@ -111,15 +111,24 @@ const defaultValues: VoucherFormValues = {
   lines: [{ ...defaultLine }],
 };
 
-type VoucherEditState = Pick<import('../types/voucher').Voucher, 'voucher_type' | 'status' | 'converted_sales'>;
+type VoucherEditState = Pick<import('../types/voucher').Voucher,
+  'voucher_type' | 'status' | 'converted_sales' | 'access_billed_flag'>;
 
 export function getVoucherEditBlockReason(voucher?: Partial<VoucherEditState>): string | null {
+  // R-0143 A-B-06: Accessで請求済みの伝票はstatusに関わらず編集不可（バックエンドは既に409を返す）
+  if (voucher?.access_billed_flag === 1) return 'Accessで請求済み';
   if (voucher?.status === 'billed') return '請求済み';
   if (voucher?.status === 'void') return '無効化済み';
   if (voucher?.voucher_type === 'estimate' && (voucher.converted_sales?.length ?? 0) > 0) {
     return '売上に引用済み';
   }
   return null;
+}
+
+/** R-0143 A-B-06: 'YYYY-MM-DD' を 'yyyy/mm/dd' に変換（不正値はそのまま返す） */
+function formatDateSlash(dateStr?: string | null): string {
+  if (!dateStr) return '';
+  return dateStr.slice(0, 10).replaceAll('-', '/');
 }
 
 export default function VoucherEdit() {
@@ -374,6 +383,21 @@ export default function VoucherEdit() {
                 参照モード
               </span>
             )}
+            {!isNew && (
+              <span style={{
+                fontSize: 11, padding: '2px 8px', borderRadius: 4,
+                background: voucher?.access_voucher_id != null ? '#eff6ff' : '#f0fdf4',
+                color: voucher?.access_voucher_id != null ? '#1e40af' : '#166534',
+                border: `1px solid ${voucher?.access_voucher_id != null ? '#bfdbfe' : '#bbf7d0'}`,
+              }}>
+                {voucher?.access_voucher_id != null ? 'Access由来' : 'Beaver作成'}
+              </span>
+            )}
+            {!isNew && voucher?.last_synced_at && (
+              <span style={{ fontSize: 11, color: '#94a3b8' }}>
+                最終同期: {voucher.last_synced_at}
+              </span>
+            )}
           </div>
 
           <div style={{ display: 'flex', gap: 6 }}>
@@ -416,6 +440,22 @@ export default function VoucherEdit() {
           <div style={{ marginBottom: 12, padding: '10px 14px', background: '#fee2e2',
             color: '#dc2626', borderRadius: 6, fontSize: 14 }}>
             保存に失敗しました: {String(mutError)}
+          </div>
+        )}
+
+        {/* R-0143 A-B-06: 請求済みロック表示 */}
+        {!isNew && voucher?.access_billed_flag === 1 && (
+          <div style={{ marginBottom: 12, padding: '10px 14px', background: '#fef2f2',
+            color: '#991b1b', borderRadius: 6, fontSize: 14, border: '1px solid #fecaca' }}>
+            Accessで請求済み（請求日 {formatDateSlash(voucher.access_billing_date)}）のため編集できません
+          </div>
+        )}
+
+        {/* R-0143 A-B-06: Access側で確認待ち（競合の可能性あり） */}
+        {!isNew && voucher?.sync_pending === 1 && (
+          <div style={{ marginBottom: 12, padding: '10px 14px', background: '#fffbeb',
+            color: '#92400e', borderRadius: 6, fontSize: 14, border: '1px solid #fde68a' }}>
+            Access で確認待ちです
           </div>
         )}
 
@@ -554,7 +594,7 @@ export default function VoucherEdit() {
                   <button type="button" onClick={closeGoBack} style={cancelBtnStyle}>
                     キャンセル
                   </button>
-                  <button type="submit" disabled={isPending} style={submitBtnStyle}>
+                  <button type="submit" disabled={isPending || voucher?.access_billed_flag === 1} style={submitBtnStyle}>
                     {isPending ? '保存中...' : '保存'}
                   </button>
                 </>
