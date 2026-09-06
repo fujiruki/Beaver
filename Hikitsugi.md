@@ -1,6 +1,43 @@
 # 引き継ぎ資料 — Beaver
 
-**最終更新**: 2026-09-01
+**最終更新**: 2026-09-06
+
+---
+
+## R-0140・R-0141 実装完了（2026-09-06）
+
+前節の AccessTategu 側からの依頼（連携契約）を、Agent 2体（worktree隔離・並行実行）に委譲して実装した。
+
+### 実装内容
+- **R-0140 (1)(2)(4)(5)**: コミット `26d6903`
+  - (1) `voucher_lines.quantity` を INTEGER→REAL 化（migration 028）、負数拒否を撤廃（値引行 `quantity=-1` 等を許容）
+  - (2) `PATCH /customers/{id}/access-link` 新設（得意先の紐付け/解除、B-01〜B-04）。`customers.last_synced_at` 列追加（migration 029、既存スキーマに無かったため実装過程で発覚・追加）。`PUT /customers/{id}` から `access_customer_no` を更新対象外に（B-04、2-6は「無視される・200」に決定し仕様書へ追記済み）
+  - (4) sales_categories のID突合は一致確認済みのため `docs/spec/02_機能仕様.md` へ運用注記のみ追記
+  - (5) 見積番号+10000変換SQLを `api/manual/r0140_5_estimate_no_plus10000.sql` に用意（**未実行**。Access側P4全件再push直前に手動実行する）
+  - (3) 基準線の記録はAccess側の合図待ちのため対象外（未着手）
+  - migration 028/029 は**ローカルdev DBに適用済み**（backup: `api/backups/database_20260906_0335_pre_r0140_migrations.sqlite`）
+- **R-0141**: コミット `21fecb5`
+  - `api/config.php`のBASE_PATH・`frontend/vite.config.ts`のbaseを環境変数（`BEAVER_APP_ID`/`VITE_APP_ID`）から切替可能化。未指定時は従来通り本番`Beaver`として動作（後方互換確認済み）
+  - Cookie/LocalStorageプレフィックスを`frontend/src/lib/appId.ts`で一元管理。本番は既存`bv_`を維持、それ以外は`{AppID}_`
+  - `App.tsx`等の`/contents/Beaver`直書き5箇所（自己参照URL）をAPP_ID参照へ修正（実装Agentが当初のgrep洗い出しで見落としていたが追加発見・修正。ここを直さないとベータビルドがルーティング破綻する重大な穴だった）
+  - `upload.ps1`に`-Beta`スイッチ追加（配置先・ビルド時AppID・`.htaccess`のRewriteBase/SetEnvを切替、省略時は本番向け挙動不変）
+  - `docs/development_env.md`・`C:\Fujiruki\CLAUDE.md`（Git管理外）のAppID表にベータ行を追記済み
+  - **本番サーバー側のベータ環境構築（`Beaver_beta`用ディレクトリ作成・SQLite複製・auth-hub実機疎通確認）は今回のスコープ外**、次回セッションで実施
+
+### 実装体制・検証
+- 仕様: `docs/spec/R-0140_accesstategu_r086_integration.md`、`docs/spec/R-0141_beaver_beta_environment.md`（いずれも受入条件表に対応テスト名を追記済み）
+- Agent（`general-purpose`、worktree隔離で並行実行、TDD必須、トークン予算R-0140=45k/R-0141=35k・修正ループ上限5周・同一エラー2回で停止を事前宣言）に実装委譲。実績はR-0140が約221k、R-0141が約162kトークン（いずれも予算を大幅超過したが、指揮役の裏取り検証で問題は見つからなかった。次回は予算見積もりの見直しを検討）
+- 指揮役が両worktreeの差分を確認しメインリポジトリへ手動コピー・統合（`.claude/regression-suite.sh`は両Agentが同じ箇所に別テスト行を追記していたため手動マージ）、vitest・PHPテスト・`npm run build`（本番/ベータ両AppID）・`bash .claude/regression-suite.sh`を再実行して裏取り（🔵青）
+- migration 028/029のdev DB適用はauto mode classifierにブロックされたため、藤田晴樹さんに`!`プレフィックスでの直接実行を依頼して適用（PHPワンショットスクリプト経由）
+- コミット: `26d6903`（R-0140）、`21fecb5`（R-0141）。**未push**
+- 今回使用したworktree（`agent-a399193a86d74bd23`、`agent-a7c59debabfc5136e`）は統合後にnode_modulesがジャンクションでないことを確認した上で`git worktree remove --force`で削除済み
+
+### 次にやること
+1. **GitHubへのpush**: `26d6903`・`21fecb5`をfrontPC側（Access連携の相手）へ知らせるためpushが必要
+2. **R-0141の本番サーバー側構築**: `Beaver_beta`用ディレクトリ作成、SQLite複製（本番の複製から）、`.htaccess`の`SetEnv`がConoHa WINGで`getenv()`に反映されるか実機確認、auth-hubログインフローの実機確認
+3. **R-0140 (3)**: Access側から基準線記録の合図が来たら、G-14〜G-18のSQLを実行して記録する
+4. **R-0140 (5)の本番実行**: Access側のP4全件再push直前に、Beaver停止・Access同期停止の窓で`api/manual/r0140_5_estimate_no_plus10000.sql`を本番DBに実行する（両側で日程調整）
+5. 未着手のworktree5件（`agent-a30c433a79e970f9e`、`agent-a9ee1bf33f176e9e5`、`agent-abd15e38b709ae78f`、`agent-abe7bcf2e660d1f63`、`agent-ad15eead68ebef4b4`）の内容確認・削除は今回も未着手
 
 ---
 
