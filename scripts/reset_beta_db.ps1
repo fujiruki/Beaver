@@ -141,13 +141,24 @@ foreach (`$pdo->query("PRAGMA table_info(voucher_lines)") as `$col) {
         Write-Log "  -> 対象migrationなし。スキップします"
     }
 
-    # 5. projects/sync API（認証不要）のレコード一致を確認する
+    # 5. projects/sync APIのレコード一致を確認する
+    #    Beaver_betaはSYNC_TOKEN_REQUIRED=true（R-0143 A-B-08）のため認証が必要。
+    #    ローカル秘密ファイルがあればbeta側のみにBearerトークンを付与する（本番はトークン不要）
     Write-Log "[5/5] projects/sync APIのレコード一致を確認します"
     $prodUrl = "https://door-fujita.com/contents/Beaver/api/projects/sync?limit=1"
     $betaUrl = "https://door-fujita.com/contents/Beaver_beta/api/projects/sync?limit=1"
 
+    $syncTokenPath = Join-Path $PSScriptRoot ".sync_token.local"
+    $betaCurlArgs  = @("-s")
+    if (Test-Path $syncTokenPath) {
+        $syncToken = (Get-Content -Raw $syncTokenPath).Trim()
+        if ($syncToken -ne "") {
+            $betaCurlArgs += @("-H", "Authorization: Bearer $syncToken")
+        }
+    }
+
     $prodJson = curl.exe -s $prodUrl | ConvertFrom-Json
-    $betaJson = curl.exe -s $betaUrl | ConvertFrom-Json
+    $betaJson = curl.exe @betaCurlArgs $betaUrl | ConvertFrom-Json
 
     $prodId = $prodJson.projects[0].id
     $betaId = $betaJson.projects[0].id

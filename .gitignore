@@ -12,3 +12,4 @@ api/tests/_server_bootstrap.php
 api/config.local.php
 .htpasswd
 .claude/secrets/
+scripts/.sync_token.local
