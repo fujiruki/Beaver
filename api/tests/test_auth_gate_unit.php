@@ -8,6 +8,7 @@
 declare(strict_types=1);
 
 define('BANTO_API_TOKEN', 'unit-test-banto-token');
+define('SYNC_API_TOKEN', 'unit-test-sync-token');
 require_once dirname(__DIR__) . '/auth_gate.php';
 
 $passed = 0;
@@ -40,11 +41,14 @@ $exemptCases = [
     ['POST', '/feedback'],
     ['GET', '/admin/feedback'],
     ['GET', '/projects/sync'],
-    ['POST', '/projects/1/vouchers/sync'],
     ['GET', '/vouchers/sync'],
     ['POST', '/vouchers/sync'],
+    ['GET', '/customers/sync'],
+    ['POST', '/invoices/sync'],
+    ['POST', '/payments/sync'],
+    ['POST', '/sync/heartbeat'],
     ['PATCH', '/vouchers/5/access-link'],
-    ['POST', '/aggregation-categories/sync'],
+    ['PATCH', '/vouchers/5/sync-state'],
 ];
 foreach ($exemptCases as [$method, $path]) {
     runTest("対象外: $method $path", function () use ($method, $path) {
@@ -58,6 +62,11 @@ $guardedCases = [
     ['POST', '/vouchers'],
     ['GET', '/me'],
     ['GET', '/'],
+    // R-0143 A-B-08: 完全一致の免除一覧に変更したため、部分一致でのみ免除されていたパスはゲート対象に戻る
+    ['POST', '/projects/1/vouchers/sync'],
+    ['POST', '/aggregation-categories/sync'],
+    ['GET', '/vouchers/synchronize'],
+    ['GET', '/sync/status'],
 ];
 foreach ($guardedCases as [$method, $path]) {
     runTest("ゲート対象: $method $path", function () use ($method, $path) {
@@ -92,6 +101,25 @@ runTest('Bearer以外のスキームはfalse', function () {
     $_SERVER['HTTP_AUTHORIZATION'] = 'Basic dXNlcjpwYXNz';
     assertTrue(!authGateHasValidBantoToken());
     unset($_SERVER['HTTP_AUTHORIZATION']);
+});
+
+echo "\n=== R-0143 authGateHasValidSyncToken() テスト ===\n\n";
+
+runTest('一致するBearerトークンはtrue', function () {
+    $_SERVER['HTTP_AUTHORIZATION'] = 'Bearer unit-test-sync-token';
+    assertTrue(authGateHasValidSyncToken());
+    unset($_SERVER['HTTP_AUTHORIZATION']);
+});
+
+runTest('不一致のBearerトークンはfalse', function () {
+    $_SERVER['HTTP_AUTHORIZATION'] = 'Bearer wrong-token';
+    assertTrue(!authGateHasValidSyncToken());
+    unset($_SERVER['HTTP_AUTHORIZATION']);
+});
+
+runTest('Authorizationヘッダーなしはfalse', function () {
+    unset($_SERVER['HTTP_AUTHORIZATION']);
+    assertTrue(!authGateHasValidSyncToken());
 });
 
 echo "\n";
