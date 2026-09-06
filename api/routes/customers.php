@@ -174,9 +174,9 @@ if ($method === 'GET' && isset($segments[1]) && $segments[1] === 'sync' && !isse
     }
 
     // carry_forward_balance は正本がAccess側のため絶対にSELECTしない
-    $sql = 'SELECT id, access_customer_no, code, name, name_kana, honorific_type,
-                   postal_code, address1, address2, tel, email, cutoff_day, memo,
-                   updated_at, last_synced_at
+    $sql = 'SELECT id, access_customer_no, code, name, name_kana, honorific_type, gender,
+                   postal_code, address1, address2, tel, mobile, fax, email, cutoff_day, memo,
+                   is_active, updated_at, last_synced_at
             FROM customers WHERE 1=1';
     $params = [];
     if ($updatedAfterSql !== null) {

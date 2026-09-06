@@ -195,6 +195,22 @@ try {
         }
     });
 
+    runTest('gender/mobile/fax/is_activeの4列が応答に含まれる', function () use ($fetch, $base) {
+        $data = json_decode($fetch($base)['body'], true);
+        foreach ($data['customers'] as $c) {
+            foreach (['gender', 'mobile', 'fax', 'is_active'] as $key) {
+                assertTrue(array_key_exists($key, $c), "$key キーが存在すること");
+            }
+        }
+    });
+
+    runTest('4列追加後もcarry_forward_balanceキーは応答に含まれない', function () use ($fetch, $base) {
+        $data = json_decode($fetch($base)['body'], true);
+        foreach ($data['customers'] as $c) {
+            assertTrue(!array_key_exists('carry_forward_balance', $c), 'carry_forward_balanceキーが含まれない');
+        }
+    });
+
     runTest('存在しない列(tax_type/trade_type)は応答に含まれない', function () use ($fetch, $base) {
         $data = json_decode($fetch($base)['body'], true);
         foreach ($data['customers'] as $c) {
