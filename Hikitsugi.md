@@ -1,6 +1,26 @@
 # 引き継ぎ資料 — Beaver
 
-**最終更新**: 2026-09-06（続き10）
+**最終更新**: 2026-09-06（続き11）
+
+---
+
+## R-0143 A-B-03 完了（2026-09-06）
+
+`GET/POST /vouchers/sync`に明細`lines[]`を追加（コミット`9fa585b`）。`GET`応答に`price`（=`line_total`）キー追加、`POST`側の明細同期を自動判定方式に変更（`lines_mode=replace`明示時は常に全置換、未指定時は`edited_in_beaver=1`の行が無ければ自動全置換・あれば保護）。
+
+**要確認事項**: `price`を`line_total`（明細行合計金額）にマッピングしたが、Access側が単価的な値を期待している可能性もあり、Dodaikun側に確認が必要（実装Agentからの申し送り）。
+
+### 実機確認（Beaver_beta、PHP curl経由。日本語混じりJSONはcurlコマンドのコマンドライン引数だとWindows環境でエンコーディング崩れが起きるため、PHPスクリプト経由でリクエストした）
+```
+POST（lines同梱） → voucher_id=5810作成
+GET → line_no=1, item_name="TestItemA", quantity=2, price=12000(=line_total), updated_at="2026-09-06 18:23:10" が往復一致
+```
+
+### 次にやること
+- A-B-05（請求・入金編集封印）はまだAgentで実装中。完了後、Beaver_betaデプロイ・実機確認・Dodaikunへの報告を行う
+- Dodaikunへ`price`マッピングの確認を依頼すること
+
+---
 
 ---
 
