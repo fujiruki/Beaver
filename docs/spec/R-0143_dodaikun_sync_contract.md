@@ -88,7 +88,7 @@
 | A-B-06 | 同期バッジ・ロック表示・`sync-state`・`/sync/status`・`/sync/heartbeat` | A-B-02 | vitest: バッジ 3 状態・ロック表示・確認待ちバナー。`test_sync_state.php`・`test_sync_status.php` | todo |
 | A-B-07 | `GET /projects/sync` に `deleted_at` | — | `test_projects_sync.php`: 削除済み案件が `deleted_at` 付きで返る | done（21f7c3f、Beaver_betaにmigration034適用済み） |
 | A-B-08 | 同期 API の認証（完全一致免除＋`SYNC_API_TOKEN`＋`SYNC_TOKEN_REQUIRED`、`/sync/status` は通常認証） | — | `test_auth_gate_sync.php`: (1) `/vouchers/synchronize` が免除されない (2) `SYNC_TOKEN_REQUIRED=true` でトークン無しの `/vouchers/sync` が 401 (3) 正しいトークンで 200 (4) `/sync/status` は `df_session` 無しで 401。Beaver_beta で true にして curl 照合 | done（cd981d7、Beaver_betaでSYNC_TOKEN_REQUIRED=true・curl照合済み） |
-| A-B-09 | push系応答（`POST /vouchers/sync`・`POST /projects/{id}/vouchers/sync`・`PATCH /projects/{id}/vouchers/{no}/shipped`・`PATCH /projects/{id}/customer`・`POST /customers`）に`last_synced_at`（サーバJST時刻）を必ず含める | A-B-08 | `test_push_responses_last_synced_at.php`: 上記5経路の応答に`last_synced_at`がありDBの同列と一致。`POST /customers`更新後に`customers.last_synced_at`が更新されている | todo |
+| A-B-09 | push系応答（`POST /vouchers/sync`・`POST /projects/{id}/vouchers/sync`・`PATCH /projects/{id}/vouchers/{no}/shipped`・`PATCH /projects/{id}/customer`・`POST /customers`）に`last_synced_at`（サーバJST時刻）を必ず含める | A-B-08 | `test_push_responses_last_synced_at.php`: 上記5経路の応答に`last_synced_at`がありDBの同列と一致。`POST /customers`更新後に`customers.last_synced_at`が更新されている | done（e6dfef8、Beaver_betaで実機確認済み） |
 
 ## 8. 運用ルール
 

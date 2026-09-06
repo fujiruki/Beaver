@@ -1,6 +1,51 @@
 # 引き継ぎ資料 — Beaver
 
-**最終更新**: 2026-09-06（続き8）
+**最終更新**: 2026-09-06（続き9）
+
+---
+
+## ⚠️ セキュリティインシデント: BANTO_API_TOKENの会話ログ露出とローテーション（2026-09-06）
+
+### 何が起きたか
+R-0143 A-B-09の実機確認中、`POST /customers`（通常認証が必要なエンドポイント）を叩くために`curl -v`を実行したところ、`Authorization: Bearer <値>`ヘッダーの実際の値（`BANTO_API_TOKEN`、R-0110番頭AI用の固定トークン）がverboseログに出力され、指揮役のツール実行結果としてこのセッションの会話に露出した。確認したところ**本番Beaverと Beaver_betaで同一の値**だった。
+
+### 対応（藤田晴樹さんの承認を得て実施）
+1. 新しいランダムトークン（32バイト、hex）を生成
+2. 本番・Beaver_beta両方の`config.local.php`をバックアップ（`config.local.php.bak_pre_banto_rotate_20260906`）してからロー テーション（`define('BANTO_API_TOKEN', ...)`を新しい値に置換）
+3. 新トークンで本番・Beaver_beta両方の認証が通ることを確認（`POST /customers`・`GET /customers`）
+4. 新トークンの値は、`docs/wiki/knowledge/banto_ai_beaver_integration.md`の運用ルール（「トークンの値は本ページに書かない。藤田晴樹さんから別途安全な経路で受け取ること」）に従い、**指揮役から番頭AIへ直接は伝えず**、藤田晴樹さんに会話内で提示し、番頭AI側への反映は藤田晴樹さんに依頼した
+5. リモート・ローカルの一時ファイル（トークン抽出・置換用スクリプト、トークン値を含む一時ファイル）はすべて削除済み
+
+### 次にやること（重要）
+- **藤田晴樹さんが番頭AI（BantoAI）側の設定に新しいBANTO_API_TOKENを反映する必要がある**（まだ未実施の可能性が高い、次回セッションで確認すること）。反映されるまで番頭AIはBeaver APIへアクセスできない
+- 旧トークンは既に無効化済み（config.local.php書き換え済みのため、旧値では認証できない）
+
+### 教訓
+- SSH越しに秘密情報を扱うコマンドで`-v`（verbose）オプションは絶対に使わない。Authorizationヘッダーの値がそのまま出力される
+- 今後、トークンを使った実機確認をする際は、値を変数に入れてもコマンド自体の詳細ログ出力（`-v`、`set -x`等）を有効にしない
+- 本番とBeaver_betaで同一の秘密トークンを使い回す設計だと、片方の事故が両方に波及する。今後、環境ごとに別トークンにする設計も検討の余地がある（今回は同一のまま両方ローテーションして対応）
+
+---
+
+## R-0143 A-B-09 完了（2026-09-06）
+
+push系応答に`last_synced_at`を追加（コミット`e6dfef8`）。対象5経路（`syncVoucherUpsert`×2エンドポイント・`syncVoucherShipped`・`syncProjectCustomer`・`POST /customers`）すべて対応。`test_push_responses_last_synced_at.php`6件全PASS、回帰スイート🔵青。Beaver_betaへデプロイ済み。
+
+### 実機確認（BANTO_API_TOKENで認証、英数字のみのテストデータで確認）
+```
+$ curl -X POST ".../Beaver_beta/api/customers" -H "Authorization: Bearer <token>" -d '{"access_customer_no":"90099","name":"TestCustomer90099"}'
+{"id":829,...,"access_customer_no":"90099","last_synced_at":"2026-09-06 08:21:10"} HTTP:201
+```
+`last_synced_at`が正しく含まれることを確認。
+
+**注意**: 日本語を含むJSONボディをWindows環境のcurlで送信すると文字コードの問題で正しく送信されないことが判明（`name`が空文字・`access_customer_no`がnullになる現象を確認）。実機確認時は英数字のみのテストデータを使うか、別の方法（PHPスクリプト経由等）でJSONを送ること。
+
+R-0143契約書の状態表もA-B-09をdoneに更新すること（次回セッションで未実施なら対応）。
+
+### 次にやること（R-0143続き）
+- A-B-02（請求済みロック）→A-B-05（請求・入金編集封印）→A-B-03（lines[]）の順で逐次実装（vouchers.php/invoices.php等で重複するため並列不可）
+
+---
 
 ---
 
