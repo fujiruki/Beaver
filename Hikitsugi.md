@@ -1,6 +1,33 @@
 # 引き継ぎ資料 — Beaver
 
-**最終更新**: 2026-09-06（続き3）
+**最終更新**: 2026-09-06（続き4）
+
+---
+
+## upload.ps1のapi/backups/混入バグ修正（2026-09-06）
+
+前節で発見した「`upload.ps1`がローカルの`api/backups/`（dev DBバックアップ置き場、Git管理外）をデプロイ先へまるごとコピーしてしまう」問題を修正（コミット`426929a`）。`Copy-Item "api\*" -Recurse`の直後に`Remove-Item "$stagingDir\api\backups" -Recurse -Force`を追加。本番Beaver側のcron自動バックアップ置き場（サーバー上の`api/backups/`）はデプロイコマンド側で`api`ディレクトリごと保護される仕組みのため無関係、影響なし。
+
+Beaver_betaに紛れ込んでいた3ファイル（`database_20260714_164504_pre_migration_repair.sqlite`等、ローカルのapi/backups/と一致確認済み）はSSHで削除済み。修正後の`upload.ps1 -Beta`で再デプロイし、backupsに新規混入が無いこと・`/api/health`・`projects/sync`とも正常・本番無事を実データで確認済み。
+
+## R-108完了・今後の進め方（Dodaikun連絡、2026-09-06）
+
+Access側R-108（ベータFEの同期先をBeaver_betaへ切替）完了・push済み（AccessTategu `27ee041`）。ただし同期自体は`sync_paused`で停止中、実際の同期はP4（同期の載せ替え）実装後。
+
+藤田晴樹さんの決定（2026-09-06）で連携の対象と正本が確定:
+- 得意先・伝票（見積/売上）: 双方向＋競合解消
+- 案件: Beaverのみで作成・編集（Beaver→Access一方向）
+- 請求・入金: 双方向でBeaverでも編集可（優先度低め、後段フェーズ）
+- 売掛: 集計値のため同期しない
+
+Dodaikun側で連携設計書を作成中。完成後、Beaver側の契約部分をR-01xxとして受け取り、frontpc/backpcで並行実装に入る予定。**設計書ができるまで大きな実装は待機**。
+
+### 次にやること
+- Dodaikunからの連携設計書（R-01xx）待ち
+- R-0140(3)基準線記録・(5)見積番号+10000変換の本番実行はAccess側合図待ち（変更なし）
+- 本番BeaverへのR-0140デプロイは設計書で順序を決めてから（変更なし）
+
+---
 
 ---
 
