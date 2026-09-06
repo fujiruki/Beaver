@@ -1,6 +1,29 @@
 # 引き継ぎ資料 — Beaver
 
-**最終更新**: 2026-09-06（続き15）
+**最終更新**: 2026-09-06（続き16）
+
+---
+
+## R-0143 完了後の通し確認（2026-09-06、Dodaikun依頼）
+
+Access側がA-F-04〜07で待機中のため、backpc側での積み重ね確認を実施。
+
+### 1. 通し回帰確認 — 🔵青
+メインリポジトリ（Beaver_betaにデプロイ済みのコードと同一）で`bash .claude/regression-suite.sh`（vitest+PHPテスト30本超）・`npm run build`とも成功。Beaver_beta実機でも`customers/sync`・`projects/sync`・`vouchers/sync`・`health`が200、`/sync/status`（SYNC_API_TOKENでは401、仕様通り）を確認。
+
+### 2. 本番Beaver無傷確認
+- 本番サーバー上のコード（`grep -l 'R-0143' api/routes/*.php`等）にR-0143関連文字列が一切無いことを確認
+- 本番`api/migrations/`の最新は`027_seed_aggregation_categories.sql`のまま（028以降のR-0140/R-0141/R-0143系migrationは一切存在しない）
+- 本番DBスキーマ: `vouchers.access_billed_flag`列は存在せず、`voucher_lines.quantity`は`INTEGER`型のまま（R-0143はおろかR-0140すら本番未適用のまま維持されている）
+- 本番API実データ確認（BANTOトークン使用）:
+  - `GET /customers` → 812件、応答キーに`access_billed_flag`等のR-0143追加列なし
+  - `GET /projects` → 54件
+  - `GET /vouchers` → 5800件、`access_billed_flag`キー含まれず（正常）
+  - `GET /api/health` → 200、`{"status":"ok","app":"Beaver"}`
+
+**結論: 本番Beaverは今回の一連のR-0140〜R-0143作業で一切変更されていないことを確認済み。** Dodaikunへ報告し、Access側のA-F-04〜07完了まで待機。
+
+---
 
 ---
 
