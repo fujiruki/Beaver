@@ -132,6 +132,105 @@ function customerAccessLink(PDO $pdo, int $customerId): void {
     ]);
 }
 
+// --- AccessTategu連携契約 A-B-01: Beaver→Access 得意先同期用 軽量増分API ---
+// GET /customers/sync[?updated_after=YYYY-MM-DD HH:NN:SS (JST)][&limit=N][&cursor=ID]
+// 完全一致チェック（/customers/sync/anything を全件返却で誤通過させない）
+if ($method === 'GET' && isset($segments[1]) && $segments[1] === 'sync' && isset($segments[2])) {
+    http_response_code(404);
+    echo json_encode(['error' => 'Not found', 'path' => $path]);
+    exit;
+}
+if ($method === 'GET' && isset($segments[1]) && $segments[1] === 'sync' && !isset($segments[2])) {
+    require_once __DIR__ . '/sync_helpers.php';
+
+    // updated_after は JST の 'Y-m-d H:i:s' として受け取る契約（vouchers/sync と同じ）。
+    // DB列 updated_at は UTC 保存のため、比較前に UTC へ逆変換する。
+    $updatedAfterRaw = $_GET['updated_after'] ?? null;
+    $updatedAfterSql = null;
+    if ($updatedAfterRaw !== null && $updatedAfterRaw !== '') {
+        $updatedAfterDt = DateTime::createFromFormat('Y-m-d H:i:s', $updatedAfterRaw, new DateTimeZone('Asia/Tokyo'));
+        if ($updatedAfterDt === false || $updatedAfterDt->format('Y-m-d H:i:s') !== $updatedAfterRaw) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Invalid updated_after format']);
+            exit;
+        }
+        $updatedAfterDt->setTimezone(new DateTimeZone('UTC'));
+        $updatedAfterSql = $updatedAfterDt->format('Y-m-d H:i:s');
+    }
+
+    // pagination: デフォルト limit=1000、最大 5000、cursor は since_id 方式（id > cursor 昇順）
+    $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 1000;
+    if ($limit < 1)    $limit = 1000;
+    if ($limit > 5000) $limit = 5000;
+
+    $cursor = null;
+    if (isset($_GET['cursor']) && $_GET['cursor'] !== '') {
+        if (!is_numeric($_GET['cursor'])) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Invalid cursor (numeric id required)']);
+            exit;
+        }
+        $cursor = (int)$_GET['cursor'];
+    }
+
+    // carry_forward_balance は正本がAccess側のため絶対にSELECTしない
+    $sql = 'SELECT id, access_customer_no, code, name, name_kana, honorific_type,
+                   postal_code, address1, address2, tel, email, cutoff_day, memo,
+                   updated_at, last_synced_at
+            FROM customers WHERE 1=1';
+    $params = [];
+    if ($updatedAfterSql !== null) {
+        $sql .= ' AND updated_at > :updated_after';
+        $params[':updated_after'] = $updatedAfterSql;
+    }
+    if ($cursor !== null) {
+        $sql .= ' AND id > :cursor';
+        $params[':cursor'] = $cursor;
+    }
+    $sql .= ' ORDER BY id ASC LIMIT :limit_plus_one';
+    $params[':limit_plus_one'] = $limit + 1; // next_cursor 検出のため +1 件取得
+
+    $stmt = $pdo->prepare($sql);
+    foreach ($params as $k => $val) {
+        $type = ($k === ':limit_plus_one' || $k === ':cursor') ? PDO::PARAM_INT : PDO::PARAM_STR;
+        $stmt->bindValue($k, $val, $type);
+    }
+    $stmt->execute();
+    $rows = $stmt->fetchAll();
+
+    // limit+1件目 = 次ページ先頭になるはずのレコード（next_cursor_atの出所）。
+    // next_cursor自体は現ページ最終行のid（id > cursorで次ページを取得する契約のため、
+    // limit+1件目のidを渡すとその行がスキップされてしまう）。
+    $nextCursor = null;
+    $nextCursorAt = null;
+    if (count($rows) > $limit) {
+        $extraRow = $rows[$limit];
+        $rows = array_slice($rows, 0, $limit);
+        $lastRow = end($rows);
+        $nextCursor = (int)$lastRow['id'];
+        $nextCursorAt = utcToJst($extraRow['updated_at']);
+        reset($rows);
+    }
+
+    foreach ($rows as &$row) {
+        $row['updated_at']     = utcToJst($row['updated_at']);
+        $row['last_synced_at'] = utcToJst($row['last_synced_at']);
+    }
+    unset($row);
+
+    $now = new DateTime('now', new DateTimeZone('Asia/Tokyo'));
+    $response = [
+        'synced_at' => $now->format('c'),
+        'customers' => $rows,
+    ];
+    if ($nextCursor !== null) {
+        $response['next_cursor']    = $nextCursor;
+        $response['next_cursor_at'] = $nextCursorAt;
+    }
+    echo json_encode($response);
+    exit;
+}
+
 switch ($method) {
     case 'GET':
         if ($resourceId) {

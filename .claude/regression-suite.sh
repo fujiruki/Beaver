@@ -16,6 +16,7 @@ fail() { echo "$1" >&2; rm -f "$root"/api/tests/*.sqlite 2>/dev/null; exit 1; }
 php "$root/api/tests/test_sync.php"              >/tmp/bv_sync.log   2>&1 || fail "[test_sync] $(tail -n 8 /tmp/bv_sync.log)"
 php "$root/api/tests/test_recalc_inclusive.php"  >/tmp/bv_recalc.log 2>&1 || fail "[test_recalc_inclusive] $(tail -n 8 /tmp/bv_recalc.log)"
 php "$root/api/tests/test_customers.php"         >/tmp/bv_cust.log  2>&1 || fail "[test_customers] $(tail -n 8 /tmp/bv_cust.log)"
+php "$root/api/tests/test_customers_sync.php"    >/tmp/bv_cust_sync.log 2>&1 || fail "[test_customers_sync] $(tail -n 8 /tmp/bv_cust_sync.log)"
 php "$root/api/tests/test_voucher_lines_edit.php" >/tmp/bv_lines.log 2>&1 || fail "[test_voucher_lines_edit] $(tail -n 8 /tmp/bv_lines.log)"
 php "$root/api/tests/test_projects.php"          >/tmp/bv_projects.log 2>&1 || fail "[test_projects] $(tail -n 8 /tmp/bv_projects.log)"
 php "$root/api/tests/test_list_sort.php"         >/tmp/bv_list_sort.log 2>&1 || fail "[test_list_sort] $(tail -n 8 /tmp/bv_list_sort.log)"
