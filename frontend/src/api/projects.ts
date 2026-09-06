@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tansta
 import { api } from './client';
 import type { Project, ProjectInput, ProjectImage } from '../types/project';
 import type { PaginatedResponse, SortParam } from '../types/pagination';
+import { APP_ID } from '../lib/appId';
 
 const KEY = 'projects';
 
@@ -90,7 +91,7 @@ export function useUploadProjectImage(projectId: number) {
     mutationFn: async (file: File) => {
       const formData = new FormData();
       formData.append('image', file);
-      const res = await fetch(`/contents/Beaver/api/projects/${projectId}/images`, {
+      const res = await fetch(`/contents/${APP_ID}/api/projects/${projectId}/images`, {
         method: 'POST',
         body: formData,
       });

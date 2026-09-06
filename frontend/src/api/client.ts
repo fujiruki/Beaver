@@ -1,7 +1,9 @@
 // APIクライアント — すべてのAPIフックはこれ経由で呼ぶ
-// Vite proxy: /contents/Beaver/api/* → localhost:8003/*
+// Vite proxy: /contents/{APP_ID}/api/* → localhost:8003/*
 
-const BASE = '/contents/Beaver/api';
+import { APP_ID } from '../lib/appId';
+
+const BASE = `/contents/${APP_ID}/api`;
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(BASE + path, init);

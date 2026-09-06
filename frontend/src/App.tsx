@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import AppLayout from './components/layout/AppLayout';
 import { AppSettingsProvider } from './contexts/AppSettingsContext';
+import { APP_ID } from './lib/appId';
 
 const Dashboard            = lazy(() => import('./pages/Dashboard'));
 const CustomerList         = lazy(() => import('./pages/CustomerList'));
@@ -35,7 +36,7 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AppSettingsProvider>
-        <BrowserRouter basename="/contents/Beaver">
+        <BrowserRouter basename={`/contents/${APP_ID}`}>
           <Suspense fallback={<div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>読み込み中...</div>}>
             <Routes>
               <Route path="/" element={<AppLayout />}>

@@ -1,4 +1,5 @@
 import { createContext, useContext, useState } from 'react';
+import { APP_STORAGE_PREFIX } from '../lib/appId';
 
 export interface ColumnMapping {
   cost_body: string;
@@ -19,7 +20,7 @@ export interface AppSettings {
   columnMapping: ColumnMapping;
 }
 
-const KEY = 'bv_app_settings';
+const KEY = `${APP_STORAGE_PREFIX}app_settings`;
 
 const DEFAULT_COLUMN_MAPPING: ColumnMapping = {
   cost_body:          'MAIN',

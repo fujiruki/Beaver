@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { dailyLoad } from '../../lib/dandoriCalc';
+import { APP_STORAGE_PREFIX } from '../../lib/appId';
 import {
   addDaysISO,
   daysBetween,
@@ -15,7 +16,7 @@ const DETAIL_THRESHOLD_PX = 12; // これ未満は日付数字を消して月境
 const LABEL_THRESHOLD_PX = 10;  // これ未満はバー内ラベルを消す
 
 // R-0138: 案件名列・得意先名列の幅
-const LABEL_WIDTHS_STORAGE_KEY = 'bv_dandori_label_widths';
+const LABEL_WIDTHS_STORAGE_KEY = `${APP_STORAGE_PREFIX}dandori_label_widths`;
 const NAME_COL_MIN_WIDTH = 60;
 const CUST_COL_MIN_WIDTH = 60;
 const LABEL_TOTAL_MIN_WIDTH = NAME_COL_MIN_WIDTH + CUST_COL_MIN_WIDTH;

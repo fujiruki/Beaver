@@ -1,6 +1,7 @@
 import { useMutation } from '@tanstack/react-query';
+import { APP_ID } from '../lib/appId';
 
-const BASE = '/contents/Beaver/api';
+const BASE = `/contents/${APP_ID}/api`;
 
 export interface FeedbackInput {
   message: string;

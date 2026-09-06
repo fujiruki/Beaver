@@ -1,13 +1,16 @@
 param (
-    [switch]$KeepLocalDB
+    [switch]$KeepLocalDB,
+    # R-0141: ベータ環境（AppID Beaver_beta）へ配置する場合に指定する。省略時は従来通り本番へ配置する
+    [switch]$Beta
 )
 
 $ErrorActionPreference = "Stop"
 
+$appId       = if ($Beta) { "Beaver_beta" } else { "Beaver" }
 $serverHost  = "www1045.conoha.ne.jp"
 $serverUser  = "c6924945"
 $serverPort  = "8022"
-$remoteDir   = "public_html/door-fujita.com/contents/Beaver"
+$remoteDir   = "public_html/door-fujita.com/contents/$appId"
 $sshKeyPath  = "C:\Fujiruki\Projects\AI_DEVELOP_RULES\UPLOAD\key-2025-11-29-07-10.pem"
 $archiveName = "deploy.tar.gz"
 
@@ -18,8 +21,11 @@ Write-Host "Target: $remoteDir"
 # 1. Build
 Write-Host "`n[1/4] Building frontend..."
 Push-Location "$PSScriptRoot\frontend"
+$env:VITE_APP_ID = $appId
 npm.cmd run build
-if ($LASTEXITCODE -ne 0) { Pop-Location; throw "Build failed" }
+$buildExitCode = $LASTEXITCODE
+Remove-Item Env:\VITE_APP_ID
+if ($buildExitCode -ne 0) { Pop-Location; throw "Build failed" }
 Pop-Location
 
 # 2. Stage
@@ -31,7 +37,10 @@ New-Item -ItemType Directory -Path $stagingDir | Out-Null
 Write-Host "  -> Copying dist..." -ForegroundColor Cyan
 Copy-Item "$PSScriptRoot\frontend\dist\*" "$stagingDir\" -Recurse -Force
 
-Copy-Item "$PSScriptRoot\.htaccess" "$stagingDir\.htaccess" -Force
+$htaccess = Get-Content "$PSScriptRoot\.htaccess" -Raw
+$htaccess = $htaccess.Replace("/contents/Beaver/", "/contents/$appId/")
+$htaccess += "`nSetEnv BEAVER_APP_ID $appId`n"
+Set-Content -Path "$stagingDir\.htaccess" -Value $htaccess -NoNewline
 
 Write-Host "  -> Copying api..." -ForegroundColor Cyan
 New-Item -ItemType Directory -Path "$stagingDir\api" | Out-Null
@@ -77,7 +86,7 @@ try {
 
     Write-Host "`n========================================" -ForegroundColor Green
     Write-Host "  DEPLOYMENT COMPLETED SUCCESSFULLY!" -ForegroundColor Green
-    Write-Host "  https://door-fujita.com/contents/Beaver/" -ForegroundColor Green
+    Write-Host "  https://door-fujita.com/contents/$appId/" -ForegroundColor Green
     Write-Host "========================================" -ForegroundColor Green
 }
 finally {

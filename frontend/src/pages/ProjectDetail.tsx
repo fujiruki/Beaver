@@ -13,6 +13,7 @@ import HardDeleteProjectModal from '../components/HardDeleteProjectModal';
 import { useAppSettings } from '../contexts/AppSettingsContext';
 import { useSmartBack } from '../hooks/useSmartBack';
 import type { ProjectInput } from '../types/project';
+import { APP_ID } from '../lib/appId';
 import type { Customer } from '../types/customer';
 
 /** APIクライアントの `API error 409: {"error":"..."}` 形式からサーバのエラーメッセージ本文を取り出す */
@@ -370,7 +371,7 @@ export default function ProjectDetail() {
                 {images.map(img => (
                   <div key={img.id} className="relative group">
                     <img
-                      src={`/contents/Beaver/api/${img.file_path}`}
+                      src={`/contents/${APP_ID}/api/${img.file_path}`}
                       alt={img.file_name}
                       className="w-24 h-24 object-cover rounded border border-slate-200"
                     />

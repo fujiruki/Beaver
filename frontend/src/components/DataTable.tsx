@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, ReactNode } from 'react';
+import { APP_STORAGE_PREFIX } from '../lib/appId';
 
 export type SortDir = 'asc' | 'desc';
 
@@ -38,9 +39,9 @@ export interface SortState {
   dir: SortDir;
 }
 
-const STORAGE_PREFIX = 'bv_table_widths_';
-const ORDER_STORAGE_PREFIX = 'bv_table_order_';
-const SORT_STORAGE_PREFIX = 'bv_table_sort_';
+const STORAGE_PREFIX = `${APP_STORAGE_PREFIX}table_widths_`;
+const ORDER_STORAGE_PREFIX = `${APP_STORAGE_PREFIX}table_order_`;
+const SORT_STORAGE_PREFIX = `${APP_STORAGE_PREFIX}table_sort_`;
 const DEFAULT_MIN_WIDTH = 60;
 const REORDER_MOVE_THRESHOLD = 4;
 const HEADER_TEXT_COLOR = '#475569';

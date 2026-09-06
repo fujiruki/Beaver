@@ -18,8 +18,14 @@ if (!defined('DB_USER')) define('DB_USER', 'root');
 if (!defined('DB_PASS')) define('DB_PASS', '');
 
 // アプリ設定
-if (!defined('APP_ID'))    define('APP_ID', 'Beaver');
-if (!defined('BASE_PATH')) define('BASE_PATH', '/contents/Beaver/api');
+// R-0141: 環境変数 BEAVER_APP_ID でAppIDを切り替え可能にする（未指定なら本番の'Beaver'のまま）
+function beaver_resolve_app_id(string|false $env): string
+{
+    return $env !== false && $env !== '' ? $env : 'Beaver';
+}
+
+if (!defined('APP_ID'))    define('APP_ID', beaver_resolve_app_id(getenv('BEAVER_APP_ID')));
+if (!defined('BASE_PATH')) define('BASE_PATH', '/contents/' . APP_ID . '/api');
 
 // ローカル/本番固有の秘密情報（Git管理外、.gitignore済み）
 if (file_exists(__DIR__ . '/config.local.php')) {

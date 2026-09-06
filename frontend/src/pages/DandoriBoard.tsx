@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useProjects } from '../api/projects';
 import { useAppSettings } from '../contexts/AppSettingsContext';
+import { APP_STORAGE_PREFIX } from '../lib/appId';
 import { api } from '../api/client';
 import type { Project } from '../types/project';
 import GanttScroll from '../components/dandori/GanttScroll';
@@ -22,7 +23,7 @@ import {
 } from '../components/dandori/dandoriBoardUtils';
 import '../components/dandori/dandoriBoard.css';
 
-const FONT_SCALE_KEY = 'bv_dandori_font_scale';
+const FONT_SCALE_KEY = `${APP_STORAGE_PREFIX}dandori_font_scale`;
 const FONT_SCALES = [0.85, 1, 1.15];
 const FONT_LABELS = ['A−', 'A', 'A＋'];
 const PRESETS: RangePreset[] = ['8w', '6m', '1y'];
