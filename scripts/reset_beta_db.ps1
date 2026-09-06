@@ -88,16 +88,51 @@ try {
             & scp -o StrictHostKeyChecking=no -P $serverPort -i $sshKeyPath $localPath "${target}:$remotePath"
             if ($LASTEXITCODE -ne 0) { throw "scp失敗: $migration" }
 
+            # PHPコードをインラインの文字列としてssh経由の`php -r`に渡すと、多重クォートが
+            # ネイティブコマンド引数エスケープで壊れるため、一時ファイル転送方式にする
             Write-Log "  -> 適用: $migration"
-            $applyPhp = '$pdo = new PDO("sqlite:' + $betaDb + '"); $pdo->exec(file_get_contents("' + $remotePath + '"));'
-            Invoke-RemoteSsh "php -r '$applyPhp'"
+            $applyPhpLocal  = Join-Path $env:TEMP "beaver_apply_$([guid]::NewGuid()).php"
+            $applyPhpRemote = "$migrationsRemoteTmp/apply_$([guid]::NewGuid()).php"
+            $applyPhpContent = @"
+<?php
+`$pdo = new PDO("sqlite:$betaDb");
+`$pdo->exec(file_get_contents("$remotePath"));
+"@
+            [System.IO.File]::WriteAllText($applyPhpLocal, $applyPhpContent, (New-Object System.Text.UTF8Encoding $false))
+            try {
+                & scp -o StrictHostKeyChecking=no -P $serverPort -i $sshKeyPath $applyPhpLocal "${target}:$applyPhpRemote"
+                if ($LASTEXITCODE -ne 0) { throw "scp失敗: $migration 適用用PHP" }
+                Invoke-RemoteSsh "php $applyPhpRemote"
+                Invoke-RemoteSsh "rm -f $applyPhpRemote"
+            } finally {
+                Remove-Item -Path $applyPhpLocal -ErrorAction SilentlyContinue
+            }
         }
-        Invoke-RemoteSsh "rm -rf $migrationsRemoteTmp"
 
         # ponytail: 型確認は現状の唯一の対象migration（028）に合わせてvoucher_lines.quantityを直接見ている。
         # 対象が増えたら確認先カラムもあわせて増やす（配列化は今は1件のみのためYAGNI）
-        $checkPhp = '$pdo = new PDO("sqlite:' + $betaDb + '"); foreach ($pdo->query("PRAGMA table_info(voucher_lines)") as $col) { if ($col["name"] === "quantity") { echo $col["type"]; } }'
-        $quantityType = (Invoke-RemoteSsh "php -r '$checkPhp'").Trim()
+        $checkPhpLocal  = Join-Path $env:TEMP "beaver_check_$([guid]::NewGuid()).php"
+        $checkPhpRemote = "$migrationsRemoteTmp/check_$([guid]::NewGuid()).php"
+        $checkPhpContent = @"
+<?php
+`$pdo = new PDO("sqlite:$betaDb");
+foreach (`$pdo->query("PRAGMA table_info(voucher_lines)") as `$col) {
+    if (`$col["name"] === "quantity") {
+        echo `$col["type"];
+    }
+}
+"@
+        [System.IO.File]::WriteAllText($checkPhpLocal, $checkPhpContent, (New-Object System.Text.UTF8Encoding $false))
+        try {
+            & scp -o StrictHostKeyChecking=no -P $serverPort -i $sshKeyPath $checkPhpLocal "${target}:$checkPhpRemote"
+            if ($LASTEXITCODE -ne 0) { throw "scp失敗: 型確認用PHP" }
+            $quantityType = (Invoke-RemoteSsh "php $checkPhpRemote").Trim()
+            Invoke-RemoteSsh "rm -f $checkPhpRemote"
+        } finally {
+            Remove-Item -Path $checkPhpLocal -ErrorAction SilentlyContinue
+        }
+        Invoke-RemoteSsh "rm -rf $migrationsRemoteTmp"
+
         if ($quantityType -ne "REAL") {
             throw "voucher_lines.quantityの型がREALになっていません（実際: $quantityType）"
         }
