@@ -25,7 +25,7 @@ $target  = "$serverUser@$serverHost"
 $logPath = "$PSScriptRoot\reset_beta_db.log"
 
 # Beaver_betaにのみ先行適用するmigration（本番にはまだ適用されていないもの）。増えたら追記する
-$betaOnlyMigrations  = @("028_voucher_lines_quantity_real.sql")
+$betaOnlyMigrations  = @("028_voucher_lines_quantity_real.sql", "034_projects_deleted_at.sql")
 $migrationsLocalDir  = Join-Path $PSScriptRoot "..\api\migrations"
 $migrationsRemoteTmp = "$betaDir/migrations_tmp"
 
