@@ -1,4 +1,4 @@
-param (
+﻿param (
     [switch]$KeepLocalDB,
     # R-0141: ベータ環境（AppID Beaver_beta）へ配置する場合に指定する。省略時は従来通り本番へ配置する
     [switch]$Beta
@@ -45,6 +45,9 @@ Set-Content -Path "$stagingDir\.htaccess" -Value $htaccess -NoNewline
 Write-Host "  -> Copying api..." -ForegroundColor Cyan
 New-Item -ItemType Directory -Path "$stagingDir\api" | Out-Null
 Copy-Item "$PSScriptRoot\api\*" "$stagingDir\api\" -Recurse -Force
+
+Write-Host "  -> Excluding local backups directory..." -ForegroundColor Yellow
+Remove-Item "$stagingDir\api\backups" -Recurse -Force -ErrorAction SilentlyContinue
 
 if ($KeepLocalDB) {
     Write-Host "  -> WARNING: Uploading local DB. Production data will be OVERWRITTEN!" -ForegroundColor Red
