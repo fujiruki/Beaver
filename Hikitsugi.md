@@ -1,6 +1,28 @@
 # 引き継ぎ資料 — Beaver
 
-**最終更新**: 2026-09-06（続き7）
+**最終更新**: 2026-09-06（続き8）
+
+---
+
+## reset_beta_db.ps1のトークン対応・試走成功（2026-09-06）
+
+Dodaikunの指摘（A-B-08でBeaver_betaが`SYNC_TOKEN_REQUIRED=true`になったため、`reset_beta_db.ps1`の[5/5]が認証で落ちる）を受けて対応（コミット`23be01e`）。
+
+### 対応内容
+- ローカル秘密ファイル`scripts/.sync_token.local`（`.gitignore`済み）があればBeaver_beta側のリクエストにのみ`Authorization: Bearer`を付与、無ければ従来どおり無トークンで実行（後方互換）
+- トークンの値はリポジトリに一切書き込んでいない。指揮役がBeaver_beta側`config.local.php`からSSH経由でトークン値を抽出し（PHPの標準出力をファイルへリダイレクトし会話ログに出さない）、`scripts/.sync_token.local`へ保存済み
+
+### 試走結果 — [1/5]〜[5/5]すべて成功
+```
+[1/5] バックアップ完了
+[2/5] 複製完了
+[3/5] サイズ一致確認OK
+[4/5] migration028・034転送・適用・型確認OK（quantity=REAL）
+[5/5] レコード一致確認OK（トークン付きで認証通過、id=1）
+```
+再確認: Beaver_betaの`quantity=REAL`・`deleted_at=DATETIME`とも維持、本番`/api/health`→200で無事。
+
+---
 
 ---
 
