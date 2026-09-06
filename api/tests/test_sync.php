@@ -259,7 +259,7 @@ runTest('tax_category 不正値 → 422', function () {
     assertEq('tax_category', $r['body']['field']);
 });
 
-runTest('quantity 負値 → 422', function () {
+runTest('R-0140 (1): quantity 負値 → 200（負数拒否は撤廃、値引行として保存される）', function () use (&$pdo) {
     $r = runHelperCase('syncVoucherUpsert', null, [
         'access_voucher_id' => 9103,
         'voucher_type'      => 'estimate',
@@ -267,11 +267,15 @@ runTest('quantity 負値 → 422', function () {
         'voucher_date'      => '2026-06-03',
         'total_amount'      => 1000,
         'lines' => [
-            ['line_type' => 'normal', 'item_name' => 'X', 'quantity' => -1, 'line_total' => 1000, 'tax_category' => '課税'],
+            ['line_type' => 'discount', 'item_name' => '値引', 'quantity' => -1, 'line_total' => -160, 'tax_category' => '非課税'],
         ],
     ]);
-    assertEq(422, $r['code']);
-    assertEq('quantity', $r['body']['field']);
+    assertEq(200, $r['code'], 'http code', ['stderr' => $r['stderr'] ?? '', 'body' => $r['body'] ?? null]);
+    $row = $pdo->query("
+        SELECT vl.quantity FROM voucher_lines vl JOIN vouchers v ON v.id = vl.voucher_id
+        WHERE v.access_voucher_id = 9103
+    ")->fetch();
+    assertEq(-1.0, (float)$row['quantity'], 'quantity が -1 で保存される');
 });
 
 runTest('line_total 非数値 → 422', function () {
@@ -324,6 +328,61 @@ runTest('422 のときは voucher 本体も INSERT されない（rollback 確�
     assertEq(422, $r['code']);
     $row = $pdo->query('SELECT id FROM vouchers WHERE access_voucher_id = 9106')->fetch();
     assertEq(false, $row, 'voucher row should not exist (rolled back)');
+});
+
+echo "\n=== R-0140 (1) voucher_lines.quantity REAL化・負数許容（受入条件 1-1〜1-3） ===\n";
+
+$pdo->exec("INSERT INTO customers (name, access_customer_no) VALUES ('R0140テスト得意先733', '733')");
+$r0140FixtureDir = dirname($ROOT) . '/docs/spec/fixtures/accesstategu_r086';
+
+runTest('1-1: 検体voucher_estimate_11704_discount.jsonをsync→200・5行・4行目quantity=0・5行目quantity=-1(値引/非課税)', function () use (&$pdo, $r0140FixtureDir) {
+    $payload = json_decode(file_get_contents($r0140FixtureDir . '/voucher_estimate_11704_discount.json'), true);
+    $r = runHelperCase('syncVoucherUpsert', null, $payload);
+    assertEq(200, $r['code'], 'http code', ['stderr' => $r['stderr'] ?? '', 'body' => $r['body'] ?? null]);
+
+    $rows = $pdo->query("
+        SELECT vl.line_no, vl.quantity, vl.line_total, vl.tax_category, vl.line_type
+        FROM voucher_lines vl JOIN vouchers v ON v.id = vl.voucher_id
+        WHERE v.access_voucher_id = 11704 ORDER BY vl.line_no
+    ")->fetchAll();
+    assertEq(5, count($rows), '明細5行');
+    $line5 = $rows[4];
+    assertEq(-1.0, (float)$line5['quantity'], '5行目 quantity=-1');
+    assertEq(-160.0, (float)$line5['line_total'], '5行目 line_total=-160');
+    assertEq('non_taxable', $line5['tax_category'], '5行目 tax_category=非課税');
+    assertEq('discount', $line5['line_type'], '5行目 line_type=discount');
+    $line4 = $rows[3];
+    assertEq(0.0, (float)$line4['quantity'], '4行目 quantity=0');
+});
+
+runTest('1-2: 1行目quantityを2.5・line_totalを9000にして送ると小数のまま保存される', function () use (&$pdo, $r0140FixtureDir) {
+    $payload = json_decode(file_get_contents($r0140FixtureDir . '/voucher_estimate_11704_discount.json'), true);
+    $payload['lines'][0]['quantity'] = 2.5;
+    $payload['lines'][0]['line_total'] = 9000;
+    $r = runHelperCase('syncVoucherUpsert', null, $payload);
+    assertEq(200, $r['code'], 'http code', ['stderr' => $r['stderr'] ?? '', 'body' => $r['body'] ?? null]);
+
+    $row = $pdo->query("
+        SELECT vl.quantity FROM voucher_lines vl JOIN vouchers v ON v.id = vl.voucher_id
+        WHERE v.access_voucher_id = 11704 AND vl.line_no = 1
+    ")->fetch();
+    assertEq(2.5, (float)$row['quantity'], '1行目 quantity=2.5 が整数に丸まらず保存される（DB確認）');
+});
+
+runTest('1-3: quantity="abc" → 422・field=quantity（is_numeric判定は残る）', function () {
+    $r = runHelperCase('syncVoucherUpsert', null, [
+        'access_voucher_id' => 9107,
+        'voucher_type'      => 'estimate',
+        'customer_access_no'=> '',
+        'voucher_date'      => '2026-06-03',
+        'total_amount'      => 1000,
+        'lines' => [
+            ['line_type' => 'normal', 'item_name' => 'X', 'quantity' => 'abc', 'line_total' => 1000, 'tax_category' => '課税'],
+        ],
+    ]);
+    assertEq(422, $r['code']);
+    assertEq('invalid_line', $r['body']['error']);
+    assertEq('quantity', $r['body']['field']);
 });
 
 echo "\n=== R-035 (b) access_voucher_no 重複時の防御 ===\n";
@@ -835,6 +894,17 @@ try {
         ] as $key) {
             assertTrue(array_key_exists($key, $first), "$key キーが既存通り存在すること");
         }
+    });
+
+    runTest('1-2: GET /vouchers/sync の lines[].quantity も 2.5 のまま返る（整数に丸まらない）', function () use ($vfetch, $vbase) {
+        $data = json_decode($vfetch($vbase)['body'], true);
+        $found = null;
+        foreach ($data['vouchers'] as $v) { if ((int)($v['access_voucher_id'] ?? 0) === 11704) { $found = $v; break; } }
+        assertTrue($found !== null, 'access_voucher_id=11704 の伝票が見つかること');
+        $line1 = null;
+        foreach ($found['lines'] as $l) { if ((int)$l['line_no'] === 1) { $line1 = $l; break; } }
+        assertTrue($line1 !== null, '1行目が見つかること');
+        assertEq(2.5, (float)$line1['quantity'], 'GET /vouchers/sync でも quantity=2.5 が返る');
     });
 
     runTest('customer_access_no が得意先の access_customer_no と一致する', function () use ($vfetch, $vbase, $testDbPath) {

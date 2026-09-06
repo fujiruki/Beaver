@@ -61,6 +61,77 @@ if ($method === 'PATCH' && $resourceId && $subResource === 'carry-forward') {
     exit;
 }
 
+// PATCH /customers/{id}/access-link — R-0140 (2): AccessTategu 得意先番号の紐付け・解除
+if ($method === 'PATCH' && $resourceId && $subResource === 'access-link') {
+    customerAccessLink($pdo, $resourceId);
+    exit;
+}
+
+/**
+ * PATCH /customers/{id}/access-link
+ * routes/sync_helpers.php の syncVoucherAccessLink（PATCH /vouchers/{id}/access-link）と同型。
+ * B-01: access_customer_no を指定 → 紐付け（同値の再送も200で冪等）
+ * B-02: access_customer_no=null → 紐付け解除。code は nextCustomerCode() で90001〜の仮コードに戻す
+ */
+function customerAccessLink(PDO $pdo, int $customerId): void {
+    $data = json_decode(file_get_contents('php://input'), true) ?? [];
+    if (!array_key_exists('access_customer_no', $data)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'access_customer_no is required']);
+        return;
+    }
+
+    $checkStmt = $pdo->prepare('SELECT id FROM customers WHERE id = ?');
+    $checkStmt->execute([$customerId]);
+    if (!$checkStmt->fetch()) {
+        http_response_code(404);
+        echo json_encode(['error' => 'Not found']);
+        return;
+    }
+
+    $accessCustomerNo = $data['access_customer_no'];
+
+    try {
+        if ($accessCustomerNo === null) {
+            $code = nextCustomerCode($pdo);
+            $pdo->prepare('
+                UPDATE customers
+                SET access_customer_no = NULL, code = :code, updated_at = CURRENT_TIMESTAMP, last_synced_at = CURRENT_TIMESTAMP
+                WHERE id = :id
+            ')->execute([':code' => $code, ':id' => $customerId]);
+            $status = 'unlinked';
+        } else {
+            $accessCustomerNo = (string)$accessCustomerNo;
+            $pdo->prepare('
+                UPDATE customers
+                SET access_customer_no = :n, code = :n, updated_at = CURRENT_TIMESTAMP, last_synced_at = CURRENT_TIMESTAMP
+                WHERE id = :id
+            ')->execute([':n' => $accessCustomerNo, ':id' => $customerId]);
+            $status = 'linked';
+        }
+    } catch (PDOException $e) {
+        if (str_contains($e->getMessage(), 'UNIQUE constraint failed')) {
+            $violated = classifyUniqueViolationColumn($e->getMessage()) ?? 'access_customer_no';
+            http_response_code(409);
+            echo json_encode(['error' => "$violated が既に存在します", 'column' => $violated]);
+            return;
+        }
+        throw $e;
+    }
+
+    $stmt = $pdo->prepare('SELECT access_customer_no, code, last_synced_at FROM customers WHERE id = ?');
+    $stmt->execute([$customerId]);
+    $row = $stmt->fetch();
+    http_response_code(200);
+    echo json_encode([
+        'customer_id'        => $customerId,
+        'access_customer_no' => $row['access_customer_no'],
+        'code'                => $row['code'],
+        'last_synced_at'      => $row['last_synced_at'],
+        'status'              => $status,
+    ]);
+}
+
 switch ($method) {
     case 'GET':
         if ($resourceId) {
@@ -241,11 +312,11 @@ switch ($method) {
         $data = json_decode(file_get_contents('php://input'), true) ?? [];
         // carry_forward_balance は PATCH /carry-forward 専用。通常更新では変更不可
         // R-075: codeはユーザーが変更できない（自動採番のみ）ため更新対象から除外
+        // R-0140 (2) B-04: access_customer_no も PATCH /access-link 専用（誤操作防止）のため除外
         $fields = ['name','name_kana','honorific_type','gender',
                    'postal_code','address1','address2','tel','mobile','fax','email',
                    'memo','billing_name','billing_date_print',
-                   'cutoff_day','billing_offset_days','payment_due_days','is_active',
-                   'access_customer_no'];
+                   'cutoff_day','billing_offset_days','payment_due_days','is_active'];
         $sets = [];
         $params = [];
         foreach ($fields as $f) {

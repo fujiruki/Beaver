@@ -242,11 +242,11 @@ function customerSearch(PDO $pdo, string $q): array {
  */
 function customerPut(PDO $pdo, int $resourceId, array $data): array {
     // R-075: codeはユーザーが変更できない（自動採番のみ）ため更新対象から除外
+    // R-0140 (2) B-04: access_customer_noもPATCH /access-link専用のため除外
     $fields = ['name','name_kana','honorific_type','gender',
                'postal_code','address1','address2','tel','mobile','fax','email',
                'memo','billing_name','billing_date_print',
-               'cutoff_day','billing_offset_days','payment_due_days','is_active',
-               'access_customer_no'];
+               'cutoff_day','billing_offset_days','payment_due_days','is_active'];
     $sets = [];
     $params = [];
     foreach ($fields as $f) {
@@ -271,6 +271,62 @@ function customerPut(PDO $pdo, int $resourceId, array $data): array {
     $stmt = $pdo->prepare('SELECT * FROM customers WHERE id = ?');
     $stmt->execute([$resourceId]);
     return ['code' => 200, 'body' => $stmt->fetch()];
+}
+
+/**
+ * R-0140 (2): routes/customers.php の customerAccessLink() と同一ロジック。
+ * PATCH /customers/{id}/access-link をインライン実行。
+ * 戻り値: ['code' => int, 'body' => array]
+ */
+function customerAccessLink(PDO $pdo, int $customerId, array $data): array {
+    if (!array_key_exists('access_customer_no', $data)) {
+        return ['code' => 400, 'body' => ['error' => 'access_customer_no is required']];
+    }
+
+    $checkStmt = $pdo->prepare('SELECT id FROM customers WHERE id = ?');
+    $checkStmt->execute([$customerId]);
+    if (!$checkStmt->fetch()) {
+        return ['code' => 404, 'body' => ['error' => 'Not found']];
+    }
+
+    $accessCustomerNo = $data['access_customer_no'];
+
+    try {
+        if ($accessCustomerNo === null) {
+            $code = nextCustomerCode($pdo);
+            $pdo->prepare('
+                UPDATE customers
+                SET access_customer_no = NULL, code = :code, updated_at = CURRENT_TIMESTAMP, last_synced_at = CURRENT_TIMESTAMP
+                WHERE id = :id
+            ')->execute([':code' => $code, ':id' => $customerId]);
+            $status = 'unlinked';
+        } else {
+            $accessCustomerNo = (string)$accessCustomerNo;
+            $pdo->prepare('
+                UPDATE customers
+                SET access_customer_no = :n, code = :n, updated_at = CURRENT_TIMESTAMP, last_synced_at = CURRENT_TIMESTAMP
+                WHERE id = :id
+            ')->execute([':n' => $accessCustomerNo, ':id' => $customerId]);
+            $status = 'linked';
+        }
+    } catch (PDOException $e) {
+        if (str_contains($e->getMessage(), 'UNIQUE constraint failed')) {
+            $violated = classifyUniqueViolationColumn($e->getMessage()) ?? 'access_customer_no';
+            return ['code' => 409, 'body' => ['error' => "$violated が既に存在します", 'column' => $violated]];
+        }
+        throw $e;
+    }
+
+    $stmt = $pdo->prepare('SELECT access_customer_no, code, last_synced_at FROM customers WHERE id = ?');
+    $stmt->execute([$customerId]);
+    $row = $stmt->fetch();
+    return ['code' => 200, 'body' => [
+        'customer_id'        => $customerId,
+        'access_customer_no' => $row['access_customer_no'],
+        'code'                => $row['code'],
+        'last_synced_at'      => $row['last_synced_at'],
+        'status'              => $status,
+    ]];
 }
 
 // ============================================================
@@ -302,35 +358,45 @@ runTest('T-02: 同じ access_customer_no で POST → 200 UPDATE (upsert)', func
     assertEq('1001', $res['body']['access_customer_no'], 'access_customer_no は変わらない');
 });
 
-// T-03: PUT /customers/{id} で access_customer_no を更新
-runTest('T-03: PUT /customers/{id} で access_customer_no を更新', function () use ($pdo) {
+// T-03: R-0140 (2) B-04で仕様変更。PUT /customers/{id} は access_customer_no を更新しない
+// （紐付けは PATCH /customers/{id}/access-link 専用。誤操作防止のため PUT からは除外した）。
+// 従来は PUT 経由の更新を許していたが、この受入条件変更に合わせて期待値を書き換える。
+runTest('T-03: PUT /customers/{id} は access_customer_no を更新しない（R-0140 B-04で無視される）', function () use ($pdo) {
     $res1 = customerPost($pdo, ['name' => '仮登録得意先', 'access_customer_no' => null]);
     assertEq(201, $res1['code'], '事前INSERT');
     $id = (int)$res1['body']['id'];
     assertEq(null, $res1['body']['access_customer_no'], '初期は NULL');
 
-    $res2 = customerPut($pdo, $id, ['access_customer_no' => '2002']);
+    $res2 = customerPut($pdo, $id, ['name' => '仮登録得意先（更新後）', 'access_customer_no' => '2002']);
     assertEq(200, $res2['code'], 'PUT status');
-    assertEq('2002', $res2['body']['access_customer_no'], 'access_customer_no が更新された');
+    assertEq(null, $res2['body']['access_customer_no'], 'PUTでは access_customer_no は変更されない');
+    assertEq('仮登録得意先（更新後）', $res2['body']['name'], 'nameは通常通り更新される');
+
+    // 紐付けは access-link 専用エンドポイントで行う
+    $res3 = customerAccessLink($pdo, $id, ['access_customer_no' => '2002']);
+    assertEq(200, $res3['code'], 'access-link status');
+    assertEq('2002', $res3['body']['access_customer_no'], 'access-linkでは access_customer_no が更新される');
 });
 
 // T-04: UNIQUE 制約 - 別レコードに同じ access_customer_no → 409
-runTest('T-04: UNIQUE 制約 - 別レコードに同じ access_customer_no → 409', function () use ($pdo) {
+// R-0140 (2) B-04で仕様変更。PUTはaccess_customer_noを扱わなくなったため、
+// 競合の発生経路を PATCH /customers/{id}/access-link に差し替える。
+runTest('T-04: UNIQUE 制約 - 別レコードに同じ access_customer_no を access-link で設定 → 409', function () use ($pdo) {
     $res = customerPost($pdo, [
         'name'               => 'UNIQUE違反テスト',
         'access_customer_no' => '1001',
     ]);
     // '1001' は T-01 で既に登録済みだが T-02 の upsert で 200 を返している
     // 別レコード（新規）として重複させるには別の access_customer_no 経由で
-    // 既存と異なる access_customer_no を持つレコードに PUT で競合させる
+    // 既存と異なる access_customer_no を持つレコードに access-link で競合させる
     assertEq(200, $res['code'], 'upsert なので 200（既存 UPDATE）');
 
-    // 別レコードに '1001' を PUT で強制設定 → UNIQUE 制約違反で 409
+    // 別レコードに '1001' を access-link で強制設定 → UNIQUE 制約違反で 409
     $res2 = customerPost($pdo, ['name' => '競合テスト用', 'access_customer_no' => '9999']);
     assertEq(201, $res2['code'], '別レコード作成');
     $otherId = (int)$res2['body']['id'];
 
-    $res3 = customerPut($pdo, $otherId, ['access_customer_no' => '1001']);
+    $res3 = customerAccessLink($pdo, $otherId, ['access_customer_no' => '1001']);
     assertEq(409, $res3['code'], '別レコードへの重複 access_customer_no 設定は 409');
 });
 
@@ -597,6 +663,78 @@ runTest('T-23: R-0135 ひらがな入力で半角カタカナのname_kanaにヒ�
         in_array((int)$res['body']['id'], array_map(fn($r) => (int)$r['id'], $hits), true),
         'ひらがな入力で半角カタカナのname_kanaにヒットする'
     );
+});
+
+// ============================================================
+// R-0140 (2) PATCH /customers/{id}/access-link テスト（受入条件 2-1〜2-6）
+// ============================================================
+echo "\n=== R-0140 (2) PATCH /customers/{id}/access-link テスト ===\n\n";
+
+$r0140FixtureDir = dirname($ROOT) . '/docs/spec/fixtures/accesstategu_r086';
+
+// 2-1: 検体customer_755.jsonからaccess_customer_noを抜いて作成 → access-linkで紐付け
+runTest('2-1: 検体customer_755.jsonからaccess_customer_noを抜いて作成→access-link{"755"}で200・linked', function () use ($pdo, $r0140FixtureDir) {
+    $fixture = json_decode(file_get_contents($r0140FixtureDir . '/customer_755.json'), true);
+    unset($fixture['access_customer_no']);
+    $created = customerPost($pdo, $fixture);
+    assertEq(201, $created['code'], '事前作成 HTTP status');
+    $id = (int)$created['body']['id'];
+    assertEq(null, $created['body']['access_customer_no'], '作成直後は access_customer_no 未設定');
+
+    $res = customerAccessLink($pdo, $id, ['access_customer_no' => '755']);
+    assertEq(200, $res['code'], 'HTTP status');
+    assertEq('755', $res['body']['access_customer_no'], 'access_customer_no が755になる');
+    assertEq('755', $res['body']['code'], 'codeも755になる');
+    assertTrue($res['body']['last_synced_at'] !== null, 'last_synced_atが非NULL');
+    assertEq('linked', $res['body']['status'], 'status=linked');
+});
+
+// 2-2: 同じ内容をもう一度送っても冪等に200
+runTest('2-2: 2-1をもう一度送っても200（冪等、409にならない）', function () use ($pdo) {
+    $row = $pdo->query("SELECT id FROM customers WHERE access_customer_no = '755'")->fetch();
+    $res = customerAccessLink($pdo, (int)$row['id'], ['access_customer_no' => '755']);
+    assertEq(200, $res['code'], '再送でも200');
+    assertEq('linked', $res['body']['status'], 'status=linked');
+});
+
+// 2-3: 別の得意先に同じ"755"を送ると409
+runTest('2-3: 別の得意先に同じ"755"を送ると409、違反列名を含む', function () use ($pdo) {
+    $other = customerPost($pdo, ['name' => '別得意先']);
+    assertEq(201, $other['code'], '別得意先の事前作成');
+    $res = customerAccessLink($pdo, (int)$other['body']['id'], ['access_customer_no' => '755']);
+    assertEq(409, $res['code'], 'HTTP status');
+    assertTrue(
+        str_contains($res['body']['column'] ?? '', 'access_customer_no') || str_contains($res['body']['column'] ?? '', 'code'),
+        '違反列名(access_customer_noまたはcode)を含む: ' . ($res['body']['column'] ?? '')
+    );
+});
+
+// 2-4: 存在しないidは404
+runTest('2-4: 存在しないidは404', function () use ($pdo) {
+    $res = customerAccessLink($pdo, 999999, ['access_customer_no' => '9999']);
+    assertEq(404, $res['code'], 'HTTP status');
+});
+
+// 2-5: 紐付け解除
+runTest('2-5: 2-1の得意先に{"access_customer_no":null}で解除→90001以上の仮コード・unlinked', function () use ($pdo) {
+    $row = $pdo->query("SELECT id FROM customers WHERE access_customer_no = '755'")->fetch();
+    $res = customerAccessLink($pdo, (int)$row['id'], ['access_customer_no' => null]);
+    assertEq(200, $res['code'], 'HTTP status');
+    assertEq(null, $res['body']['access_customer_no'], 'access_customer_noがNULLになる');
+    assertTrue((int)$res['body']['code'] >= 90001, '仮コードが90001域: ' . $res['body']['code']);
+    assertEq('unlinked', $res['body']['status'], 'status=unlinked');
+});
+
+// 2-6: PUT /customers/{id} で access_customer_no を変えようとしても無視される（決定事項、仕様書にも追記済み）
+runTest('2-6: PUT /customers/{id}でaccess_customer_noを変えようとしても無視される（値が変わらず200）', function () use ($pdo) {
+    $created = customerPost($pdo, ['name' => 'PUT無視テスト得意先', 'access_customer_no' => '600']);
+    assertEq(201, $created['code'], '事前作成');
+    $id = (int)$created['body']['id'];
+
+    $res = customerPut($pdo, $id, ['name' => 'PUT無視テスト得意先（更新後）', 'access_customer_no' => '999999']);
+    assertEq(200, $res['code'], 'PUT status');
+    assertEq('600', $res['body']['access_customer_no'], 'access_customer_noは変更されず維持される');
+    assertEq('PUT無視テスト得意先（更新後）', $res['body']['name'], 'nameは通常通り更新される');
 });
 
 // ============================================================

@@ -28,6 +28,7 @@ php "$root/api/tests/test_auth_gate.php"         >/tmp/bv_auth_gate.log 2>&1 || 
 php "$root/api/tests/test_youkan_integration.php" >/tmp/bv_youkan.log  2>&1 || fail "[test_youkan_integration] $(tail -n 8 /tmp/bv_youkan.log)"
 php "$root/api/tests/test_capacity_check.php"    >/tmp/bv_capacity.log 2>&1 || fail "[test_capacity_check] $(tail -n 8 /tmp/bv_capacity.log)"
 php "$root/api/tests/test_youkan_link.php"       >/tmp/bv_youkan_link.log 2>&1 || fail "[test_youkan_link] $(tail -n 8 /tmp/bv_youkan_link.log)"
+php "$root/api/tests/test_r0140_estimate_no_conversion.php" >/tmp/bv_r0140_conv.log 2>&1 || fail "[test_r0140_estimate_no_conversion] $(tail -n 8 /tmp/bv_r0140_conv.log)"
 
 rm -f "$root"/api/tests/*.sqlite 2>/dev/null
 exit 0

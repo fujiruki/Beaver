@@ -45,12 +45,12 @@
 
 受入条件:
 
-| # | 入力 | 期待 |
-|---|---|---|
-| 1-1 | 検体 `voucher_estimate_11704_discount.json` を `POST /vouchers/sync` | 200。`voucher_lines` に 5 行、5 行目 `quantity=-1`、`line_total=-160`、`tax_category='非課税'`、`line_type='discount'`。4 行目 `quantity=0` |
-| 1-2 | 同検体の 1 行目 `quantity` を `2.5`、`line_total` を `9000` にして送る | 200。`quantity` が `2.5` で保存され、`GET /vouchers/sync` で `2.5` が返る（整数に丸まらない） |
-| 1-3 | `quantity` を `"abc"` にして送る | 422、`field='quantity'`（`is_numeric` 判定は残す） |
-| 1-4 | 既存の全 PHP テスト・vitest | 緑（負数 422 を期待していたテストは書き換え後に緑） |
+| # | 入力 | 期待 | テスト名（`api/tests/test_sync.php`） |
+|---|---|---|---|
+| 1-1 | 検体 `voucher_estimate_11704_discount.json` を `POST /vouchers/sync` | 200。`voucher_lines` に 5 行、5 行目 `quantity=-1`、`line_total=-160`、`tax_category='非課税'`、`line_type='discount'`。4 行目 `quantity=0` | `1-1: 検体voucher_estimate_11704_discount.jsonをsync→200・5行・4行目quantity=0・5行目quantity=-1(値引/非課税)` |
+| 1-2 | 同検体の 1 行目 `quantity` を `2.5`、`line_total` を `9000` にして送る | 200。`quantity` が `2.5` で保存され、`GET /vouchers/sync` で `2.5` が返る（整数に丸まらない） | `1-2: 1行目quantityを2.5・line_totalを9000にして送ると小数のまま保存される`（DB確認）＋ `1-2: GET /vouchers/sync の lines[].quantity も 2.5 のまま返る（整数に丸まらない）`（HTTP確認） |
+| 1-3 | `quantity` を `"abc"` にして送る | 422、`field='quantity'`（`is_numeric` 判定は残す） | `1-3: quantity="abc" → 422・field=quantity（is_numeric判定は残る）` |
+| 1-4 | 既存の全 PHP テスト・vitest | 緑（負数 422 を期待していたテストは書き換え後に緑） | `R-0140 (1): quantity 負値 → 200（負数拒否は撤廃、値引行として保存される）`（旧「quantity 負値 → 422」を書き換え）＋ `.claude/regression-suite.sh` 全体 |
 
 ### (2) `PATCH /customers/{id}/access-link` の新設【Beaver 単独で着手可】
 
@@ -64,14 +64,14 @@
 
 受入条件（`api/tests/test_customers.php` に追加）:
 
-| # | 入力 | 期待 |
-|---|---|---|
-| 2-1 | 検体 `customer_755.json` から `access_customer_no` を抜いて `POST /customers` で作成 → その id に `PATCH .../access-link {"access_customer_no":"755"}` | 200、`access_customer_no="755"`、`code="755"`、`last_synced_at` が非 NULL、`status="linked"` |
-| 2-2 | 2-1 をもう一度送る | 200（冪等、409 にならない） |
-| 2-3 | 別の得意先に同じ `"755"` を送る | 409、違反列名（`access_customer_no` または `code`）を含む |
-| 2-4 | 存在しない id | 404 |
-| 2-5 | 2-1 の得意先に `{"access_customer_no":null}` | 200、`access_customer_no` が NULL、`code` が 90001 以上の仮コード、`status="unlinked"` |
-| 2-6 | `PUT /customers/{id}` で `access_customer_no` を変えようとする | 無視される（値が変わらない）か 400。どちらかに決めて仕様に明記 |
+| # | 入力 | 期待 | テスト名（`api/tests/test_customers.php`） |
+|---|---|---|---|
+| 2-1 | 検体 `customer_755.json` から `access_customer_no` を抜いて `POST /customers` で作成 → その id に `PATCH .../access-link {"access_customer_no":"755"}` | 200、`access_customer_no="755"`、`code="755"`、`last_synced_at` が非 NULL、`status="linked"` | T-24 |
+| 2-2 | 2-1 をもう一度送る | 200（冪等、409 にならない） | T-25 |
+| 2-3 | 別の得意先に同じ `"755"` を送る | 409、違反列名（`access_customer_no` または `code`）を含む | T-26 |
+| 2-4 | 存在しない id | 404 | T-27 |
+| 2-5 | 2-1 の得意先に `{"access_customer_no":null}` | 200、`access_customer_no` が NULL、`code` が 90001 以上の仮コード、`status="unlinked"` | T-28 |
+| 2-6 | `PUT /customers/{id}` で `access_customer_no` を変えようとする | **無視される（値が変わらない、200を返す）に決定。** `customers.php` の PUT 更新対象フィールド配列から `access_customer_no` を除外することで実現（B-04 と同じ変更）。 | T-03（書き換え）・T-29 |
 
 ### (3) 同期再開前の基準線の記録【AccessTategu の合図待ち。用意だけ先に】
 
@@ -111,12 +111,14 @@ UPDATE vouchers SET access_voucher_id = access_voucher_id + 10000,
 
 受入条件:
 
-| # | 入力 | 期待 |
-|---|---|---|
-| 5-1 | 見積 `access_voucher_id=1704`、売上 `source_estimate_no="1704"` を持つテスト DB で変換を実行 | 見積 `access_voucher_id=11704`、`access_voucher_no="11704"`、売上 `source_estimate_no="11704"` |
-| 5-2 | 5-1 をもう一度実行 | 変化なし（冪等） |
-| 5-3 | 変換前後で `source_estimate_no` が指す見積が実在する件数 | 減らない（`vouchers.php` の `WHERE source_estimate_no = ? AND voucher_type = 'sales'` 相当で孤児が増えない） |
-| 5-4 | 変換後に検体 `voucher_sales_12962.json` を `POST /vouchers/sync` | 200。`access_voucher_id=12962`、`billing_date='2026-12-25'`、`delivery_date='2026-11-25'` がそのまま保存される（Beaver 側で日付を再計算しない） |
+SQL 本体は `api/manual/r0140_5_estimate_no_plus10000.sql` に用意した（`api/migrations/` には置かない。自動テストのスキーマ構築 glob に巻き込まれ、他テストの `access_voucher_id < 10000` のデータを誤って変換してしまうため）。
+
+| # | 入力 | 期待 | テスト名（`api/tests/test_r0140_estimate_no_conversion.php`） |
+|---|---|---|---|
+| 5-1 | 見積 `access_voucher_id=1704`、売上 `source_estimate_no="1704"` を持つテスト DB で変換を実行 | 見積 `access_voucher_id=11704`、`access_voucher_no="11704"`、売上 `source_estimate_no="11704"` | `5-1: 見積 access_voucher_id=1704・売上 source_estimate_no="1704" を持つテストDBで変換を実行` |
+| 5-2 | 5-1 をもう一度実行 | 変化なし（冪等） | `5-2: もう一度実行しても変化なし（冪等）` |
+| 5-3 | 変換前後で `source_estimate_no` が指す見積が実在する件数 | 減らない（`vouchers.php` の `WHERE source_estimate_no = ? AND voucher_type = 'sales'` 相当で孤児が増えない） | `5-3: 変換前後で source_estimate_no が指す見積が実在する件数は減らない` |
+| 5-4 | 変換後に検体 `voucher_sales_12962.json` を `POST /vouchers/sync` | 200。`access_voucher_id=12962`、`billing_date='2026-12-25'`、`delivery_date='2026-11-25'` がそのまま保存される（Beaver 側で日付を再計算しない） | `5-4: 変換後に検体voucher_sales_12962.jsonをsyncすると200・値をそのまま保存` |
 
 ---
 

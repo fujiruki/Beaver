@@ -487,15 +487,9 @@ function insertSyncedLines(PDO $pdo, int $voucherId, array $lines): ?array {
                 'line_no' => $lineNo,
             ];
         }
+        // R-0140 (1): AccessTategu 側は quantity に小数・負数・0 を許容する（値引行は quantity=-1 固定）ため、
+        // is_numeric の判定のみ残し、負数拒否は撤廃する。
         $quantity = (float)$quantityRaw;
-        if ($quantity < 0) {
-            return [
-                'error'   => 'invalid_line',
-                'field'   => 'quantity',
-                'value'   => $quantityRaw,
-                'line_no' => $lineNo,
-            ];
-        }
 
         $lineTotalRaw = $line['line_total'] ?? 0;
         if (!is_numeric($lineTotalRaw)) {
