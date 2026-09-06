@@ -54,3 +54,5 @@
 029_customers_last_synced_at  2026-09-06  dev (backup: 同上)
 034_projects_deleted_at       未適用      dev (worktree作業のためdatabase.sqliteが存在せず未適用。schema.sql+migrations適用のテスト専用DBで動作確認済み)
 034_projects_deleted_at       未適用      beaver_beta (R-0143 A-B-07。指揮役が別途適用)
+030_vouchers_access_billed_flag  未適用   dev (R-0143 A-B-02。worktree作業のためdatabase.sqliteが存在せず未適用。schema.sql+migrations適用のテスト専用DBで動作確認済み)
+030_vouchers_access_billed_flag  未適用   beaver_beta (R-0143 A-B-02。指揮役が別途dev/Beaver_betaへ適用)

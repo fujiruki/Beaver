@@ -86,6 +86,7 @@ if ($method === 'GET' && isset($segments[1]) && $segments[1] === 'sync' && !isse
                    v.print_date_flag, v.print_tax_excl_flag, v.print_company_seal,
                    v.sales_category_id, v.delivery_date, v.billing_date,
                    v.source_estimate_no, v.validity_period,
+                   v.access_billed_flag, v.access_billing_date, v.access_receivable_id,
                    c.access_customer_no AS customer_access_no
             FROM vouchers v
             LEFT JOIN customers c ON c.id = v.customer_id
@@ -151,6 +152,7 @@ if ($method === 'GET' && isset($segments[1]) && $segments[1] === 'sync' && !isse
         // R-076 B1-1: ヘッダーの updated_at / last_synced_at を UTC→JST に統一する。
         $row['updated_at']     = utcToJst($row['updated_at']);
         $row['last_synced_at'] = utcToJst($row['last_synced_at']);
+        $row['access_billed_flag'] = (int)$row['access_billed_flag'];
         $row['lines'] = $linesByVoucherId[(int)$row['id']] ?? [];
     }
     unset($row);
@@ -386,12 +388,18 @@ function attachLineSubtables(PDO $pdo, array &$line): void {
 }
 
 function assertVoucherEditable(PDO $pdo, int $voucherId): void {
-    $stmt = $pdo->prepare('SELECT voucher_no, voucher_type, status FROM vouchers WHERE id = ?');
+    $stmt = $pdo->prepare('SELECT voucher_no, voucher_type, status, access_billed_flag, access_billing_date FROM vouchers WHERE id = ?');
     $stmt->execute([$voucherId]);
     $voucher = $stmt->fetch();
     if (!$voucher) {
         http_response_code(404);
         echo json_encode(['error' => 'Not found']);
+        exit;
+    }
+    // R-0143 A-B-02: Accessで請求済みの伝票はstatusに関わらず編集不可（取消で解除）
+    if ((int)$voucher['access_billed_flag'] === 1) {
+        http_response_code(409);
+        echo json_encode(['error' => 'locked_by_access', 'billing_date' => $voucher['access_billing_date']]);
         exit;
     }
     if ($voucher['status'] === 'billed' || $voucher['status'] === 'void') {
@@ -937,12 +945,14 @@ switch ($method) {
 
     case 'DELETE':
         if ($resourceId && $subAction === 'lines' && $subId) {
+            assertVoucherEditable($pdo, $resourceId);
             $pdo->prepare('DELETE FROM voucher_lines WHERE id = ?')->execute([$subId]);
             recalcVoucher($pdo, $resourceId);
             echo json_encode(['deleted' => true]);
             break;
         }
         if (!$resourceId) { http_response_code(400); echo json_encode(['error' => 'ID required']); exit; }
+        assertVoucherEditable($pdo, $resourceId);
         $pdo->prepare('UPDATE vouchers SET status = "void", updated_at = CURRENT_TIMESTAMP WHERE id = ?')
             ->execute([$resourceId]);
         echo json_encode(['voided' => true]);

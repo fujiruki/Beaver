@@ -4,6 +4,16 @@
  * customers（更新）・payments（削除）・invoices（削除）の3エンティティを対象とする。
  */
 
+/**
+ * R-0143 A-B-02: 指定伝票がAccessで請求済み(access_billed_flag=1)かどうかを返す。
+ * Beaver側の請求書操作（作成・削除・復元）がこのフラグ管理下のstatusを触らないためのガードに使う。
+ */
+function voucherIsAccessBilled(PDO $pdo, int $voucherId): bool {
+    $stmt = $pdo->prepare('SELECT access_billed_flag FROM vouchers WHERE id = ?');
+    $stmt->execute([$voucherId]);
+    return (int)$stmt->fetchColumn() === 1;
+}
+
 /** record_historyへ1件記録し、挿入したidを返す（削除直後のトースト復元導線で使う） */
 function recordHistory(
     PDO $pdo,
@@ -210,8 +220,11 @@ function restoreInvoiceDelete(PDO $pdo, array $row, array $related): array {
         foreach ($voucherIds as $vid) {
             $pdo->prepare('INSERT OR IGNORE INTO invoice_vouchers (invoice_id, voucher_id) VALUES (?, ?)')
                 ->execute([$newId, $vid]);
-            $pdo->prepare('UPDATE vouchers SET status = "billed", updated_at = CURRENT_TIMESTAMP WHERE id = ?')
-                ->execute([$vid]);
+            // R-0143 A-B-02: access_billed_flag=1の伝票はAccess側管理のためstatusを書き換えない
+            if (!voucherIsAccessBilled($pdo, (int)$vid)) {
+                $pdo->prepare('UPDATE vouchers SET status = "billed", updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+                    ->execute([$vid]);
+            }
         }
 
         if (!$hasNewerInvoice) {

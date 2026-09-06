@@ -261,6 +261,14 @@ function syncVoucherUpsert(PDO $pdo, ?int $projectId): void {
         ? (string)$data['validity_period']
         : null;
 
+    // R-0143 A-B-02: Accessの請求済みロック関連フィールド。未送信ならnullのままにし、
+    // INSERT/UPDATEのSQL側で既定値補完・既存値保護を行う（他の未同期フィールドと同じパターン）。
+    $accessBilledFlag    = array_key_exists('billed_flag', $data) ? ($data['billed_flag'] ? 1 : 0) : null;
+    $accessBillingDate   = isset($data['billing_date']) ? validateVoucherDate((string)$data['billing_date']) : null;
+    $accessReceivableId  = isset($data['receivable_id']) && is_numeric($data['receivable_id'])
+        ? (int)$data['receivable_id']
+        : null;
+
     $pdo->beginTransaction();
     try {
         // race condition 回避: INSERT...ON CONFLICT(access_voucher_id) DO UPDATE で原子的に upsert する。
@@ -284,7 +292,8 @@ function syncVoucherUpsert(PDO $pdo, ?int $projectId): void {
                  trade_type, consumption_tax_type,
                  print_date_flag, print_tax_excl_flag, print_company_seal,
                  sales_category_id, delivery_date, billing_date, source_estimate_no,
-                 validity_period, last_synced_at)
+                 validity_period, last_synced_at,
+                 access_billed_flag, access_billing_date, access_receivable_id)
             VALUES
                 (:voucher_no, :voucher_type, :status, :project_id, :customer_id,
                  :voucher_date, :total_amount, :access_voucher_id, :access_voucher_no,
@@ -294,7 +303,8 @@ function syncVoucherUpsert(PDO $pdo, ?int $projectId): void {
                  COALESCE(:consumption_tax_type, ' . "'外税/伝票計'" . '),
                  COALESCE(:print_date_flag, 1), COALESCE(:print_tax_excl_flag, 0), COALESCE(:print_company_seal, 0),
                  :sales_category_id, :delivery_date, :billing_date, :source_estimate_no,
-                 :validity_period, CURRENT_TIMESTAMP)
+                 :validity_period, CURRENT_TIMESTAMP,
+                 COALESCE(:access_billed_flag, 0), :access_billing_date, :access_receivable_id)
             ON CONFLICT(access_voucher_id) DO UPDATE SET
                 voucher_type        = excluded.voucher_type,
                 status              = excluded.status,
@@ -326,7 +336,12 @@ function syncVoucherUpsert(PDO $pdo, ?int $projectId): void {
                 source_estimate_no  = COALESCE(excluded.source_estimate_no, source_estimate_no),
                 validity_period     = COALESCE(excluded.validity_period, validity_period),
                 updated_at          = CURRENT_TIMESTAMP,
-                last_synced_at      = CURRENT_TIMESTAMP
+                last_synced_at      = CURRENT_TIMESTAMP,
+                -- R-0143 A-B-02: excludedはVALUES句でCOALESCE済みのため使わず、生バインドで
+                --   未送信(null)なら既存値を保持する（他のNOT NULL列と同じパターン）。
+                access_billed_flag   = COALESCE(:access_billed_flag, access_billed_flag),
+                access_billing_date  = COALESCE(excluded.access_billing_date, access_billing_date),
+                access_receivable_id = COALESCE(excluded.access_receivable_id, access_receivable_id)
         ')->execute([
             ':voucher_no'          => $voucherNo,
             ':voucher_type'        => $voucherType,
@@ -349,6 +364,9 @@ function syncVoucherUpsert(PDO $pdo, ?int $projectId): void {
             ':billing_date'        => $billingDate,
             ':source_estimate_no'  => $sourceEstimateNo,
             ':validity_period'     => $validityPeriod,
+            ':access_billed_flag'    => $accessBilledFlag,
+            ':access_billing_date'   => $accessBillingDate,
+            ':access_receivable_id'  => $accessReceivableId,
         ]);
 
         if ($existing) {

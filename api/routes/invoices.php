@@ -78,6 +78,21 @@ switch ($method) {
 
     case 'POST':
         $data = json_decode(file_get_contents('php://input'), true) ?? [];
+
+        // R-0143 A-B-02: voucher_idsにAccessで請求済みの伝票が含まれる場合は請求書自体を作らず409
+        if (!empty($data['voucher_ids']) && is_array($data['voucher_ids'])) {
+            foreach ($data['voucher_ids'] as $vid) {
+                $bStmt = $pdo->prepare('SELECT access_billed_flag, access_billing_date FROM vouchers WHERE id = ?');
+                $bStmt->execute([(int)$vid]);
+                $billed = $bStmt->fetch();
+                if ($billed && (int)$billed['access_billed_flag'] === 1) {
+                    http_response_code(409);
+                    echo json_encode(['error' => 'locked_by_access', 'billing_date' => $billed['access_billing_date']]);
+                    exit;
+                }
+            }
+        }
+
         $no = nextInvoiceNo($pdo);
 
         // 得意先の請求先名スナップショット
@@ -158,8 +173,11 @@ switch ($method) {
         $ivRows = $iv->fetchAll();
         $voucherIds = array_map(fn($row) => (int)$row['voucher_id'], $ivRows);
         foreach ($ivRows as $row) {
-            $pdo->prepare('UPDATE vouchers SET status = "approved", updated_at = CURRENT_TIMESTAMP WHERE id = ?')
-                ->execute([$row['voucher_id']]);
+            // R-0143 A-B-02: access_billed_flag=1の伝票はAccess側管理のためstatusを書き換えない
+            if (!voucherIsAccessBilled($pdo, (int)$row['voucher_id'])) {
+                $pdo->prepare('UPDATE vouchers SET status = "approved", updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+                    ->execute([$row['voucher_id']]);
+            }
         }
         $historyId = null;
         if ($targetInvoice) {
