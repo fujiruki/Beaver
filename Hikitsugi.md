@@ -1,6 +1,43 @@
 # 引き継ぎ資料 — Beaver
 
-**最終更新**: 2026-09-06（続き）
+**最終更新**: 2026-09-06（続き2）
+
+---
+
+## Dodaikun依頼3件 完了（2026-09-06）
+
+frontPC側（Dodaikun）からの追加依頼3件を、藤田晴樹さんの包括承認（「9/9まではDodaikun側の依頼は事前承認」）のもとで実施。
+
+### 1. `/api/health`のAppID固定文字列を修正 — 完了・デプロイ済み
+`api/index.php`の`'app' => 'Beaver'`を`'app' => APP_ID`に修正（コミット`7118689`）。Agent実装→回帰スイート🔵青→`upload.ps1 -Beta`で再デプロイ→実機確認済み:
+- `Beaver_beta` → `{"status":"ok","app":"Beaver_beta"}`
+- 本番 → `{"status":"ok","app":"Beaver"}`（無傷）
+- DBはデプロイ後も維持されていることを`projects/sync`で確認
+
+### 2. Beaver_beta DBリセットスクリプト作成 — 完了（試走は未実施）
+`scripts/reset_beta_db.ps1`を新規作成（コミット`c7e1809`）。本番DBをBeaver_betaへ複製し、Beaver_beta専用の先行migration（`$betaOnlyMigrations`配列で管理、現在`028_voucher_lines_quantity_real.sql`のみ）を自動再適用する。作成のみで試走は未実施（実行前に藤田晴樹さんへ確認する）。
+
+**教訓**: 日本語コメントを含むPowerShellスクリプトをBOM無しUTF-8で保存すると、Windows PowerShellがShift-JISとして誤読し構文が崩れる（今回`[System.Management.Automation.Language.Parser]::ParseFile`での構文チェックで発覚。エラーメッセージも文字化けする）。BOM付きUTF-8で保存すること。既存の`upload.ps1`もBOM無しだが偶然壊れていないだけの可能性があり、次に触る際は要注意。
+
+### 3. Beaver_betaへのR-0140反映確認 — 完了
+- (2) `PATCH /customers/{id}/access-link`: Beaver_betaで動作確認済み（未認証で409、実ロジック到達）。**本番BeaverにはまだR-0140が未デプロイ**であることも判明（本番同エンドポイントは405）
+- (1) quantity負数拒否撤廃: コードは反映済みだが、**DBスキーマ（migration028）はBeaver_beta・本番とも未適用**だったことが判明
+- (5) 見積番号+10000変換SQL: `api/manual/`に同梱確認済み
+- 副次発見: `customers.last_synced_at`列は本番DBに（R-0140実装以前から）既に存在していた
+
+### 追加対応: migration028をBeaver_beta DBへ適用 — 完了
+Dodaikunからの追加依頼。Beaver_beta側DBをバックアップ後（`backups/database_beta_pre_reset_...`相当の命名は使わず`database_20260906_pre_r0140_migration028.sqlite`）、`api/migrations/028_voucher_lines_quantity_real.sql`をSSH経由でBeaver_beta DBにのみ適用（藤田晴樹さんに`!`直接実行を依頼）。適用後・本番とも確認:
+- Beaver_beta: `voucher_lines.quantity type=REAL`
+- 本番: `voucher_lines.quantity type=INTEGER`（無傷）
+
+リモートホームディレクトリに置いた一時ファイル（`apply_migration.php`等）は作業後に削除済み。
+
+### 次にやること
+- R-108（Access側のベータ同期先切替）はAccess側R-116完了待ちで保留中。Dodaikunから連絡があり次第対応
+- `reset_beta_db.ps1`の試走は藤田晴樹さんの実行可否確認後
+- 本番BeaverへのR-0140デプロイ・migration028適用は別途判断（現時点ではBeaver_beta先行のみ）
+
+---
 
 ---
 
