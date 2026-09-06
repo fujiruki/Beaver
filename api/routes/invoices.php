@@ -77,6 +77,13 @@ switch ($method) {
         break;
 
     case 'POST':
+        // R-0143 A-B-05: 請求・入金編集の封印。フラグOFFの間は新規作成できない
+        if (!BILLING_EDIT_ENABLED) {
+            http_response_code(409);
+            echo json_encode(['error' => 'billing_edit_disabled']);
+            exit;
+        }
+
         $data = json_decode(file_get_contents('php://input'), true) ?? [];
 
         // R-0143 A-B-02: voucher_idsにAccessで請求済みの伝票が含まれる場合は請求書自体を作らず409
@@ -151,6 +158,12 @@ switch ($method) {
         break;
 
     case 'DELETE':
+        // R-0143 A-B-05: 請求・入金編集の封印。フラグOFFの間は削除できない
+        if (!BILLING_EDIT_ENABLED) {
+            http_response_code(409);
+            echo json_encode(['error' => 'billing_edit_disabled']);
+            exit;
+        }
         if (!$resourceId) { http_response_code(400); echo json_encode(['error' => 'ID required']); exit; }
         // 入金が存在する場合は削除不可
         $chk = $pdo->prepare('SELECT COUNT(*) FROM payments WHERE invoice_id = ?');

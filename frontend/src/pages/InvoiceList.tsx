@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useInvoices } from '../api/invoices';
 import { useCustomers } from '../api/customers';
 import { useRestoreHistory } from '../api/history';
+import { useBillingEditEnabled } from '../api/settings';
 import DataTable, { useSortState } from '../components/DataTable';
 import HistoryDrawer from '../components/history/HistoryDrawer';
 import UndoToast from '../components/history/UndoToast';
@@ -35,6 +36,8 @@ export default function InvoiceList() {
     () => (location.state as LocationToastState | null)?.toast ?? null,
   );
   const restoreMutation = useRestoreHistory();
+  const { data: billingEditSetting } = useBillingEditEnabled();
+  const billingEditEnabled = billingEditSetting?.billing_edit_enabled ?? false;
 
   async function handleUndoDelete() {
     if (!deleteToast?.historyId) return;
@@ -146,7 +149,9 @@ export default function InvoiceList() {
         <h1 style={{ margin: 0, fontSize: 20, fontWeight: 'bold' }}>請求一覧</h1>
         <div style={{ display: 'flex', gap: 8 }}>
           <button onClick={() => setShowDeleteHistory(true)} style={historyBtnStyle}>削除履歴</button>
-          <button onClick={() => navigate('/invoices/new')} style={newBtnStyle}>+ 新規請求書</button>
+          {billingEditEnabled && (
+            <button onClick={() => navigate('/invoices/new')} style={newBtnStyle}>+ 新規請求書</button>
+          )}
         </div>
       </div>
 

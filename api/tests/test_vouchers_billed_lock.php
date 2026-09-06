@@ -116,8 +116,11 @@ function assertTrue(bool $cond, string $label = ''): void {
 // ============================================================
 // HTTP サーバ起動
 // ============================================================
+// R-0143 A-B-05: 請求・入金編集の封印フラグは既定falseだが、本テストはA-B-02の
+// locked_by_accessロックを検証する回帰テストのためBILLING_EDIT_ENABLEDをtrueにする
+// （A-B-05自体の検証はtest_billing_edit_disabled.phpが担う）
 $bootstrap = __DIR__ . '/_server_bootstrap_billed_lock.php';
-file_put_contents($bootstrap, "<?php\ndefine('DB_PATH', " . var_export($testDbPath, true) . ");\n");
+file_put_contents($bootstrap, "<?php\ndefine('DB_PATH', " . var_export($testDbPath, true) . ");\ndefine('BILLING_EDIT_ENABLED', true);\n");
 
 $port = 18099;
 $serverProc = proc_open(

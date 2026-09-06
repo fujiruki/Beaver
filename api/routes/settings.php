@@ -1,9 +1,20 @@
 <?php
 /**
  * /settings エンドポイント
- * GET  /settings   自社情報取得
- * PUT  /settings   自社情報更新
+ * GET  /settings                          自社情報取得
+ * PUT  /settings                          自社情報更新
+ * GET  /settings/billing-edit-enabled     R-0143 A-B-05: 請求・入金編集の封印フラグ取得
  */
+
+$segments    = explode('/', trim($path, '/'));
+$subResource = $segments[1] ?? null;
+
+// R-0143 A-B-05: BILLING_EDIT_ENABLEDはサーバ側config.phpの定数のため、フロントエンドへは
+// この軽量APIで伝える（UI側のボタン非表示・繰越残高編集封印の出し分けに使う）
+if ($method === 'GET' && $subResource === 'billing-edit-enabled') {
+    echo json_encode(['billing_edit_enabled' => BILLING_EDIT_ENABLED]);
+    exit;
+}
 
 switch ($method) {
     case 'GET':

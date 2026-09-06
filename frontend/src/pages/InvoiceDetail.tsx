@@ -6,6 +6,7 @@ import { useCreatePayment, useDeletePayment } from '../api/payments';
 import { useCustomers } from '../api/customers';
 import { useVouchers } from '../api/vouchers';
 import { useRestoreHistory } from '../api/history';
+import { useBillingEditEnabled } from '../api/settings';
 import HistoryDrawer from '../components/history/HistoryDrawer';
 import UndoToast from '../components/history/UndoToast';
 import { useSmartBack } from '../hooks/useSmartBack';
@@ -26,6 +27,8 @@ export default function InvoiceDetail() {
   const createPaymentMutation = useCreatePayment();
   const deletePaymentMutation = useDeletePayment();
   const restoreMutation = useRestoreHistory();
+  const { data: billingEditSetting } = useBillingEditEnabled();
+  const billingEditEnabled = billingEditSetting?.billing_edit_enabled ?? false;
 
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const [showPaymentHistory, setShowPaymentHistory] = useState(false);
@@ -118,7 +121,10 @@ export default function InvoiceDetail() {
         <h1 style={{ margin: 0, fontSize: 20, fontWeight: 'bold' }}>
           {isNew ? '請求書 新規作成' : `請求書 ${invoice?.invoice_no ?? ''}`}
         </h1>
-        {!isNew && (
+        {!isNew && invoice?.access_cancelled_at && (
+          <span style={cancelledBadgeStyle}>取消済み</span>
+        )}
+        {!isNew && billingEditEnabled && (
           <button onClick={handleDelete} disabled={deleteMutation.isPending}
             style={{ ...backBtnStyle, color: '#dc2626', borderColor: '#fca5a5', marginLeft: 'auto' }}>
             削除
@@ -126,7 +132,11 @@ export default function InvoiceDetail() {
         )}
       </div>
 
-      {isNew ? (
+      {isNew && !billingEditEnabled ? (
+        <div style={cardStyle}>
+          請求書の新規作成は現在停止しています（Access側の写しとして表示専用です）。
+        </div>
+      ) : isNew ? (
         /* 新規作成フォーム */
         <form onSubmit={handleSubmit(onSubmit)}>
           <div style={cardStyle}>
@@ -248,13 +258,15 @@ export default function InvoiceDetail() {
                 <button onClick={() => setShowPaymentHistory(true)} style={backBtnStyle}>
                   削除履歴
                 </button>
-                <button onClick={() => setShowPaymentForm(v => !v)} style={addPayBtnStyle}>
-                  {showPaymentForm ? 'キャンセル' : '+ 入金登録'}
-                </button>
+                {billingEditEnabled && (
+                  <button onClick={() => setShowPaymentForm(v => !v)} style={addPayBtnStyle}>
+                    {showPaymentForm ? 'キャンセル' : '+ 入金登録'}
+                  </button>
+                )}
               </div>
             </div>
 
-            {showPaymentForm && (
+            {billingEditEnabled && showPaymentForm && (
               <form onSubmit={payForm.handleSubmit(onPaymentSubmit)}
                 style={{ background: '#f0f9ff', padding: 16, borderRadius: 8, marginBottom: 16 }}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
@@ -303,10 +315,12 @@ export default function InvoiceDetail() {
                       <Td right color="#10b981">¥{p.amount.toLocaleString()}</Td>
                       <Td>{p.memo ?? ''}</Td>
                       <Td>
-                        <button onClick={() => handleDeletePayment(p)}
-                          style={{ ...backBtnStyle, fontSize: 12, color: '#ef4444', borderColor: '#fca5a5' }}>
-                          取消
-                        </button>
+                        {billingEditEnabled && (
+                          <button onClick={() => handleDeletePayment(p)}
+                            style={{ ...backBtnStyle, fontSize: 12, color: '#ef4444', borderColor: '#fca5a5' }}>
+                            取消
+                          </button>
+                        )}
                       </Td>
                     </tr>
                   ))}
@@ -400,4 +414,8 @@ const submitBtnStyle: React.CSSProperties = {
 const addPayBtnStyle: React.CSSProperties = {
   padding: '5px 14px', background: '#10b981', color: '#fff', border: 'none',
   borderRadius: 6, cursor: 'pointer', fontSize: 13,
+};
+const cancelledBadgeStyle: React.CSSProperties = {
+  padding: '2px 10px', background: '#fee2e2', color: '#dc2626', borderRadius: 999,
+  fontSize: 12, fontWeight: 'bold',
 };

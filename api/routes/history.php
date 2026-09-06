@@ -44,6 +44,13 @@ if ($method === 'POST' && $resourceId && $subResource === 'restore') {
         exit;
     }
 
+    // R-0143 A-B-05: 請求・入金編集の封印。対象が請求書・入金の復元のみフラグOFFの間は拒否する
+    if (!BILLING_EDIT_ENABLED && in_array($history['entity'], ['invoices', 'payments'], true)) {
+        http_response_code(409);
+        echo json_encode(['error' => 'billing_edit_disabled']);
+        exit;
+    }
+
     $envelope = json_decode($history['before_json'], true) ?? [];
     $row      = $envelope['row'] ?? [];
     $related  = $envelope['related'] ?? [];

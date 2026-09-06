@@ -15,6 +15,8 @@ export interface Invoice {
   billing_name_print: string;
   created_at: string;
   updated_at: string;
+  // R-0143 A-B-04でmigration追加予定。未適用の環境ではキー自体が存在しない
+  access_cancelled_at?: string | null;
   // 詳細取得時のみ
   vouchers?: InvoiceVoucher[];
   payments?: Payment[];

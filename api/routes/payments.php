@@ -49,6 +49,12 @@ switch ($method) {
         break;
 
     case 'POST':
+        // R-0143 A-B-05: 請求・入金編集の封印。フラグOFFの間は新規登録できない
+        if (!BILLING_EDIT_ENABLED) {
+            http_response_code(409);
+            echo json_encode(['error' => 'billing_edit_disabled']);
+            exit;
+        }
         $data = json_decode(file_get_contents('php://input'), true) ?? [];
         $no = nextPaymentNo($pdo);
         $stmt = $pdo->prepare('
@@ -89,6 +95,12 @@ switch ($method) {
         break;
 
     case 'DELETE':
+        // R-0143 A-B-05: 請求・入金編集の封印。フラグOFFの間は削除できない
+        if (!BILLING_EDIT_ENABLED) {
+            http_response_code(409);
+            echo json_encode(['error' => 'billing_edit_disabled']);
+            exit;
+        }
         if (!$resourceId) { http_response_code(400); echo json_encode(['error' => 'ID required']); exit; }
         // 入金取消：請求書の入金額を戻す
         $stmt = $pdo->prepare('SELECT * FROM payments WHERE id = ?');

@@ -33,6 +33,10 @@ beforeEach(() => {
     if (u.pathname.endsWith('/vouchers')) {
       return new Response(JSON.stringify([]), { status: 200 });
     }
+    // このテスト群は請求・入金編集が有効な状態（billing_edit_enabled=true）での挙動を検証する
+    if (u.pathname.endsWith('/settings/billing-edit-enabled')) {
+      return new Response(JSON.stringify({ billing_edit_enabled: true }), { status: 200 });
+    }
     return new Response(JSON.stringify(baseInvoice), { status: 200 });
   }));
 });

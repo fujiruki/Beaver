@@ -44,6 +44,12 @@ function classifyUniqueViolationColumn(string $message): ?string {
 
 // PATCH /customers/{id}/carry-forward — 繰越残高例外修正
 if ($method === 'PATCH' && $resourceId && $subResource === 'carry-forward') {
+    // R-0143 A-B-05: 請求・入金編集の封印。繰越残高はAccessの写しのため、フラグOFFの間は編集不可
+    if (!BILLING_EDIT_ENABLED) {
+        http_response_code(409);
+        echo json_encode(['error' => 'billing_edit_disabled']);
+        exit;
+    }
     $data = json_decode(file_get_contents('php://input'), true) ?? [];
     if (!isset($data['carry_forward_balance'])) {
         http_response_code(400);

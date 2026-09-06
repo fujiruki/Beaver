@@ -21,7 +21,13 @@ const baseCustomer = {
 };
 
 beforeEach(() => {
-  vi.stubGlobal('fetch', vi.fn(async () => {
+  // この画面自体がbilling_edit_enabled=falseで表示専用化されるため、
+  // 従来の保存動作を検証する本テストではtrueを返す
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+    const u = new URL(url, 'http://localhost');
+    if (u.pathname.endsWith('/settings/billing-edit-enabled')) {
+      return new Response(JSON.stringify({ billing_edit_enabled: true }), { status: 200 });
+    }
     return new Response(JSON.stringify(baseCustomer), { status: 200 });
   }));
 });

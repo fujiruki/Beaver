@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useCustomer, useUpdateCarryForward } from '../api/customers';
+import { useBillingEditEnabled } from '../api/settings';
 import { useSmartBack } from '../hooks/useSmartBack';
 
 export default function CarryForwardEdit() {
@@ -10,12 +11,27 @@ export default function CarryForwardEdit() {
 
   const { data: customer, isLoading } = useCustomer(customerId);
   const mutation = useUpdateCarryForward(customerId);
+  const { data: billingEditSetting } = useBillingEditEnabled();
+  const billingEditEnabled = billingEditSetting?.billing_edit_enabled ?? false;
 
   const [balance, setBalance] = useState('');
   const [confirmed, setConfirmed] = useState(false);
 
   if (isLoading) return <div>読み込み中...</div>;
   if (!customer) return <div>得意先が見つかりません</div>;
+  if (!billingEditEnabled) {
+    return (
+      <div style={{ maxWidth: 560 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
+          <button onClick={goBack} style={backBtnStyle}>← 戻る</button>
+          <h1 style={{ margin: 0, fontSize: 20, fontWeight: 'bold' }}>繰越残高 修正</h1>
+        </div>
+        <div style={{ background: '#fff', padding: 24, borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+          繰越残高の手動修正は現在停止しています（Access側の写しとして表示専用です）。
+        </div>
+      </div>
+    );
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
