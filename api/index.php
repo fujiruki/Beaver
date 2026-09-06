@@ -47,7 +47,7 @@ try {
 
     // --- ヘルスチェック ---
     if ($path === '/health') {
-        echo json_encode(['status' => 'ok', 'app' => 'Beaver']);
+        echo json_encode(['status' => 'ok', 'app' => APP_ID]);
         exit;
     }
 
