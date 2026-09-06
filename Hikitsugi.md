@@ -1,6 +1,35 @@
 # 引き継ぎ資料 — Beaver
 
-**最終更新**: 2026-09-06（続き11）
+**最終更新**: 2026-09-06（続き12）
+
+---
+
+## R-0143 A-B-05 完了（2026-09-06）
+
+`BILLING_EDIT_ENABLED`フラグ（既定false）で請求・入金編集を封印（コミット`b70d349`）。API側6経路（`POST/DELETE /invoices`・`POST/DELETE /payments`・`POST /history/{id}/restore`（請求書・入金対象のみ）・`PATCH /customers/{id}/carry-forward`）を409化。UI側は新規請求書ボタン・削除ボタン・入金追加/取消ボタン・繰越残高編集リンクを非表示化、直URLアクセスも防御。`GET /settings/billing-edit-enabled`新設でフロントへフラグ伝達。バックエンド13ケース・フロントvitest3ファイル全PASS。
+
+### 統合時に発見したビルドエラー（修正済み、コミット`2630741`）
+Agent完了報告では`npx vitest run`のみ実行しており`npm run build`は未実施だったため、テストファイルの未使用import（`beforeEach`）によるTypeScript型チェックエラー（TS6133）を見落としていた。指揮役がBeaver_betaデプロイ時のビルドで発覚、fixerエージェントへ委譲して修正。**教訓: Agentの検証には`npx vitest run`だけでなく`npm run build`も含めるよう、今後の実装依頼プロンプトに明記すること。**
+
+### 実機確認（Beaver_beta、本番未配置）
+```
+$ curl ".../Beaver_beta/api/settings/billing-edit-enabled" -H "Authorization: Bearer <BANTO token>"
+{"billing_edit_enabled":false} HTTP:200
+
+$ curl -X POST ".../Beaver_beta/api/invoices" -H "Authorization: Bearer <BANTO token>" -d '{"customer_id":1}'
+{"error":"billing_edit_disabled"} HTTP:409
+
+$ curl -X PATCH ".../Beaver_beta/api/customers/826/carry-forward" -H "Authorization: Bearer <BANTO token>" -d '{"carry_forward_balance":5000}'
+{"error":"billing_edit_disabled"} HTTP:409
+```
+本番`/api/health`→200で無事。
+
+### 次にやること
+- **A-B-03のpriceマッピング訂正**（Dodaikun指摘、緊急ではない）: `GET/POST /vouchers/sync`の`lines[]`から誤って追加した単一`price`キーを削除し、既存の`price_body`/`price_hardware`/`price_glass`/`line_total`/`tax_category`/`memo`/`updated_at`の10列で往復一致することを`test_vouchers_sync_lines.php`で検証し直す
+- A-B-04（migration 031/032、`POST /invoices/sync`・`POST /payments/sync`）はA-B-02完了により着手可能
+- A-B-06（同期バッジ・ロック表示・sync-state・/sync/status・/sync/heartbeat）もA-B-02完了により着手可能
+
+---
 
 ---
 
