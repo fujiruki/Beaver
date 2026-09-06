@@ -1,5 +1,23 @@
 # 要望・リクエスト
 
+## 31. A-B-10・A-B-12: R-0140派生タスク（2026-09-07、Dodaikun[frontPC]からのクロスセッション依頼）
+
+Dodaikunからの原文（要約せず記録）:
+
+> 依頼（実装可、ただし Beaver_beta・本番への書き込み実行はしない）:
+> 1. A-B-12: 基準線記録のスクリプトを用意し、Beaver_beta に対して読み取り実行した出力例を返してください。対象 SQL は Beaver 側 R-0140(3)＝AccessTategu 設計書2 §5-2 の G-14（vouchers 6 本）＋設計書3 §5 の G-15〜G-18（customers: 総数／access_customer_no IS NOT NULL／CAST(code AS INTEGER)>=90001／同名 GROUP BY HAVING COUNT>1）。
+> 2. A-B-10: T6 統合スクリプト（例: api/manual/r0143_merge_duplicate_customers.php または .sql）。入力は (keep_id, dup_id) の組リスト。処理: projects/vouchers/invoices/payments の customer_id を dup→keep に付け替え → dup 行を is_active=0, access_customer_no=NULL, code='DUP-'||code, memo に '[重複統合→keep]' 追記。物理削除しない。foreign_keys を考慮し 1 トランザクション。事前にバックアップ。テストは api/tests に追加。Beaver_beta で dry-run（件数表示のみ）まで。
+> どちらも完了報告には実行コマンドとログのパス／テスト名だけを書いてください（合否はこちらで再確認します）。
+>
+> 補足: +10000 変換（r0140_5）は準備済み・未実行のままで正しいです。実行は A-X-01 の手順 4 で私から合図します。
+
+### 未確定点 → 解消（2026-09-07、Dodaikunより回答受領）
+G-14（vouchers 6項目）の具体的SQLをDodaikunから受領し、`docs/spec/R-0140_accesstategu_r086_integration.md`(3)へ反映済み（G-14-1〜G-14-6）。customers系4項目はDodaikun指定によりG-19〜G-22へ改番。旧G-14〜G-18（単一項目版）は廃案。
+
+### 対応方針
+- A-B-10: 仕様として十分具体的なため、`docs/spec/R-0140_accesstategu_r086_integration.md`に(6)として追記し、実装・テストを進める（Beaver_betaへの書き込みは行わず、dry-run件数表示のみ）
+- A-B-12: G-14-1〜G-14-6（vouchers）＋G-19〜G-22（customers）を1回の実行でJST時刻つき1ファイルに出力するスクリプトとして実装中（`api/manual/r0143_baseline_snapshot.php`）
+
 ## 30. auth-hub連携: `auth_client.php`をv1.2.0に更新し、アプリ単位のアクセス許可判定（`app_id`指定）に対応する（2026-09-01、auth-hub側からの依頼）
 
 auth-hub（社内共通認証基盤）にアプリ単位のアクセス許可管理機能が追加された（auth-hub R-0003、2026-09-01本番デプロイ済み。仕様: `C:\Fujiruki\Projects\auth-hub\docs\SPEC\01_認証仕様.md` §10）。

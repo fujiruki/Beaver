@@ -77,13 +77,22 @@
 
 Access 側の本番切替ゲート（設計_02 G-14）で使う。Beaver 側で次を取る SQL（または管理用スクリプト）を用意し、Access 側から「今取ってほしい」と依頼があった時点の値を記録する。
 
-| # | 項目 | 取り方 |
-|---|---|---|
-| G-14 | `vouchers` の `access_voucher_id IS NULL` 件数（Beaver 発で Access 未取込） | SQLite 直接 |
-| G-15 | `voucher_lines.edited_in_beaver=1` の件数 | 同上 |
-| G-16 | `access_voucher_id` の重複組数（旧仕様で見積番号と売上番号が別採番だった影響） | `GROUP BY access_voucher_id HAVING COUNT(*)>1` |
-| G-17 | `customers.access_customer_no IS NULL` の件数 | 同上 |
-| G-18 | `customers.code <> access_customer_no` の件数（両方非 NULL のもの） | 同上 |
+**2026-09-07追記（Dodaikun A-B-12依頼で再定義、クロスセッション経由）**: 下表は初版定義だったが、Dodaikunから正式なSQL（AccessTategu設計書2§5-2、6項目）と、customers系4項目の続き番号化（G-19〜G-22）の指示を受けたため、以下に置き換える。旧G-14〜G-18（本節冒頭の単一項目版）は廃案。
+
+| # | 項目 | 取り方 | 用途 |
+|---|---|---|---|
+| G-14-1 | `vouchers` の `access_voucher_id IS NULL` 件数（Beaver発・Access未取込） | `SELECT COUNT(*) FROM vouchers WHERE access_voucher_id IS NULL` | 切替手順後も同数であることの確認 |
+| G-14-2 | `access_voucher_id IS NOT NULL` を `voucher_type` 別に集計 | `SELECT voucher_type, COUNT(*) FROM vouchers WHERE access_voucher_id IS NOT NULL GROUP BY voucher_type` | +10000付け替え前の種別別件数 |
+| G-14-3 | `access_voucher_id` の最大値 | `SELECT MAX(access_voucher_id) FROM vouchers` | 付け替え前は4599以下のはず |
+| G-14-4 | `voucher_lines.edited_in_beaver=1` の件数 | `SELECT COUNT(*) FROM voucher_lines WHERE edited_in_beaver=1` | lines_modeの判断材料。0ならreplaceで問題なし |
+| G-14-5 | G-14-4が0でない場合の対象伝票一覧 | `SELECT v.id, v.voucher_no, v.access_voucher_id FROM vouchers v JOIN voucher_lines l ON l.voucher_id=v.id WHERE l.edited_in_beaver=1 GROUP BY v.id` | 晴樹さんへ提示する一覧 |
+| G-14-6 | `source_estimate_no` 付け替え対象数 | `SELECT COUNT(*) FROM vouchers WHERE voucher_type='sales' AND source_estimate_no IS NOT NULL` | (5)の付け替え対象数の事前確認 |
+| G-19 | `customers` の総数（`is_active`問わず） | `SELECT COUNT(*) FROM customers` | |
+| G-20 | `customers.access_customer_no IS NOT NULL` の件数 | `SELECT COUNT(*) FROM customers WHERE access_customer_no IS NOT NULL` | |
+| G-21 | `customers.code` を整数変換して `>= 90001`（Beaver発の仮採番域）の件数 | `SELECT COUNT(*) FROM customers WHERE CAST(code AS INTEGER) >= 90001` | |
+| G-22 | `customers.name` の重複件数（同名で複数行） | `SELECT name, COUNT(*) FROM customers GROUP BY name HAVING COUNT(*) > 1` | |
+
+出力は1回の実行で全項目をJST時刻つきで1ファイル（ログ）にまとめる（A-X-01手順1の台帳記録にそのまま使える形式）。
 
 `GET /vouchers/sync`・`GET /customers/sync` のレスポンス形（ページング、件数上限、JST 変換）を変える場合は、この契約書を更新して Access 側へ知らせること（Access 側 `Df_Beaver連携.bas` が依存）。
 
@@ -119,6 +128,28 @@ SQL 本体は `api/manual/r0140_5_estimate_no_plus10000.sql` に用意した（`
 | 5-2 | 5-1 をもう一度実行 | 変化なし（冪等） | `5-2: もう一度実行しても変化なし（冪等）` |
 | 5-3 | 変換前後で `source_estimate_no` が指す見積が実在する件数 | 減らない（`vouchers.php` の `WHERE source_estimate_no = ? AND voucher_type = 'sales'` 相当で孤児が増えない） | `5-3: 変換前後で source_estimate_no が指す見積が実在する件数は減らない` |
 | 5-4 | 変換後に検体 `voucher_sales_12962.json` を `POST /vouchers/sync` | 200。`access_voucher_id=12962`、`billing_date='2026-12-25'`、`delivery_date='2026-11-25'` がそのまま保存される（Beaver 側で日付を再計算しない） | `5-4: 変換後に検体voucher_sales_12962.jsonをsyncすると200・値をそのまま保存` |
+
+### (6) Beaver内の重複得意先統合スクリプト（A-B-10、2026-09-07 Dodaikun依頼、クロスセッション経由）【dry-runまで。本番・Beaver_betaへの書き込み実行はしない】
+
+同一のAccess得意先に対して、Beaver側で複数の`customers`行が存在しているケース（Access同期経路とUI経由の新規作成が重複した等）を統合するための管理用スクリプト。
+
+- 入力: `(keep_id, dup_id)` の組のリスト（統合の判断自体はこのスクリプトの範囲外。呼び出し側が指定する）
+- 処理（1トランザクション、外部キー制約を考慮した順序で実行）:
+  1. `projects.customer_id`・`vouchers.customer_id`・`invoices.customer_id`・`payments.customer_id` を `dup_id` → `keep_id` へ付け替え
+  2. `dup_id` の `customers` 行を物理削除せず、`is_active=0`、`access_customer_no=NULL`、`code='DUP-'||code`、`memo`に`'[重複統合→keep_id]'`を追記して更新
+- 事前にDBバックアップを取る（`reset_beta_db.ps1`と同様、実行前に自動バックアップ）
+- 出力先: `api/manual/r0143_merge_duplicate_customers.php`（`api/manual/`配下。migrations glob対象外にするため`api/migrations/`には置かない、(5)と同じ理由）
+- Beaver_betaでの検証は **dry-run（対象件数・付け替え予定件数の表示のみ、実際のUPDATE/トランザクションコミットはしない）** に限定する。書き込み実行は本要望のスコープ外（別途Dodaikunからの実行合図を待つ）
+
+受入条件（`api/tests/test_r0143_merge_duplicate_customers.php`に追加、テストはローカルdev DBのみで実施）:
+
+| # | 入力 | 期待 |
+|---|---|---|
+| 6-1 | keep/dupの2得意先を用意し、dupを参照するprojects/vouchers/invoices/paymentsを各1件作成した状態でマージ実行 | 4テーブルとも`customer_id`が`keep_id`に付け替わる |
+| 6-2 | 6-1実行後の`dup_id`の`customers`行 | `is_active=0`、`access_customer_no=NULL`、`code`が`'DUP-'`で始まる、`memo`に`'[重複統合→keep_id]'`を含む |
+| 6-3 | `dup_id`の`customers`行 | 物理削除されず`SELECT`で取得できる（論理削除のみ） |
+| 6-4 | 途中でエラーが起きるケース（例: 存在しない`dup_id`） | トランザクション全体がロールバックされ、いずれのテーブルも変更されない |
+| 6-5 | dry-runモード実行 | 対象件数のみ表示され、実際のUPDATEは発生しない（各テーブルの状態が実行前後で不変） |
 
 ---
 

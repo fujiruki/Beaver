@@ -1,7 +1,7 @@
 # Beaver タスクキュー
 
 ## 進行中
-- [ ] R-0140: AccessTategu R-086 連携の Beaver 側対応。仕様: `docs/spec/R-0140_accesstategu_r086_integration.md`（受入条件表と検体 JSON あり）。(1) quantity REAL 化・負数許容、(2) PATCH /customers/{id}/access-link、(5) 見積番号 +10000 変換 SQL とテストは今すぐ着手可。(3) 基準線は Access 側の合図待ち。(4) は確認済みで作業なし。完了報告はテスト名・実行ログ・変更ファイル一覧で
+- [ ] R-0140: AccessTategu R-086 連携の Beaver 側対応。仕様: `docs/spec/R-0140_accesstategu_r086_integration.md`（受入条件表と検体 JSON あり）。(1) quantity REAL 化・負数許容、(2) PATCH /customers/{id}/access-link、(5) 見積番号 +10000 変換 SQL とテストは今すぐ着手可。(3) 基準線はcustomers系(G-15〜G-18)のみ2026-09-07にDodaikun依頼(A-B-12)で再定義・着手可、vouchers系(G-14)は具体的SQL未受領で保留。(4) は確認済みで作業なし。(6) A-B-10: 重複得意先統合スクリプト（dry-runまで、書き込み実行はしない）2026-09-07追加。完了報告はテスト名・実行ログ・変更ファイル一覧で
 - [ ] R-0141: Beaver ベータ環境（AppID Beaver_beta、別 SQLite、upload.ps1 の配置先切替）。仕様: `docs/spec/R-0141_beaver_beta_environment.md`。完了時に Access 側へ渡す情報を仕様書末尾に追記
 - [ ] R-0132: PWAインストール時のアイコン未設定（favicon/apple-touch-icon/manifest.json不足）。/readyoubouで本番id=36を確認。素材（ロゴ画像）待ちのため未着手、次回セッション候補
 
