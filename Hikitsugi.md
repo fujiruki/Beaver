@@ -1,6 +1,40 @@
 # 引き継ぎ資料 — Beaver
 
-**最終更新**: 2026-09-06（続き9）
+**最終更新**: 2026-09-06（続き10）
+
+---
+
+## R-0143 A-B-02 完了（2026-09-06）
+
+migration 030（`vouchers.access_billed_flag`/`access_billing_date`/`access_receivable_id`）新設、`POST /vouchers/sync`でAccess側の請求済み情報を受信、`assertVoucherEditable`を拡張（コミット`f5e2018`）。
+
+### 副次的に修正した既存の欠落・バグ
+- `DELETE /vouchers/{id}`・`DELETE /vouchers/{id}/lines/{lineId}`にロックチェック（`assertVoucherEditable`呼び出し）が一切無かった欠落を追加
+- `DELETE /invoices/{id}`・`POST /history/{id}/restore`（`restoreInvoiceDelete`）が対象伝票の`status`を無条件で書き換えていたバグを修正（`access_billed_flag=1`ならAccess管理下として触れないよう保護）
+
+### 統合時のトラブル（教訓）
+worktree統合作業中、Bashツールの作業ディレクトリがworktree内に取り残されたまま`bash .claude/regression-suite.sh`を実行してしまい、誤ってworktree側のvite.config.tsを参照してERR_MODULE_NOT_FOUNDになった（メインリポジトリのコード自体には問題なし）。`cd`コマンドの効果がBashツール呼び出しをまたいで確実に持続するとは限らないため、**worktree統合後は`pwd`で明示的にカレントディレクトリを確認してから回帰スイートを実行すること**。
+
+### 実機確認（Beaver_betaのみ、本番未配置）
+```
+$ php -r '...PRAGMA table_info(vouchers)...'（Beaver_beta）
+access_billed_flag=INTEGER / access_billing_date=DATE / access_receivable_id=INTEGER
+
+$ curl -X POST ".../Beaver_beta/api/vouchers/sync" -H "Authorization: Bearer <SYNC token>" -d '{"access_voucher_id":99001,...,"billed_flag":true,"billing_date":"2026-09-01"}'
+→ 200、voucher_id=5809で作成
+
+$ curl -X PUT ".../Beaver_beta/api/vouchers/5809" -H "Authorization: Bearer <BANTO token>" -d '{"total_amount":9999}'
+{"error":"locked_by_access","billing_date":"2026-09-01"} HTTP:409
+```
+仕様通りロックが機能。本番`/api/health`→200で無事。
+
+`reset_beta_db.ps1`の`$betaOnlyMigrations`に`030_vouchers_access_billed_flag.sql`を追加済み（コミット`dd6e605`）、試走で`[1/5]〜[5/5]`成功確認済み。
+
+### 次にやること
+- **A-B-03**（`lines[]`）と**A-B-05**（請求・入金編集封印）を並列でAgent実装委譲する予定（ユーザーの「並行で進められることはどんどん」指示による）。両方ともvouchers.php/invoices.php等でA-B-02と重複するファイルを触るため、A-B-02完了後の今なら安全に並列化できる
+- A-B-04（migration 031/032）はA-B-02完了により着手可能になった
+
+---
 
 ---
 

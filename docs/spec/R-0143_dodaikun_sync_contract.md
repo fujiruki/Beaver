@@ -81,7 +81,7 @@
 | ID | 内容 | 依存 | 受入条件（決定論的） | 状態 |
 |:--|:--|:--|:--|:--|
 | A-B-01 | `GET /customers/sync` | — | 済（20de0a2）。追補: `gender/mobile/fax/is_active` を含む、`carry_forward_balance` を含まない | 追補中 |
-| A-B-02 | migration 030、`POST /vouchers/sync` の請求済み受信、ロック拡張 | — | `test_vouchers_billed_lock.php`: (1) `access_billed_flag=1, status='approved'` で PUT/PATCH/DELETE・明細変更が 409 (2) `POST /invoices` の `voucher_ids` に含めると 409 (3) `DELETE /invoices/{id}`・`POST /history/{id}/restore` が当該伝票の `status`/`access_billed_flag` を変えない (4) `GET /vouchers/sync` に `access_billed_flag`。Beaver_beta に 030 適用（`PRAGMA table_info`） | todo |
+| A-B-02 | migration 030、`POST /vouchers/sync` の請求済み受信、ロック拡張 | — | `test_vouchers_billed_lock.php`: (1) `access_billed_flag=1, status='approved'` で PUT/PATCH/DELETE・明細変更が 409 (2) `POST /invoices` の `voucher_ids` に含めると 409 (3) `DELETE /invoices/{id}`・`POST /history/{id}/restore` が当該伝票の `status`/`access_billed_flag` を変えない (4) `GET /vouchers/sync` に `access_billed_flag`。Beaver_beta に 030 適用（`PRAGMA table_info`） | done（f5e2018、Beaver_betaで実機確認済み。既存のDELETE系ロック欠落・invoices/history側のstatus無条件書き換えバグも副次的に修正） |
 | A-B-03 | `GET/POST /vouchers/sync` に `lines[]` | — | `test_vouchers_sync_lines.php`: 5 列が往復で一致、`lines_mode` の replace/merge | todo |
 | A-B-04 | migration 031/032、`POST /invoices/sync`・`POST /payments/sync` | A-B-02 | `test_invoices_sync.php`/`test_payments_sync.php`: upsert 冪等、`access_cancelled_at`、`customer_access_no`→`customer_id` 解決、未知の得意先は 422 | todo |
 | A-B-05 | `BILLING_EDIT_ENABLED` と API 409、UI 非表示、繰越残高の表示専用化 | — | `test_billing_edit_disabled.php`: flag=false で上記 6 経路が 409、true で従来どおり。vitest: flag=false で描画されない。Beaver_beta で curl 照合 | todo |
