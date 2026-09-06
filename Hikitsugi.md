@@ -1,6 +1,34 @@
 # 引き継ぎ資料 — Beaver
 
-**最終更新**: 2026-09-06（続き2）
+**最終更新**: 2026-09-06（続き3）
+
+---
+
+## reset_beta_db.ps1のクォート問題修正・試走成功（2026-09-06）
+
+Dodaikunが`reset_beta_db.ps1`を試走したところステップ[4/5]で失敗（SSH exit=255）。原因はPowerShellの`& ssh @sshOpts $target $Command`のような外部プロセス呼び出しで、`php -r '...'`のような多重クォート（シングルクォート+ダブルクォート）がWindowsの引数エスケープ処理で壊れるという既知の落とし穴だった。
+
+### 修正内容（コミット`6d58f7b`）
+migration適用・型確認の両方を「PHPコードをローカル一時ファイルに書き出し→scp転送→リモートで`php <ファイルパス>`実行」方式に変更（Dodaikun提案どおり）。ヒアドキュメント内のPHP変数（`$pdo`等）はバッククォートでエスケープしPowerShell変数展開との衝突を回避。
+
+### 再試走結果 — [1/5]〜[5/5]すべて成功
+```
+[1/5] バックアップ完了
+[2/5] 複製完了
+[3/5] サイズ一致確認OK (本番=8159232 / beta=8159232)
+[4/5] migration028転送・適用・型確認OK: voucher_lines.quantity = REAL
+[5/5] レコード一致確認OK (id=1)
+```
+実データで再確認: Beaver_beta`quantity=REAL`、本番`quantity=INTEGER`（無傷）、`migrations_tmp`一時ディレクトリは削除済み。
+
+### 副次的に発見した軽微な問題（次回対応候補）
+`upload.ps1`の`Copy-Item "$PSScriptRoot\api\*" "$stagingDir\api\" -Recurse -Force`が`api/backups/`ディレクトリごとコピーしてしまうため、ローカルのdev DBバックアップファイル（`database_20260906_0335_pre_r0140_migrations.sqlite`等）がBeaver_betaの`api/backups/`に紛れ込んでいた。機能的な実害はない（ディスク容量のみ）が、`upload.ps1`のstaging処理で`api/backups/`を除外するとよい。今回は対応せず記録のみ。
+
+### 教訓（reset_beta_db.ps1のBOM問題と合わせて）
+- 日本語コメントを含むPowerShellスクリプトはBOM無しUTF-8で保存するとWindows PowerShellにShift-JISとして誤読され構文が壊れる（BOM付きUTF-8で保存すること）
+- PowerShellから`ssh`等の外部コマンドへ複雑な文字列（特に多重クォート）を引数として渡すと壊れやすい。一時ファイル経由で渡す方式の方が確実
+
+---
 
 ---
 
