@@ -145,8 +145,6 @@ if ($method === 'GET' && isset($segments[1]) && $segments[1] === 'sync' && !isse
             if ($lineRow['tax_category'] === 'non_taxable') $lineRow['tax_category'] = '非課税';
             // R-076 B1-1: 明細の updated_at も UTC→JST に統一する。
             $lineRow['updated_at']       = utcToJst($lineRow['updated_at']);
-            // R-0143 A-B-03: Access側契約の price キー（= line_total）を追加する。
-            $lineRow['price'] = $lineRow['line_total'];
             $linesByVoucherId[$vid][] = $lineRow;
         }
     }

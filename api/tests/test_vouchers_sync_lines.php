@@ -150,10 +150,10 @@ try {
 
     echo "=== A-B-03 POST/GET /vouchers/sync に lines[] の往復一致 ===\n";
 
-    runTest('POST /vouchers/sync で lines を送信すると、GET /vouchers/sync で line_no・item_name・quantity・price・updated_at が往復一致する', function () use ($port) {
+    runTest('POST /vouchers/sync で lines を送信すると、GET /vouchers/sync で10列（line_no・item_name・quantity・price_body・price_hardware・price_glass・line_total・tax_category・memo・updated_at）が往復一致する', function () use ($port) {
         $lines = [
-            ['line_no' => 1, 'item_name' => '框戸A', 'quantity' => 2, 'line_total' => 12000, 'tax_category' => '課税'],
-            ['line_no' => 2, 'item_name' => '把手B', 'quantity' => 1, 'line_total' => 3000,  'tax_category' => '課税'],
+            ['line_no' => 1, 'item_name' => '框戸A', 'quantity' => 2, 'price_body' => 8000, 'price_hardware' => 2500, 'price_glass' => 1500, 'line_total' => 12000, 'tax_category' => '課税', 'memo' => '備考A'],
+            ['line_no' => 2, 'item_name' => '把手B', 'quantity' => 1, 'price_body' => 3000, 'price_hardware' => 0,    'price_glass' => 0,    'line_total' => 3000,  'tax_category' => '非課税', 'memo' => ''],
         ];
         $post = httpJson($port, '/vouchers/sync', 'POST', [
             'access_voucher_id'  => 40001,
@@ -171,13 +171,19 @@ try {
         assertTrue($voucher !== null, 'access_voucher_id=40001 の伝票が見つかる');
         assertEq(2, count($voucher['lines']), '明細2件');
 
+        assertTrue(!array_key_exists('price', $voucher['lines'][0]), '単一の price キーは存在しない');
+
         foreach ($lines as $i => $expected) {
             $actual = $voucher['lines'][$i];
             assertEq($expected['line_no'], (int)$actual['line_no'], "line_no[$i] 往復一致");
             assertEq($expected['item_name'], $actual['item_name'], "item_name[$i] 往復一致");
             assertEq((float)$expected['quantity'], (float)$actual['quantity'], "quantity[$i] 往復一致");
-            assertTrue(array_key_exists('price', $actual), "price[$i] キーが存在する");
-            assertEq((float)$expected['line_total'], (float)$actual['price'], "price[$i] = line_total が往復一致");
+            assertEq((float)$expected['price_body'], (float)$actual['price_body'], "price_body[$i] 往復一致");
+            assertEq((float)$expected['price_hardware'], (float)$actual['price_hardware'], "price_hardware[$i] 往復一致");
+            assertEq((float)$expected['price_glass'], (float)$actual['price_glass'], "price_glass[$i] 往復一致");
+            assertEq((float)$expected['line_total'], (float)$actual['line_total'], "line_total[$i] 往復一致");
+            assertEq($expected['tax_category'], $actual['tax_category'], "tax_category[$i] 往復一致");
+            assertEq($expected['memo'], $actual['memo'] ?? '', "memo[$i] 往復一致");
             assertTrue(array_key_exists('updated_at', $actual) && $actual['updated_at'] !== null, "updated_at[$i] が非nullで存在する");
         }
     });
