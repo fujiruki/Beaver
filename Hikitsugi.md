@@ -1,6 +1,38 @@
 # 引き継ぎ資料 — Beaver
 
-**最終更新**: 2026-09-06（続き6）
+**最終更新**: 2026-09-06（続き7）
+
+---
+
+## R-0143 Phase A着手: A-B-07・A-B-08 完了（2026-09-06）
+
+Dodaikunから連携契約R-0143（正本はAccessTategu側`docs/Dodaikun_Beaver連携設計.md`）を受領。`docs/spec/R-0143_dodaikun_sync_contract.md`に写し、`docs/SPEC.md`索引にも追加（R-0142の索引漏れも合わせて追加）。ユーザー指示により今回は実装をCodexではなくAgent（Sonnet）に委譲して進めた。
+
+### A-B-07: GET /projects/sync に deleted_at 追加 — done（コミット`21f7c3f`）
+migration 034で`projects.deleted_at`列を新設。`DELETE /projects/{id}`（キャンセル扱い、hard=1以外）でセット。Beaver_betaに適用済み（`PRAGMA table_info`でDATETIME型確認済み）、`scripts/reset_beta_db.ps1`の`$betaOnlyMigrations`に追加済み。
+
+### A-B-08: 同期APIの認証 — done（コミット`cd981d7`）
+`authGateIsExempt()`を部分一致（`/sync`を含む任意パス）から完全一致リストに変更、`SYNC_API_TOKEN`＋`SYNC_TOKEN_REQUIRED`（既定false）を新設。Beaver_betaで`SYNC_TOKEN_REQUIRED=true`にして実機確認:
+```
+トークン無し/vouchers/sync → 401
+正しいトークン/vouchers/sync → 200（実データ）
+/sync/status（未実装ルート） → 401（df_session無し）
+偽装パス/vouchers/synchronize → 401（guarded化）
+```
+SYNC_API_TOKENの値はBeaver_beta側`config.local.php`にのみ保存（会話ログ・Dodaikunへの報告には含めていない）。バックアップ: `config.local.php.bak_pre_sync_token`（Beaver_beta上）。
+
+副次確認: `/aggregation-categories/sync`が完全一致化でguarded扱いに変わったが、これはフロントエンド（ログイン済みユーザー）専用の内部エンドポイントのため実害なしと確認済み。
+
+### 実装体制・検証
+- 両タスクともAgent（worktree隔離、並行実行、TDD必須）に実装委譲。指揮役がメインリポジトリで統合・`bash .claude/regression-suite.sh`（vitest含む）を再実行し🔵青を確認してから別々にコミット
+- Agent worktree内では`frontend/node_modules`不在によりvitestが見かけ上失敗することが続いている（既知の環境要因、統合後のメインでは問題なし）
+
+### 次にやること
+- **A-B-09（新規、Dodaikunから追加依頼）**: push系応答（`POST /vouchers/sync`・`POST /projects/{id}/vouchers/sync`・`PATCH /projects/{id}/vouchers/{no}/shipped`・`PATCH /projects/{id}/customer`・`POST /customers`）に`last_synced_at`を必ず含める。A-B-08の次、A-B-02の前に着手（Access側A-F-09対応のため優先度高）
+- 続けてA-B-02（請求済みロック）→A-B-05（請求・入金編集封印）→A-B-03（lines[]）。いずれもvouchers.php/invoices.php等で重複するため逐次実装（並列不可と判断）
+- R-0143 §7の状態表を都度`done`に更新すること
+
+---
 
 ---
 
