@@ -33,6 +33,7 @@ function authGateIsExempt(string $path, string $method): bool
 {
     if ($path === '/health') return true;
     if ($path === '/feedback' && $method === 'POST') return true;
+    if ($path === '/customers' && $method === 'POST') return true;
     if ($path === '/admin/feedback') return true;
     if (in_array($path, AUTH_GATE_SYNC_EXEMPT_PATHS, true)) return true;
     foreach (AUTH_GATE_SYNC_EXEMPT_PATTERNS as $pattern) {

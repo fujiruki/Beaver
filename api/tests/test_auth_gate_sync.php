@@ -47,6 +47,17 @@ function httpGet(int $port, string $path, array $headers = []): array {
     return ['status' => $status, 'body' => (string)$body];
 }
 
+function httpPost(int $port, string $path, array $headers, string $body): array {
+    $header = "Connection: close\r\n" . implode('', array_map(fn($h) => "$h\r\n", $headers));
+    $ctx = stream_context_create(['http' => [
+        'method' => 'POST', 'header' => $header, 'content' => $body,
+        'timeout' => 5, 'ignore_errors' => true,
+    ]]);
+    $body = @file_get_contents("http://127.0.0.1:$port/contents/Beaver/api$path", false, $ctx);
+    $status = $http_response_header[0] ?? '';
+    return ['status' => $status, 'body' => (string)$body];
+}
+
 function startServer(string $root, string $bootstrap, int $port): mixed {
     $proc = proc_open(
         ['php', '-d', 'auto_prepend_file=' . $bootstrap, '-S', "127.0.0.1:$port", '-t', $root, $root . '/index.php'],
@@ -134,6 +145,29 @@ try {
     runTest('正しいSYNC_API_TOKENを付けた /vouchers/sync は200', function () use ($port) {
         $res = httpGet($port, '/vouchers/sync', ['Authorization: Bearer unit-test-sync-token']);
         assertTrue(str_contains($res['status'], '200'), 'expected 200 got: ' . $res['status'] . ' body=' . $res['body']);
+    });
+
+    runTest('トークン無しの POST /customers は401', function () use ($port) {
+        $body = json_encode(['name' => 'テスト同期太郎', 'access_customer_no' => 'unittest-ab13-1']);
+        $res = httpPost($port, '/customers', ['Content-Type: application/json'], $body);
+        assertTrue(str_contains($res['status'], '401'), 'expected 401 got: ' . $res['status'] . ' body=' . $res['body']);
+    });
+
+    runTest('正しいSYNC_API_TOKENを付けた POST /customers は200または201', function () use ($port) {
+        $body = json_encode(['name' => 'テスト同期太郎', 'access_customer_no' => 'unittest-ab13-1']);
+        $res = httpPost($port, '/customers', [
+            'Content-Type: application/json',
+            'Authorization: Bearer unit-test-sync-token',
+        ], $body);
+        assertTrue(
+            str_contains($res['status'], '200') || str_contains($res['status'], '201'),
+            'expected 200 or 201 got: ' . $res['status'] . ' body=' . $res['body']
+        );
+    });
+
+    runTest('GET /customers は免除されず、df_session無しで401', function () use ($port) {
+        $res = httpGet($port, '/customers');
+        assertTrue(str_contains($res['status'], '401'), 'expected 401 got: ' . $res['status'] . ' body=' . $res['body']);
     });
 
     runTest('/sync/status は免除されず、df_session無しで401', function () use ($port) {
