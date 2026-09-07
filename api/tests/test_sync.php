@@ -938,7 +938,7 @@ echo "\n=== R-034 review HIGH-1 migration 012 で sales_category_id が保全さ
 
 runTest('test_migration_012_preserves_sales_category_id', function () use ($ROOT) {
     // 独立した一時 DB を用意（test_sync.sqlite には触らない）
-    $migDbPath = __DIR__ . '/test_migration_012.sqlite';
+    $migDbPath = __DIR__ . '/test_migration_012_' . getmypid() . '.sqlite';
     if (file_exists($migDbPath)) { unlink($migDbPath); }
 
     $mpdo = new PDO('sqlite:' . $migDbPath, null, null, [
