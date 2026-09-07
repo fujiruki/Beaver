@@ -335,9 +335,15 @@ Access側の統合同期ボタンに対応するBeaver側タスク群（詳細: 
 
 ---
 
-## 19. R-0093: PHPテスト用一時SQLiteファイルの競合対策（バックログ、品質改善・低優先）
+## 19. ~~R-0093: PHPテスト用一時SQLiteファイルの競合対策~~ ✅ 解決済み（2026-09-08、Codexへ委譲・実装）
 
-2026-08-05、複数のCodex実装・指揮役の検証コマンドを並行実行した際に、`test_sync.php`/`test_list_sort.php`等がランダムに失敗する事象を確認（`api/tests/test_projects.sqlite`等、テストファイルごとに固定名の一時SQLiteを使っているため、同時実行時に競合する）。単独実行時は問題なし。テストの一時DBファイル名をプロセスID等でユニーク化すれば解消できる見込み。実害は「並行実行時のみ・単独再実行で解消」程度で緊急性は低い。
+2026-08-05、複数のCodex実装・指揮役の検証コマンドを並行実行した際に、`test_sync.php`/`test_list_sort.php`等がランダムに失敗する事象を確認（`api/tests/test_projects.sqlite`等、テストファイルごとに固定名の一時SQLiteを使っているため、同時実行時に競合する）。単独実行時は問題なし。
+
+### 対応（2026-09-08）
+`api/tests/`配下をgrepした結果、固定名のまま残っていたのは`test_sync.php`内の`test_migration_012_preserves_sales_category_id`テストケース（他は既に`getmypid()`でユニーク化済み）のみだった。`test_migration_012.sqlite` → `test_migration_012_' . getmypid() . '.sqlite`に変更（commit `6d93a3f`）。`test_sync.php`単独実行56/0 PASS、`test_sync.php`と`test_list_sort.php`の異なるテスト同士の並行実行も両方PASSを確認。
+
+### 派生の発見（別件・未対応）
+同一テストファイル（`test_sync.php`）を2本同時起動すると、固定ポート番号と`_server_bootstrap.php`（一時ファイル名固定）の競合で失敗することが分かった。これはSQLiteファイル名とは別の資源競合で、通常の開発フロー（異なるテストの並行実行、または同一テストの連続実行）では発生しないため、今回のR-0093の対応範囲外として様子見。再発したら別要望として起票する。
 
 ## 18. R-0084: 検索の複数プロパティ対応 Phase2（バックログ、未着手）
 
