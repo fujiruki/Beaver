@@ -14,16 +14,19 @@
 ### 2. 【要片付け・保留】`_handoff/AccessTategu_BuildProgressGui/` フォルダ（Git管理外）
 AccessTategu（Access VBA業務システム）のビルド進捗可視化GUIをDodaikun（frontpc）から依頼され、Beaverとは無関係な独立ツールとして`C:\Fujiruki\Projects\Beaver\_handoff\AccessTategu_BuildProgressGui\`に一時的に作成した（Codexのサンドボックスが現在の作業ディレクトリ配下しか書き込めなかったための一時退避場所）。ファイル本体はDodaikunへ送信済み・AccessTateguリポジトリへコミット済み（`142cd4e`→改良版`302fa76`）で、Beaver側には内容としては不要。**2026-09-08、削除の可否を藤田晴樹さんに確認したところ「まだ開発する可能性があるので置いておいて」とのことで削除せず保留。今後も勝手に削除しないこと。**
 
-### 3. R-0143 / A-X-01（Dodaikun⇔Beaverベータ切替）進行中
+### 3. R-0143 / A-X-01（Dodaikun⇔Beaverベータ切替）進行中・要復旧作業
 AccessTategu連携契約R-0143のbackpc側タスク（A-B-01〜12）はすべて完了・commit+push済み（`22dfe58`）。2026-09-08、Dodaikunから合図が届き、A-X-01（設計書`docs/Dodaikun_Beaver連携設計.md`§10-5、AccessTategu側リポジトリ）に着手：
 
-- **手順1（完了・2026-09-08）**: 藤田晴樹さんの明示許可のもとSSHで本番`Beaver/api/database.sqlite`をBeaver_betaへ再複製（ファイルサイズ8159232バイト一致確認済み）→ `api/manual/r0143_baseline_snapshot.php`をBeaver_beta上で実行 → 結果（総数823・access_customer_no空23・code>=90001が22・同名19グループ/45行）が前回2026-09-07の暫定値と完全一致、Dodaikunへ報告済み
-- **手順2（Dodaikun側で着手中）**: ImportBeaverSnapshot→RunMatching→T1〜T3/T5/T6一括承認、T4判定。実装はDodaikun側がCodexへ委譲、検証後に実行。Beaver側の作業は現時点で発生していない
-- **手順3（未着手）**: ApplyRun。完了後、Dodaikunから手順4（合図②：+10000変換、`api/manual/r0140_5_estimate_no_plus10000.sql`実行）の合図が来る予定 — **これがA-B-10（重複得意先統合スクリプト`api/manual/r0143_merge_duplicate_customers.php`）の実行合図も兼ねる可能性が高いので、次回はこの2つの実行漏れに注意**
-- 「code<>access_customer_no不一致」「is_active=0」の2項目はDodaikun側で前回値（0件・11件）を把握済みのため現時点では算出不要、と2026-09-08に確認済み
+- **手順1（完了・2026-09-08）**: SSHで本番`Beaver/api/database.sqlite`をBeaver_betaへ再複製→基準線記録（総数823・access_customer_no空23・code>=90001が22・同名19グループ/45行、前回暫定値と完全一致）、Dodaikunへ報告済み
+- **手順2（Dodaikun側完了・2026-09-08）**: ImportBeaverSnapshot→RunMatching（run_id=10）。結果T1=800/T2=2/T4=24/T5=17/T6=4、pending/hold 0。T6（重複4組: Access53/662/764/791、keep⇔dup id）の事前情報を受領し、Beaver_betaで内容照合済み（一致確認）
+- **手順3（ApplyRun実行→事故発生→復旧、2026-09-08）**: DodaikunがApplyRun実行（applied=814/failed=6）。失敗6件はBeaver側`api/auth_gate.php`に`POST /customers`の同期トークン免除が無かったため401（新規タスクA-B-13としてDodaikunが起票）。
+  - **A-B-13対応**: Codexへ実装委譲→`authGateIsExempt()`に`POST /customers`免除を追加（GETは対象外のまま維持）、テスト追加（8/8 PASS、回帰56/0 PASS）、commit `0e5001b`、Beaver_betaへデプロイしcurlで201確認済み
+  - **⚠️事故（要注意・お詫び済み）**: A-B-13デプロイ時に`upload.ps1 -Beta -KeepLocalDB`を実行したところ、**`-KeepLocalDB`は名前と逆の意味（ローカルdev DBでリモートを上書きするフラグ）**であることに気づかず、Beaver_betaのDBが一時的にローカル開発用DB（得意先3件のみ）で上書きされる事故が発生。**Dodaikunの手順3 ApplyRun結果（T1 800件のupsert・T5 17件作成・access-link更新等）がBeaver_beta側から失われた**（本番Beaverは無傷）。本番から再cloneして基準線状態（823件）まで復旧済み、Dodaikunへ経緯を報告しApplyRunの再実行を依頼済み。詳細: プロジェクトメモリ`feedback_upload_ps1_keeplocaldb_gotcha.md`。**今後、Beaver_betaへコードのみデプロイする際は`-KeepLocalDB`を絶対に付けないこと**
+  - この作業中、SYNC_API_TOKENの値をsedコマンドのミスで一度ターミナル出力に露出させてしまった（`feedback_secret_leak_response.md`の方針により緊急ローテーションは不要と判断、記録のみ）
+- **手順4（未着手）**: Dodaikun側のApplyRun再実行→V-01〜V-10照合が緑になってから合図が来る想定。合図が来たらA-B-10（重複得意先統合スクリプト`api/manual/r0143_merge_duplicate_customers.php`、対象4組は事前照合済み）の実行も併せて依頼される可能性が高い
 - 仕様書: `docs/spec/R-0140_accesstategu_r086_integration.md`の(3)(6)節に受入条件・SQL定義あり、`docs/spec/R-0143_dodaikun_sync_contract.md`・`docs/spec/R-0141_beaver_beta_environment.md`も参照
 
-**次回セッション開始時、Dodaikunから新規メッセージ（特に手順4の合図）が届いていないか確認すること**（`ListAgents`で`Dodaikun`の状態を見る、新規cross-session-messageが来ていれば自動的に見える）。
+**次回セッション開始時、Dodaikunから新規メッセージ（ApplyRun再実行結果・手順4合図）が届いていないか確認すること**（`ListAgents`で`Dodaikun`の状態を見る、新規cross-session-messageが来ていれば自動的に見える）。
 
 ### 4. AccessTateguビルド進捗GUI（Beaverと無関係な副次タスク、完了済み）
 Dodaikunからの依頼で、AccessTateguの`build_and_test.ps1`（所要2分〜11分）の進捗を可視化するPowerShell+Windows Forms GUIを2回に分けて実装した（Codexへ委譲、機密情報・MCP不要な独立実装のため）。
