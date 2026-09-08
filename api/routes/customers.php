@@ -11,6 +11,7 @@
 require_once __DIR__ . '/list_helpers.php';
 require_once __DIR__ . '/../search_helpers.php';
 require_once __DIR__ . '/history_helpers.php';
+require_once __DIR__ . '/sync_helpers.php';
 
 // IDとサブリソースを取り出す
 $segments = explode('/', trim($path, '/'));
@@ -147,8 +148,6 @@ if ($method === 'GET' && isset($segments[1]) && $segments[1] === 'sync' && isset
     exit;
 }
 if ($method === 'GET' && isset($segments[1]) && $segments[1] === 'sync' && !isset($segments[2])) {
-    require_once __DIR__ . '/sync_helpers.php';
-
     // updated_after は JST の 'Y-m-d H:i:s' として受け取る契約（vouchers/sync と同じ）。
     // DB列 updated_at は UTC 保存のため、比較前に UTC へ逆変換する。
     $updatedAfterRaw = $_GET['updated_after'] ?? null;
