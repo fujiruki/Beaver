@@ -282,7 +282,9 @@ try {
         $tmpPdo2 = new PDO('sqlite:' . $testDbPath, null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
         $afterRow = $tmpPdo2->query("SELECT last_synced_at FROM customers WHERE access_customer_no = '500'")->fetch(PDO::FETCH_ASSOC);
         assertTrue($afterRow['last_synced_at'] !== $beforeRow['last_synced_at'], '更新前後でlast_synced_atが変化していること');
-        assertEq($afterRow['last_synced_at'], $data['last_synced_at'], '応答のlast_synced_atがDB値と一致する（生UTCのまま）');
+        $expectedJst = (new DateTime($afterRow['last_synced_at'], new DateTimeZone('UTC')))
+            ->setTimezone(new DateTimeZone('Asia/Tokyo'))->format('Y-m-d H:i:s');
+        assertEq($expectedJst, $data['last_synced_at'], '応答のlast_synced_atがDB値(JST変換)と一致する');
     });
 
 } finally {
