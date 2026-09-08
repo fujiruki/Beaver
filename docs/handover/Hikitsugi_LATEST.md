@@ -33,16 +33,13 @@ AccessTategu連携契約R-0143のbackpc側タスク（A-B-01〜12）はすべて
   2. **401（4件）**: `POST /projects/{id}/vouchers/sync`が`auth_gate.php`の同期トークン免除リストに無かった（A-B-08当時の設計漏れ）。調査の過程で同種の見落とし2件（`PATCH /projects/{id}/vouchers/{no}/shipped`・`PATCH /projects/{id}/customer`）も発見し、まとめてA-B-14として対応。Codexへ委譲→`test_auth_gate_unit.php`の既存アサーション更新含め全テストPASS→commit `6340795`→Beaver_betaへデプロイ・token無し401確認済み。**完了**
   3. **400（8件、うち4件は`access_voucher_id`必須エラー）**: `sync_helpers.php`の`readJsonBody()`がjson_decode失敗を握り潰し空配列を返す実装のため、Access側の不正なUTF-8バイト（単独サロゲート、Access側で特定・R-131として修正中）を含むペイロードが「フィールド無し」扱いになっていた。Beaver側の改善（decode失敗を明示的にログ・エラー返却する）はDodaikunからA-B-15として依頼済み・**未着手**（急ぎではない）
 - **A-B-16（完了・2026-09-08）**: 藤田晴樹さんの業務判断（相殺・返金伝票対応）として本セッションで直接確認の上、`sync_helpers.php`の`total_amount < 0`拒否バリデーションを2箇所削除（`is_numeric`チェックは維持）。Codexへ委譲、回帰56/0 PASS、commit `e773614`、Beaver_betaへデプロイ済み
-- **全件再送（Dodaikun側で実行中、2026-09-08）**: migration適用・A-B-14・A-B-16の反映を受け、failed_retryable 5,878件＋積み直し9件の計5,888件を再送開始。デプロイ後の確認時点でvouchers件数が5800→6577に増加しており、正常に進行していることを確認済み
-- **再送完了後の想定**: Dodaikunから以下の照合を依頼される予定（まだ来ていない）:
-  - Beaver_betaのvouchers件数
-  - access_voucher_idの重複なし
-  - customer_idのNULLなし
-  - 409/422件数
-  この照合結果を返した後、Dodaikunは手順7（藤田晴樹さんがベータFEで「Beaverと同期」1回）→手順8（実機確認）に進む
+- **全件再送（完了・2026-09-08）**: migration適用・A-B-14・A-B-16の反映後、sent 5,918件（対象5,888件＋既存分）、pending/failed 0件で完走。conflict 15件・discarded計65件はAccess側の既存分・過去分で今回とは無関係
+- **手順6相当の照合（完了・2026-09-08）**: Beaver_beta（PHP PDO経由、CLIのsqlite3は`malformed database schema`で使用不可）で照合。access_voucher_id重複0件・customer_id NULL 0件・vouchers総数11,665件（うちaccess_voucher_id設定済み5,889件）。409/422はBeaver側にログが残らず件数不明（Access側も0件と確認済み）
+- **1件差異の調査（完了・2026-09-08）**: Access側5,888件とBeaver_beta 5,889件で1件差異。DodaikunからAccess側現行IDリスト（レンジ圧縮形式）を受領し、ローカルPHPスクリプトで突合。**孤児1件（access_voucher_id=4613、id=5792、voucher_no=S04594、2026-07-14作成の古いdraft状態sales伝票、今回の作業とは無関係）を特定**。未送信は0件で完全一致。削除可否は藤田晴樹さんの判断待ち（Dodaikun経由）
+- **次の想定**: 藤田晴樹さんが手順7（ベータFEで「Beaverと同期」1回）→手順8（実機確認）に進む。孤児（access_voucher_id=4613）の削除可否の返答も来る可能性あり
 - 仕様書: `docs/spec/R-0140_accesstategu_r086_integration.md`の(3)(6)節に受入条件・SQL定義あり、`docs/spec/R-0143_dodaikun_sync_contract.md`・`docs/spec/R-0141_beaver_beta_environment.md`も参照
 
-**【最優先】次回セッション開始時、Dodaikunから全件再送（5,888件）の完了報告・手順6相当の照合依頼が届いていないか確認すること。** 届いていたら、Beaver_beta（PHP PDO経由、CLIのsqlite3は使用不可）でvouchers件数・access_voucher_id重複なし・customer_id NULLなし・409/422件数を照合して返信する。
+**【最優先】次回セッション開始時、Dodaikunから手順7/8の進捗、または孤児（access_voucher_id=4613）削除可否の返答が届いていないか確認すること。**
 
 **次回セッション開始時、Dodaikunから新規メッセージ（RunFullPush完了報告・手順7/8の進捗）が届いていないか確認すること**（`ListAgents`で`Dodaikun`の状態を見る、新規cross-session-messageが来ていれば自動的に見える）。届いていたら、上記3点（vouchers件数・access_voucher_id重複・customer_id NULL）をBeaver_betaで照合してから返信すること。Beaver_betaのバックアップファイル（`database.sqlite.bak_*`、Git管理外）が3世代溜まっているので、作業が落ち着いたら整理を検討。
 
