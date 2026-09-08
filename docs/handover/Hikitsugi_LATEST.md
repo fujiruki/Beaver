@@ -38,11 +38,11 @@ AccessTategu連携契約R-0143のbackpc側タスク（A-B-01〜12）はすべて
 - **1件差異の調査（完了・2026-09-08）**: Access側5,888件とBeaver_beta 5,889件で1件差異。DodaikunからAccess側現行IDリスト（レンジ圧縮形式）を受領し、ローカルPHPスクリプトで突合。**孤児1件（access_voucher_id=4613、id=5792、voucher_no=S04594、2026-07-14作成の古いdraft状態sales伝票、今回の作業とは無関係）を特定**。未送信は0件で完全一致。削除可否は藤田晴樹さんの判断待ち（Dodaikun経由）
 - **孤児（access_voucher_id=4613）削除（完了・2026-09-08）**: 藤田晴樹さん承認、バックアップ後に削除（`database.sqlite.bak_20260908_pre_delete_orphan_5792`）。削除後、access_voucher_id設定済み件数が5,888件でAccess側と完全一致
 - **手順7実行→新たな問題2件（Dodaikun側・2026-09-08）**: 藤田晴樹さんがベータFEで「Beaverと同期」実行 →
-  1. **【要対応・調査中】** Beaver_betaの`access_voucher_id IS NULL`のvouchers（Dodaikunは「1,000件、2002〜2015年」と報告）がAccess側のtbl競合待ちに「新規」として大量に積まれた。晴樹さん承認で削除予定だが、**実際にクエリすると`access_voucher_id IS NULL`は5,776件（2002〜2026年、直近〜将来分も含む）でDodaikun報告の1,000件と大きく乖離**。5,776件を条件だけで一括削除すると未同期の正当な最近の伝票も巻き込む危険があるため、**削除を保留しDodaikunへ正確な対象ID一覧を再依頼中**。回答待ち
-  2. **【低優先・記録済み】** A-B-10で無効化した重複customer 4件（DUP-始まりのcode）が、`GET /customers/sync`に`is_active`除外フィルタが無いため「新規」としてAccess側に誤同期された。原因はコードで確認済み、Dodaikun側は当該4件をtbl競合待ちから破棄する方針。恒久対応は`docs/requests.md`の32番に記録済み（急ぎではない）
+  1. **【完了・2026-09-08】** Beaver_betaの`access_voucher_id IS NULL`のvouchers（当初Dodaikunは「1,000件、2002〜2015年」と報告したが、実クエリでは5,776件でDodaikun報告と大きく乖離。安易な一括削除を避け、まず`created_at`分布を調査）。**`created_at`が2026-03-17 20:04台（UTC）に集中する5,772件が単発seed/インポート処理の痕跡と特定**（updated_atだけ後日変わった7件も含めセーフ）。残る4件（id=5805-5808、`project_id`付きの最近のdraft伝票、A-B-12基準線でedited_in_beaver=1として記録済み）は除外対象と確定。藤田晴樹さんの最終承認を得て、削除前カウント一致・除外4件との重複0件の安全チェック付きスクリプトで削除実行。**vouchers総数5,892件、access_voucher_id NULL残数4件（想定通り）**。バックアップ: `database.sqlite.bak_20260908_pre_delete_seed5772`
+  2. **【低優先・記録済み・対応不要】** A-B-10で無効化した重複customer 4件（DUP-始まりのcode）が、`GET /customers/sync`に`is_active`除外フィルタが無いため「新規」としてAccess側に誤同期された。原因はコードで確認済み、Dodaikun側でAccess側tbl競合待ちから破棄済み。恒久対応は`docs/requests.md`の32番に記録済み（急ぎではない）
 - 仕様書: `docs/spec/R-0140_accesstategu_r086_integration.md`の(3)(6)節に受入条件・SQL定義あり、`docs/spec/R-0143_dodaikun_sync_contract.md`・`docs/spec/R-0141_beaver_beta_environment.md`も参照
 
-**【最優先】次回セッション開始時、Dodaikunから「1,000件（access_voucher_id NULLの旧データ）」の正確な削除対象ID一覧が届いていないか確認すること。** 届いたら、5,776件全件ではなく指定されたIDのみをバックアップ後に削除し、件数を報告する。**`access_voucher_id IS NULL`という条件だけで一括削除しないこと**（未同期の正当な最近の伝票を巻き込む）。
+**【最優先】次回セッション開始時、Dodaikunから続報（Access側1,000件のdiscarded完了報告、手順8実機確認、または新規の問題）が届いていないか確認すること。**
 
 Beaver_betaのバックアップファイル（`database.sqlite.bak_*`、Git管理外）が複数世代溜まっているので、作業が落ち着いたら整理を検討。
 
