@@ -122,21 +122,24 @@ if ($method === 'GET' && isset($segments[1]) && $segments[1] === 'sync' && !isse
     }
     $stmt->execute();
     $rows = $stmt->fetchAll();
+    // limit+1件目 = 次ページ先頭になるはずのレコード（next_cursor_atの出所）。
+    // next_cursor自体は現ページ最終行のid（id > cursorで次ページを取得する契約のため、
+    // limit+1件目のidを渡すとその行がスキップされてしまう）。
+    $nextCursor = null;
+    $nextCursorAt = null;
+    if (count($rows) > $limit) {
+        $extraRow = $rows[$limit];
+        $rows = array_slice($rows, 0, $limit);
+        $lastRow = end($rows);
+        $nextCursor = (int)$lastRow['id'];
+        $nextCursorAt = utcToJst($extraRow['updated_at']);
+        reset($rows);
+    }
+
     foreach ($rows as &$row) {
         $row['deleted_at'] = utcToJst($row['deleted_at']);
     }
     unset($row);
-
-    $nextCursor = null;
-    if (count($rows) > $limit) {
-        // limit+1 件目があった場合は次ページが存在する。limit 件のみ返し、最後の id を next_cursor に。
-        $rows = array_slice($rows, 0, $limit);
-        $lastRow = end($rows);
-        if (is_array($lastRow) && isset($lastRow['id'])) {
-            $nextCursor = (int)$lastRow['id'];
-        }
-        reset($rows);
-    }
 
     $now = new DateTime('now', new DateTimeZone('Asia/Tokyo'));
     $response = [
@@ -146,7 +149,8 @@ if ($method === 'GET' && isset($segments[1]) && $segments[1] === 'sync' && !isse
         'limit'     => $limit,
     ];
     if ($nextCursor !== null) {
-        $response['next_cursor'] = $nextCursor;
+        $response['next_cursor']    = $nextCursor;
+        $response['next_cursor_at'] = $nextCursorAt;
     }
     echo json_encode($response);
     exit;

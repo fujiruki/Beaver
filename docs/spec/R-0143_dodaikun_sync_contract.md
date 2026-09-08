@@ -31,14 +31,14 @@
 | メソッド | パス | 認証 | 内容 |
 |:--|:--|:--|:--|
 | GET | `/customers/sync?updated_after&limit&cursor` | 同期トークン | **済（A-B-01）**。応答 `{synced_at, customers[], next_cursor, next_cursor_at}`。`carry_forward_balance` を含めない。`gender/mobile/fax/is_active` を含める（追補） |
-| GET | `/vouchers/sync` | 同期トークン | 応答の各伝票に `access_billed_flag`・`access_billing_date`・`lines[]`（`line_no, item_name, quantity, price, updated_at`）を追加 |
+| GET | `/vouchers/sync?updated_after&limit&cursor` | 同期トークン | 応答の各伝票に `access_billed_flag`・`access_billing_date`・`lines[]`（`line_no, item_name, quantity, price, updated_at`）を追加。次ページがある場合は `next_cursor` と、次ページ先頭レコードの `updated_at` をJST変換した `next_cursor_at` を必ず対で返す |
 | POST | `/vouchers/sync` | 同期トークン | 受信 `billed_flag`（→`access_billed_flag`）・`billing_date`（→`access_billing_date`）・`cutoff_day`（Access 側で 0→31 変換済み）・`receivable_id`（→`access_receivable_id`）。応答に `last_synced_at`。`lines_mode`: `edited_in_beaver=1` の行が無ければ replace |
 | PATCH | `/vouchers/{id}/sync-state` | 同期トークン | 新設。`{sync_pending: bool}`。Access 側で競合待ちの伝票に印を付ける |
 | POST | `/invoices/sync` | 同期トークン | 新設。`access_receivable_id` で upsert。列: `customer_access_no`（→`customer_id` 解決）, `cutoff_day`, `billing_date`, `carry_forward`, `sales_total`, `tax_total`, `payment_received`, `invoice_total`, `next_carry_forward`, `voucher_access_ids[]`（→`invoice_vouchers`）, `cancelled_at`（→`access_cancelled_at`。削除しない） |
 | POST | `/payments/sync` | 同期トークン | 新設。`access_payment_no` で upsert。列: `customer_access_no`, `payment_date`, `amount`, `memo`, `receivable_id`（→`invoice_id` 解決、無ければ NULL） |
 | POST | `/sync/heartbeat` | 同期トークン | 新設。`{synced_at, source: 'access'}` を保存 |
 | GET | `/sync/status` | **通常認証（`df_session`）** | 新設。最終同期時刻・同期先 AppID |
-| GET | `/projects/sync` | 同期トークン | `deleted_at` を返す（論理削除列が無ければ追加） |
+| GET | `/projects/sync?updated_after&limit&cursor` | 同期トークン | `deleted_at` を返す。次ページがある場合は `next_cursor` と、次ページ先頭レコードの `updated_at` をJST変換した `next_cursor_at` を必ず対で返す |
 | PATCH | `/customers/{id}/access-link` | 同期トークン | 済（R-0140(2)） |
 
 ### 認証（A-B-08）
@@ -89,6 +89,7 @@
 | A-B-07 | `GET /projects/sync` に `deleted_at` | — | `test_projects_sync.php`: 削除済み案件が `deleted_at` 付きで返る | done（21f7c3f、Beaver_betaにmigration034適用済み） |
 | A-B-08 | 同期 API の認証（完全一致免除＋`SYNC_API_TOKEN`＋`SYNC_TOKEN_REQUIRED`、`/sync/status` は通常認証） | — | `test_auth_gate_sync.php`: (1) `/vouchers/synchronize` が免除されない (2) `SYNC_TOKEN_REQUIRED=true` でトークン無しの `/vouchers/sync` が 401 (3) 正しいトークンで 200 (4) `/sync/status` は `df_session` 無しで 401。Beaver_beta で true にして curl 照合 | done（cd981d7、Beaver_betaでSYNC_TOKEN_REQUIRED=true・curl照合済み） |
 | A-B-09 | push系応答（`POST /vouchers/sync`・`POST /projects/{id}/vouchers/sync`・`PATCH /projects/{id}/vouchers/{no}/shipped`・`PATCH /projects/{id}/customer`・`POST /customers`）に`last_synced_at`（サーバJST時刻）を必ず含める | A-B-08 | `test_push_responses_last_synced_at.php`: 上記5経路の応答に`last_synced_at`がありDBの同列と一致。`POST /customers`更新後に`customers.last_synced_at`が更新されている | done（e6dfef8、Beaver_betaで実機確認済み） |
+| A-B-11 | `GET /vouchers/sync`・`GET /projects/sync` のcursorページング契約修正 | — | `test_sync.php`: `limit=2`で次ページがある応答に`next_cursor`と`next_cursor_at`が対で存在する。`next_cursor_at`はlimit+1件目（次ページ先頭）の生の`updated_at`をJST変換した値 | done（2026-09-08、PHP実装・既存テスト更新、56 PASS / 0 FAIL） |
 
 ## 8. 運用ルール
 

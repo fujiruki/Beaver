@@ -6,6 +6,7 @@
 - [ ] R-0132: PWAインストール時のアイコン未設定（favicon/apple-touch-icon/manifest.json不足）。/readyoubouで本番id=36を確認。素材（ロゴ画像）待ちのため未着手、次回セッション候補
 
 ## 完了（本セッション）
+- [x] R-0143 A-B-11: `GET /vouchers/sync`・`GET /projects/sync` のcursorページングで、`next_cursor`がある場合に次ページ先頭の`updated_at`（JST）を`next_cursor_at`として必ず返す。`api/tests/test_sync.php` 56/56 PASS、関連ファイルPHP構文検査PASS
 - [x] R-0138: 段取りボードの案件名・得意先名を2列表示＋列幅ドラッグ調整＋幅記憶。/readyoubouで本番id=46を確認、藤田晴樹さん確認済み。仕様: `docs/spec/R-0138_dandori_label_columns.md`。Agent（worktree）にTDD委譲、指揮役が再実行して裏取り（vitest全PASS・build成功）
 - [x] R-0139: PC表示時のナビゲーションをサイドバーから上部ヘッダーのタブへ変更＋アイコン追加。/readyoubouで本番id=45を確認、藤田晴樹さん確認済み。仕様: `docs/spec/R-0139_pc_header_tab_nav.md`。実装過程で発見した既存バグ（モバイルヘッダーのインラインstyleがTailwindの`md:hidden`を上書きしPC幅でも表示され続ける）もあわせて修正。指揮役が実ブラウザ（1920px幅）で見た目確認・vitest全PASS・build成功・回帰スイート🔵青を確認
 - [x] R-0137: 上部の保存ボタンが隠れる。本番id=44を確認。R-0139の実装過程で真因判明（モバイルヘッダーのインラインstyleがTailwindのレスポンシブ非表示を上書きしPC幅でも表示され続けていた）、R-0139の修正で解消

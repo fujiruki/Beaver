@@ -118,13 +118,17 @@ if ($method === 'GET' && isset($segments[1]) && $segments[1] === 'sync' && !isse
     $stmt->execute();
     $rows = $stmt->fetchAll();
 
+    // limit+1件目 = 次ページ先頭になるはずのレコード（next_cursor_atの出所）。
+    // next_cursor自体は現ページ最終行のid（id > cursorで次ページを取得する契約のため、
+    // limit+1件目のidを渡すとその行がスキップされてしまう）。
     $nextCursor = null;
+    $nextCursorAt = null;
     if (count($rows) > $limit) {
+        $extraRow = $rows[$limit];
         $rows = array_slice($rows, 0, $limit);
         $lastRow = end($rows);
-        if (is_array($lastRow) && isset($lastRow['id'])) {
-            $nextCursor = (int)$lastRow['id'];
-        }
+        $nextCursor = (int)$lastRow['id'];
+        $nextCursorAt = utcToJst($extraRow['updated_at']);
         reset($rows);
     }
 
@@ -172,7 +176,8 @@ if ($method === 'GET' && isset($segments[1]) && $segments[1] === 'sync' && !isse
         'limit'     => $limit,
     ];
     if ($nextCursor !== null) {
-        $response['next_cursor'] = $nextCursor;
+        $response['next_cursor']    = $nextCursor;
+        $response['next_cursor_at'] = $nextCursorAt;
     }
     echo json_encode($response);
     exit;

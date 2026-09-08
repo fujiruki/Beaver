@@ -572,12 +572,13 @@ try {
         assertEq(1000, $data['limit']);
     });
 
-    runTest('/projects/sync?limit=2 は 2 件返し next_cursor を含む', function () use ($port) {
+    runTest('/projects/sync?limit=2 は 2 件返し next_cursor/next_cursor_at を含む', function () use ($port) {
         $body = file_get_contents("http://127.0.0.1:$port/contents/Beaver/api/projects/sync?limit=2");
         $data = json_decode($body, true);
         assertEq(2, count($data['projects']), 'projects count');
         assertEq(2, $data['limit']);
         assertTrue(isset($data['next_cursor']), 'next_cursor present');
+        assertTrue(isset($data['next_cursor_at']), 'next_cursor_at present');
     });
 
     runTest('/projects/sync?limit=2&cursor=N で次ページを取得できる', function () use ($port) {
@@ -719,11 +720,12 @@ try {
         assertTrue(array_key_exists('access_voucher_id', $data['vouchers'][0]), 'access_voucher_id key exists');
     });
 
-    runTest('/vouchers/sync?limit=2 は 2 件返し next_cursor を含む', function () use ($vfetch, $vbase) {
+    runTest('/vouchers/sync?limit=2 は 2 件返し next_cursor/next_cursor_at を含む', function () use ($vfetch, $vbase) {
         $data = json_decode($vfetch($vbase . '?limit=2')['body'], true);
         assertEq(2, count($data['vouchers']), 'vouchers count');
         assertEq(2, $data['limit']);
         assertTrue(isset($data['next_cursor']), 'next_cursor present');
+        assertTrue(isset($data['next_cursor_at']), 'next_cursor_at present');
     });
 
     runTest('/vouchers/sync?cursor=1 は id>1 のみ返す', function () use ($vfetch, $vbase) {
