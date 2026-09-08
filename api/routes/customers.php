@@ -133,7 +133,7 @@ function customerAccessLink(PDO $pdo, int $customerId): void {
         'customer_id'        => $customerId,
         'access_customer_no' => $row['access_customer_no'],
         'code'                => $row['code'],
-        'last_synced_at'      => $row['last_synced_at'],
+        'last_synced_at'      => utcToJst($row['last_synced_at']),
         'status'              => $status,
     ]);
 }
@@ -341,8 +341,11 @@ switch ($method) {
                 $pdo->prepare('UPDATE customers SET ' . implode(', ', $sets) . ' WHERE id = :id')->execute($params);
                 $stmt2 = $pdo->prepare('SELECT * FROM customers WHERE id = ?');
                 $stmt2->execute([(int)$existingId]);
+                $row = $stmt2->fetch();
+                $row['updated_at'] = utcToJst($row['updated_at']);
+                $row['last_synced_at'] = utcToJst($row['last_synced_at']);
                 http_response_code(200);
-                echo json_encode($stmt2->fetch());
+                echo json_encode($row);
                 break;
             }
         }
@@ -410,7 +413,10 @@ switch ($method) {
         http_response_code(201);
         $stmt2 = $pdo->prepare('SELECT * FROM customers WHERE id = ?');
         $stmt2->execute([$id]);
-        echo json_encode($stmt2->fetch());
+        $row = $stmt2->fetch();
+        $row['updated_at'] = utcToJst($row['updated_at']);
+        $row['last_synced_at'] = utcToJst($row['last_synced_at']);
+        echo json_encode($row);
         break;
 
     case 'PUT':

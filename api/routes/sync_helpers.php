@@ -941,7 +941,7 @@ function syncVoucherAccessLink(PDO $pdo, int $voucherId): void {
         'voucher_id' => (int)$row['id'],
         'access_voucher_id' => (int)$row['access_voucher_id'],
         'access_voucher_no' => $row['access_voucher_no'],
-        'last_synced_at' => $row['last_synced_at'],
+        'last_synced_at' => utcToJst($row['last_synced_at']),
         'status' => 'linked',
     ]);
 }
