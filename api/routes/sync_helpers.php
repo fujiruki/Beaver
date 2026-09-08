@@ -205,10 +205,6 @@ function syncVoucherUpsert(PDO $pdo, ?int $projectId): void {
             return;
         }
         $totalAmount = (float)$data['total_amount'];
-        if ($totalAmount < 0) {
-            respond(400, ['error' => 'total_amount は 0 以上で指定してください']);
-            return;
-        }
     } else {
         $totalAmount = 0.0;
     }
@@ -607,10 +603,6 @@ function syncVoucherUpdate(PDO $pdo, int $projectId, string $accessVoucherNo): v
             return;
         }
         $totalAmount = (float)$data['total_amount'];
-        if ($totalAmount < 0) {
-            respond(400, ['error' => 'total_amount は 0 以上で指定してください']);
-            return;
-        }
     }
 
     // R-035 (b): access_voucher_no 重複時の防御。
