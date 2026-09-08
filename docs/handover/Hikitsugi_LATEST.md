@@ -29,11 +29,12 @@ AccessTategu連携契約R-0143のbackpc側タスク（A-B-01〜12）はすべて
 - **手順4（完了・2026-09-08）**: `api/manual/r0140_5_estimate_no_plus10000.sql`をBeaver_betaで実行。estimate 13件（2003-2080→12003-12080）、sales 7件（0-2080→10000-12080）で正しく変換。実行前に`database.sqlite.bak_20260908_pre_plus10000`をバックアップ
 - **手順6（Dodaikun側完了・2026-09-08）**: sync_paused削除（1→0）
 - **手順5 RunFullPush（Dodaikun側で実行→大量エラー、2026-09-08）**: 対象5,890件を送信した結果、**failed_retryable 5,878件（HTTP 500）・failed_permanent 12件（400×8/401×4）・sent 30件**という大規模障害が発生。原因を3つ特定・一部対応中:
-  1. **500（5,878件・最大の問題）**: migration 030/031/032/034/035（`vouchers.access_billed_flag`等）が本番・Beaver_beta両方に一度も適用されていなかった（`applied.txt`に「未適用」のまま放置されていたことが判明。今回の一連の事故とは無関係の、以前からの適用漏れ）。**⚠️未対応・藤田晴樹さんの許可待ち**（自動モード分類器にブロックされ確認中、まだ返答なし）。CLIのsqlite3は3.7.17で部分インデックス非対応だがPHPのPDOは3.45.2で対応しているため、適用はCLIではなくPHP経由で行うこと（`api/manual/`配下に恒久スクリプト化するか、その場限りのワンショットで済ますかは未定）
+  1. **500（5,878件・最大の問題）**: migration 030/031/032/034/035（`vouchers.access_billed_flag`等）が本番・Beaver_beta両方に一度も適用されていなかった（`applied.txt`に「未適用」のまま放置されていたことが判明。今回の一連の事故とは無関係の、以前からの適用漏れ）。**完了（2026-09-08）**: 藤田晴樹さんの許可を本セッションで直接確認の上、PHP PDO経由（CLIのsqlite3は3.7.17で部分インデックス入りスキーマを読めなくなるため使用不可、`malformed database schema`エラーで実際に遭遇した）で適用。PRAGMA table_infoで全列存在・customers件数不変(828)を確認、`applied.txt`更新（commit `85cfd30`）、Dodaikunへ結果報告済み
   2. **401（4件）**: `POST /projects/{id}/vouchers/sync`が`auth_gate.php`の同期トークン免除リストに無かった（A-B-08当時の設計漏れ）。調査の過程で同種の見落とし2件（`PATCH /projects/{id}/vouchers/{no}/shipped`・`PATCH /projects/{id}/customer`）も発見し、まとめてA-B-14として対応。Codexへ委譲→`test_auth_gate_unit.php`の既存アサーション更新含め全テストPASS→commit `6340795`→Beaver_betaへデプロイ・token無し401確認済み。**完了**
-  3. **400（8件、うち4件は`access_voucher_id`必須エラー）**: `sync_helpers.php`の`readJsonBody()`がjson_decode失敗を握り潰し空配列を返す実装のため、Access側の不正なUTF-8バイト（文字コード変換不備疑い）を含むペイロードが「フィールド無し」扱いになっていた。原因はDodaikunへ報告済み、Access側でR-131として対応予定。Beaver側の改善（decode失敗を明示的にログ・エラー返却する）はDodaikunからA-B-15として依頼済み・**未着手**（急ぎではない、A-B-14の後でよいとのこと）
-  - 500解消（migration適用）後、DodaikunがfailedRetryable 5,878件を試行回数リセットして一括再送する予定（ランチャ準備済み）。A-B-14分（401の4件）は先に再送してもらって良いと伝達済み
-- **手順5完了後の想定**: 送信成功後、Beaver側へ以下の照合を依頼される予定（まだ来ていない）:
+  3. **400（8件、うち4件は`access_voucher_id`必須エラー）**: `sync_helpers.php`の`readJsonBody()`がjson_decode失敗を握り潰し空配列を返す実装のため、Access側の不正なUTF-8バイト（単独サロゲート、Access側で特定・R-131として修正中）を含むペイロードが「フィールド無し」扱いになっていた。Beaver側の改善（decode失敗を明示的にログ・エラー返却する）はDodaikunからA-B-15として依頼済み・**未着手**（急ぎではない）
+- **A-B-16（完了・2026-09-08）**: 藤田晴樹さんの業務判断（相殺・返金伝票対応）として本セッションで直接確認の上、`sync_helpers.php`の`total_amount < 0`拒否バリデーションを2箇所削除（`is_numeric`チェックは維持）。Codexへ委譲、回帰56/0 PASS、commit `e773614`、Beaver_betaへデプロイ済み
+- **全件再送（Dodaikun側で実行中、2026-09-08）**: migration適用・A-B-14・A-B-16の反映を受け、failed_retryable 5,878件＋積み直し9件の計5,888件を再送開始。デプロイ後の確認時点でvouchers件数が5800→6577に増加しており、正常に進行していることを確認済み
+- **再送完了後の想定**: Dodaikunから以下の照合を依頼される予定（まだ来ていない）:
   - Beaver_betaのvouchers件数
   - access_voucher_idの重複なし
   - customer_idのNULLなし
@@ -41,7 +42,7 @@ AccessTategu連携契約R-0143のbackpc側タスク（A-B-01〜12）はすべて
   この照合結果を返した後、Dodaikunは手順7（藤田晴樹さんがベータFEで「Beaverと同期」1回）→手順8（実機確認）に進む
 - 仕様書: `docs/spec/R-0140_accesstategu_r086_integration.md`の(3)(6)節に受入条件・SQL定義あり、`docs/spec/R-0143_dodaikun_sync_contract.md`・`docs/spec/R-0141_beaver_beta_environment.md`も参照
 
-**【最優先】次回セッション開始時、まずmigration 030/031/032/034/035のBeaver_beta適用許可が藤田晴樹さんから出ていないか確認すること。** 出ていれば即座に適用（PHP PDO経由、バックアップ後）し、Dodaikunへ合図。これが現在Access↔Beaver同期の再送を止めている最大のブロッカー。
+**【最優先】次回セッション開始時、Dodaikunから全件再送（5,888件）の完了報告・手順6相当の照合依頼が届いていないか確認すること。** 届いていたら、Beaver_beta（PHP PDO経由、CLIのsqlite3は使用不可）でvouchers件数・access_voucher_id重複なし・customer_id NULLなし・409/422件数を照合して返信する。
 
 **次回セッション開始時、Dodaikunから新規メッセージ（RunFullPush完了報告・手順7/8の進捗）が届いていないか確認すること**（`ListAgents`で`Dodaikun`の状態を見る、新規cross-session-messageが来ていれば自動的に見える）。届いていたら、上記3点（vouchers件数・access_voucher_id重複・customer_id NULL）をBeaver_betaで照合してから返信すること。Beaver_betaのバックアップファイル（`database.sqlite.bak_*`、Git管理外）が3世代溜まっているので、作業が落ち着いたら整理を検討。
 
