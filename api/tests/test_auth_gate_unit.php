@@ -49,6 +49,10 @@ $exemptCases = [
     ['POST', '/sync/heartbeat'],
     ['PATCH', '/vouchers/5/access-link'],
     ['PATCH', '/vouchers/5/sync-state'],
+    // R-0143 A-B-14: AccessTategu連携のpush系エンドポイントは同期トークン認証の対象として免除する。
+    ['POST', '/projects/1/vouchers/sync'],
+    ['PATCH', '/projects/1/vouchers/E00001/shipped'],
+    ['PATCH', '/projects/1/customer'],
 ];
 foreach ($exemptCases as [$method, $path]) {
     runTest("対象外: $method $path", function () use ($method, $path) {
@@ -63,7 +67,6 @@ $guardedCases = [
     ['GET', '/me'],
     ['GET', '/'],
     // R-0143 A-B-08: 完全一致の免除一覧に変更したため、部分一致でのみ免除されていたパスはゲート対象に戻る
-    ['POST', '/projects/1/vouchers/sync'],
     ['POST', '/aggregation-categories/sync'],
     ['GET', '/vouchers/synchronize'],
     ['GET', '/sync/status'],

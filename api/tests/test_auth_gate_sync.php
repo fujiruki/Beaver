@@ -101,6 +101,8 @@ function makeTestDb(string $root, string $dbPath): void {
             try { $pdo->exec($stmt); } catch (Throwable $_) { /* 重複系は無視 */ }
         }
     }
+    $pdo->exec("INSERT INTO customers (name, access_customer_no) VALUES ('案件伝票同期テスト得意先', '1')");
+    $pdo->exec("INSERT INTO projects (customer_id, name) VALUES (1, '案件伝票同期テスト案件')");
 }
 
 echo "=== R-0143 A-B-08 認証ゲート統合テスト ===\n\n";
@@ -168,6 +170,69 @@ try {
     runTest('GET /customers は免除されず、df_session無しで401', function () use ($port) {
         $res = httpGet($port, '/customers');
         assertTrue(str_contains($res['status'], '401'), 'expected 401 got: ' . $res['status'] . ' body=' . $res['body']);
+    });
+
+    runTest('トークン無しの POST /projects/{id}/vouchers/sync は401', function () use ($port) {
+        $body = json_encode(['access_voucher_id' => 99001, 'voucher_type' => 'estimate', 'customer_access_no' => '1']);
+        $res = httpPost($port, '/projects/1/vouchers/sync', ['Content-Type: application/json'], $body);
+        assertTrue(str_contains($res['status'], '401'), 'expected 401 got: ' . $res['status'] . ' body=' . $res['body']);
+    });
+
+    runTest('正しいSYNC_API_TOKENを付けた POST /projects/{id}/vouchers/sync は401以外', function () use ($port) {
+        $body = json_encode(['access_voucher_id' => 99001, 'voucher_type' => 'estimate', 'customer_access_no' => '1']);
+        $res = httpPost($port, '/projects/1/vouchers/sync', [
+            'Content-Type: application/json',
+            'Authorization: Bearer unit-test-sync-token',
+        ], $body);
+        assertTrue(!str_contains($res['status'], '401'), 'expected non-401 got: ' . $res['status'] . ' body=' . $res['body']);
+    });
+
+    runTest('トークン無しの PATCH /projects/{id}/vouchers/{voucher_no}/shipped は401', function () use ($port) {
+        $body = json_encode(['shipped' => true]);
+        $header = "Connection: close\r\nContent-Type: application/json\r\n";
+        $ctx = stream_context_create(['http' => [
+            'method' => 'PATCH', 'header' => $header, 'content' => $body,
+            'timeout' => 5, 'ignore_errors' => true,
+        ]]);
+        $responseBody = @file_get_contents("http://127.0.0.1:$port/contents/Beaver/api/projects/1/vouchers/E00001/shipped", false, $ctx);
+        $status = $http_response_header[0] ?? '';
+        assertTrue(str_contains($status, '401'), 'expected 401 got: ' . $status . ' body=' . (string)$responseBody);
+    });
+
+    runTest('正しいSYNC_API_TOKENを付けた PATCH /projects/{id}/vouchers/{voucher_no}/shipped は401以外', function () use ($port) {
+        $body = json_encode(['shipped' => true]);
+        $header = "Connection: close\r\nContent-Type: application/json\r\nAuthorization: Bearer unit-test-sync-token\r\n";
+        $ctx = stream_context_create(['http' => [
+            'method' => 'PATCH', 'header' => $header, 'content' => $body,
+            'timeout' => 5, 'ignore_errors' => true,
+        ]]);
+        $responseBody = @file_get_contents("http://127.0.0.1:$port/contents/Beaver/api/projects/1/vouchers/E00001/shipped", false, $ctx);
+        $status = $http_response_header[0] ?? '';
+        assertTrue(!str_contains($status, '401'), 'expected non-401 got: ' . $status . ' body=' . (string)$responseBody);
+    });
+
+    runTest('トークン無しの PATCH /projects/{id}/customer は401', function () use ($port) {
+        $body = json_encode(['customer_access_no' => '1']);
+        $header = "Connection: close\r\nContent-Type: application/json\r\n";
+        $ctx = stream_context_create(['http' => [
+            'method' => 'PATCH', 'header' => $header, 'content' => $body,
+            'timeout' => 5, 'ignore_errors' => true,
+        ]]);
+        $responseBody = @file_get_contents("http://127.0.0.1:$port/contents/Beaver/api/projects/1/customer", false, $ctx);
+        $status = $http_response_header[0] ?? '';
+        assertTrue(str_contains($status, '401'), 'expected 401 got: ' . $status . ' body=' . (string)$responseBody);
+    });
+
+    runTest('正しいSYNC_API_TOKENを付けた PATCH /projects/{id}/customer は401以外', function () use ($port) {
+        $body = json_encode(['customer_access_no' => '1']);
+        $header = "Connection: close\r\nContent-Type: application/json\r\nAuthorization: Bearer unit-test-sync-token\r\n";
+        $ctx = stream_context_create(['http' => [
+            'method' => 'PATCH', 'header' => $header, 'content' => $body,
+            'timeout' => 5, 'ignore_errors' => true,
+        ]]);
+        $responseBody = @file_get_contents("http://127.0.0.1:$port/contents/Beaver/api/projects/1/customer", false, $ctx);
+        $status = $http_response_header[0] ?? '';
+        assertTrue(!str_contains($status, '401'), 'expected non-401 got: ' . $status . ' body=' . (string)$responseBody);
     });
 
     runTest('/sync/status は免除されず、df_session無しで401', function () use ($port) {

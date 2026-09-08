@@ -22,6 +22,9 @@ const AUTH_GATE_SYNC_EXEMPT_PATHS = [
 const AUTH_GATE_SYNC_EXEMPT_PATTERNS = [
     '#/access-link$#',
     '#/vouchers/\d+/sync-state$#',
+    '#^/projects/\d+/vouchers/sync$#',
+    '#^/projects/\d+/vouchers/[^/]+/shipped$#',
+    '#^/projects/\d+/customer$#',
 ];
 
 /**
