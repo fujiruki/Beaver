@@ -1,5 +1,17 @@
 # 要望・リクエスト
 
+## 32. 無効化得意先（is_active=0）が`GET /customers/sync`経由でAccess側に誤って「新規」として同期される（2026-09-08発覚、優先度低・急ぎではない）
+
+R-0143 A-B-10（重複得意先統合）でis_active=0・access_customer_no=NULLに無効化したcustomer 4件が、Dodaikunの手順7「Beaverと同期」実行時にAccess側のtbl競合待びに「種別=new」として積まれた。
+
+### 原因
+`api/routes/customers.php`の`GET /customers/sync`（142〜186行目付近）は`updated_after`でフィルタするのみで、`is_active`による除外が無い。A-B-10で無効化した際に`updated_at`が更新されるため、増分同期に含まれてしまう。`access_customer_no`がNULLのため、Access側は既存customerとのマッチングキーが無く「新規」と誤認識する。
+
+### 対応方針（未着手、Dodaikunと設計要相談）
+- `GET /customers/sync`のレスポンスから`is_active=0`の行を除外する（ただしAccess側で既に同期済みの得意先が後からBeaver側で無効化されたケースを正しく伝播できなくなる可能性があり、要件整理が必要）
+- 代替案: `is_active=0`かつ`access_customer_no IS NULL`の行のみ除外する（統合・無効化専用のケースに限定）
+- Dodaikun（AccessTategu側）からの提起。急ぎではないとのことなので、次回のR-0143関連作業のタイミングで設計を詰める
+
 ## 31. A-B-10・A-B-12: R-0140派生タスク（2026-09-07、Dodaikun[frontPC]からのクロスセッション依頼）
 
 Dodaikunからの原文（要約せず記録）:
