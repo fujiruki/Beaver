@@ -40,9 +40,10 @@ AccessTategu連携契約R-0143のbackpc側タスク（A-B-01〜12）はすべて
 - **手順7実行→新たな問題2件（Dodaikun側・2026-09-08）**: 藤田晴樹さんがベータFEで「Beaverと同期」実行 →
   1. **【完了・2026-09-08】** Beaver_betaの`access_voucher_id IS NULL`のvouchers（当初Dodaikunは「1,000件、2002〜2015年」と報告したが、実クエリでは5,776件でDodaikun報告と大きく乖離。安易な一括削除を避け、まず`created_at`分布を調査）。**`created_at`が2026-03-17 20:04台（UTC）に集中する5,772件が単発seed/インポート処理の痕跡と特定**（updated_atだけ後日変わった7件も含めセーフ）。残る4件（id=5805-5808、`project_id`付きの最近のdraft伝票、A-B-12基準線でedited_in_beaver=1として記録済み）は除外対象と確定。藤田晴樹さんの最終承認を得て、削除前カウント一致・除外4件との重複0件の安全チェック付きスクリプトで削除実行。**vouchers総数5,892件、access_voucher_id NULL残数4件（想定通り）**。バックアップ: `database.sqlite.bak_20260908_pre_delete_seed5772`
   2. **【低優先・記録済み・対応不要】** A-B-10で無効化した重複customer 4件（DUP-始まりのcode）が、`GET /customers/sync`に`is_active`除外フィルタが無いため「新規」としてAccess側に誤同期された。原因はコードで確認済み、Dodaikun側でAccess側tbl競合待ちから破棄済み。恒久対応は`docs/requests.md`の32番に記録済み（急ぎではない）
+- **A-B-11（完了・2026-09-08）**: 手順7の伝票プルが毎回失敗する別バグを発見。`GET /vouchers/sync`・`GET /projects/sync`が`next_cursor`はあるのに`next_cursor_at`を返しておらず（`limit+1`件目を`array_slice`で切り捨てる前に取得し忘れ）、Access側の安全策（next_cursor単独は同期失敗扱い）に引っかかっていた。`customers.php`は元々正しい実装だったのでそれに合わせて統一。Codexへ委譲、`test_sync.php`にアサーション追加、56/0 PASS、commit `0c7224a`、Beaver_betaへデプロイ・curlで`next_cursor_at`が返ることを確認済み。仕様書`docs/spec/R-0143_dodaikun_sync_contract.md`にA-B-11として記録済み
 - 仕様書: `docs/spec/R-0140_accesstategu_r086_integration.md`の(3)(6)節に受入条件・SQL定義あり、`docs/spec/R-0143_dodaikun_sync_contract.md`・`docs/spec/R-0141_beaver_beta_environment.md`も参照
 
-**【最優先】次回セッション開始時、Dodaikunから続報（Access側1,000件のdiscarded完了報告、手順8実機確認、または新規の問題）が届いていないか確認すること。**
+**【最優先】次回セッション開始時、Dodaikunから続報（A-B-11後の手順7再実行結果、手順8実機確認、または新規の問題）が届いていないか確認すること。**
 
 Beaver_betaのバックアップファイル（`database.sqlite.bak_*`、Git管理外）が複数世代溜まっているので、作業が落ち着いたら整理を検討。
 
