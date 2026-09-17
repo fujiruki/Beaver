@@ -40,3 +40,13 @@ AccessTategu連携契約R-0143のbackpc側タスク（A-B-01〜12）はすべて
 - **R-0093修正**: バックログのPHPテスト一時SQLiteファイル名の並行実行競合をCodexへ委譲・修正（`test_sync.php`の`test_migration_012`ケースのみ固定名が残っていた）。commit `6d93a3f`、`docs/requests.md`も解決済みに更新（commit `e66f361`）
 - **`/hikitsugi`スキル新規作成**: `C:\Users\fjtsu\.claude\commands\hikitsugi.md`（Beaver固有ではなく汎用スキル）。セッションの引き継ぎ資料を更新し、次セッション冒頭に貼り付ける短いプロンプトを出力する
 - **AccessTateguビルド進捗GUI**: Dodaikunからの依頼でPowerShell+Windows Forms GUIを実装（Codexへ委譲）。Beaver側の対応は完了、Dodaikun側で実機確認・コミット済み（`142cd4e`→`302fa76`）
+
+## 2026-09-08夜〜2026-09-17: Dodaikunからの続報とR-0144対応
+
+2026-09-08夜、Dodaikunから続報を受信: 手順7再実行結果「新規0・更新2件・得意先9件を承認待ちに追加」（Beaver側タイムゾーン修正commit`5549c56`/`2ea3f68`より前の実行だった可能性があり未検証）、手順8（実機確認）は別バグ（frm競合解決時の得意先「（不明）」表示）修正を優先するため保留、という内容だった。この時点でBeaver側の対応は不要と判断し待機。
+
+2026-09-17、frontpc・AccessTateguセッションからGoogle Drive「AI共有庫 カンガルー」経由でBeaver_beta向け機能追加依頼（B-1〜B-6、Dodaikun v1受入テスト自動化のため）を受領。SdDDフローでR-0144として仕様化（`docs/spec/R-0144_beaver_beta_uat_support.md`）→Agent（worktree）にTDD実装委譲→指揮役が差分確認・回帰テスト再実行で裏取り→Beaver_betaへ`upload.ps1 -Beta`でデプロイ→migration 036をSSH+PHP PDO経由で適用→実機確認→カンガルーへ返信ファイル作成、まで一気通貫で完了。詳細はcommit`0d00f33`〜`17dd57b`、カンガルーの`2026-09-17_03_Beaver_Dodaikun受入テスト_Beaver_beta_API実装完了_返信.md`を参照。
+
+このやり取りの過程で、ローカルdev DBがmigration 031/032/035（Beaver_betaには2026-09-08適用済み）を長期間未適用のまま放置されていたと判明し、合わせて解消した（コミット`5ccf703`）。本番Beaverには今回のR-0144コードを意図的に未デプロイのまま（`admin/snapshot`ルート自体が存在しない状態が最も安全なため）。
+
+「コミット・マージ・プッシュは指揮役の判断で確認せず進めてよい」という明示指示を2026-09-17に受けた（`feedback_commit_push_preapproved.md`）。
