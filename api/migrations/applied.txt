@@ -63,3 +63,4 @@
 035_sync_state_heartbeat  2026-09-17  dev (R-0144実機確認のため今回適用。backup: 同上)
 035_sync_state_heartbeat  2026-09-08  beaver_beta (R-0143 A-B-06。PHP PDO経由で適用、vouchers.sync_pending・sync_heartbeatsテーブル存在確認済み)
 036_invoices_payments_updated_at  2026-09-17  dev (R-0144 B-4。PHP PDO経由で適用、invoices.updated_at/payments.updated_at存在確認済み。backup: api/backups/database_20260917_1844_pre_r0144_migration.sqlite)
+036_invoices_payments_updated_at  2026-09-17  beaver_beta (R-0144 B-4。PHP PDO経由で適用、invoices.updated_at/payments.updated_at存在確認済み、NULL残存0件。backup: database.sqlite.bak_pre_r0144_20260917_1847)
