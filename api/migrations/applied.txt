@@ -62,3 +62,4 @@
 032_payments_access_fields  2026-09-08  beaver_beta (R-0143 A-B-04。PHP PDO経由で適用、payments.access_payment_no/origin存在確認済み。部分インデックスidx_payments_access_payment_noも作成済み)
 035_sync_state_heartbeat  未適用   dev (R-0143 A-B-06。worktree作業のためdatabase.sqliteが存在せず未適用。schema.sql+migrations適用のテスト専用DBで動作確認済み)
 035_sync_state_heartbeat  2026-09-08  beaver_beta (R-0143 A-B-06。PHP PDO経由で適用、vouchers.sync_pending・sync_heartbeatsテーブル存在確認済み)
+036_invoices_payments_updated_at  未適用   dev (R-0144 B-4。worktree作業のためdatabase.sqliteが存在せず未適用。schema.sql+migrations適用のテスト専用DBで動作確認済み)

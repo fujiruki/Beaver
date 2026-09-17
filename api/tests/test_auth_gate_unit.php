@@ -47,6 +47,12 @@ $exemptCases = [
     ['POST', '/invoices/sync'],
     ['POST', '/payments/sync'],
     ['POST', '/sync/heartbeat'],
+    // R-0144 B-2: 認証ゲート免除漏れの修正（SYNC_API_TOKENで呼べるようにする）
+    ['GET', '/sync/status'],
+    // R-0144 B-1: Beaver_betaスナップショット保存・復元・一覧（SYNC_API_TOKEN必須はルート側で検証）
+    ['POST', '/admin/snapshot/save'],
+    ['POST', '/admin/snapshot/restore'],
+    ['GET', '/admin/snapshot/list'],
     ['PATCH', '/vouchers/5/access-link'],
     ['PATCH', '/vouchers/5/sync-state'],
     // R-0143 A-B-14: AccessTategu連携のpush系エンドポイントは同期トークン認証の対象として免除する。
@@ -69,7 +75,6 @@ $guardedCases = [
     // R-0143 A-B-08: 完全一致の免除一覧に変更したため、部分一致でのみ免除されていたパスはゲート対象に戻る
     ['POST', '/aggregation-categories/sync'],
     ['GET', '/vouchers/synchronize'],
-    ['GET', '/sync/status'],
 ];
 foreach ($guardedCases as [$method, $path]) {
     runTest("ゲート対象: $method $path", function () use ($method, $path) {

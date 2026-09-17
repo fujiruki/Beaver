@@ -16,6 +16,10 @@ const AUTH_GATE_SYNC_EXEMPT_PATHS = [
     '/invoices/sync',
     '/payments/sync',
     '/sync/heartbeat',
+    '/sync/status',
+    '/admin/snapshot/save',
+    '/admin/snapshot/restore',
+    '/admin/snapshot/list',
 ];
 
 /** R-0143 A-B-08: 正規表現で判定する免除パス（末尾一致のIDパラメータ入りパス） */

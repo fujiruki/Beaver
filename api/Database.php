@@ -37,6 +37,14 @@ class Database {
         return self::$instance;
     }
 
+    /**
+     * R-0144 B-1: スナップショット復元時にDBファイルを丸ごと差し替える前に、
+     * このリクエスト内で保持しているPDO接続を明示的に解放する。
+     */
+    public static function disconnect(): void {
+        self::$instance = null;
+    }
+
     private static function initSchema(PDO $pdo): void {
         $schema = file_get_contents(__DIR__ . '/schema.sql');
         $pdo->exec($schema);

@@ -135,7 +135,7 @@ function restorePaymentDelete(PDO $pdo, array $row): array {
         if ($invoiceId && $inv) {
             $newReceived = (float)$inv['payment_received'] + (float)$row['amount'];
             $newCarryFwd = (float)$inv['invoice_total'] - $newReceived;
-            $pdo->prepare('UPDATE invoices SET payment_received = ?, next_carry_forward = ? WHERE id = ?')
+            $pdo->prepare('UPDATE invoices SET payment_received = ?, next_carry_forward = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
                 ->execute([$newReceived, $newCarryFwd, $invoiceId]);
             $pdo->prepare('UPDATE customers SET carry_forward_balance = ? WHERE id = ?')
                 ->execute([$newCarryFwd, $inv['customer_id']]);

@@ -76,7 +76,8 @@ function syncPaymentUpsert(PDO $pdo): void {
                     payment_date = :payment_date,
                     amount       = :amount,
                     memo         = :memo,
-                    origin       = :origin
+                    origin       = :origin,
+                    updated_at   = CURRENT_TIMESTAMP
                 WHERE id = :id
             ')->execute([
                 ':customer_id'  => $customerId,
@@ -92,10 +93,10 @@ function syncPaymentUpsert(PDO $pdo): void {
             $pdo->prepare('
                 INSERT INTO payments
                     (payment_no, customer_id, invoice_id, payment_date, amount, payment_type, memo,
-                     access_payment_no, origin)
+                     access_payment_no, origin, updated_at)
                 VALUES
                     (:payment_no, :customer_id, :invoice_id, :payment_date, :amount, :payment_type, :memo,
-                     :access_payment_no, :origin)
+                     :access_payment_no, :origin, CURRENT_TIMESTAMP)
             ')->execute([
                 ':payment_no'        => $paymentNo,
                 ':customer_id'       => $customerId,
@@ -125,6 +126,107 @@ function syncPaymentUpsert(PDO $pdo): void {
 // POST /payments/sync（R-0143 A-B-04）
 if ($method === 'POST' && isset($segments[1]) && $segments[1] === 'sync' && !$resourceId) {
     syncPaymentUpsert($pdo);
+    exit;
+}
+
+// R-0144 B-4: GET /payments/sync[?updated_after=YYYY-MM-DD HH:NN:SS (JST)][&customer_access_no=N][&limit=N][&cursor=ID]
+// 完全一致チェック（/payments/sync/anything を全件返却で誤通過させない）
+if ($method === 'GET' && isset($segments[1]) && $segments[1] === 'sync' && isset($segments[2])) {
+    http_response_code(404);
+    echo json_encode(['error' => 'Not found', 'path' => $path]);
+    exit;
+}
+if ($method === 'GET' && isset($segments[1]) && $segments[1] === 'sync' && !isset($segments[2])) {
+    $updatedAfterRaw = $_GET['updated_after'] ?? null;
+    $updatedAfterSql = null;
+    if ($updatedAfterRaw !== null && $updatedAfterRaw !== '') {
+        $updatedAfterDt = DateTime::createFromFormat('Y-m-d H:i:s', $updatedAfterRaw, new DateTimeZone('Asia/Tokyo'));
+        if ($updatedAfterDt === false || $updatedAfterDt->format('Y-m-d H:i:s') !== $updatedAfterRaw) {
+            respond(400, ['error' => 'Invalid updated_after format']);
+            exit;
+        }
+        $updatedAfterDt->setTimezone(new DateTimeZone('UTC'));
+        $updatedAfterSql = $updatedAfterDt->format('Y-m-d H:i:s');
+    }
+
+    $customerAccessNo = isset($_GET['customer_access_no']) && $_GET['customer_access_no'] !== ''
+        ? (string)$_GET['customer_access_no']
+        : null;
+
+    $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 1000;
+    if ($limit < 1)    $limit = 1000;
+    if ($limit > 5000) $limit = 5000;
+
+    $cursor = null;
+    if (isset($_GET['cursor']) && $_GET['cursor'] !== '') {
+        if (!is_numeric($_GET['cursor'])) {
+            respond(400, ['error' => 'Invalid cursor (numeric id required)']);
+            exit;
+        }
+        $cursor = (int)$_GET['cursor'];
+    }
+
+    $sql = 'SELECT p.id, p.access_payment_no, p.amount, p.updated_at,
+                   inv.access_receivable_id
+            FROM payments p
+            LEFT JOIN customers c ON c.id = p.customer_id
+            LEFT JOIN invoices inv ON inv.id = p.invoice_id
+            WHERE 1=1';
+    $params = [];
+    if ($updatedAfterSql !== null) {
+        $sql .= ' AND p.updated_at > :updated_after';
+        $params[':updated_after'] = $updatedAfterSql;
+    }
+    if ($customerAccessNo !== null) {
+        $sql .= ' AND c.access_customer_no = :customer_access_no';
+        $params[':customer_access_no'] = $customerAccessNo;
+    }
+    if ($cursor !== null) {
+        $sql .= ' AND p.id > :cursor';
+        $params[':cursor'] = $cursor;
+    }
+    $sql .= ' ORDER BY p.id ASC LIMIT :limit_plus_one';
+    $params[':limit_plus_one'] = $limit + 1;
+
+    $stmt = $pdo->prepare($sql);
+    foreach ($params as $k => $val) {
+        $type = ($k === ':limit_plus_one' || $k === ':cursor') ? PDO::PARAM_INT : PDO::PARAM_STR;
+        $stmt->bindValue($k, $val, $type);
+    }
+    $stmt->execute();
+    $rows = $stmt->fetchAll();
+
+    $nextCursor = null;
+    $nextCursorAt = null;
+    if (count($rows) > $limit) {
+        $extraRow = $rows[$limit];
+        $rows = array_slice($rows, 0, $limit);
+        $lastRow = end($rows);
+        $nextCursor = (int)$lastRow['id'];
+        $nextCursorAt = utcToJst($extraRow['updated_at']);
+        reset($rows);
+    }
+
+    foreach ($rows as &$row) {
+        $row['access_payment_no']    = $row['access_payment_no'] !== null ? (int)$row['access_payment_no'] : null;
+        $row['amount']               = (float)$row['amount'];
+        $row['access_receivable_id'] = $row['access_receivable_id'] !== null ? (int)$row['access_receivable_id'] : null;
+        $row['updated_at']           = utcToJst($row['updated_at']);
+    }
+    unset($row);
+
+    $now = new DateTime('now', new DateTimeZone('Asia/Tokyo'));
+    $response = [
+        'synced_at' => $now->format('c'),
+        'payments'  => $rows,
+        'total'     => count($rows),
+        'limit'     => $limit,
+    ];
+    if ($nextCursor !== null) {
+        $response['next_cursor']    = $nextCursor;
+        $response['next_cursor_at'] = $nextCursorAt;
+    }
+    respond(200, $response);
     exit;
 }
 
@@ -166,8 +268,8 @@ switch ($method) {
         $data = json_decode(file_get_contents('php://input'), true) ?? [];
         $no = nextPaymentNo($pdo);
         $stmt = $pdo->prepare('
-            INSERT INTO payments (payment_no, customer_id, invoice_id, payment_date, amount, payment_type, memo, origin)
-            VALUES (:payment_no, :customer_id, :invoice_id, :payment_date, :amount, :payment_type, :memo, :origin)
+            INSERT INTO payments (payment_no, customer_id, invoice_id, payment_date, amount, payment_type, memo, origin, updated_at)
+            VALUES (:payment_no, :customer_id, :invoice_id, :payment_date, :amount, :payment_type, :memo, :origin, CURRENT_TIMESTAMP)
         ');
         $stmt->execute([
             ':payment_no'   => $no,
@@ -189,7 +291,7 @@ switch ($method) {
             if ($inv) {
                 $newReceived = (float)$inv['payment_received'] + (float)($data['amount'] ?? 0);
                 $newCarryFwd = (float)$inv['invoice_total'] - $newReceived;
-                $pdo->prepare('UPDATE invoices SET payment_received = ?, next_carry_forward = ? WHERE id = ?')
+                $pdo->prepare('UPDATE invoices SET payment_received = ?, next_carry_forward = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
                     ->execute([$newReceived, $newCarryFwd, $data['invoice_id']]);
                 // 得意先の繰越残高を更新
                 $pdo->prepare('UPDATE customers SET carry_forward_balance = ? WHERE id = ?')
@@ -225,7 +327,7 @@ switch ($method) {
                 $clamped = ((float)$inv['payment_received'] - (float)$pay['amount']) < 0;
                 $newReceived = max(0, (float)$inv['payment_received'] - (float)$pay['amount']);
                 $newCarryFwd = (float)$inv['invoice_total'] - $newReceived;
-                $pdo->prepare('UPDATE invoices SET payment_received = ?, next_carry_forward = ? WHERE id = ?')
+                $pdo->prepare('UPDATE invoices SET payment_received = ?, next_carry_forward = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
                     ->execute([$newReceived, $newCarryFwd, $pay['invoice_id']]);
                 $pdo->prepare('UPDATE customers SET carry_forward_balance = ? WHERE id = ?')
                     ->execute([$newCarryFwd, $inv['customer_id']]);

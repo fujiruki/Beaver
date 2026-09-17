@@ -27,6 +27,15 @@ if (strpos($parsedPath, BASE_PATH) === 0) {
 $path = '/' . trim($path, '/');
 if ($path === '/') $path = '';
 
+// R-0144 B-1: スナップショット復元中の簡易メンテナンスモード。
+// /health のみ例外とし、他の全リクエストを503で止める。
+if ($path !== '/health' && file_exists(__DIR__ . '/beta_snapshots/.restoring')) {
+    header('Content-Type: application/json; charset=utf-8');
+    http_response_code(503);
+    echo json_encode(['error' => 'restoring']);
+    exit;
+}
+
 $method = $_SERVER['REQUEST_METHOD'];
 if ($method === 'POST') {
     if (isset($_GET['_method'])) {
@@ -104,6 +113,7 @@ try {
         'aggregation-categories'   => __DIR__ . '/routes/aggregation_categories.php',
         'feedback'                 => __DIR__ . '/routes/feedback.php',
         'admin/feedback'           => __DIR__ . '/routes/feedback.php',
+        'admin/snapshot'           => __DIR__ . '/routes/admin_snapshot.php',
         'integrations/youkan'      => __DIR__ . '/routes/integrations_youkan.php',
         'sync'                     => __DIR__ . '/routes/sync.php',
     ];

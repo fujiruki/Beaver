@@ -53,6 +53,10 @@ if (!defined('SYNC_TOKEN_REQUIRED')) define('SYNC_TOKEN_REQUIRED', false);
 // R-0143 A-B-05: 請求・入金編集の封印フラグ。既定false（Beaver側での新規作成・削除・繰越残高編集を禁止し、Accessの写しとして表示専用にする）
 if (!defined('BILLING_EDIT_ENABLED')) define('BILLING_EDIT_ENABLED', false);
 
+// R-0144 B-1: Beaver_betaスナップショット保存・復元の有効化フラグ。既定false（無効）。
+// 本番のconfig.local.phpには絶対に設定しないこと。環境変数 BETA_SNAPSHOT_ENABLED=1 でのみ有効化する。
+if (!defined('BETA_SNAPSHOT_ENABLED')) define('BETA_SNAPSHOT_ENABLED', getenv('BETA_SNAPSHOT_ENABLED') === '1');
+
 // R-0118: Youkan容量判定プロキシ用。config.local.php で未定義の場合のみ開発用フォールバック値を使う
 if (!defined('BEAVER_CAPACITY_TOKEN')) define('BEAVER_CAPACITY_TOKEN', 'dev-beaver-capacity-token-change-me');
 if (!defined('YOUKAN_CAPACITY_URL')) define('YOUKAN_CAPACITY_URL', 'http://localhost:8000/integrations/beaver/capacity-check');

@@ -48,8 +48,9 @@ function startServer(string $root, string $bootstrap, int $port): mixed {
     return $proc;
 }
 
-function httpJson(int $port, string $method, string $path, ?array $body = null): array {
-    $opts = ['method' => $method, 'header' => "Content-Type: application/json\r\nConnection: close\r\n", 'ignore_errors' => true, 'timeout' => 5];
+function httpJson(int $port, string $method, string $path, ?array $body = null, array $headers = []): array {
+    $header = "Content-Type: application/json\r\nConnection: close\r\n" . implode('', array_map(fn($h) => "$h\r\n", $headers));
+    $opts = ['method' => $method, 'header' => $header, 'ignore_errors' => true, 'timeout' => 5];
     if ($body !== null) $opts['content'] = json_encode($body, JSON_UNESCAPED_UNICODE);
     $ctx = stream_context_create(['http' => $opts]);
     $rawBody = false; $hdr = [];
@@ -128,23 +129,35 @@ try {
 }
 
 // ============================================================
-// (2) 認証テスト: AUTH_DRIVER=shared・df_sessionクッキー無し → 401
+// (2) 認証テスト: R-0144 B-2でAUTH_GATE_SYNC_EXEMPT_PATHSに追加されたため、
+// df_sessionクッキー無しでも通り、SYNC_TOKEN_REQUIRED=trueの間はSYNC_API_TOKENで制御される。
 // ============================================================
 $dbPath2 = __DIR__ . '/test_sync_status_auth_' . getmypid() . '.sqlite';
 if (file_exists($dbPath2)) unlink($dbPath2);
 makeTestDb($ROOT, $dbPath2);
 $bootstrap2 = __DIR__ . '/_sync_status_auth_bootstrap.php';
-file_put_contents($bootstrap2, "<?php\ndefine('DB_PATH', " . var_export($dbPath2, true) . ");\ndefine('AUTH_DRIVER', 'shared');\n");
+file_put_contents($bootstrap2, "<?php\n"
+    . "define('DB_PATH', " . var_export($dbPath2, true) . ");\n"
+    . "define('AUTH_DRIVER', 'shared');\n"
+    . "define('SYNC_TOKEN_REQUIRED', true);\n"
+    . "define('SYNC_API_TOKEN', 'unit-test-sync-token');\n"
+    . "require_once dirname(__DIR__) . '/auth_client.php';\n"
+    . "auth_configure(['verifier' => fn(string \$t): ?array => ['id' => 1, 'name' => 'テスト太郎']]);\n"
+);
 
 $port2 = 18103;
 $proc2 = null;
 try {
     $proc2 = startServer($ROOT, $bootstrap2, $port2);
 
-    echo "\n=== R-0143 A-B-06 GET /sync/status 認証（df_session無しで401） ===\n";
-    runTest('AUTH_DRIVER=shared・df_session無しで401', function () use ($port2) {
+    echo "\n=== R-0144 B-2 GET /sync/status 認証（df_session無し・SYNC_API_TOKENで制御） ===\n";
+    runTest('df_session無し・SYNC_API_TOKEN無しで401', function () use ($port2) {
         $r = httpJson($port2, 'GET', '/sync/status');
         assertTrue(str_contains($r['status'], '401'), 'HTTP 401: ' . $r['status']);
+    });
+    runTest('df_session無しでも正しいSYNC_API_TOKENがあれば200', function () use ($port2) {
+        $r = httpJson($port2, 'GET', '/sync/status', null, ['Authorization: Bearer unit-test-sync-token']);
+        assertTrue(str_contains($r['status'], '200'), 'HTTP 200: ' . $r['status']);
     });
 } finally {
     if (is_resource($proc2)) { proc_terminate($proc2); proc_close($proc2); }

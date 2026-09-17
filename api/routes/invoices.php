@@ -91,7 +91,8 @@ function syncInvoiceUpsert(PDO $pdo): void {
                     invoice_total = :invoice_total,
                     next_carry_forward = :next_carry_forward,
                     billing_name_print = :billing_name_print,
-                    access_cancelled_at = :access_cancelled_at
+                    access_cancelled_at = :access_cancelled_at,
+                    updated_at = CURRENT_TIMESTAMP
                 WHERE id = :id
             ')->execute([
                 ':customer_id'         => $customerId,
@@ -114,12 +115,12 @@ function syncInvoiceUpsert(PDO $pdo): void {
                     (invoice_no, customer_id, invoice_date, cutoff_date, billing_date,
                      carry_forward, sales_total, tax_total, payment_received,
                      invoice_total, next_carry_forward, billing_name_print,
-                     access_receivable_id, access_cancelled_at)
+                     access_receivable_id, access_cancelled_at, updated_at)
                 VALUES
                     (:invoice_no, :customer_id, :invoice_date, :cutoff_date, :billing_date,
                      :carry_forward, :sales_total, :tax_total, :payment_received,
                      :invoice_total, :next_carry_forward, :billing_name_print,
-                     :access_receivable_id, :access_cancelled_at)
+                     :access_receivable_id, :access_cancelled_at, CURRENT_TIMESTAMP)
             ')->execute([
                 ':invoice_no'          => $invoiceNo,
                 ':customer_id'         => $customerId,
@@ -168,6 +169,125 @@ function syncInvoiceUpsert(PDO $pdo): void {
 // POST /invoices/sync（R-0143 A-B-04）
 if ($method === 'POST' && isset($segments[1]) && $segments[1] === 'sync' && !$resourceId) {
     syncInvoiceUpsert($pdo);
+    exit;
+}
+
+// R-0144 B-4: GET /invoices/sync[?updated_after=YYYY-MM-DD HH:NN:SS (JST)][&customer_access_no=N][&limit=N][&cursor=ID]
+// 完全一致チェック（/invoices/sync/anything を全件返却で誤通過させない）
+if ($method === 'GET' && isset($segments[1]) && $segments[1] === 'sync' && isset($segments[2])) {
+    http_response_code(404);
+    echo json_encode(['error' => 'Not found', 'path' => $path]);
+    exit;
+}
+if ($method === 'GET' && isset($segments[1]) && $segments[1] === 'sync' && !isset($segments[2])) {
+    $updatedAfterRaw = $_GET['updated_after'] ?? null;
+    $updatedAfterSql = null;
+    if ($updatedAfterRaw !== null && $updatedAfterRaw !== '') {
+        $updatedAfterDt = DateTime::createFromFormat('Y-m-d H:i:s', $updatedAfterRaw, new DateTimeZone('Asia/Tokyo'));
+        if ($updatedAfterDt === false || $updatedAfterDt->format('Y-m-d H:i:s') !== $updatedAfterRaw) {
+            respond(400, ['error' => 'Invalid updated_after format']);
+            exit;
+        }
+        $updatedAfterDt->setTimezone(new DateTimeZone('UTC'));
+        $updatedAfterSql = $updatedAfterDt->format('Y-m-d H:i:s');
+    }
+
+    $customerAccessNo = isset($_GET['customer_access_no']) && $_GET['customer_access_no'] !== ''
+        ? (string)$_GET['customer_access_no']
+        : null;
+
+    $limit = isset($_GET['limit']) ? (int)$_GET['limit'] : 1000;
+    if ($limit < 1)    $limit = 1000;
+    if ($limit > 5000) $limit = 5000;
+
+    $cursor = null;
+    if (isset($_GET['cursor']) && $_GET['cursor'] !== '') {
+        if (!is_numeric($_GET['cursor'])) {
+            respond(400, ['error' => 'Invalid cursor (numeric id required)']);
+            exit;
+        }
+        $cursor = (int)$_GET['cursor'];
+    }
+
+    $sql = 'SELECT inv.id, inv.access_receivable_id, inv.access_cancelled_at,
+                   inv.invoice_total AS amount, inv.updated_at
+            FROM invoices inv
+            LEFT JOIN customers c ON c.id = inv.customer_id
+            WHERE 1=1';
+    $params = [];
+    if ($updatedAfterSql !== null) {
+        $sql .= ' AND inv.updated_at > :updated_after';
+        $params[':updated_after'] = $updatedAfterSql;
+    }
+    if ($customerAccessNo !== null) {
+        $sql .= ' AND c.access_customer_no = :customer_access_no';
+        $params[':customer_access_no'] = $customerAccessNo;
+    }
+    if ($cursor !== null) {
+        $sql .= ' AND inv.id > :cursor';
+        $params[':cursor'] = $cursor;
+    }
+    $sql .= ' ORDER BY inv.id ASC LIMIT :limit_plus_one';
+    $params[':limit_plus_one'] = $limit + 1;
+
+    $stmt = $pdo->prepare($sql);
+    foreach ($params as $k => $val) {
+        $type = ($k === ':limit_plus_one' || $k === ':cursor') ? PDO::PARAM_INT : PDO::PARAM_STR;
+        $stmt->bindValue($k, $val, $type);
+    }
+    $stmt->execute();
+    $rows = $stmt->fetchAll();
+
+    $nextCursor = null;
+    $nextCursorAt = null;
+    if (count($rows) > $limit) {
+        $extraRow = $rows[$limit];
+        $rows = array_slice($rows, 0, $limit);
+        $lastRow = end($rows);
+        $nextCursor = (int)$lastRow['id'];
+        $nextCursorAt = utcToJst($extraRow['updated_at']);
+        reset($rows);
+    }
+
+    // 紐づく売上伝票のaccess_voucher_idを一括取得
+    $invoiceIds = array_column($rows, 'id');
+    $voucherAccessIdsByInvoiceId = [];
+    if (!empty($invoiceIds)) {
+        $placeholders = implode(',', array_fill(0, count($invoiceIds), '?'));
+        $vStmt = $pdo->prepare("
+            SELECT iv.invoice_id, v.access_voucher_id
+            FROM invoice_vouchers iv
+            JOIN vouchers v ON v.id = iv.voucher_id
+            WHERE iv.invoice_id IN ($placeholders) AND v.access_voucher_id IS NOT NULL
+            ORDER BY v.access_voucher_id ASC
+        ");
+        $vStmt->execute($invoiceIds);
+        foreach ($vStmt->fetchAll() as $vRow) {
+            $voucherAccessIdsByInvoiceId[(int)$vRow['invoice_id']][] = (int)$vRow['access_voucher_id'];
+        }
+    }
+
+    foreach ($rows as &$row) {
+        $invId = (int)$row['id'];
+        $row['access_receivable_id'] = $row['access_receivable_id'] !== null ? (int)$row['access_receivable_id'] : null;
+        $row['amount']               = (float)$row['amount'];
+        $row['updated_at']           = utcToJst($row['updated_at']);
+        $row['voucher_access_ids']   = $voucherAccessIdsByInvoiceId[$invId] ?? [];
+    }
+    unset($row);
+
+    $now = new DateTime('now', new DateTimeZone('Asia/Tokyo'));
+    $response = [
+        'synced_at' => $now->format('c'),
+        'invoices'  => $rows,
+        'total'     => count($rows),
+        'limit'     => $limit,
+    ];
+    if ($nextCursor !== null) {
+        $response['next_cursor']    = $nextCursor;
+        $response['next_cursor_at'] = $nextCursorAt;
+    }
+    respond(200, $response);
     exit;
 }
 
@@ -261,11 +381,11 @@ switch ($method) {
             INSERT INTO invoices
                 (invoice_no, customer_id, invoice_date, cutoff_date, billing_date,
                  carry_forward, sales_total, tax_total, payment_received,
-                 invoice_total, next_carry_forward, billing_name_print)
+                 invoice_total, next_carry_forward, billing_name_print, updated_at)
             VALUES
                 (:invoice_no, :customer_id, :invoice_date, :cutoff_date, :billing_date,
                  :carry_forward, :sales_total, :tax_total, :payment_received,
-                 :invoice_total, :next_carry_forward, :billing_name_print)
+                 :invoice_total, :next_carry_forward, :billing_name_print, CURRENT_TIMESTAMP)
         ');
         $stmt->execute([
             ':invoice_no'         => $no,
