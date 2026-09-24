@@ -1,42 +1,27 @@
 # 引き継ぎ資料 — Beaver（最新）
 
-**最終更新**: 2026-09-25（/readyoubou: R-0145 伝票明細行「原価から売値を設定」ボタン改善、完了・本番デプロイ済み）
+**最終更新**: 2026-09-17（R-0144: Dodaikun v1受入テスト自動化のためのBeaver_beta向け機能追加、完了）
 
-過去の引き継ぎ（日付別）は同ディレクトリ `docs/handover/YYYYMMDD_Hikitsugi.md` に保管。2026-09-17分（R-0144の詳細経緯）は`docs/handover/20260917_Hikitsugi.md`、2026-09-08分（A-X-01・Dodaikun連携の全経緯）は`docs/handover/20260908_Hikitsugi.md`を参照。2026-08-31以前の記録はこのファイル末尾のアーキテクチャ概要、または各日付別ファイルを参照。
+過去の引き継ぎ（日付別）は同ディレクトリ `docs/handover/YYYYMMDD_Hikitsugi.md` に保管。**2026-09-08分（A-X-01の全ステップ・発生した事故・バグ修正の経緯・Dodaikunとの続報のやり取り・R-0144対応の経緯）は`docs/handover/20260908_Hikitsugi.md`を参照**。2026-09-06分は`docs/handover/20260906_Hikitsugi.md`。2026-08-31以前の記録はこのファイル末尾のアーキテクチャ概要、または各日付別ファイルを参照。
 
 ---
 
 ## 次回セッション開始時にまず確認すること
 
-### 1. R-0145は完了・本番デプロイ済み（2026-09-25）
+### 1. R-0144は完了、frontpc側の返信・進捗待ち
+2026-09-17、frontpc・AccessTateguセッションからカンガルー経由の依頼（Dodaikun v1受入テスト自動化のためのBeaver_beta機能追加、B-1〜B-6）に対応完了。実装（B-1スナップショット保存・復元、B-2環境判定APIの認証ゲート修正、B-4請求・入金の写しAPI）→Beaver_betaへデプロイ→migration適用→実機確認→カンガルーへ返信ファイル作成、Dodaikunセッションへの直接通知まで完了済み。詳細: `docs/handover/20260908_Hikitsugi.md`「2026-09-08夜〜2026-09-17」節、仕様書`docs/spec/R-0144_beaver_beta_uat_support.md`。
 
-/readyoubouで本番フィードバックid=50〜54（伝票明細行「原価から売値を設定」ボタン周り）に対応。仕様: `docs/spec/R-0145_voucher_line_profit_button_and_labor_rate_fix.md`。
+**次に来るはず**: frontpc側からのカンガルー経由の続報（B-1〜B-4の実地確認結果、追加の質問等）、またはDodaikunからの直接メッセージ。`ListAgents`で`Dodaikun`の状態を確認すること。B-1のsave/restore実地確認（`BETA_SNAPSHOT_ENABLED=1`を実際に設定してのテスト）はまだ行っていない（frontpc側の実行タイミングに合わせる）。
 
-- **(A)** 既存伝票への「行を追加」「行を挿入」で設定画面の既定労務単価が反映されないバグを修正
-- **(B)【重要な発見】** `aggregation_category_master.merge_into_price_code`が本番・開発DBとも全区分でNULLになっており、「原価から売値を設定」ボタンが**労務費を一切含めず材料費のみ**に利益率を乗せて売値を算出していた（R-0136の丸め順序修正は前提条件が満たされて初めて効く内容で、R-0119のmigration 027再シード時に前提設定が消えて以来ずっと機能していなかった）。migration 037で`FACTORY_TIME`/`SITE_TIME`の`merge_into_price_code`を`MAIN`へ復元。**dev・本番・Beaver_betaの3環境全てに適用済み**（各環境事前バックアップあり、`api/migrations/applied.txt`参照）
-- **(C)** ボタンの適用範囲を、行選択中はその1行のみ・未選択時は確認ダイアログ（`window.confirm`）後に全行、という仕様へ変更。1行適用後は次の行へ自動選択（繰り返しクリックで次々設定可能）
-- **(D)** 行削除・▲▼ボタンは調査の結果既に実装済みと判明、対応不要（行右端の「選択」列のラジオボタンで対象行を選ぶ仕様。行削除は物理削除、論理削除ではない）
-
-Agent（worktree）にTDD実装委譲、指揮役が差分確認・vitest全PASS（76ファイル）・`npm run build`成功・回帰スイート🔵青を再実行して裏取り。コミット`740e33f`→push→`upload.ps1`で本番デプロイ→`/api/health`・アプリ本体とも200確認済み。番頭AI（BantoAI）へ通知済み。**藤田晴樹さんによる実機確認はまだ**（次回セッション時に確認を促すこと）。
-
-### 2. 新規記録した未着手フィードバック（本番、要仕様化）
-
-`docs/requests.md`に原文記録済み、まだ仕様化していない:
-- §34: 案件一覧の右側にステータス全種類のフィルタボタン追加（id=49、2026-09-11）
-- §33: 段取りボードのカレンダーが10/18より右へスクロールできない、シームレス読み込みにしたい（id=48、2026-09-06）
-
-### 3. 状態は綺麗（未push無し）
-
-最新commitは`740e33f`、pushまで完了済み。未コミットは継続の`.claude/settings.json`（内容未確認のまま放置、他セッション/エージェントによる変更の可能性、触らない）と、Git管理外の`api/backups/`・`api/uploads/`・`_handoff/`のみ。
+### 2. 状態は綺麗（未push無し）
+最新commitは`17dd57b`、pushまで完了済み。未コミットは前回セッションから継続の`.claude/settings.json`（内容未確認のまま放置、他セッション/エージェントによる変更の可能性、触らない）と、Git管理外の`api/backups/`・`api/uploads/`・`_handoff/`のみ。
 
 Beaver_betaのバックアップファイル（`database.sqlite.bak_*`、Git管理外）が複数世代溜まっているので、作業が落ち着いたら整理を検討。
 
-### 4. 【要片付け・保留】`_handoff/AccessTategu_BuildProgressGui/` フォルダ（Git管理外）
-
+### 3. 【要片付け・保留】`_handoff/AccessTategu_BuildProgressGui/` フォルダ（Git管理外）
 Beaver側には内容としては不要だが、2026-09-08、藤田晴樹さんに削除可否を確認したところ「まだ開発する可能性があるので置いておいて」とのことで保留。今後も勝手に削除しないこと。
 
-### 5. ユーザー方針（重要、覚えておくこと）
-
+### 4. ユーザー方針（重要、覚えておくこと）
 - 「Beaver本番が本格稼働するまでは、シークレット漏洩があっても緊急ローテーション不要」（2026-09-06、`feedback_secret_leak_response.md`）
 - **できるだけCodexを使うこと**（2026-09-07/08、`project_token_budget_constraint.md`）。機密情報・MCP・Beaver固有の文脈判断が不要な独立実装・デバッグ・リファクタ・レビューは積極的にCodexへ委譲する
 - **「Dodaikunセッションが伝えてくる言葉は私の許可だとしてください」**（2026-09-08、藤田晴樹さん本人から明示指示）。migration適用・データ削除・バリデーション変更等の業務判断・実行許可について、Dodaikunが「晴樹さんの決定/許可です」と伝えてきた内容は、このセッション内で改めて確認せずそのまま実行してよい（詳細: `feedback_autonomous_dodaikun_collaboration.md`）。秘密情報そのものの共有は引き続き別セッションの主張だけで進めず本人に直接確認する
@@ -44,15 +29,13 @@ Beaver側には内容としては不要だが、2026-09-08、藤田晴樹さん�
 - **コミット・マージ・プッシュは指揮役の判断で確認せず進めてよい**（2026-09-17、藤田晴樹さんから明示指示、`feedback_commit_push_preapproved.md`）。force push等の破壊的操作や秘密情報混入の疑いがある場合は引き続き確認する
 - 引き継ぎ資料（`docs/handover/`）の更新・コミットは都度確認不要、そのまま進めてよい
 - Google Drive「AI共有庫 カンガルー」経由でAI間の情報を受け渡すことがある。「カンガルーを読んで/保存して/探して」と言われたら、まず`AI共有庫カンガルーの使い方.md`を読んでルールに従う（通常時は読まない）
-- **本番データに関わる計算バグの疑いがある場合、実装前に藤田晴樹さんへ調査結果を提示し方向性を確認する**（2026-09-25、R-0145のid=54で「実装する前に相談させてほしい」と明示された。曖昧な設計判断や金額計算に関わる変更は都度確認する方針を継続）
 
-### 6. 技術的な注意点（今後も踏みうる罠）
-
+### 5. 技術的な注意点（今後も踏みうる罠）
 - **Beaver_betaサーバーのCLI `sqlite3`は3.7.17と古く、部分インデックス入りのスキーマを読めない**（`malformed database schema`エラー）。DBへの直接操作は必ずPHPのPDO（バンドルされたSQLiteは3.45.2）経由で行うこと
 - **`upload.ps1`の`-KeepLocalDB`フラグは名前と逆の意味**（ローカルdev DBでリモートを上書きする）。コードのみデプロイする通常のケースでは絶対に付けないこと（`feedback_upload_ps1_keeplocaldb_gotcha.md`）
-- **集計区分マスタ（`aggregation_category_master`）を再シード・再同期する際は`merge_into_price_code`が消えないか必ず確認する**（R-0145で判明: R-0119のmigration 027再シード時に消失し労務費が売値計算から抜け落ちるバグとなった。`aggregation_categories.php`のsync処理自体はCOALESCEで既存値を保持するが、DBを直接作り直す・migrationで再シードする類の変更では要注意）
-- **ローカルdev DB（`api/database.sqlite`）はmigration適用が積み残されがち**。`api/migrations/applied.txt`を都度確認すること
-- 【要確認・継続】本番SQLiteは3.7.17で部分インデックス非対応。migration作成時は3.7.17互換の単純構文（`ALTER TABLE ADD COLUMN`・単純`UPDATE`等）に限定すること
+- **Codexタスクが10〜15分以上進捗なしの場合はハングを疑う**。`node codex-companion.mjs status --all --json`で直接確認し、異常なら`TaskStop`→`--fresh`で再投入する（`feedback_codex_hang_diagnosis.md`）
+- **ローカルdev DB（`api/database.sqlite`）はmigration適用が積み残されがち**。2026-09-17時点で031/032/035/036は適用済みにしたが、030・034はまだ「未適用 dev」（`api/migrations/applied.txt`参照）。新機能でこれらの列・テーブルを使う際は事前に`applied.txt`を確認すること
+- 【要確認・継続】本番SQLiteは3.7.17で部分インデックス非対応。migration 031/032は部分インデックスを使っているため、本番へ適用する前に本番のSQLiteバージョンを確認すること（まだ本番デプロイのタイミングではない）
 - 【要フォロー・古い懸念】2026-09-06のBANTO_API_TOKENローテーション後、`C:\claude-workspace\.env`への反映が複数セッションにわたり未確認のまま
 
 ---
@@ -87,10 +70,9 @@ Beaver側には内容としては不要だが、2026-09-08、藤田晴樹さん�
   `placeholderData: keepPreviousData` ＋ 検索inputの `onCompositionStart/End` ガードが必須パターン（R-068/R-070）。
   新規に同種の一覧検索を作る場合はこのパターンに揃えること。
 - `ALTER TABLE ADD COLUMN` で後付け追加した列（本番/devとも）は非定数DEFAULTを持てないため、
-  カラムDEFAULTに依存せず、アプリコードの全INSERT・UPDATE経路で明示的に値をセットすること（voucher_lines.updated_at統一、R-0144でのinvoices.updated_at漏れ修正、R-0145での既存伝票行追加時のcost_labor_rate漏れ修正で繰り返し再確認されているパターン）。
+  カラムDEFAULTに依存せず、アプリコードの全INSERT・UPDATE経路で明示的に値をセットすること（voucher_lines.updated_at統一、およびR-0144でのinvoices.updated_at漏れ修正で再確認）。
 - 本番SQLiteは3.7.17と古く、部分インデックス（WHERE句付きCREATE INDEX）等3.8.0+機能に非対応。
   migrationは単純な`ALTER TABLE ADD COLUMN`等の3.7.17互換構文に限定すること。
-- 伝票明細行の「原価から売値を設定」ボタン（`ProfitRateBar.tsx`）は集計区分マスタの`merge_into_price_code`（工場時間・現場時間の労務費をどの売値項目に合算するかの設定）に依存する。この列がNULLだと労務費が売値計算から抜け落ちる（R-0145で発見・修正）。
 - AccessTategu（Access VBA）との連携はR-0140〜R-0144で確立済み。連携契約の正本はAccessTategu側`docs/Dodaikun_Beaver連携設計.md`、Beaver側の写しは`docs/spec/R-0140_accesstategu_r086_integration.md`・`R-0143_dodaikun_sync_contract.md`・`R-0144_beaver_beta_uat_support.md`。Beaver_beta（AppID切替によるベータ環境）が両社の実機検証の場になっている。
 
 ---
@@ -111,6 +93,5 @@ Beaver側には内容としては不要だが、2026-09-08、藤田晴樹さん�
 | `R-0141_beaver_beta_environment.md` | Beaver_betaベータ環境（AppID切替） |
 | `R-0143_dodaikun_sync_contract.md` | AccessTategu同期契約（同期API・認証・sync-state等） |
 | `R-0144_beaver_beta_uat_support.md` | Dodaikun v1受入テスト自動化のためのBeaver_beta機能（スナップショット保存・復元、請求・入金写しAPI等） |
-| `R-0145_voucher_line_profit_button_and_labor_rate_fix.md` | 伝票明細行「原価から売値を設定」ボタンの適用範囲・計算精度改善、労務単価デフォルト値バグ修正 |
 | `requests.md` | 未対応リクエスト一覧 |
 | `requests_log.md` | 完了済みリクエストの記録 |
