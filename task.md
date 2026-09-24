@@ -1,6 +1,7 @@
 # Beaver タスクキュー
 
 ## 完了（本セッション）
+- [x] R-0145: 伝票明細行「原価から売値を設定」ボタンの適用範囲・計算精度改善、労務単価デフォルト値バグ修正。仕様: `docs/spec/R-0145_voucher_line_profit_button_and_labor_rate_fix.md`。/readyoubouで本番id=50〜54を確認、藤田晴樹さんに実装方針を確認済み（2026-09-25）。(A)行追加時の労務単価デフォルト値バグ修正、(B)集計区分マスタmerge_into_price_code修正（データ修正のみ、dev/beta/本番全環境に適用済み）、(C)ボタンの選択行のみ適用＋未選択時confirm＋次行自動選択、(D)行削除・▲▼ボタンは調査の結果既存実装で対応不要。Agent（worktree）にTDD実装委譲、指揮役が差分確認・vitest全PASS・build成功・回帰スイート🔵青を再実行して裏取り
 - [x] R-0144: Dodaikun v1受入テスト自動化のためのBeaver_beta向け機能追加。仕様: `docs/spec/R-0144_beaver_beta_uat_support.md`。実装・デプロイ・実機確認・カンガルー返信まで完了（コミット`0d00f33`/`5ccf703`/`affb653`）。Beaver_betaへ`upload.ps1 -Beta`でデプロイ済み、migration 036適用済み、`reset_beta_db.ps1`にも036反映済み。`GET /sync/status`・`GET /invoices/sync`・`GET /payments/sync`・B-1歯止め(403)を実機確認済み。カンガルーへ返信ファイル作成済み（`2026-09-17_03_Beaver_Dodaikun受入テスト_Beaver_beta_API実装完了_返信.md`）。B-1のsave/restore実地確認（`BETA_SNAPSHOT_ENABLED=1`設定してのテスト）はfrontpc側の実行タイミングに合わせて次回
 - [ ] R-0140: AccessTategu R-086 連携の Beaver 側対応。仕様: `docs/spec/R-0140_accesstategu_r086_integration.md`（受入条件表と検体 JSON あり）。(1) quantity REAL 化・負数許容、(2) PATCH /customers/{id}/access-link、(5) 見積番号 +10000 変換 SQL とテストは今すぐ着手可。(3) 基準線はcustomers系(G-15〜G-18)のみ2026-09-07にDodaikun依頼(A-B-12)で再定義・着手可、vouchers系(G-14)は具体的SQL未受領で保留。(4) は確認済みで作業なし。(6) A-B-10: 重複得意先統合スクリプト（dry-runまで、書き込み実行はしない）2026-09-07追加。完了報告はテスト名・実行ログ・変更ファイル一覧で
 - [ ] R-0141: Beaver ベータ環境（AppID Beaver_beta、別 SQLite、upload.ps1 の配置先切替）。仕様: `docs/spec/R-0141_beaver_beta_environment.md`。完了時に Access 側へ渡す情報を仕様書末尾に追記

@@ -64,3 +64,6 @@
 035_sync_state_heartbeat  2026-09-08  beaver_beta (R-0143 A-B-06。PHP PDO経由で適用、vouchers.sync_pending・sync_heartbeatsテーブル存在確認済み)
 036_invoices_payments_updated_at  2026-09-17  dev (R-0144 B-4。PHP PDO経由で適用、invoices.updated_at/payments.updated_at存在確認済み。backup: api/backups/database_20260917_1844_pre_r0144_migration.sqlite)
 036_invoices_payments_updated_at  2026-09-17  beaver_beta (R-0144 B-4。PHP PDO経由で適用、invoices.updated_at/payments.updated_at存在確認済み、NULL残存0件。backup: database.sqlite.bak_pre_r0144_20260917_1847)
+037_fix_time_category_merge_price_code  2026-09-25  dev (R-0145 B。FACTORY_TIME/SITE_TIMEのmerge_into_price_codeをMAINへ復元、PHP PDO経由で適用。backup: api/backups/database_20260925_0243_pre_r0145_merge_price_code.sqlite)
+037_fix_time_category_merge_price_code  2026-09-25  prod (R-0145 B。FACTORY_TIME/SITE_TIMEのmerge_into_price_codeをMAINへ復元、SSH+PHP PDO経由で適用。backup: database_20260925_0245_pre_r0145_merge_price_code.sqlite)
+037_fix_time_category_merge_price_code  2026-09-25  beaver_beta (R-0145 B。FACTORY_TIME/SITE_TIMEのmerge_into_price_codeをMAINへ復元、SSH+PHP PDO経由で適用。backup: database_20260925_0246_pre_r0145_merge_price_code.sqlite)

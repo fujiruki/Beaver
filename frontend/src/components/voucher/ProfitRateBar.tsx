@@ -2,12 +2,14 @@ import { useFormContext } from 'react-hook-form';
 import { useVoucherStore } from '../../stores/voucherStore';
 import { useAppSettings } from '../../contexts/AppSettingsContext';
 import { calcManufactureCostDynamic, calcLaborCostDynamic, roundToHundred } from '../../lib/voucherCalc';
-import type { VoucherFormValues } from '../../pages/VoucherEdit';
+import type { VoucherFormValues, LineFormValues } from '../../pages/VoucherEdit';
 import type { AggregationCategoryMaster } from '../../api/aggregationCategories';
 import type { LineCategoryValue } from '../../types/voucher';
 
 type Props = {
   categories: AggregationCategoryMaster[];
+  selectedIdx: number | null;
+  setSelectedIdx: (idx: number | null) => void;
 };
 
 /**
@@ -54,49 +56,65 @@ export function calcCategorySellPrices(
   return newPrices;
 }
 
-export default function ProfitRateBar({ categories }: Props) {
+export default function ProfitRateBar({ categories, selectedIdx, setSelectedIdx }: Props) {
   const { profitRate, setProfitRate } = useVoucherStore();
   const { getValues, setValue } = useFormContext<VoucherFormValues>();
   const { settings } = useAppSettings();
 
+  function applyToLine(index: number, line: LineFormValues) {
+    if (line.line_type !== 'normal') return;
+
+    const costs: LineCategoryValue[] = line.costs ?? [];
+    const laborRate = line.cost_labor_rate ?? 0;
+
+    if (costs.length > 0) {
+      // 動的モード: costs[] を元に各 money型区分の売値を計算
+      const newPrices = calcCategorySellPrices(costs, categories, laborRate, profitRate);
+
+      if (newPrices.length > 0) {
+        newPrices.sort((a, b) => a.sort_order - b.sort_order);
+        setValue(`lines.${index}.prices`, newPrices);
+        const unitPrice = newPrices.reduce((s, p) => s + p.value, 0);
+        setValue(`lines.${index}.line_total`, unitPrice * (line.quantity ?? 1));
+      }
+    } else {
+      // フォールバック: 固定列モード
+      const mfgCost = calcManufactureCostDynamic(costs, laborRate, 1)
+        || (line.cost_body ?? 0) + (line.cost_hardware ?? 0) + (line.cost_glass ?? 0)
+          + calcLaborCostDynamic(
+            [
+              { category_code: 'FACTORY_TIME', category_name: '工場時間', measure_type: 'time', value: line.cost_factory_hours ?? 0, sort_order: 4 },
+              { category_code: 'SITE_TIME',    category_name: '現場時間', measure_type: 'time', value: line.cost_site_hours    ?? 0, sort_order: 5 },
+            ],
+            laborRate,
+            1,
+          );
+      if (mfgCost === 0) return;
+      const lineTotal = roundToHundred(profitRate >= 1 ? mfgCost : Math.ceil(mfgCost / (1 - profitRate)));
+      setValue(`lines.${index}.line_total`, lineTotal);
+      setValue(`lines.${index}.price_body`, lineTotal);
+      setValue(`lines.${index}.price_hardware`, 0);
+      setValue(`lines.${index}.price_glass`, 0);
+    }
+  }
+
   function applyProfitRate() {
     const lines = getValues('lines');
-    lines.forEach((line, index) => {
-      if (line.line_type !== 'normal') return;
 
-      const costs: LineCategoryValue[] = line.costs ?? [];
-      const laborRate = line.cost_labor_rate ?? 0;
-
-      if (costs.length > 0) {
-        // 動的モード: costs[] を元に各 money型区分の売値を計算
-        const newPrices = calcCategorySellPrices(costs, categories, laborRate, profitRate);
-
-        if (newPrices.length > 0) {
-          newPrices.sort((a, b) => a.sort_order - b.sort_order);
-          setValue(`lines.${index}.prices`, newPrices);
-          const unitPrice = newPrices.reduce((s, p) => s + p.value, 0);
-          setValue(`lines.${index}.line_total`, unitPrice * (line.quantity ?? 1));
-        }
-      } else {
-        // フォールバック: 固定列モード
-        const mfgCost = calcManufactureCostDynamic(costs, laborRate, 1)
-          || (line.cost_body ?? 0) + (line.cost_hardware ?? 0) + (line.cost_glass ?? 0)
-            + calcLaborCostDynamic(
-              [
-                { category_code: 'FACTORY_TIME', category_name: '工場時間', measure_type: 'time', value: line.cost_factory_hours ?? 0, sort_order: 4 },
-                { category_code: 'SITE_TIME',    category_name: '現場時間', measure_type: 'time', value: line.cost_site_hours    ?? 0, sort_order: 5 },
-              ],
-              laborRate,
-              1,
-            );
-        if (mfgCost === 0) return;
-        const lineTotal = roundToHundred(profitRate >= 1 ? mfgCost : Math.ceil(mfgCost / (1 - profitRate)));
-        setValue(`lines.${index}.line_total`, lineTotal);
-        setValue(`lines.${index}.price_body`, lineTotal);
-        setValue(`lines.${index}.price_hardware`, 0);
-        setValue(`lines.${index}.price_glass`, 0);
+    if (selectedIdx !== null) {
+      // 行選択中はその1行だけに適用し、次の行へ選択を進める
+      const line = lines[selectedIdx];
+      if (!line) return;
+      applyToLine(selectedIdx, line);
+      if (selectedIdx < lines.length - 1) {
+        setSelectedIdx(selectedIdx + 1);
       }
-    });
+      return;
+    }
+
+    // 未選択時は全行に適用（誤操作防止のため確認ダイアログを挟む）
+    if (!window.confirm('行が選択されていません。全行に適用します。よろしいですか？')) return;
+    lines.forEach((line, index) => applyToLine(index, line));
   }
 
   return (

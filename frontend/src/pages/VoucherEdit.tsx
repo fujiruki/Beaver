@@ -301,7 +301,7 @@ export default function VoucherEdit() {
     if (isNew) {
       append({ ...defaultLine, line_no: nextNo, cost_labor_rate: settings.defaultLaborRate });
     } else {
-      addLineMutation.mutate({ ...defaultLine, line_no: nextNo, voucher_id: voucherId } as any);
+      addLineMutation.mutate({ ...defaultLine, line_no: nextNo, cost_labor_rate: settings.defaultLaborRate, voucher_id: voucherId } as any);
     }
   }
 
@@ -324,7 +324,7 @@ export default function VoucherEdit() {
     if (isNew) {
       append({ ...defaultLine, line_no: nextNo, cost_labor_rate: settings.defaultLaborRate });
     } else {
-      addLineMutation.mutate({ ...defaultLine, line_no: nextNo, voucher_id: voucherId } as any);
+      addLineMutation.mutate({ ...defaultLine, line_no: nextNo, cost_labor_rate: settings.defaultLaborRate, voucher_id: voucherId } as any);
     }
   }
 
@@ -499,7 +499,7 @@ export default function VoucherEdit() {
             readOnly={isReadOnly}
           />
 
-          <ProfitRateBar categories={categories} />
+          <ProfitRateBar categories={categories} selectedIdx={selectedIdx} setSelectedIdx={setSelectedIdx} />
 
           {/* 明細行 */}
           {!isReadOnly && (
