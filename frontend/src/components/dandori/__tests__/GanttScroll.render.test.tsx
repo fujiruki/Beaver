@@ -18,7 +18,7 @@ const bar: DandoriBar = {
   unknownHours: false,
 };
 
-function renderGantt() {
+function renderGantt(onNearRightEdge?: () => void) {
   return render(
     <GanttScroll
       bars={[bar]}
@@ -28,8 +28,15 @@ function renderGantt() {
       todayISO="2026-09-01"
       onCommit={vi.fn()}
       onProjectDoubleClick={vi.fn()}
+      onNearRightEdge={onNearRightEdge}
     />,
   );
+}
+
+function mockScrollMetrics(el: HTMLElement, metrics: { scrollWidth: number; clientWidth: number; scrollLeft: number }) {
+  Object.defineProperty(el, 'scrollWidth', { value: metrics.scrollWidth, configurable: true });
+  Object.defineProperty(el, 'clientWidth', { value: metrics.clientWidth, configurable: true });
+  Object.defineProperty(el, 'scrollLeft', { value: metrics.scrollLeft, configurable: true });
 }
 
 describe('GanttScroll 案件名・得意先名の2列表示（R-0138）', () => {
@@ -131,5 +138,37 @@ describe('GanttScroll 案件名・得意先名の2列表示（R-0138）', () => 
 
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null');
     expect(saved.total).toBe(120);
+  });
+});
+
+describe('GanttScroll シームレススクロール（R-0146: onNearRightEdge）', () => {
+  it('残り幅が閾値（400px）未満になるとonNearRightEdgeが呼ばれる', () => {
+    const onNearRightEdge = vi.fn();
+    const { container } = renderGantt(onNearRightEdge);
+    const scrollEl = container.querySelector('.gantt-scroll') as HTMLElement;
+    mockScrollMetrics(scrollEl, { scrollWidth: 2000, clientWidth: 800, scrollLeft: 1900 }); // 残り -700px
+
+    fireEvent.scroll(scrollEl);
+
+    expect(onNearRightEdge).toHaveBeenCalledTimes(1);
+  });
+
+  it('残り幅が閾値以上離れている場合は呼ばれない', () => {
+    const onNearRightEdge = vi.fn();
+    const { container } = renderGantt(onNearRightEdge);
+    const scrollEl = container.querySelector('.gantt-scroll') as HTMLElement;
+    mockScrollMetrics(scrollEl, { scrollWidth: 2000, clientWidth: 800, scrollLeft: 100 }); // 残り 1100px
+
+    fireEvent.scroll(scrollEl);
+
+    expect(onNearRightEdge).not.toHaveBeenCalled();
+  });
+
+  it('onNearRightEdgeが渡されていない場合はスクロールしてもエラーにならない', () => {
+    const { container } = renderGantt(undefined);
+    const scrollEl = container.querySelector('.gantt-scroll') as HTMLElement;
+    mockScrollMetrics(scrollEl, { scrollWidth: 2000, clientWidth: 800, scrollLeft: 1900 });
+
+    expect(() => fireEvent.scroll(scrollEl)).not.toThrow();
   });
 });

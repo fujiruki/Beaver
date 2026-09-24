@@ -16,6 +16,8 @@ import {
   todayISOLocal,
   unstartedProjects,
   nextFreeDay,
+  nextExtraDays,
+  addDaysISO,
   PRESET_DEFAULT_PX_PER_DAY,
   PRESET_LABELS,
   type RangePreset,
@@ -28,6 +30,8 @@ const FONT_SCALES = [0.85, 1, 1.15];
 const FONT_LABELS = ['A−', 'A', 'A＋'];
 const PRESETS: RangePreset[] = ['8w', '6m', '1y'];
 const PROJECTS_QUERY_KEY = ['projects', {}];
+const EXTRA_STEP_DAYS = 28; // R-0146: 右端接近1回あたりの延長日数
+const EXTRA_MAX_DAYS = 730; // R-0146: 延長の上限（プリセット終了日から約2年）
 
 function loadFontScale(): number {
   const saved = Number(localStorage.getItem(FONT_SCALE_KEY));
@@ -46,9 +50,11 @@ export default function DandoriBoard() {
   const [showDone, setShowDone] = useState(false);
   const [dragError, setDragError] = useState<string | null>(null);
   const [editingProjectId, setEditingProjectId] = useState<number | null>(null);
+  const [extraDays, setExtraDays] = useState(0);
 
   const todayISO = todayISOLocal();
-  const { start: rangeStart, end: rangeEnd } = useMemo(() => rangeForPreset(todayISO, preset), [todayISO, preset]);
+  const { start: rangeStart, end: presetRangeEnd } = useMemo(() => rangeForPreset(todayISO, preset), [todayISO, preset]);
+  const rangeEnd = useMemo(() => addDaysISO(presetRangeEnd, extraDays), [presetRangeEnd, extraDays]);
 
   const commitMutation = useMutation({
     mutationFn: ({ id, patch }: { id: number; patch: { start_date?: string; delivery_date?: string } }) =>
@@ -73,6 +79,11 @@ export default function DandoriBoard() {
   function handlePreset(next: RangePreset) {
     setPreset(next);
     setPxPerDay(PRESET_DEFAULT_PX_PER_DAY[next]);
+    setExtraDays(0);
+  }
+
+  function handleNearRightEdge() {
+    setExtraDays(prev => nextExtraDays(prev, EXTRA_STEP_DAYS, EXTRA_MAX_DAYS));
   }
 
   function handleCommit(id: number, patch: { start_date?: string; delivery_date?: string }) {
@@ -200,6 +211,7 @@ export default function DandoriBoard() {
           todayISO={todayISO}
           onCommit={handleCommit}
           onProjectDoubleClick={setEditingProjectId}
+          onNearRightEdge={handleNearRightEdge}
         />
       ) : (
         <WrapView bars={visibleBars} rangeStart={rangeStart} rangeEnd={rangeEnd} todayISO={todayISO} onProjectDoubleClick={setEditingProjectId} />

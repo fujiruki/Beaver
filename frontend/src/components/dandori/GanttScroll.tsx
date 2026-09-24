@@ -163,6 +163,8 @@ function useDayDrag(pxPerDay: number, onCommit: (deltaDays: number) => void) {
   return { handlers, dragOffsetPx: deltaDays * pxPerDay, isDragging: dragPx !== null };
 }
 
+const NEAR_RIGHT_EDGE_THRESHOLD_PX = 400; // R-0146: 残りがこの幅未満でonNearRightEdgeを呼ぶ
+
 interface GanttScrollProps {
   bars: DandoriBar[];
   rangeStart: string;
@@ -171,9 +173,10 @@ interface GanttScrollProps {
   todayISO: string;
   onCommit: (id: number, patch: { start_date?: string; delivery_date?: string }) => void;
   onProjectDoubleClick: (id: number) => void;
+  onNearRightEdge?: () => void;
 }
 
-export default function GanttScroll({ bars, rangeStart, rangeEnd, pxPerDay, todayISO, onCommit, onProjectDoubleClick }: GanttScrollProps) {
+export default function GanttScroll({ bars, rangeStart, rangeEnd, pxPerDay, todayISO, onCommit, onProjectDoubleClick, onNearRightEdge }: GanttScrollProps) {
   const totalDays = daysBetween(rangeStart, rangeEnd) + 1;
   const gridWidth = totalDays * pxPerDay;
   const showDayNumbers = pxPerDay >= DETAIL_THRESHOLD_PX;
@@ -187,8 +190,15 @@ export default function GanttScroll({ bars, rangeStart, rangeEnd, pxPerDay, toda
   const markers = freeMarkerLabels(load, todayISO);
   const loadDays = enumerateDays(rangeStart, rangeEnd);
 
+  function handleScroll(e: React.UIEvent<HTMLDivElement>) {
+    if (!onNearRightEdge) return;
+    const el = e.currentTarget;
+    const remainingPx = el.scrollWidth - (el.scrollLeft + el.clientWidth);
+    if (remainingPx < NEAR_RIGHT_EDGE_THRESHOLD_PX) onNearRightEdge();
+  }
+
   return (
-    <div className="gantt-scroll">
+    <div className="gantt-scroll" onScroll={handleScroll}>
       <div className="gantt" style={{ width: labelTotalWidth + gridWidth }}>
         <div className="axis">
           <div className="label-col" style={{ width: labelTotalWidth }}>

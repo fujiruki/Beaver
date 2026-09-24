@@ -12,6 +12,7 @@ import {
   buildBar,
   unstartedProjects,
   nextFreeDay,
+  nextExtraDays,
 } from '../dandoriBoardUtils';
 
 describe('statusCategory', () => {
@@ -143,6 +144,21 @@ describe('nextFreeDay', () => {
 
   it('バーが無く今日が土日なら次の月曜を返す', () => {
     expect(nextFreeDay([], '2024-01-06')).toBe('2024-01-08'); // 土曜起点→翌月曜
+  });
+});
+
+describe('nextExtraDays（R-0146: シームレススクロールの延長日数計算）', () => {
+  it('上限未満なら指定ステップぶん増える', () => {
+    expect(nextExtraDays(0, 28, 730)).toBe(28);
+    expect(nextExtraDays(28, 28, 730)).toBe(56);
+  });
+
+  it('ステップを加えると上限を超える場合は上限で頭打ちになる', () => {
+    expect(nextExtraDays(720, 28, 730)).toBe(730);
+  });
+
+  it('既に上限に達している場合はそれ以上増えない', () => {
+    expect(nextExtraDays(730, 28, 730)).toBe(730);
   });
 });
 

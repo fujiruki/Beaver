@@ -92,6 +92,11 @@ export function nextFreeDay(bars: { start: string; end: string }[], todayISO: st
   return freeDayMarkers(load, todayISO)[0] ?? todayISO;
 }
 
+/** R-0146: シームレススクロールでの延長日数。上限を超えて増やさない */
+export function nextExtraDays(currentExtraDays: number, stepDays: number, maxExtraDays: number): number {
+  return Math.min(currentExtraDays + stepDays, maxExtraDays);
+}
+
 export function isWeekendISO(iso: string): boolean {
   const day = parseISO(iso).getUTCDay();
   return day === 0 || day === 6;
