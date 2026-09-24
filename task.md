@@ -1,5 +1,9 @@
 # Beaver タスクキュー
 
+## 進行中
+- [ ] R-0146: 段取りボードのカレンダーをシームレススクロールで先まで見られるようにする。仕様: `docs/spec/R-0146_dandori_seamless_scroll.md`。/readyoubouで本番id=48を確認。Agentへ実装委譲中
+- [ ] R-0147: 案件一覧にステータス全種類のフィルタボタンを追加。仕様: `docs/spec/R-0147_project_list_status_filter.md`。/readyoubouで本番id=49を確認。バックエンドの`status=キャンセル`矛盾条件バグも同時発見・修正対象。Agentへ実装委譲中
+
 ## 完了（本セッション）
 - [x] R-0145: 伝票明細行「原価から売値を設定」ボタンの適用範囲・計算精度改善、労務単価デフォルト値バグ修正。仕様: `docs/spec/R-0145_voucher_line_profit_button_and_labor_rate_fix.md`。/readyoubouで本番id=50〜54を確認、藤田晴樹さんに実装方針を確認済み（2026-09-25）。(A)行追加時の労務単価デフォルト値バグ修正、(B)集計区分マスタmerge_into_price_code修正（データ修正のみ、dev/beta/本番全環境に適用済み）、(C)ボタンの選択行のみ適用＋未選択時confirm＋次行自動選択、(D)行削除・▲▼ボタンは調査の結果既存実装で対応不要。Agent（worktree）にTDD実装委譲、指揮役が差分確認・vitest全PASS・build成功・回帰スイート🔵青を再実行して裏取り
 - [x] R-0144: Dodaikun v1受入テスト自動化のためのBeaver_beta向け機能追加。仕様: `docs/spec/R-0144_beaver_beta_uat_support.md`。実装・デプロイ・実機確認・カンガルー返信まで完了（コミット`0d00f33`/`5ccf703`/`affb653`）。Beaver_betaへ`upload.ps1 -Beta`でデプロイ済み、migration 036適用済み、`reset_beta_db.ps1`にも036反映済み。`GET /sync/status`・`GET /invoices/sync`・`GET /payments/sync`・B-1歯止め(403)を実機確認済み。カンガルーへ返信ファイル作成済み（`2026-09-17_03_Beaver_Dodaikun受入テスト_Beaver_beta_API実装完了_返信.md`）。B-1のsave/restore実地確認（`BETA_SNAPSHOT_ENABLED=1`設定してのテスト）はfrontpc側の実行タイミングに合わせて次回
