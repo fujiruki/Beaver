@@ -373,15 +373,16 @@ switch ($method) {
 
             echo json_encode($row);
         } else {
-            $where = 'WHERE p.status != "キャンセル"';
             $params = [];
+            if (!empty($_GET['status'])) {
+                $where = 'WHERE p.status = ?';
+                $params[] = $_GET['status'];
+            } else {
+                $where = 'WHERE p.status != "キャンセル"';
+            }
             if (!empty($_GET['customer_id'])) {
                 $where .= ' AND p.customer_id = ?';
                 $params[] = (int)$_GET['customer_id'];
-            }
-            if (!empty($_GET['status'])) {
-                $where .= ' AND p.status = ?';
-                $params[] = $_GET['status'];
             }
             if (!empty($_GET['q'])) {
                 // R-0091: 検索対象を案件コード・案件名・得意先名に拡張

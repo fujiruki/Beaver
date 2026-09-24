@@ -30,6 +30,7 @@ const statusLabel: Record<ProjectStatus, string> = {
   '納品済':     '納品済',
   '請求済':     '請求済',
   '完了':       '完了',
+  'キャンセル': 'キャンセル',
 };
 const statusColor: Record<ProjectStatus, string> = {
   '問い合わせ': 'bg-slate-100 text-slate-600',
@@ -39,12 +40,16 @@ const statusColor: Record<ProjectStatus, string> = {
   '納品済':     'bg-cyan-100 text-cyan-700',
   '請求済':     'bg-purple-100 text-purple-700',
   '完了':       'bg-green-100 text-green-700',
+  'キャンセル': 'bg-rose-100 text-rose-700',
 };
+// R-0147: ステータスフィルタボタンの並び順（工程順）はstatusLabelのキー順をそのまま使う
+const ALL_STATUSES = Object.keys(statusLabel);
 
 export default function ProjectList() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const customerFilter = searchParams.get('customer_id') ? Number(searchParams.get('customer_id')) : undefined;
+  const statusFilter = searchParams.get('status') || undefined;
 
   const [page, setPage] = useState(() => {
     const p = Number(searchParams.get('page'));
@@ -58,7 +63,11 @@ export default function ProjectList() {
   const isComposingRef = useRef(false);
   const { data: customers = [] } = useCustomers();
   const { settings } = useAppSettings();
-  const filters = { ...(search ? { q: search } : {}), ...(customerFilter ? { customer_id: customerFilter } : {}) };
+  const filters = {
+    ...(search ? { q: search } : {}),
+    ...(customerFilter ? { customer_id: customerFilter } : {}),
+    ...(statusFilter ? { status: statusFilter } : {}),
+  };
   const { data, isLoading, error } = useProjectsPaged(page, Object.keys(filters).length ? filters : undefined, sortKeys);
   const deleteMutation = useDeleteProject();
   const filterCustomer = customerFilter ? customers.find(c => c.id === customerFilter) : null;
@@ -67,9 +76,10 @@ export default function ProjectList() {
   const meta = data?.meta;
 
   // R-0091: ページ・検索語・ソートキーの状態をURLクエリへ反映し、リロード後も復元できるようにする
-  function syncUrl(nextPage: number, nextSearch: string, nextSortKeys: SortState[]) {
+  function syncUrl(nextPage: number, nextSearch: string, nextSortKeys: SortState[], nextStatus: string | undefined) {
     const next = new URLSearchParams();
     if (customerFilter) next.set('customer_id', String(customerFilter));
+    if (nextStatus) next.set('status', nextStatus);
     if (nextPage > 1) next.set('page', String(nextPage));
     if (nextSearch) next.set('q', nextSearch);
     if (nextSortKeys.length > 0) {
@@ -82,7 +92,7 @@ export default function ProjectList() {
   function commitSearch(q: string) {
     setSearch(q);
     setPage(1);
-    syncUrl(1, q, sortKeys);
+    syncUrl(1, q, sortKeys, statusFilter);
   }
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -107,13 +117,20 @@ export default function ProjectList() {
 
   function handlePageChange(p: number) {
     setPage(p);
-    syncUrl(p, search, sortKeys);
+    syncUrl(p, search, sortKeys, statusFilter);
   }
 
   function handleMultiSortChange(keys: SortState[]) {
     setSortKeys(keys);
     setPage(1);
-    syncUrl(1, search, keys);
+    syncUrl(1, search, keys, statusFilter);
+  }
+
+  // R-0147: 単一選択のステータスフィルタ。選択中のボタンを再クリックすると解除して「すべて」に戻る
+  function handleStatusFilterClick(status?: string) {
+    const nextStatus = status && statusFilter !== status ? status : undefined;
+    setPage(1);
+    syncUrl(1, search, sortKeys, nextStatus);
   }
 
   if (isLoading) return <div className="p-6">読み込み中...</div>;
@@ -205,7 +222,7 @@ export default function ProjectList() {
         </button>
       </div>
 
-      <div className="mb-3">
+      <div className="mb-3 flex items-center justify-between flex-wrap gap-2">
         <input
           type="text"
           placeholder="案件名・得意先名で検索"
@@ -215,6 +232,29 @@ export default function ProjectList() {
           onCompositionEnd={handleCompositionEnd}
           className="px-3 py-1.5 border border-slate-300 rounded-md text-sm w-60"
         />
+        <div className="flex flex-wrap gap-1.5" data-testid="status-filter-buttons">
+          <button
+            type="button"
+            onClick={() => handleStatusFilterClick(undefined)}
+            className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${
+              !statusFilter ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-300'
+            }`}
+          >
+            すべて
+          </button>
+          {ALL_STATUSES.map(s => (
+            <button
+              type="button"
+              key={s}
+              onClick={() => handleStatusFilterClick(s)}
+              className={`px-2.5 py-1 rounded-full text-xs font-semibold border ${
+                statusFilter === s ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-300'
+              }`}
+            >
+              {statusLabel[s]}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="bg-white rounded-lg shadow-sm overflow-hidden">

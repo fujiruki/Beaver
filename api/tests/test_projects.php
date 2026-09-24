@@ -333,8 +333,13 @@ function projectListPage(PDO $pdo, array $getParams): array {
     require_once dirname(__DIR__) . '/search_helpers.php';
 
     $_GET = $getParams;
-    $where = 'WHERE p.status != "キャンセル"';
     $params = [];
+    if (!empty($_GET['status'])) {
+        $where = 'WHERE p.status = ?';
+        $params[] = $_GET['status'];
+    } else {
+        $where = 'WHERE p.status != "キャンセル"';
+    }
     if (!empty($_GET['q'])) {
         [$searchClause, $searchParams] = buildMultiColumnSearchClause(
             ['p.project_code', 'p.name', 'c.name'],
@@ -605,6 +610,28 @@ runTest('T-13: 案件一覧の各行にeffective_estimated_hoursが含まれる'
 
     assertEq(2.0, (float)$rowById[(int)$withVoucher['body']['id']]['effective_estimated_hours'], '伝票集計優先(1+1)');
     assertEq(3.5, (float)$rowById[(int)$withoutVoucher['body']['id']]['effective_estimated_hours'], '手動入力フォールバック');
+});
+
+// T-14: status=キャンセル を明示指定した場合はキャンセル案件が返る（R-0147: デフォルト除外との矛盾条件バグ修正）
+runTest('T-14: status=キャンセルを指定するとキャンセル案件が返る', function () use ($pdo) {
+    $created = projectPost($pdo, ['customer_id' => 1, 'name' => 'キャンセル確認案件']);
+    $id = (int)$created['body']['id'];
+    projectDelete($pdo, $id);
+
+    $result = projectListPage($pdo, ['status' => 'キャンセル', 'page' => '1', 'per_page' => '200']);
+    $ids = array_column($result['data'], 'id');
+    assertEq(true, in_array($id, $ids, true), 'status=キャンセル指定時にキャンセル案件が含まれる');
+});
+
+// T-15: status指定なしの場合は従来通りキャンセル案件が除外される（回帰確認）
+runTest('T-15: status未指定の場合はキャンセル案件が除外される（既存動作の回帰確認）', function () use ($pdo) {
+    $created = projectPost($pdo, ['customer_id' => 1, 'name' => 'キャンセル除外確認案件']);
+    $id = (int)$created['body']['id'];
+    projectDelete($pdo, $id);
+
+    $result = projectListPage($pdo, ['page' => '1', 'per_page' => '200']);
+    $ids = array_column($result['data'], 'id');
+    assertEq(false, in_array($id, $ids, true), 'status未指定時にキャンセル案件が除外される');
 });
 
 // ============================================================

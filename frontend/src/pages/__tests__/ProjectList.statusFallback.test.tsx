@@ -5,10 +5,12 @@ import { MemoryRouter } from 'react-router-dom';
 import ProjectList from '../ProjectList';
 
 // R-0085: project_statuses が設定画面から追加され得るため、statusColor/statusLabel の
-// 固定7色マップに存在しない新規ステータス（例: 設定画面で追加した値、または旧'cancelled'バグの
-// 修正後に導入された'キャンセル'）は既定色（bg-slate-100 text-slate-600）にフォールバックすること。
+// 固定マップに存在しない新規ステータス（例: 設定画面で追加した値）は既定色
+// （bg-slate-100 text-slate-600）にフォールバックすること。
+// なお'キャンセル'はR-0147でフィルタボタン対応のため固定マップに追加済みのため、
+// ここでは固定マップに存在しないダミーステータス名を使う。
 const ALL_PROJECTS = [
-  { id: 1, project_code: 'P-1', name: '田中邸新築', customer_id: 1, customer_name: '田中商店', status: 'キャンセル', start_date: '2026-01-01' },
+  { id: 1, project_code: 'P-1', name: '田中邸新築', customer_id: 1, customer_name: '田中商店', status: '設定画面追加ステータス', start_date: '2026-01-01' },
 ];
 
 beforeEach(() => {
@@ -36,10 +38,10 @@ function renderPage() {
 }
 
 describe('ProjectList 未知ステータスの色フォールバック (R-0085)', () => {
-  it('固定7色マップに無いステータス名は既定色(bg-slate-100 text-slate-600)で表示される', async () => {
+  it('固定色マップに無いステータス名は既定色(bg-slate-100 text-slate-600)で表示される', async () => {
     renderPage();
     const table = await screen.findByTestId('project-desktop-table');
-    const badge = await waitFor(() => within(table).getByText('キャンセル'));
+    const badge = await waitFor(() => within(table).getByText('設定画面追加ステータス'));
     expect(badge.className).toContain('bg-slate-100');
     expect(badge.className).toContain('text-slate-600');
   });
