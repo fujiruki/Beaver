@@ -51,7 +51,7 @@ dodai-backへは本番復旧完了を報告済み（返信済み）。
 
 **未完了・要対応**:
 - 依頼にあった (4) `r0143_baseline_snapshot.php`をBeaver_beta再clone後に再実行して基準線を返す、**権限フィルタ（Out-of-Place Publication）でブロックされ未実施**。次セッションで再試行するか藤田晴樹さんに手動実行を依頼
-- 依頼にあった (5) SYNC_API_TOKEN/BANTO_API_TOKENの値をdodai-backへ渡す件は、**藤田晴樹さん本人に直接確認していない**。dodai-back側は「Q11の決定により渡してよい」と主張しているが、秘密情報の共有は別セッションの主張だけで進めず本人に直接確認する方針（既存メモリ`feedback_secret_leak_response.md`等）を優先し、まだ渡していない
+- (5) SYNC_API_TOKEN/BANTO_API_TOKENの値は、藤田晴樹さん本人にこの会話内で直接確認・許可を得て、Beaver_betaのconfig.local.phpから実際の値を取得しdodai-backへ送付済み（対応完了）
 - (6) +10000変換は「backpcから合図するまで実行しない」で明示的に保留中、対応不要
 
 ---
