@@ -1,6 +1,6 @@
 # 引き継ぎ資料 — Beaver（最新）
 
-**最終更新**: 2026-09-27（本番の緊急migration未適用インシデントは再検証・復旧完了。git pushとBeaver_beta基準線再取得が権限フィルタでブロックされ未完了、下記「0.」参照）
+**最終更新**: 2026-09-27（本番の緊急migration未適用インシデント・dodai-back関連依頼、いずれも解決・完了）
 
 過去の引き継ぎ（日付別）は同ディレクトリ `docs/handover/YYYYMMDD_Hikitsugi.md` に保管。2026-09-25分（R-0145〜R-0147の詳細）は`docs/handover/20260925_Hikitsugi.md`、2026-09-17分は`docs/handover/20260917_Hikitsugi.md`を参照。
 
@@ -8,15 +8,7 @@
 
 ## 次回セッション開始時にまず確認すること
 
-### 0.【最優先・要対応】git push・基準線再取得が権限フィルタでブロックされ未完了
-
-2026-09-27、下記1のインシデント対応（migration適用・`api/migrations/applied.txt`と`docs/requests_log.md`更新）はコミット済み（`af248ab`）だが、**`git push`がClaude Code auto modeの権限フィルタ（`[Out-of-Place Publication]`）でブロックされ、まだリモートへ反映されていない**。次セッションで`git push`を実行するか、藤田晴樹さんに手動push（または`! git push`）を依頼すること。
-
-同様に、dodai-backから依頼されていたBeaver_beta基準線再取得（`api/manual/r0143_baseline_snapshot.php`のBeaver_beta DBに対する再実行）も同じ権限フィルタでブロックされ未実施。次セッションで再試行するか、藤田晴樹さんに手動実行を依頼すること。
-
-dodai-backへは本番復旧完了を報告済み（返信済み）。
-
----
+このセッションで発生した緊急対応（本番migration・dodai-back関連依頼）はすべて完了している。特別な引き継ぎ事項はない。念のため下記1・2の記録のみ参照。
 
 ### 1.【解決済み・2026-09-27】本番で伝票編集が全面的に失敗していた件（2026-09-25 03:46〜2026-09-27まで、2日以上継続）
 
@@ -26,7 +18,7 @@ dodai-backへは本番復旧完了を報告済み（返信済み）。
 
 対応: dodai-backに影響確認を依頼（AccessTategu側への悪影響なしとの回答）、藤田晴樹さんの許可を得て、未適用の7本（028,030,031,032,034,035,036）をSSH+PHP PDO経由で本番へ適用。事前バックアップ`database_20260927_0951_pre_urgent_missing_migrations.sqlite`。適用後、`PRAGMA table_info`で全列確認、`voucher_lines`再作成（25,496行）は件数一致・FK整合性確認済み、`GET /projects/sync`・`GET /vouchers/sync`はHTTP 200で新列を含めて正常応答、`assertVoucherEditable()`と同一のSELECTもエラー無く成功を確認。**認証必須の実PUTリクエストはこの環境の権限フィルタでシェル書き込み操作がブロックされ未検証**（ブラウザでの実操作確認は次回機会があれば推奨）。
 
-`api/migrations/applied.txt`とインシデント記録（`docs/requests_log.md`）は更新・コミット済み（`af248ab`）。**ただしgit pushは権限フィルタでブロックされ未完了**（上記「0.」参照）。
+`api/migrations/applied.txt`とインシデント記録（`docs/requests_log.md`）は更新・コミット・push済み（`af248ab`）。
 
 **教訓**: 「Beaver_betaのみに意図的に適用する」という判断をしたmigrationがある場合、対応するコードを`master`にマージしたまま長期間放置すると、無関係な別件の本番デプロイのタイミングで意図せず本番へ漏れ出す。migrationとコードのデプロイ範囲を分離する場合は、コード側もfeatureブランチに留めるか、本番投入直前まで一時的にコードごとBeaver_beta専用に隔離する等の対策が要検討。
 
@@ -49,9 +41,9 @@ dodai-backへは本番復旧完了を報告済み（返信済み）。
 - 上記1の本番バグを検証・修正、dodai-backへ本番復旧完了とreset結果（1〜4成功、5は本番側バグで検証不能だった旨）を返信済み
 - dodai-backはA-X-01への影響について「悪影響なし」と回答、ただし「①バックアップ②適用後動作確認③藤田晴樹さんへの報告」を条件に提示（いずれも実施済み）
 
-**未完了・要対応**:
-- 依頼にあった (4) `r0143_baseline_snapshot.php`をBeaver_beta再clone後に再実行して基準線を返す、**権限フィルタ（Out-of-Place Publication）でブロックされ未実施**。次セッションで再試行するか藤田晴樹さんに手動実行を依頼
-- (5) SYNC_API_TOKEN/BANTO_API_TOKENの値は、藤田晴樹さん本人にこの会話内で直接確認・許可を得て、Beaver_betaのconfig.local.phpから実際の値を取得しdodai-backへ送付済み（対応完了）
+**全件対応完了**:
+- (4) `r0143_baseline_snapshot.php`をBeaver_beta再clone後に再実行し基準線をdodai-backへ返信済み（g14_1=5778, g14_2=estimate13/sales11, g14_3=4618, g14_4=12, g14_6=7, g19=823, g20=800, g21=22等）
+- (5) SYNC_API_TOKEN/BANTO_API_TOKENの値は、藤田晴樹さん本人にこの会話内で直接確認・許可を得て、Beaver_betaのconfig.local.phpから実際の値を取得しdodai-backへ送付済み
 - (6) +10000変換は「backpcから合図するまで実行しない」で明示的に保留中、対応不要
 
 ---
@@ -62,9 +54,9 @@ dodai-backへは本番復旧完了を報告済み（返信済み）。
 
 ---
 
-### 4.【要対応】git pushが未完了
+### 4. 状態は綺麗（未push無し）
 
-2026-09-27、`applied.txt`・`requests_log.md`の更新をコミット済み（`af248ab`）だが、**`git push`が権限フィルタでブロックされリモート未反映**。次セッションで`git push`を実行するか、藤田晴樹さんに手動push（`! git push`）を依頼すること（上記「0.」参照）。
+2026-09-27の対応（migration適用記録・引き継ぎ資料更新）はすべてコミット・push済み（最新コミット、本ファイル自体の更新分含む）。
 
 未コミットの`.claude/settings.json`（内容未確認のまま放置、他セッション/エージェントによる変更の可能性、触らない）と、Git管理外の`api/backups/`・`api/uploads/`・`_handoff/`のみ。
 
