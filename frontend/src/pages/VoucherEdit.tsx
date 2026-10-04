@@ -237,6 +237,17 @@ export default function VoucherEdit() {
     }
   }, [initCustomerIdParam, isNew, customers, setValue]);
 
+  // R-0148: 新規伝票作成時、案件プルダウンで案件を選んだら得意先が未設定ならその案件の得意先を既定値として反映する
+  const watchedProjectId = watch('project_id');
+  useEffect(() => {
+    if (!isNew || !watchedProjectId) return;
+    const customerId = watch('customer_id');
+    if (customerId !== '' && customerId !== '0') return;
+    const project = projects.find(p => String(p.id) === watchedProjectId);
+    if (project?.customer_id == null) return;
+    setValue('customer_id', String(project.customer_id));
+  }, [watchedProjectId, isNew, projects, watch, setValue]);
+
   const watchedLines = useWatch({ control, name: 'lines' });
   const watchedTaxInputType = watch('tax_input_type');
 
