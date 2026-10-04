@@ -923,6 +923,61 @@ try {
         assertEq($expectedAccessNo, $found['customer_access_no'], 'customer_access_noが得意先のaccess_customer_noと一致する');
     });
 
+    // ============================================================
+    // R-0149: GET /vouchers/sync に得意先名・案件名の生データを追加
+    // ============================================================
+    echo "\n=== R-0149 GET /vouchers/sync に beaver_customer_name/beaver_project_name が含まれる ===\n";
+
+    runTest('レスポンスにbeaver_customer_name・beaver_project_nameキーが存在する', function () use ($vfetch, $vbase) {
+        $data = json_decode($vfetch($vbase)['body'], true);
+        assertTrue(count($data['vouchers']) > 0, 'has vouchers');
+        $first = $data['vouchers'][0];
+        assertTrue(array_key_exists('beaver_customer_name', $first), 'beaver_customer_name キーが存在すること');
+        assertTrue(array_key_exists('beaver_project_name', $first), 'beaver_project_name キーが存在すること');
+    });
+
+    runTest('beaver_customer_nameが紐づく得意先のnameと一致する', function () use ($vfetch, $vbase, $testDbPath) {
+        $tmpPdo = new PDO('sqlite:' . $testDbPath, null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+        $voucherRow = $tmpPdo->query("SELECT id, customer_id FROM vouchers WHERE voucher_no = 'VS001'")->fetch(PDO::FETCH_ASSOC);
+        $voucherId = (int)$voucherRow['id'];
+        $expectedName = $tmpPdo->query("SELECT name FROM customers WHERE id = " . (int)$voucherRow['customer_id'])->fetchColumn();
+        $tmpPdo = null;
+
+        $data = json_decode($vfetch($vbase)['body'], true);
+        $found = null;
+        foreach ($data['vouchers'] as $v) { if ((int)$v['id'] === $voucherId) { $found = $v; break; } }
+        assertTrue($found !== null, 'VS001 が見つかること');
+        assertEq($expectedName, $found['beaver_customer_name'], 'beaver_customer_nameが得意先のnameと一致する');
+    });
+
+    runTest('beaver_project_nameが紐づく案件のnameと一致する', function () use ($vfetch, $vbase, $testDbPath) {
+        $tmpPdo = new PDO('sqlite:' . $testDbPath, null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+        $voucherRow = $tmpPdo->query("SELECT id, project_id FROM vouchers WHERE voucher_no = 'E99001'")->fetch(PDO::FETCH_ASSOC);
+        $voucherId = (int)$voucherRow['id'];
+        $expectedName = $tmpPdo->query("SELECT name FROM projects WHERE id = " . (int)$voucherRow['project_id'])->fetchColumn();
+        $tmpPdo = null;
+
+        $data = json_decode($vfetch($vbase)['body'], true);
+        $found = null;
+        foreach ($data['vouchers'] as $v) { if ((int)$v['id'] === $voucherId) { $found = $v; break; } }
+        assertTrue($found !== null, 'E99001 が見つかること');
+        assertEq($expectedName, $found['beaver_project_name'], 'beaver_project_nameが案件のnameと一致する');
+    });
+
+    runTest('project_idがNULLの伝票はbeaver_project_nameがnull', function () use ($vfetch, $vbase, $testDbPath) {
+        $tmpPdo = new PDO('sqlite:' . $testDbPath, null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+        $voucherRow = $tmpPdo->query("SELECT id, project_id FROM vouchers WHERE voucher_no = 'VS001'")->fetch(PDO::FETCH_ASSOC);
+        $voucherId = (int)$voucherRow['id'];
+        assertEq(null, $voucherRow['project_id'], 'VS001はproject_id未設定の前提');
+        $tmpPdo = null;
+
+        $data = json_decode($vfetch($vbase)['body'], true);
+        $found = null;
+        foreach ($data['vouchers'] as $v) { if ((int)$v['id'] === $voucherId) { $found = $v; break; } }
+        assertTrue($found !== null, 'VS001 が見つかること');
+        assertEq(null, $found['beaver_project_name'], 'project_id未設定の伝票はbeaver_project_name=null');
+    });
+
 } finally {
     // サーバ停止
     if (is_resource($serverProc)) {
