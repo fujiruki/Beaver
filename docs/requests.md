@@ -1,6 +1,37 @@
 # 要望・リクエスト
 
-## 34. 案件に紐づいて伝票が作られるとき、その案件の得意先を伝票の得意先にもデフォルト設定する（2026-10-04、藤田晴樹さんより会話内で直接）
+## 35. `/vouchers/sync`に得意先名・案件名の生データを追加してほしい（2026-10-04、dodai-back[AccessTategu側backpc指揮役]より）
+
+dodai-backからのクロスセッション依頼原文（要約せず記録、2通）:
+
+> 正式な修正依頼です（先ほどの取り消しとは別の、本当に必要な修正です）。
+>
+> ## 問題
+> `/vouchers/sync`エンドポイント(api/routes/vouchers.php:89-100のSELECT)が、得意先情報として`access_customer_no`（Access側の番号、c.access_customer_noのLEFT JOIN）だけを返しており、**Beaver側の生の得意先名(`customers.name`)を一切含んでいません**。
+>
+> このため、AccessTategu側の競合解決画面(`frm競合解決`)で、まだAccessとリンクされていない新規得意先の伝票を見ると、Beaver版の得意先名が永遠に「該当なし」としか表示されず、見積/売上の内容を比較・判断する材料がありません（実例: 得意先「青木」さんの新規見積がこの状態でした）。
+>
+> 一方、Beaver内部の通常の伝票一覧用クエリ(vouchers.php:539等)は`c.name AS customer_name`を普通に取得しているので、同期専用エンドポイントだけがこの情報を落としています。
+>
+> ## 依頼内容
+> `/vouchers/sync`のSELECT文に、生の得意先名も追加してほしいです。フィールド名案: `beaver_customer_name`（AccessTategu側は既存の`customer_access_no`と対にして`beaver_customer_name`を参照する実装にする想定です）。
+>
+> 同様の構造が`/customers/sync`や他の同期系エンドポイント(projects等)にもあれば、横展開をご検討ください。
+>
+> 対応可能か、またフィールド名案に異存がないか教えてください。合わせてAccessTategu側（ResolveBeaverCustomerName関数）も修正に着手します。
+
+> 追記です。同じ問題が案件名にもあります。`/vouchers/sync`のSELECT文(vouchers.php:89-100)には`project_id`はありますが、projectsテーブルとのJOIN自体が無く、`access_project_no`も生の案件名(`projects.name`)もどちらも取得されていません（得意先より状態が悪いです）。
+>
+> 依頼をまとめます。`/vouchers/sync`のSELECT文に追加してほしいもの：
+> - `c.access_customer_no AS customer_access_no`（既存）＋ `c.name AS beaver_customer_name`（新規）
+> - projectsテーブルとのLEFT JOINを追加し、`p.access_project_no AS project_access_no`（新規）＋ `p.name AS beaver_project_name`（新規）
+>
+> AccessTategu側は、Access側とのリンクが取れればそちらの名前を優先、取れなければ`beaver_customer_name`/`beaver_project_name`を表示する形にする想定です。よろしくお願いします。
+
+### 調査結果・回答（技術的訂正あり）
+- `beaver_customer_name`追加は問題なく対応可能（`vouchers.php:89-100`の既存`customers` LEFT JOINに`c.name`を1列追加するだけ）
+- **`access_project_no`は存在しない・不要**: `docs/from_access/20260906_R-086_Beaverスキーマ対応表.md`§2.2の既存調査により、案件IDはAccess/Beaver間で**共通ID**（`projects.id`をAccess側`案件番号`としてそのまま使用、`sync_helpers.php`の`resolveProjectIdById`参照）と判明済み。Beaver側にAccess案件ID用の別列（`access_project_id`等）は存在しない設計。SELECTに既にある`v.project_id`自体が共通IDの役割を果たすため、新規に`project_access_no`列を追加する必要はない。projectsテーブルへのLEFT JOINを追加し`p.name AS beaver_project_name`のみ返せばよい
+- 横展開: `/customers/sync`（`customers.php`）は既に`name`を直接SELECT済み（customers自身のエンドポイントのためJOIN不要）、`/projects/sync`も同様に自テーブルのnameを直接返しているため、どちらも対応不要。同種の間接参照ギャップは`/vouchers/sync`のみと確認
 
 原文: 「案件に紐づいて伝票がつくられるときには　その案件の得意先がその伝票の得意先にもデフォルトとして設定されるようにしてね」
 
