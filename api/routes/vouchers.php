@@ -143,7 +143,7 @@ if ($method === 'GET' && isset($segments[1]) && $segments[1] === 'sync' && !isse
     if (!empty($voucherIds)) {
         $placeholders = implode(',', array_fill(0, count($voucherIds), '?'));
         $lineStmt = $pdo->prepare("
-            SELECT voucher_id, access_line_id, line_no, item_name, quantity,
+            SELECT voucher_id, id AS beaver_line_id, access_line_id, line_no, item_name, quantity,
                    price_body, price_hardware, price_glass, line_total,
                    tax_category, memo, updated_at, edited_in_beaver
             FROM voucher_lines
@@ -154,6 +154,7 @@ if ($method === 'GET' && isset($segments[1]) && $segments[1] === 'sync' && !isse
         foreach ($lineStmt->fetchAll() as $lineRow) {
             $vid = (int)$lineRow['voucher_id'];
             unset($lineRow['voucher_id']);
+            $lineRow['beaver_line_id']    = (int)$lineRow['beaver_line_id'];
             $lineRow['access_line_id']   = $lineRow['access_line_id'] !== null ? (int)$lineRow['access_line_id'] : null;
             $lineRow['edited_in_beaver'] = (int)$lineRow['edited_in_beaver'];
             if ($lineRow['tax_category'] === 'taxable') $lineRow['tax_category'] = '課税';
@@ -205,58 +206,6 @@ function normalizeSalesCategoryId($value) {
         return null;
     }
     return $value;
-}
-
-// --- 伝票合計を再計算して vouchers を更新 ---
-function recalcVoucher(PDO $pdo, int $voucherId): void {
-    $stmt = $pdo->prepare('SELECT tax_input_type FROM vouchers WHERE id = ?');
-    $stmt->execute([$voucherId]);
-    $v = $stmt->fetch();
-
-    $taxStmt = $pdo->query('SELECT rate FROM tax_rates ORDER BY valid_from DESC LIMIT 1');
-    $taxRate = (float)$taxStmt->fetchColumn();
-
-    $lStmt = $pdo->prepare('SELECT line_type, line_total, tax_category FROM voucher_lines WHERE voucher_id = ?');
-    $lStmt->execute([$voucherId]);
-    $lines = $lStmt->fetchAll();
-
-    $taxable    = 0;
-    $nontaxable = 0;
-    $discount   = 0;
-
-    foreach ($lines as $l) {
-        $amt = (float)$l['line_total'];
-        if ($l['line_type'] === 'discount') {
-            $discount += $amt;
-        } elseif ($l['tax_category'] === 'taxable') {
-            $taxable += $amt;
-        } else {
-            $nontaxable += $amt;
-        }
-    }
-
-    if ($v['tax_input_type'] === 'inclusive') {
-        $taxAmount       = (int)floor($taxable * $taxRate / (1 + $taxRate));
-        $subtotalTaxable = $taxable - $taxAmount;
-        $total           = $taxable + $nontaxable - $discount;
-        $pdo->prepare('
-            UPDATE vouchers SET
-                subtotal_taxable = ?, subtotal_nontaxable = ?, subtotal_discount = ?,
-                tax_amount = ?, total_amount = ?, updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?
-        ')->execute([$subtotalTaxable, $nontaxable, $discount, $taxAmount, $total, $voucherId]);
-        return;
-    }
-
-    $taxAmount = (int)floor($taxable * $taxRate);
-    $total     = $taxable + $nontaxable - $discount + $taxAmount;
-
-    $pdo->prepare('
-        UPDATE vouchers SET
-            subtotal_taxable = ?, subtotal_nontaxable = ?, subtotal_discount = ?,
-            tax_amount = ?, total_amount = ?, updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?
-    ')->execute([$taxable, $nontaxable, $discount, $taxAmount, $total, $voucherId]);
 }
 
 // --- 明細行に建具台帳スナップショットをロード ---

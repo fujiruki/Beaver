@@ -809,6 +809,29 @@ try {
     });
 
     // ============================================================
+    // R-0151 (2): GET /vouchers/sync の明細レスポンスに beaver_line_id を追加
+    // ============================================================
+    echo "\n=== R-0151 (2) GET /vouchers/sync に beaver_line_id が含まれる ===\n";
+
+    runTest('/vouchers/sync レスポンスに beaver_line_id が含まれ、voucher_lines.id と一致する', function () use ($vfetch, $vbase, $testDbPath) {
+        $tmpPdo = new PDO('sqlite:' . $testDbPath, null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+        $voucherRow = $tmpPdo->query("SELECT id FROM vouchers WHERE voucher_no = 'VS001'")->fetch(PDO::FETCH_ASSOC);
+        $voucherId = (int)$voucherRow['id'];
+        $expectedLineId = (int)$tmpPdo->query("SELECT id FROM voucher_lines WHERE voucher_id = $voucherId AND access_line_id = 555")->fetchColumn();
+        $tmpPdo = null;
+
+        $data = json_decode($vfetch($vbase)['body'], true);
+        $found = null;
+        foreach ($data['vouchers'] as $v) { if ((int)$v['id'] === $voucherId) { $found = $v; break; } }
+        assertTrue($found !== null, 'VS001 が見つかること');
+        $lineA = null;
+        foreach ($found['lines'] as $l) { if ($l['access_line_id'] === 555) { $lineA = $l; break; } }
+        assertTrue($lineA !== null, 'access_line_id=555 の明細が見つかる');
+        assertTrue(array_key_exists('beaver_line_id', $lineA), 'beaver_line_id キーが存在すること');
+        assertEq($expectedLineId, (int)$lineA['beaver_line_id'], 'beaver_line_id が voucher_lines.id と一致する');
+    });
+
+    // ============================================================
     // R-076 B1-1: GET /vouchers/sync の updated_at / last_synced_at をJSTで返す
     // ============================================================
     echo "\n=== R-076 B1-1 GET /vouchers/sync のタイムスタンプJST変換 ===\n";
@@ -1614,6 +1637,359 @@ runTest('syncVoucherUpdate でconsumption_tax_type未指定なら既存値が保
     ]);
     assertEq(200, $r['code'], 'http code', $r);
     assertEq('内税/請求計', $r['body']['consumption_tax_type'], '既存値保持');
+});
+
+// ============================================================
+// R-0151 (0)/(3): recalcVoucher の sync_helpers.php 移動後も呼べること・
+//                  lines_mode=replace 後に total_amount 等が再計算されること
+// ============================================================
+echo "\n=== R-0151 (0)/(3) recalcVoucher 呼び出し・lines_mode=replace 後の再計算 ===\n";
+
+runTest('project_id付き(syncVoucherUpsert)でlines_mode=replace送信後、total_amount等が明細から再計算される', function () use (&$pdo, $projectId) {
+    $r = runHelperCase('syncVoucherUpsert', $projectId, [
+        'access_voucher_id'  => 151001,
+        'voucher_type'       => 'sales',
+        'customer_access_no' => '100',
+        'voucher_date'       => '2026-09-01',
+        'total_amount'       => 0,
+        'lines_mode'         => 'replace',
+        'lines' => [
+            ['access_line_id' => 95001, 'line_no' => 1, 'item_name' => 'A', 'quantity' => 1, 'line_total' => 1000, 'tax_category' => '課税'],
+            ['access_line_id' => 95002, 'line_no' => 2, 'item_name' => 'B', 'quantity' => 1, 'line_total' => 2000, 'tax_category' => '課税'],
+        ],
+    ]);
+    assertEq(200, $r['code'], 'http code（recalcVoucherがsync_helpers.php経由で呼べること）', ['stderr' => $r['stderr'] ?? '', 'body' => $r['body'] ?? null]);
+
+    $row = $pdo->query("SELECT subtotal_taxable, tax_amount, total_amount FROM vouchers WHERE access_voucher_id = 151001")->fetch();
+    assertEq(3000.0, (float)$row['subtotal_taxable'], 'subtotal_taxable = 1000+2000');
+    assertEq(300.0, (float)$row['tax_amount'], 'tax_amount = 3000 * 10%');
+    assertEq(3300.0, (float)$row['total_amount'], 'total_amount = 3000 + 300');
+});
+
+// ============================================================
+// R-0151 (1): PATCH /vouchers/{id}/access-link に lines パラメータを追加
+// ============================================================
+echo "\n=== R-0151 (1) PATCH /vouchers/{id}/access-link の lines パラメータ ===\n";
+
+function r0151MakeVoucherWithLines(PDO $pdo, string $voucherNo, array $lines): int {
+    $pdo->exec("INSERT INTO vouchers (voucher_no, voucher_type, status, voucher_date, total_amount)
+                VALUES ('$voucherNo', 'estimate', 'draft', '2026-09-01', 1000)");
+    $voucherId = (int)$pdo->lastInsertId();
+    $ins = $pdo->prepare("
+        INSERT INTO voucher_lines
+            (voucher_id, line_no, line_type, item_name, quantity, line_total, tax_category, source, access_line_id, edited_in_beaver, updated_at)
+        VALUES (?, ?, 'normal', ?, 1, 1000, '課税', 'beaver', ?, 0, '2026-09-01 00:00:00')
+    ");
+    foreach ($lines as $l) {
+        $ins->execute([$voucherId, $l['line_no'], $l['item_name'] ?? ('item' . $l['line_no']), $l['access_line_id'] ?? null]);
+    }
+    return $voucherId;
+}
+
+runTest('lines指定でaccess_line_idが設定される', function () use (&$pdo) {
+    $voucherId = r0151MakeVoucherWithLines($pdo, 'R0151-LINK-1', [
+        ['line_no' => 1], ['line_no' => 2],
+    ]);
+
+    $r = runHelperCase('syncVoucherAccessLink', $voucherId, [
+        'access_voucher_id' => 160001,
+        'access_voucher_no' => 'A-160001',
+        'lines' => [
+            ['line_no' => 1, 'access_line_id' => 7001],
+            ['line_no' => 2, 'access_line_id' => 7002],
+        ],
+    ]);
+    assertEq(200, $r['code'], 'http code', ['stderr' => $r['stderr'] ?? '', 'body' => $r['body'] ?? null]);
+
+    $rows = $pdo->query("SELECT line_no, access_line_id, updated_at, edited_in_beaver FROM voucher_lines WHERE voucher_id = $voucherId ORDER BY line_no")->fetchAll();
+    assertEq(7001, (int)$rows[0]['access_line_id'], '1行目にaccess_line_idが設定される');
+    assertEq(7002, (int)$rows[1]['access_line_id'], '2行目にaccess_line_idが設定される');
+    assertEq('2026-09-01 00:00:00', $rows[0]['updated_at'], 'updated_atは変更されない');
+    assertEq(0, (int)$rows[0]['edited_in_beaver'], 'edited_in_beaverは変更されない');
+});
+
+runTest('同じ値を再送すると冪等に200になる', function () use (&$pdo) {
+    $voucherRow = $pdo->query("SELECT id FROM vouchers WHERE voucher_no = 'R0151-LINK-1'")->fetch();
+    $voucherId = (int)$voucherRow['id'];
+
+    $r = runHelperCase('syncVoucherAccessLink', $voucherId, [
+        'access_voucher_id' => 160001,
+        'access_voucher_no' => 'A-160001',
+        'lines' => [
+            ['line_no' => 1, 'access_line_id' => 7001],
+            ['line_no' => 2, 'access_line_id' => 7002],
+        ],
+    ]);
+    assertEq(200, $r['code'], 'http code（冪等）', ['stderr' => $r['stderr'] ?? '', 'body' => $r['body'] ?? null]);
+
+    $rows = $pdo->query("SELECT access_line_id FROM voucher_lines WHERE voucher_id = $voucherId ORDER BY line_no")->fetchAll();
+    assertEq(7001, (int)$rows[0]['access_line_id'], '1行目は変化しない');
+    assertEq(7002, (int)$rows[1]['access_line_id'], '2行目は変化しない');
+});
+
+runTest('既にリンク済みの行を別の値で送ると409になり何も反映されない（ロールバック確認）', function () use (&$pdo) {
+    $voucherRow = $pdo->query("SELECT id, access_voucher_id FROM vouchers WHERE voucher_no = 'R0151-LINK-1'")->fetch();
+    $voucherId = (int)$voucherRow['id'];
+
+    $r = runHelperCase('syncVoucherAccessLink', $voucherId, [
+        'access_voucher_id' => 160001,
+        'access_voucher_no' => 'A-160001',
+        'lines' => [
+            ['line_no' => 1, 'access_line_id' => 9999],
+        ],
+    ]);
+    assertEq(409, $r['code'], 'http code', ['stderr' => $r['stderr'] ?? '', 'body' => $r['body'] ?? null]);
+
+    $row = $pdo->query("SELECT access_line_id FROM voucher_lines WHERE voucher_id = $voucherId AND line_no = 1")->fetch();
+    assertEq(7001, (int)$row['access_line_id'], '409時は既存のaccess_line_idが維持される（ロールバック）');
+    $header = $pdo->query("SELECT access_voucher_id FROM vouchers WHERE id = $voucherId")->fetch();
+    assertEq(160001, (int)$header['access_voucher_id'], 'ヘッダーも変化しない');
+});
+
+runTest('payload外の既存行が既に持つaccess_line_idを別行に割り当てようとすると422になり何も反映されない（UNIQUE制約の500化防止）', function () use (&$pdo) {
+    $voucherId = r0151MakeVoucherWithLines($pdo, 'R0151-LINK-CONFLICT', [
+        ['line_no' => 1, 'access_line_id' => 9001],
+        ['line_no' => 2],
+    ]);
+
+    $r = runHelperCase('syncVoucherAccessLink', $voucherId, [
+        'access_voucher_id' => 160006,
+        'lines' => [
+            ['line_no' => 2, 'access_line_id' => 9001],
+        ],
+    ]);
+    assertEq(422, $r['code'], 'http code（500ではなく422になる）', ['stderr' => $r['stderr'] ?? '', 'body' => $r['body'] ?? null]);
+
+    $rows = $pdo->query("SELECT line_no, access_line_id FROM voucher_lines WHERE voucher_id = $voucherId ORDER BY line_no")->fetchAll();
+    assertEq(9001, (int)$rows[0]['access_line_id'], 'line_no=1のaccess_line_idは維持される');
+    assertEq(null, $rows[1]['access_line_id'], 'line_no=2は更新されない（ロールバック）');
+    $header = $pdo->query("SELECT access_voucher_id FROM vouchers WHERE id = $voucherId")->fetch();
+    assertEq(null, $header['access_voucher_id'], 'ヘッダーも更新されない');
+});
+
+runTest('存在しないline_noを含むと422になり何も反映されない（ロールバック確認）', function () use (&$pdo) {
+    $voucherId = r0151MakeVoucherWithLines($pdo, 'R0151-LINK-2', [['line_no' => 1]]);
+
+    $r = runHelperCase('syncVoucherAccessLink', $voucherId, [
+        'access_voucher_id' => 160002,
+        'lines' => [
+            ['line_no' => 5, 'access_line_id' => 8001],
+        ],
+    ]);
+    assertEq(422, $r['code'], 'http code', ['stderr' => $r['stderr'] ?? '', 'body' => $r['body'] ?? null]);
+
+    $header = $pdo->query("SELECT access_voucher_id FROM vouchers WHERE id = $voucherId")->fetch();
+    assertEq(null, $header['access_voucher_id'], 'line_no不正時はヘッダーも更新されない（ロールバック）');
+});
+
+runTest('lines内でline_noが重複すると422になる', function () use (&$pdo) {
+    $voucherId = r0151MakeVoucherWithLines($pdo, 'R0151-LINK-3', [['line_no' => 1], ['line_no' => 2]]);
+
+    $r = runHelperCase('syncVoucherAccessLink', $voucherId, [
+        'access_voucher_id' => 160003,
+        'lines' => [
+            ['line_no' => 1, 'access_line_id' => 8101],
+            ['line_no' => 1, 'access_line_id' => 8102],
+        ],
+    ]);
+    assertEq(422, $r['code'], 'http code', ['stderr' => $r['stderr'] ?? '', 'body' => $r['body'] ?? null]);
+    $header = $pdo->query("SELECT access_voucher_id FROM vouchers WHERE id = $voucherId")->fetch();
+    assertEq(null, $header['access_voucher_id'], 'line_no重複時はヘッダーも更新されない');
+});
+
+runTest('lines内でaccess_line_idが重複すると422になる', function () use (&$pdo) {
+    $voucherId = r0151MakeVoucherWithLines($pdo, 'R0151-LINK-4', [['line_no' => 1], ['line_no' => 2]]);
+
+    $r = runHelperCase('syncVoucherAccessLink', $voucherId, [
+        'access_voucher_id' => 160004,
+        'lines' => [
+            ['line_no' => 1, 'access_line_id' => 8201],
+            ['line_no' => 2, 'access_line_id' => 8201],
+        ],
+    ]);
+    assertEq(422, $r['code'], 'http code', ['stderr' => $r['stderr'] ?? '', 'body' => $r['body'] ?? null]);
+    $header = $pdo->query("SELECT access_voucher_id FROM vouchers WHERE id = $voucherId")->fetch();
+    assertEq(null, $header['access_voucher_id'], 'access_line_id重複時はヘッダーも更新されない');
+});
+
+runTest('linesを指定しないリクエストは現行動作のまま（回帰確認）', function () use (&$pdo) {
+    $voucherId = r0151MakeVoucherWithLines($pdo, 'R0151-LINK-5', [['line_no' => 1]]);
+
+    $r = runHelperCase('syncVoucherAccessLink', $voucherId, [
+        'access_voucher_id' => 160005,
+        'access_voucher_no' => 'A-160005',
+    ]);
+    assertEq(200, $r['code'], 'http code', ['stderr' => $r['stderr'] ?? '', 'body' => $r['body'] ?? null]);
+    $header = $pdo->query("SELECT access_voucher_id, access_voucher_no FROM vouchers WHERE id = $voucherId")->fetch();
+    assertEq(160005, (int)$header['access_voucher_id'], 'ヘッダーは通常通り更新される');
+    $line = $pdo->query("SELECT access_line_id FROM voucher_lines WHERE voucher_id = $voucherId AND line_no = 1")->fetch();
+    assertEq(null, $line['access_line_id'], '明細は変更されない（lines未指定）');
+});
+
+// ============================================================
+// R-0151 (3): lines_mode=replace を access_line_id キーの upsert に変更
+// ============================================================
+echo "\n=== R-0151 (3) lines_mode=replace のaccess_line_idキーupsert ===\n";
+
+runTest('一致するaccess_line_idはUPDATEされ、Beaver側のid・costs/pricesが維持される', function () use (&$pdo, $projectId) {
+    $pdo->exec("INSERT INTO vouchers (voucher_no, voucher_type, status, project_id, voucher_date, total_amount, access_voucher_no, access_voucher_id)
+                VALUES ('R0151-UPD-1', 'sales', 'approved', $projectId, '2026-09-01', 1000, 'R0151-UPD-1', 161001)");
+    $voucherId = (int)$pdo->lastInsertId();
+    $pdo->exec("INSERT INTO voucher_lines
+        (voucher_id, line_no, line_type, item_name, quantity, line_total, tax_category, source, access_line_id, edited_in_beaver, updated_at)
+        VALUES ($voucherId, 1, 'normal', 'old-item', 1, 1000, '課税', 'access', 9301, 1, CURRENT_TIMESTAMP)");
+    $lineId = (int)$pdo->lastInsertId();
+    $pdo->exec("INSERT INTO voucher_line_costs (voucher_line_id, category_code, category_name, measure_type, value, sort_order) VALUES ($lineId, 'MAIN', '本体', 'money', 500, 1)");
+    $pdo->exec("INSERT INTO voucher_line_prices (voucher_line_id, category_code, category_name, measure_type, value, sort_order) VALUES ($lineId, 'MAIN', '本体', 'money', 800, 1)");
+
+    $r = runHelperCase('syncVoucherUpdate', ['project_id' => $projectId, 'voucher_no' => 'R0151-UPD-1'], [
+        'voucher_type'       => 'sales',
+        'customer_access_no' => '100',
+        'voucher_date'       => '2026-09-02',
+        'total_amount'       => 0,
+        'lines_mode'         => 'replace',
+        'lines' => [
+            ['access_line_id' => 9301, 'line_no' => 1, 'item_name' => 'updated-item', 'quantity' => 2, 'price_body' => 1200, 'line_total' => 2400, 'tax_category' => '課税'],
+        ],
+    ]);
+    assertEq(200, $r['code'], 'http code', ['stderr' => $r['stderr'] ?? '', 'body' => $r['body'] ?? null]);
+
+    $row = $pdo->query("SELECT id, item_name, quantity, line_total, edited_in_beaver FROM voucher_lines WHERE voucher_id = $voucherId")->fetch();
+    assertEq($lineId, (int)$row['id'], 'Beaver側の明細idが変わらない');
+    assertEq('updated-item', $row['item_name'], 'item_nameがUPDATEされる');
+    assertEq(2400.0, (float)$row['line_total'], 'line_totalがUPDATEされる');
+    assertEq(0, (int)$row['edited_in_beaver'], 'edited_in_beaverが0にクリアされる');
+
+    $costCount = (int)$pdo->query("SELECT COUNT(*) FROM voucher_line_costs WHERE voucher_line_id = $lineId")->fetchColumn();
+    assertEq(1, $costCount, 'voucher_line_costsが消えない');
+    $priceCount = (int)$pdo->query("SELECT COUNT(*) FROM voucher_line_prices WHERE voucher_line_id = $lineId")->fetchColumn();
+    assertEq(1, $priceCount, 'voucher_line_pricesが消えない');
+
+    $voucherRow = $pdo->query("SELECT total_amount, tax_amount FROM vouchers WHERE id = $voucherId")->fetch();
+    assertEq(2640.0, (float)$voucherRow['total_amount'], 'total_amountが明細から再計算される(2400+240)');
+    assertEq(240.0, (float)$voucherRow['tax_amount'], 'tax_amountが再計算される');
+});
+
+runTest('payloadに無い既存行(edited_in_beaver=1含む)はDELETEされ、新しいaccess_line_idの行はINSERTされる', function () use (&$pdo, $projectId) {
+    $pdo->exec("INSERT INTO vouchers (voucher_no, voucher_type, status, voucher_date, total_amount, access_voucher_no, access_voucher_id)
+                VALUES ('R0151-UPD-2', 'estimate', 'approved', '2026-09-01', 1000, 'R0151-UPD-2', 161002)");
+    $voucherId = (int)$pdo->lastInsertId();
+    // line1: payloadに残る（UPDATE対象）
+    $pdo->exec("INSERT INTO voucher_lines (voucher_id, line_no, line_type, item_name, quantity, line_total, tax_category, source, access_line_id, edited_in_beaver, updated_at)
+        VALUES ($voucherId, 1, 'normal', 'keep', 1, 1000, '課税', 'access', 9501, 0, CURRENT_TIMESTAMP)");
+    // line2: Access採用で削除されるはずの行（edited_in_beaver=1でも保護されない）
+    $pdo->exec("INSERT INTO voucher_lines (voucher_id, line_no, line_type, item_name, quantity, line_total, tax_category, source, access_line_id, edited_in_beaver, updated_at)
+        VALUES ($voucherId, 2, 'normal', 'to-be-deleted', 1, 500, '課税', 'access', 9502, 1, CURRENT_TIMESTAMP)");
+    // line3: Beaver新規行(access_line_id=NULL)も削除対象
+    $pdo->exec("INSERT INTO voucher_lines (voucher_id, line_no, line_type, item_name, quantity, line_total, tax_category, source, access_line_id, edited_in_beaver, updated_at)
+        VALUES ($voucherId, 3, 'normal', 'beaver-new', 1, 300, '課税', 'beaver', NULL, 1, CURRENT_TIMESTAMP)");
+
+    $r = runHelperCase('syncVoucherUpdate', ['project_id' => $projectId, 'voucher_no' => 'R0151-UPD-2'], [
+        'voucher_type'       => 'estimate',
+        'customer_access_no' => '100',
+        'voucher_date'       => '2026-09-02',
+        'total_amount'       => 0,
+        'lines_mode'         => 'replace',
+        'lines' => [
+            ['access_line_id' => 9501, 'line_no' => 1, 'item_name' => 'kept-updated', 'quantity' => 1, 'line_total' => 1000, 'tax_category' => '課税'],
+            ['access_line_id' => 9503, 'line_no' => 2, 'item_name' => 'brand-new', 'quantity' => 1, 'line_total' => 2000, 'tax_category' => '課税'],
+        ],
+    ]);
+    assertEq(200, $r['code'], 'http code', ['stderr' => $r['stderr'] ?? '', 'body' => $r['body'] ?? null]);
+
+    $rows = $pdo->query("SELECT access_line_id, item_name, line_total FROM voucher_lines WHERE voucher_id = $voucherId ORDER BY access_line_id")->fetchAll();
+    assertEq(2, count($rows), '明細は2件（1件UPDATE・1件INSERT、2件DELETE）');
+    assertEq(9501, (int)$rows[0]['access_line_id'], '既存行は維持');
+    assertEq('kept-updated', $rows[0]['item_name'], '既存行がUPDATEされる');
+    assertEq(9503, (int)$rows[1]['access_line_id'], '新規行がINSERTされる');
+    assertEq('brand-new', $rows[1]['item_name'], '新規行のitem_name');
+
+    $deletedCount = (int)$pdo->query("SELECT COUNT(*) FROM voucher_lines WHERE voucher_id = $voucherId AND access_line_id IN (9502)")->fetchColumn();
+    assertEq(0, $deletedCount, 'payloadに無い行(edited_in_beaver=1)は削除される');
+    $nullCount = (int)$pdo->query("SELECT COUNT(*) FROM voucher_lines WHERE voucher_id = $voucherId AND access_line_id IS NULL")->fetchColumn();
+    assertEq(0, $nullCount, 'Beaver新規行(access_line_id=NULL)も削除される');
+
+    $voucherRow = $pdo->query("SELECT total_amount, tax_amount FROM vouchers WHERE id = $voucherId")->fetch();
+    assertEq(3300.0, (float)$voucherRow['total_amount'], 'total_amountが明細(1000+2000)から再計算される');
+});
+
+// ============================================================
+// R-0151 (3)-補: lines_mode未指定（自動判定・edited_in_beaver保護）に回帰がないこと
+// ============================================================
+echo "\n=== R-0151 lines_mode未指定の既存動作に回帰がないこと ===\n";
+
+runTest('lines_mode未指定でedited_in_beaver=1の行があれば明細は変更されない（保護される）', function () use (&$pdo) {
+    $pdo->exec("INSERT INTO vouchers (voucher_no, voucher_type, status, voucher_date, total_amount, access_voucher_no, access_voucher_id)
+                VALUES ('R0151-AUTO-1', 'estimate', 'approved', '2026-09-01', 1000, 'R0151-AUTO-1', 161101)");
+    $voucherId = (int)$pdo->lastInsertId();
+    $pdo->exec("INSERT INTO voucher_lines (voucher_id, line_no, line_type, item_name, quantity, line_total, tax_category, source, access_line_id, edited_in_beaver, updated_at)
+        VALUES ($voucherId, 1, 'normal', 'protected', 1, 1000, '課税', 'beaver', NULL, 1, CURRENT_TIMESTAMP)");
+
+    $r = runHelperCase('syncVoucherUpsert', null, [
+        'access_voucher_id'  => 161101,
+        'voucher_type'       => 'estimate',
+        'customer_access_no' => '',
+        'voucher_date'       => '2026-09-03',
+        'total_amount'       => 9999,
+        'lines' => [
+            ['line_no' => 1, 'item_name' => 'from-access', 'quantity' => 1, 'line_total' => 1, 'tax_category' => '課税'],
+        ],
+    ]);
+    assertEq(200, $r['code'], 'http code', ['stderr' => $r['stderr'] ?? '', 'body' => $r['body'] ?? null]);
+
+    $row = $pdo->query("SELECT item_name FROM voucher_lines WHERE voucher_id = $voucherId")->fetch();
+    assertEq('protected', $row['item_name'], 'edited_in_beaver保護により明細は変更されない（lines_mode未指定の既存動作）');
+});
+
+// ============================================================
+// R-0151 (4): total_amount一括修復スクリプト
+// ============================================================
+echo "\n=== R-0151 (4) total_amount一括修復スクリプト ===\n";
+
+require_once dirname(__DIR__) . '/manual/r0151_recalc_voucher_totals.php';
+
+runTest('差分がある伝票のみdry-runで検出され、--execute相当でtotal_amountが修復されupdated_atは変化しない', function () use (&$pdo) {
+    $pdo->exec("INSERT INTO vouchers
+        (voucher_no, voucher_type, status, voucher_date, total_amount, subtotal_taxable, subtotal_nontaxable, subtotal_discount, tax_amount, access_voucher_id, updated_at)
+        VALUES ('R0151-FIX-1', 'sales', 'approved', '2026-09-05', 999999, 0, 0, 0, 0, 162001, '2026-09-05 00:00:00')");
+    $voucherId = (int)$pdo->lastInsertId();
+    $pdo->exec("INSERT INTO voucher_lines (voucher_id, line_no, line_type, item_name, quantity, line_total, tax_category, source, updated_at)
+        VALUES ($voucherId, 1, 'normal', 'A', 1, 1000, 'taxable', 'access', CURRENT_TIMESTAMP)");
+    $beforeUpdatedAt = $pdo->query("SELECT updated_at FROM vouchers WHERE id = $voucherId")->fetchColumn();
+
+    $dryRun = r0151RecalcVoucherTotals($pdo, false);
+    assertTrue($dryRun['executed'] === false, 'dry-runでは executed=false');
+    $target = null;
+    foreach ($dryRun['targets'] as $t) { if ($t['id'] === $voucherId) { $target = $t; break; } }
+    assertTrue($target !== null, '対象伝票として検出される');
+    assertEq(999999.0, $target['old_total_amount'], 'old_total_amount');
+    assertEq(1100.0, $target['new_total_amount'], 'new_total_amount(1000+税100)');
+
+    $afterDry = $pdo->query("SELECT total_amount FROM vouchers WHERE id = $voucherId")->fetchColumn();
+    assertEq(999999.0, (float)$afterDry, 'dry-runではDBは変更されない');
+
+    $exec = r0151RecalcVoucherTotals($pdo, true);
+    assertTrue($exec['executed'], '--execute相当で実行される');
+
+    $after = $pdo->query("SELECT total_amount, tax_amount, subtotal_taxable, updated_at FROM vouchers WHERE id = $voucherId")->fetch();
+    assertEq(1100.0, (float)$after['total_amount'], '実行後にtotal_amountが修復される');
+    assertEq(100.0, (float)$after['tax_amount'], 'tax_amountも修復される');
+    assertEq(1000.0, (float)$after['subtotal_taxable'], 'subtotal_taxableも修復される');
+    assertEq($beforeUpdatedAt, $after['updated_at'], 'updated_atは変化しない');
+});
+
+runTest('差分が無い伝票は対象にならない', function () use (&$pdo) {
+    $pdo->exec("INSERT INTO vouchers
+        (voucher_no, voucher_type, status, voucher_date, total_amount, subtotal_taxable, subtotal_nontaxable, subtotal_discount, tax_amount, access_voucher_id)
+        VALUES ('R0151-FIX-2', 'sales', 'approved', '2026-09-05', 1100, 1000, 0, 0, 100, 162002)");
+    $voucherId = (int)$pdo->lastInsertId();
+    $pdo->exec("INSERT INTO voucher_lines (voucher_id, line_no, line_type, item_name, quantity, line_total, tax_category, source, updated_at)
+        VALUES ($voucherId, 1, 'normal', 'A', 1, 1000, 'taxable', 'access', CURRENT_TIMESTAMP)");
+
+    $dryRun = r0151RecalcVoucherTotals($pdo, false);
+    $target = null;
+    foreach ($dryRun['targets'] as $t) { if ($t['id'] === $voucherId) { $target = $t; break; } }
+    assertTrue($target === null, '差分が無いので対象にならない');
 });
 
 // ============================================================

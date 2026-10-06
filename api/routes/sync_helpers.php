@@ -103,6 +103,63 @@ function resolveCustomerId(PDO $pdo, ?string $accessCustomerNo): ?int {
 }
 
 /**
+ * R-0151 (0): 伝票合計を再計算して vouchers を更新する。
+ * 元は vouchers.php にのみ定義されていたが、syncVoucherUpsert/syncVoucherUpdate
+ * （/projects/{id}/vouchers/sync 経由では vouchers.php が一切読み込まれない）からも
+ * 呼べるようにするため、この共通ヘルパへ移動した。
+ */
+function recalcVoucher(PDO $pdo, int $voucherId): void {
+    $stmt = $pdo->prepare('SELECT tax_input_type FROM vouchers WHERE id = ?');
+    $stmt->execute([$voucherId]);
+    $v = $stmt->fetch();
+
+    $taxStmt = $pdo->query('SELECT rate FROM tax_rates ORDER BY valid_from DESC LIMIT 1');
+    $taxRate = (float)$taxStmt->fetchColumn();
+
+    $lStmt = $pdo->prepare('SELECT line_type, line_total, tax_category FROM voucher_lines WHERE voucher_id = ?');
+    $lStmt->execute([$voucherId]);
+    $lines = $lStmt->fetchAll();
+
+    $taxable    = 0;
+    $nontaxable = 0;
+    $discount   = 0;
+
+    foreach ($lines as $l) {
+        $amt = (float)$l['line_total'];
+        if ($l['line_type'] === 'discount') {
+            $discount += $amt;
+        } elseif ($l['tax_category'] === 'taxable') {
+            $taxable += $amt;
+        } else {
+            $nontaxable += $amt;
+        }
+    }
+
+    if ($v['tax_input_type'] === 'inclusive') {
+        $taxAmount       = (int)floor($taxable * $taxRate / (1 + $taxRate));
+        $subtotalTaxable = $taxable - $taxAmount;
+        $total           = $taxable + $nontaxable - $discount;
+        $pdo->prepare('
+            UPDATE vouchers SET
+                subtotal_taxable = ?, subtotal_nontaxable = ?, subtotal_discount = ?,
+                tax_amount = ?, total_amount = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        ')->execute([$subtotalTaxable, $nontaxable, $discount, $taxAmount, $total, $voucherId]);
+        return;
+    }
+
+    $taxAmount = (int)floor($taxable * $taxRate);
+    $total     = $taxable + $nontaxable - $discount + $taxAmount;
+
+    $pdo->prepare('
+        UPDATE vouchers SET
+            subtotal_taxable = ?, subtotal_nontaxable = ?, subtotal_discount = ?,
+            tax_amount = ?, total_amount = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+    ')->execute([$taxable, $nontaxable, $discount, $taxAmount, $total, $voucherId]);
+}
+
+/**
  * project_id が存在するか確認。
  */
 function projectExists(PDO $pdo, int $projectId): bool {
@@ -461,8 +518,9 @@ function hasEditedInBeaverLines(PDO $pdo, int $voucherId): bool {
 }
 
 /**
- * R-076 B2-2: Access採用 payload(lines_mode=replace) では既存明細を全削除し、
- * Access側から送られた lines をそのまま再INSERTする。
+ * R-0151 (3): Access採用 payload(lines_mode=replace) では access_line_id をキーに
+ * 既存明細を upsert する（全DELETE→INSERTだと id が振り直され、costs/prices も消えてしまうため）。
+ * 処理完了後に recalcVoucher を呼び、total_amount 等を明細から再計算する。
  */
 function replaceSyncedLinesFromPayload(PDO $pdo, int $voucherId, array $data): ?array {
     if (($data['lines_mode'] ?? null) !== 'replace') {
@@ -475,8 +533,161 @@ function replaceSyncedLinesFromPayload(PDO $pdo, int $voucherId, array $data): ?
         ];
     }
 
-    $pdo->prepare('DELETE FROM voucher_lines WHERE voucher_id = ?')->execute([$voucherId]);
-    return insertSyncedLines($pdo, $voucherId, $data['lines']);
+    $lineError = upsertSyncedLines($pdo, $voucherId, $data['lines']);
+    if ($lineError !== null) {
+        return $lineError;
+    }
+
+    recalcVoucher($pdo, $voucherId);
+    return null;
+}
+
+/**
+ * R-0151 (3): payload の lines を access_line_id キーで既存 voucher_lines と突き合わせ、
+ * 一致する行は UPDATE（id・voucher_line_costs/pricesはそのまま維持）、
+ * 一致しない新規行は INSERT、payload に無い既存行（access_line_id が NULL の行も含む）は DELETE する。
+ * この経路では edited_in_beaver 保護は適用しない（Access採用＝Access版が正のため）。
+ * 不正値が見つかった場合は INSERT を中断し、422 のレスポンスボディ用配列を返す（正常系は null）。
+ */
+function upsertSyncedLines(PDO $pdo, int $voucherId, array $lines): ?array {
+    $allowedLineTypes     = ['normal', 'discount', 'subtotal'];
+    $allowedTaxCategories = ['課税', '非課税'];
+
+    $existingStmt = $pdo->prepare('SELECT id, access_line_id FROM voucher_lines WHERE voucher_id = ?');
+    $existingStmt->execute([$voucherId]);
+    $existingByAccessId = [];
+    $existingIds = [];
+    foreach ($existingStmt->fetchAll() as $row) {
+        $existingIds[] = (int)$row['id'];
+        if ($row['access_line_id'] !== null) {
+            $existingByAccessId[(int)$row['access_line_id']] = (int)$row['id'];
+        }
+    }
+
+    $lineNo = 1;
+    $matchedAccessIds = [];
+    $toUpdate = [];
+    $toInsert = [];
+
+    foreach ($lines as $line) {
+        if (!is_array($line)) { $lineNo++; continue; }
+
+        $lineType = $line['line_type'] ?? 'normal';
+        if (!in_array($lineType, $allowedLineTypes, true)) {
+            return ['error' => 'invalid_line', 'field' => 'line_type', 'value' => $lineType, 'line_no' => $lineNo];
+        }
+
+        $taxCategory = $line['tax_category'] ?? '課税';
+        if (!in_array($taxCategory, $allowedTaxCategories, true)) {
+            return ['error' => 'invalid_line', 'field' => 'tax_category', 'value' => $taxCategory, 'line_no' => $lineNo];
+        }
+
+        $quantityRaw = $line['quantity'] ?? 1;
+        if (!is_numeric($quantityRaw)) {
+            return ['error' => 'invalid_line', 'field' => 'quantity', 'value' => $quantityRaw, 'line_no' => $lineNo];
+        }
+
+        $lineTotalRaw = $line['line_total'] ?? 0;
+        if (!is_numeric($lineTotalRaw)) {
+            return ['error' => 'invalid_line', 'field' => 'line_total', 'value' => $lineTotalRaw, 'line_no' => $lineNo];
+        }
+
+        $accessLineId = isset($line['access_line_id']) ? (int)$line['access_line_id'] : null;
+        $normalized = [
+            'line_no'        => isset($line['line_no']) ? (int)$line['line_no'] : $lineNo,
+            'line_type'      => $lineType,
+            'item_name'      => $line['item_name'] ?? null,
+            'quantity'       => (float)$quantityRaw,
+            'price_body'     => isset($line['price_body'])     ? (float)$line['price_body']     : 0.0,
+            'price_hardware' => isset($line['price_hardware']) ? (float)$line['price_hardware'] : 0.0,
+            'price_glass'    => isset($line['price_glass'])    ? (float)$line['price_glass']    : 0.0,
+            'line_total'     => (float)$lineTotalRaw,
+            'tax_category'   => $taxCategory === '課税' ? 'taxable' : 'non_taxable',
+            'memo'           => $line['memo'] ?? null,
+            'access_line_id' => $accessLineId,
+        ];
+
+        if ($accessLineId !== null && isset($existingByAccessId[$accessLineId])) {
+            $matchedAccessIds[$accessLineId] = true;
+            $toUpdate[] = ['id' => $existingByAccessId[$accessLineId]] + $normalized;
+        } else {
+            $toInsert[] = $normalized;
+        }
+
+        $lineNo++;
+    }
+
+    // payload に無い既存行（access_line_id が NULL の行も含む）を DELETE
+    // CASCADE で voucher_line_costs/voucher_line_prices も削除される（想定通り）
+    $matchedIds = array_map(fn($u) => $u['id'], $toUpdate);
+    $deleteIds = array_diff($existingIds, $matchedIds);
+    if (!empty($deleteIds)) {
+        $placeholders = implode(',', array_fill(0, count($deleteIds), '?'));
+        $pdo->prepare("DELETE FROM voucher_lines WHERE id IN ($placeholders)")->execute(array_values($deleteIds));
+    }
+
+    // line_no の UNIQUE(voucher_id, line_no) 制約に抵触しないよう、
+    // 一旦負値へ退避してから本来の line_no を設定する（行同士の入れ替えに対応するため）
+    foreach ($toUpdate as $u) {
+        $pdo->prepare('UPDATE voucher_lines SET line_no = ? WHERE id = ?')->execute([-$u['id'], $u['id']]);
+    }
+    $upd = $pdo->prepare('
+        UPDATE voucher_lines SET
+            line_no = :line_no, line_type = :line_type, item_name = :item_name, quantity = :quantity,
+            price_body = :price_body, price_hardware = :price_hardware, price_glass = :price_glass,
+            line_total = :line_total, tax_category = :tax_category, memo = :memo,
+            edited_in_beaver = 0, updated_at = CURRENT_TIMESTAMP
+        WHERE id = :id
+    ');
+    foreach ($toUpdate as $u) {
+        $upd->execute([
+            ':line_no'       => $u['line_no'],
+            ':line_type'     => $u['line_type'],
+            ':item_name'     => $u['item_name'],
+            ':quantity'      => $u['quantity'],
+            ':price_body'    => $u['price_body'],
+            ':price_hardware' => $u['price_hardware'],
+            ':price_glass'   => $u['price_glass'],
+            ':line_total'    => $u['line_total'],
+            ':tax_category'  => $u['tax_category'],
+            ':memo'          => $u['memo'],
+            ':id'            => $u['id'],
+        ]);
+    }
+
+    if (!empty($toInsert)) {
+        $ins = $pdo->prepare('
+            INSERT INTO voucher_lines
+                (voucher_id, line_no, line_type, item_name, quantity,
+                 price_body, price_hardware, price_glass,
+                 line_total, tax_category, memo,
+                 source, access_line_id, edited_in_beaver, updated_at)
+            VALUES
+                (:voucher_id, :line_no, :line_type, :item_name, :quantity,
+                 :price_body, :price_hardware, :price_glass,
+                 :line_total, :tax_category, :memo,
+                 :source, :access_line_id, 0, CURRENT_TIMESTAMP)
+        ');
+        foreach ($toInsert as $n) {
+            $ins->execute([
+                ':voucher_id'     => $voucherId,
+                ':line_no'        => $n['line_no'],
+                ':line_type'      => $n['line_type'],
+                ':item_name'      => $n['item_name'],
+                ':quantity'       => $n['quantity'],
+                ':price_body'     => $n['price_body'],
+                ':price_hardware' => $n['price_hardware'],
+                ':price_glass'    => $n['price_glass'],
+                ':line_total'     => $n['line_total'],
+                ':tax_category'   => $n['tax_category'],
+                ':memo'           => $n['memo'],
+                ':source'         => 'access',
+                ':access_line_id' => $n['access_line_id'],
+            ]);
+        }
+    }
+
+    return null;
 }
 
 /**
@@ -939,7 +1150,88 @@ function syncVoucherAccessLink(PDO $pdo, int $voucherId): void {
         return;
     }
 
+    // R-0151 (1): lines 指定時は、適用前に全行を検証する（1件でも不正なら全件何も反映しない）。
+    $lineUpdates = [];
+    if (array_key_exists('lines', $data)) {
+        if (!is_array($data['lines'])) {
+            respond(422, ['error' => 'invalid_lines', 'field' => 'lines']);
+            return;
+        }
+
+        $existingLinesStmt = $pdo->prepare('SELECT id, line_no, access_line_id FROM voucher_lines WHERE voucher_id = ?');
+        $existingLinesStmt->execute([$voucherId]);
+        $existingByLineNo = [];
+        $existingLineNoByAccessLineId = [];
+        foreach ($existingLinesStmt->fetchAll() as $row) {
+            $existingByLineNo[(int)$row['line_no']] = $row;
+            if ($row['access_line_id'] !== null) {
+                $existingLineNoByAccessLineId[(int)$row['access_line_id']] = (int)$row['line_no'];
+            }
+        }
+
+        $seenLineNo = [];
+        $seenAccessLineId = [];
+
+        foreach ($data['lines'] as $lineReq) {
+            if (!is_array($lineReq) || !isset($lineReq['line_no']) || !isset($lineReq['access_line_id'])) {
+                respond(422, ['error' => 'invalid_lines', 'field' => 'lines']);
+                return;
+            }
+            $lineNo = (int)$lineReq['line_no'];
+            $accessLineId = (int)$lineReq['access_line_id'];
+
+            if (isset($seenLineNo[$lineNo])) {
+                respond(422, ['error' => 'duplicate_line_no', 'line_no' => $lineNo]);
+                return;
+            }
+            $seenLineNo[$lineNo] = true;
+
+            if (isset($seenAccessLineId[$accessLineId])) {
+                respond(422, ['error' => 'duplicate_access_line_id', 'access_line_id' => $accessLineId]);
+                return;
+            }
+            $seenAccessLineId[$accessLineId] = true;
+
+            if (!isset($existingByLineNo[$lineNo])) {
+                respond(422, ['error' => 'line_no_not_found', 'line_no' => $lineNo]);
+                return;
+            }
+
+            $existingRow = $existingByLineNo[$lineNo];
+            $currentAccessLineId = $existingRow['access_line_id'] !== null ? (int)$existingRow['access_line_id'] : null;
+
+            if ($currentAccessLineId !== null && $currentAccessLineId !== $accessLineId) {
+                respond(409, [
+                    'error' => 'line の access_line_id は既に別の値でリンク済みです',
+                    'voucher_id' => $voucherId,
+                    'line_no' => $lineNo,
+                    'current_access_line_id' => $currentAccessLineId,
+                    'requested_access_line_id' => $accessLineId,
+                ]);
+                return;
+            }
+
+            if (isset($existingLineNoByAccessLineId[$accessLineId]) && $existingLineNoByAccessLineId[$accessLineId] !== $lineNo) {
+                respond(422, [
+                    'error' => 'access_line_id_conflict',
+                    'voucher_id' => $voucherId,
+                    'line_no' => $lineNo,
+                    'access_line_id' => $accessLineId,
+                    'conflicting_line_no' => $existingLineNoByAccessLineId[$accessLineId],
+                ]);
+                return;
+            }
+
+            // 未設定（NULL）の行のみ更新対象にする（既に同値設定済みの行は冪等に成功扱い＝何もしない）
+            if ($currentAccessLineId === null) {
+                $lineUpdates[] = ['id' => (int)$existingRow['id'], 'access_line_id' => $accessLineId];
+            }
+        }
+    }
+
     try {
+        $pdo->beginTransaction();
+
         $pdo->prepare('
             UPDATE vouchers
             SET access_voucher_id = :access_voucher_id,
@@ -952,7 +1244,16 @@ function syncVoucherAccessLink(PDO $pdo, int $voucherId): void {
             ':access_voucher_no' => $accessVoucherNo,
             ':id' => $voucherId,
         ]);
+
+        // updated_at / edited_in_beaver は変更しない（次回pullでの誤検知を防ぐため）
+        $lineUpdStmt = $pdo->prepare('UPDATE voucher_lines SET access_line_id = ? WHERE id = ?');
+        foreach ($lineUpdates as $u) {
+            $lineUpdStmt->execute([$u['access_line_id'], $u['id']]);
+        }
+
+        $pdo->commit();
     } catch (Throwable $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
         respondInternalError($e, 'syncVoucherAccessLink');
         return;
     }
