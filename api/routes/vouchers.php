@@ -845,6 +845,11 @@ switch ($method) {
 
         // ---- 新規伝票作成 ----
         $data = json_decode(file_get_contents('php://input'), true) ?? [];
+        if (array_key_exists('consumption_tax_type', $data) && !isValidConsumptionTaxType((string)$data['consumption_tax_type'])) {
+            http_response_code(400);
+            echo json_encode(['error' => 'consumption_tax_type は ' . implode('/', allowedConsumptionTaxTypes()) . ' のいずれかで指定してください']);
+            exit;
+        }
         $type = $data['voucher_type'] ?? 'estimate';
         $no = nextVoucherNo($pdo, $type);
         $stmt = $pdo->prepare('
@@ -937,6 +942,11 @@ switch ($method) {
         if (!$resourceId) { http_response_code(400); echo json_encode(['error' => 'ID required']); exit; }
         assertVoucherEditable($pdo, $resourceId);
         $data = json_decode(file_get_contents('php://input'), true) ?? [];
+        if (array_key_exists('consumption_tax_type', $data) && !isValidConsumptionTaxType((string)$data['consumption_tax_type'])) {
+            http_response_code(400);
+            echo json_encode(['error' => 'consumption_tax_type は ' . implode('/', allowedConsumptionTaxTypes()) . ' のいずれかで指定してください']);
+            exit;
+        }
         $fields = ['status','project_id','customer_id','voucher_date','delivery_date',
                    'tax_input_type','consumption_tax_type','cutoff_date','billing_date','override_billing_date',
                    'trade_type','profit_rate','memo','description',

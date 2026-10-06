@@ -39,6 +39,22 @@ function respondInternalError(Throwable $e, string $context): void {
 }
 
 /**
+ * R-0150: 伝票見出しの consumption_tax_type（消費税区分）の許容値域。
+ * 明細行の tax_category（課税/非課税）とは別の値域。
+ */
+if (!function_exists('allowedConsumptionTaxTypes')) {
+    function allowedConsumptionTaxTypes(): array {
+        return ['外税/伝票計', '外税/請求計', '内税/伝票計', '内税/請求計'];
+    }
+}
+
+if (!function_exists('isValidConsumptionTaxType')) {
+    function isValidConsumptionTaxType(string $value): bool {
+        return in_array($value, allowedConsumptionTaxTypes(), true);
+    }
+}
+
+/**
  * voucher_date を 'Y-m-d' 形式で検証。不正なら null。
  */
 function validateVoucherDate(?string $value): ?string {
@@ -234,6 +250,10 @@ function syncVoucherUpsert(PDO $pdo, ?int $projectId): void {
     // （変数を DEFAULT 値で埋めると再同期時に既存値を上書きしてしまうため）
     $tradeType          = isset($data['trade_type'])           ? (string)$data['trade_type']           : null;
     $consumptionTaxType = isset($data['consumption_tax_type']) ? (string)$data['consumption_tax_type'] : null;
+    if ($consumptionTaxType !== null && !isValidConsumptionTaxType($consumptionTaxType)) {
+        respond(400, ['error' => 'consumption_tax_type は ' . implode('/', allowedConsumptionTaxTypes()) . ' のいずれかで指定してください']);
+        return;
+    }
     $printDateFlag      = isset($data['print_date_flag'])      ? ($data['print_date_flag'] ? 1 : 0)    : null;
     $printTaxExclFlag   = isset($data['print_tax_excl_flag'])  ? ($data['print_tax_excl_flag'] ? 1 : 0) : null;
     $printCompanySeal   = isset($data['print_company_seal'])   ? ($data['print_company_seal'] ? 1 : 0) : null;
@@ -629,6 +649,10 @@ function syncVoucherUpdate(PDO $pdo, int $projectId, string $accessVoucherNo): v
     // else（fresh INSERT）分岐の VALUES 句で既定値補完を行う。
     $tradeType          = isset($data['trade_type'])           ? (string)$data['trade_type']           : null;
     $consumptionTaxType = isset($data['consumption_tax_type']) ? (string)$data['consumption_tax_type'] : null;
+    if ($consumptionTaxType !== null && !isValidConsumptionTaxType($consumptionTaxType)) {
+        respond(400, ['error' => 'consumption_tax_type は ' . implode('/', allowedConsumptionTaxTypes()) . ' のいずれかで指定してください']);
+        return;
+    }
     $printDateFlag      = isset($data['print_date_flag'])      ? ($data['print_date_flag'] ? 1 : 0)    : null;
     $printTaxExclFlag   = isset($data['print_tax_excl_flag'])  ? ($data['print_tax_excl_flag'] ? 1 : 0) : null;
     $printCompanySeal   = isset($data['print_company_seal'])   ? ($data['print_company_seal'] ? 1 : 0) : null;

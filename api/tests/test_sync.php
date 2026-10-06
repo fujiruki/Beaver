@@ -169,6 +169,23 @@ function runHelperCase(string $func, $arg1, ?array $body): array {
     return $decoded;
 }
 
+/**
+ * R-0150: php ビルトインサーバへ POST/PUT 等の JSON リクエストを送るヘルパ。
+ */
+function vhttp(int $port, string $method, string $path, ?array $body = null): array {
+    $options = [
+        'method'        => $method,
+        'header'        => "Content-Type: application/json\r\nConnection: close\r\n",
+        'timeout'       => 5,
+        'ignore_errors' => true,
+    ];
+    if ($body !== null) $options['content'] = json_encode($body, JSON_UNESCAPED_UNICODE);
+    $raw = @file_get_contents("http://127.0.0.1:$port/contents/Beaver/api$path", false, stream_context_create(['http' => $options]));
+    $statusLine = $http_response_header[0] ?? '';
+    preg_match('/\s(\d{3})\s/', $statusLine, $m);
+    return ['status' => (int)($m[1] ?? 0), 'body' => json_decode((string)$raw, true)];
+}
+
 // ============================================================
 // テスト本体
 // ============================================================
@@ -978,6 +995,70 @@ try {
         assertEq(null, $found['beaver_project_name'], 'project_id未設定の伝票はbeaver_project_name=null');
     });
 
+    // ============================================================
+    // R-0150: consumption_tax_type 値域バリデーション（POST/PUT /vouchers）
+    // ============================================================
+    echo "\n=== R-0150 consumption_tax_type 値域バリデーション (POST/PUT /vouchers) ===\n";
+
+    runTest('POST /vouchers で不正なconsumption_tax_typeを送ると400', function () use ($port, $customerAId) {
+        $r = vhttp($port, 'POST', '/vouchers', [
+            'voucher_type'         => 'estimate',
+            'customer_id'          => $customerAId,
+            'consumption_tax_type' => '課税',
+        ]);
+        assertEq(400, $r['status'], 'http code', $r);
+        assertTrue(isset($r['body']['error']), 'error message present');
+    });
+
+    runTest('POST /vouchers で許容値4種類はいずれも201で作成でき、そのまま保存される', function () use ($port, $customerAId) {
+        foreach (['外税/伝票計', '外税/請求計', '内税/伝票計', '内税/請求計'] as $v) {
+            $r = vhttp($port, 'POST', '/vouchers', [
+                'voucher_type'         => 'estimate',
+                'customer_id'          => $customerAId,
+                'consumption_tax_type' => $v,
+            ]);
+            assertEq(201, $r['status'], "http code for $v", $r);
+            assertEq($v, $r['body']['consumption_tax_type'], "作成時の保存値 for $v");
+        }
+    });
+
+    runTest('POST /vouchers でconsumption_tax_type未指定ならデフォルト値が補完される（既存挙動）', function () use ($port, $customerAId) {
+        $r = vhttp($port, 'POST', '/vouchers', [
+            'voucher_type' => 'estimate',
+            'customer_id'  => $customerAId,
+        ]);
+        assertEq(201, $r['status'], 'http code', $r);
+        assertEq('外税/伝票計', $r['body']['consumption_tax_type'], 'デフォルト値');
+    });
+
+    runTest('PUT /vouchers/{id} で不正なconsumption_tax_typeを送ると400', function () use ($port, $customerAId) {
+        $created = vhttp($port, 'POST', '/vouchers', ['voucher_type' => 'estimate', 'customer_id' => $customerAId]);
+        assertEq(201, $created['status'], 'precondition: create voucher');
+        $id = $created['body']['id'];
+        $r = vhttp($port, 'PUT', "/vouchers/$id", ['consumption_tax_type' => '課税']);
+        assertEq(400, $r['status'], 'http code', $r);
+    });
+
+    runTest('PUT /vouchers/{id} で許容値を送ると200で更新される', function () use ($port, $customerAId) {
+        $created = vhttp($port, 'POST', '/vouchers', ['voucher_type' => 'estimate', 'customer_id' => $customerAId]);
+        $id = $created['body']['id'];
+        $r = vhttp($port, 'PUT', "/vouchers/$id", ['consumption_tax_type' => '内税/請求計']);
+        assertEq(200, $r['status'], 'http code', $r);
+        assertEq('内税/請求計', $r['body']['consumption_tax_type'], '更新後の値');
+    });
+
+    runTest('PUT /vouchers/{id} でconsumption_tax_typeを指定しなければ既存値が保持される（既存挙動）', function () use ($port, $customerAId) {
+        $created = vhttp($port, 'POST', '/vouchers', [
+            'voucher_type'         => 'estimate',
+            'customer_id'          => $customerAId,
+            'consumption_tax_type' => '内税/伝票計',
+        ]);
+        $id = $created['body']['id'];
+        $r = vhttp($port, 'PUT', "/vouchers/$id", ['memo' => 'メモ更新のみ']);
+        assertEq(200, $r['status'], 'http code', $r);
+        assertEq('内税/伝票計', $r['body']['consumption_tax_type'], '既存値が保持される');
+    });
+
 } finally {
     // サーバ停止
     if (is_resource($serverProc)) {
@@ -1414,6 +1495,125 @@ runTest('B2-3: 存在しない voucher_id は 404', function () {
         'access_voucher_no' => 'A-99051',
     ]);
     assertEq(404, $r['code'], 'http code');
+});
+
+// ============================================================
+// R-0150: consumption_tax_type 値域バリデーション（syncVoucherUpsert / syncVoucherUpdate）
+// ============================================================
+echo "\n=== R-0150 consumption_tax_type 値域バリデーション (sync_helpers) ===\n";
+
+runTest('syncVoucherUpsert 過去伝票モードで不正値 → 400', function () {
+    $r = runHelperCase('syncVoucherUpsert', null, [
+        'access_voucher_id'    => 150001,
+        'voucher_type'         => 'estimate',
+        'customer_access_no'   => '',
+        'voucher_date'         => '2026-08-01',
+        'total_amount'         => 1000,
+        'consumption_tax_type' => '課税',
+    ]);
+    assertEq(400, $r['code'], 'http code', $r);
+});
+
+runTest('syncVoucherUpsert 案件付きモードで不正値 → 400', function () use ($projectId) {
+    $r = runHelperCase('syncVoucherUpsert', $projectId, [
+        'access_voucher_id'    => 150002,
+        'voucher_type'         => 'estimate',
+        'customer_access_no'   => '100',
+        'voucher_date'         => '2026-08-01',
+        'total_amount'         => 1000,
+        'consumption_tax_type' => '課税',
+    ]);
+    assertEq(400, $r['code'], 'http code', $r);
+});
+
+runTest('syncVoucherUpsert 不正値のときは伝票がINSERTされない', function () use (&$pdo) {
+    $row = $pdo->query('SELECT id FROM vouchers WHERE access_voucher_id IN (150001, 150002)')->fetch();
+    assertEq(false, $row, 'access_voucher_id=150001/150002 のいずれも作成されていない');
+});
+
+runTest('syncVoucherUpsert 許容値4種類はいずれも200で保存される', function () use (&$pdo) {
+    $i = 150010;
+    foreach (['外税/伝票計', '外税/請求計', '内税/伝票計', '内税/請求計'] as $v) {
+        $i++;
+        $r = runHelperCase('syncVoucherUpsert', null, [
+            'access_voucher_id'    => $i,
+            'voucher_type'         => 'estimate',
+            'customer_access_no'   => '',
+            'voucher_date'         => '2026-08-02',
+            'total_amount'         => 1000,
+            'consumption_tax_type' => $v,
+        ]);
+        assertEq(200, $r['code'], "http code for $v", $r);
+        $row = $pdo->query("SELECT consumption_tax_type FROM vouchers WHERE access_voucher_id = $i")->fetch();
+        assertEq($v, $row['consumption_tax_type'], "DB保存値 for $v");
+    }
+});
+
+runTest('syncVoucherUpsert でconsumption_tax_type未指定ならデフォルト補完される（既存挙動）', function () use (&$pdo) {
+    $r = runHelperCase('syncVoucherUpsert', null, [
+        'access_voucher_id'  => 150020,
+        'voucher_type'       => 'estimate',
+        'customer_access_no' => '',
+        'voucher_date'       => '2026-08-03',
+        'total_amount'       => 1000,
+    ]);
+    assertEq(200, $r['code'], 'http code', $r);
+    $row = $pdo->query('SELECT consumption_tax_type FROM vouchers WHERE access_voucher_id = 150020')->fetch();
+    assertEq('外税/伝票計', $row['consumption_tax_type'], 'デフォルト補完');
+});
+
+runTest('syncVoucherUpdate 新規INSERT経路で不正値 → 400', function () use ($projectId) {
+    $r = runHelperCase('syncVoucherUpdate', ['project_id' => $projectId, 'voucher_no' => 'AC-R0150-NEW'], [
+        'voucher_type'         => 'sales',
+        'customer_access_no'   => '100',
+        'voucher_date'         => '2026-08-04',
+        'total_amount'         => 1000,
+        'consumption_tax_type' => '課税',
+    ]);
+    assertEq(400, $r['code'], 'http code', $r);
+});
+
+runTest('syncVoucherUpdate 不正値のときは伝票がINSERTされない', function () use (&$pdo) {
+    $row = $pdo->query("SELECT id FROM vouchers WHERE access_voucher_no = 'AC-R0150-NEW'")->fetch();
+    assertEq(false, $row, 'AC-R0150-NEW は作成されていない');
+});
+
+runTest('syncVoucherUpdate 許容値は201で保存される（新規INSERT経路）', function () use (&$pdo, $projectId) {
+    $r = runHelperCase('syncVoucherUpdate', ['project_id' => $projectId, 'voucher_no' => 'AC-R0150-OK'], [
+        'voucher_type'         => 'sales',
+        'customer_access_no'   => '100',
+        'voucher_date'         => '2026-08-04',
+        'total_amount'         => 2000,
+        'consumption_tax_type' => '内税/請求計',
+    ]);
+    assertEq(201, $r['code'], 'http code', $r);
+    assertEq('内税/請求計', $r['body']['consumption_tax_type'], 'response value');
+});
+
+runTest('syncVoucherUpdate 既存行への不正値更新は400になり既存値が変更されない', function () use (&$pdo, $projectId) {
+    $before = $pdo->query("SELECT consumption_tax_type, total_amount FROM vouchers WHERE access_voucher_no = 'AC-R0150-OK'")->fetch();
+    $r = runHelperCase('syncVoucherUpdate', ['project_id' => $projectId, 'voucher_no' => 'AC-R0150-OK'], [
+        'voucher_type'         => 'sales',
+        'customer_access_no'   => '100',
+        'voucher_date'         => '2026-08-05',
+        'total_amount'         => 3000,
+        'consumption_tax_type' => '課税',
+    ]);
+    assertEq(400, $r['code'], 'http code', $r);
+    $after = $pdo->query("SELECT consumption_tax_type, total_amount FROM vouchers WHERE access_voucher_no = 'AC-R0150-OK'")->fetch();
+    assertEq($before['consumption_tax_type'], $after['consumption_tax_type'], '既存値が変更されない');
+    assertEq($before['total_amount'], $after['total_amount'], 'total_amountも更新されない（バリデーションで中断）');
+});
+
+runTest('syncVoucherUpdate でconsumption_tax_type未指定なら既存値が保持される（既存挙動）', function () use (&$pdo, $projectId) {
+    $r = runHelperCase('syncVoucherUpdate', ['project_id' => $projectId, 'voucher_no' => 'AC-R0150-OK'], [
+        'voucher_type'       => 'sales',
+        'customer_access_no' => '100',
+        'voucher_date'       => '2026-08-06',
+        'total_amount'       => 4000,
+    ]);
+    assertEq(200, $r['code'], 'http code', $r);
+    assertEq('内税/請求計', $r['body']['consumption_tax_type'], '既存値保持');
 });
 
 // ============================================================

@@ -100,7 +100,7 @@ const defaultValues: VoucherFormValues = {
   voucher_date: new Date().toISOString().split('T')[0],
   delivery_date: null,
   tax_input_type: 'exclusive',
-  consumption_tax_type: '課税',
+  consumption_tax_type: '外税/伝票計',
   override_billing_date: null,
   trade_type: '掛売上',
   description: null,
