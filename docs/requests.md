@@ -1,5 +1,17 @@
 # 要望・リクエスト
 
+## 38. R-0153: 伝票編集画面の合計プレビューをR-0152の計算規則に揃える（2026-10-06、dodai-back[AccessTategu側backpc指揮役]より。Dodaikun乗り換え前に必ず直す）
+
+R-0152（`docs/spec/R-0152_recalc_voucher_access_parity.md`）の確認の中で見つかった、フロントエンド側の同じ誤り。dodai-backの回答原文:
+
+> 補足（フロント表示）: 別要望に分けて構いませんが、Dodaikun 乗り換え（Beaver が正本になる）までに必ず直す項目として Beaver 側の要望一覧に登録してください。古い伝票を開くと誤った合計がプレビューされるため。
+
+- `frontend/src/pages/VoucherEdit.tsx:597`で`TotalSummary`に`taxRate={0.10}`を固定で渡している（基準日の税率になっていない）
+- `frontend/src/lib/voucherCalc.ts`の`calcVoucherTotal`が値引行の合計を符号そのままで差し引いている（負数の値引が加算になる）。`外税/請求計`の税0、0方向の切り捨ても未対応
+- 保存される`total_amount`はサーバー側（R-0152）で正しくなるので、影響は画面のプレビュー表示のみ
+
+状態: 未着手（R-0152の完了後に仕様化する）
+
 ## 37. R-0150のBeaver_beta・本番反映、既存データ修正の事前確認、明細同期（access_line_id）の抜本修正（2026-10-06、dodai-back[AccessTategu側backpc指揮役]より、藤田晴樹さん了承済み）
 
 dodai-backからのクロスセッション依頼原文（要約せず記録）:
