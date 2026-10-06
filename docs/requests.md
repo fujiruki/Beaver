@@ -30,6 +30,14 @@ dodai-backからのクロスセッション依頼原文（要約せず記録）:
 2. 売上4274(Beaver 9335)のtotal_amount=15180が誤り（正: 10120、晴樹さん確認済み）。`POST /vouchers/{id}/reload-snapshots`エンドポイントが内部で`recalcVoucher()`を呼ぶため、再計算の回避策として使える（Access同期済み明細はtategu_item_id全件NULLのためスナップショット再読込部分は安全にno-op）。dodai-backへ回答済み
 3. 恒久対応は明細同期の抜本修正と同じ`sync_helpers.php`の改修タイミングで、`syncVoucherUpsert`/`syncVoucherUpdate`に`recalcVoucher()`呼び出しを追加する方針
 
+### 本番の実害確認結果（2026-10-06、dodai-backへ回答済み）
+本番は現時点で実害ゼロ。本番`invoices`・`invoice_vouchers`とも0件（請求書機能未使用）。本番sales総数3,907件中total_amount=0/NULLは22件のみで、全件`access_voucher_id=NULL`（Access同期未経由）・`created_at=2026-03-17 20:04`台・`voucher_no`が`U0xxxx`形式。Beaver_betaで既に削除済みの単発seed/インポートの痕跡と同一由来で、recalcVoucher未呼び出しバグとは無関係。影響はAccess同期テストを実施しているBeaver_betaに限定、A-X-02本番切替前に恒久対応を完了させれば本番への実害は防げる。
+
+### 追加依頼（2026-10-06、dodai-backより、方針合意済み）
+- `syncVoucherUpsert`/`syncVoucherUpdate`の明細反映後に`recalcVoucher()`を呼ぶ（Accessが送る`total_amount`を信頼しない）
+- 既存データの一括修復スクリプト（dry-run既定・`--execute`は晴樹さん実行、事前バックアップ、`updated_at`は変更しない、対象件数と前後の値を出力）をBeaver_beta・本番の両方向けに、`reload-snapshots`の副作用に頼らず`recalcVoucher`を直接呼ぶ形で用意する
+- 完了報告は明細同期のAPI最終仕様とまとめて行う
+
 dodai-backからのクロスセッション依頼原文（要約せず記録）:
 
 > Beaver伝票作成画面の消費税区分の初期値バグについて、修正をお願いします（AccessTategu側セッションから、晴樹さん了承済みの依頼です）。
