@@ -66,7 +66,7 @@ dodai-back（AccessTategu側backpc指揮役）より（2026-10-06、藤田晴樹
 
 - 各行について、実行前に`WHERE id=? AND voucher_id=? AND access_line_id IS NULL`で対象を特定
 - item_name・line_totalが期待値と一致するか確認してから`--execute`時のみ`UPDATE voucher_lines SET access_line_id = ? WHERE id = ?`を実行（`updated_at`は変更しない）
-- 不一致なら該当行の処理を中止しエラー出力（他の行には影響しない）
+- 不一致なら全体を中止しエラー出力（部分適用禁止）
 - 実行後、全17件の`access_line_id`が正しく設定されたか照合する
 - **item_name・line_totalの期待値（Access側の値）がまだ無いため、dodai-backに確認して入手する**。それまでは現在のBeaver側の値を出力するdry-run機能のみ実装し、`--execute`は値確認後に対応する
 
@@ -98,7 +98,7 @@ dodai-backより2026-10-06受領（Access BEをDAO読み取りで取得）。`it
 
 - 各行`id=<Beaver明細id>`について、現在のBeaver側`item_name`・`line_total`を取得
 - 照合: `line_total`は数値として一致、`item_name`はBeaver側の値がAccess側の値（上表）で始まっていれば一致とみなす（Access側の切り詰めを考慮）。両者とも空文字列/NULLなら一致
-- 不一致なら当該行をスキップしエラーとして出力（他の行の処理は継続可、全体を止めない。1行の不一致が全体を止める`access-link`とは別物）
+- 不一致なら全体を中止し、何も更新しない（部分適用禁止。17行は7伝票にまたがる一体の修復作業のため、`access-link`の全件ロールバック方式と同様に扱う）
 - `--execute`時のみ一致した行に`UPDATE voucher_lines SET access_line_id = ? WHERE id = ? AND voucher_id = ? AND access_line_id IS NULL`を実行。**`updated_at`は変更しない**
 - 事前にBeaver_betaのDBバックアップを取得する
 - 実行後、17行の`access_line_id`が正しく設定されたか照合して出力する
