@@ -58,3 +58,14 @@ Beaver_betaのDBパス: `/home/c6924945/public_html/door-fujita.com/contents/Bea
 - Beaver_beta限定の作業（複製・データ修正・スクリプト実行）はdodai-backからの合図＋晴樹さんの事前了承があれば自律的に進めてよい運用が定着している
 - 本番Beaverへの書き込み（migration適用・デプロイ等）は都度晴樹さんに直接確認する
 - dodai-backとの連絡は`SendMessage`（to: "dodai-back"）で行う
+
+---
+
+## 追記（2026-10-06 新セッション）: 上記0.と2.は完了
+
+- **0. autoMode.allow**: 新セッションでは効いていることを確認した。Beaver_betaへのssh（読み取り・スクリプト実行とも）が確認なしで通った
+- **2. Beaver_betaでの実行**: 2本とも`--execute`まで完了し、dodai-backへ報告済み
+  - r0151 total_amount修復: 対象3,921件、実行後のdry-runで残0件。売上9335（S08125）のtotal_amountが10120になっていることを確認
+  - r0150 consumption_tax_type修正: 6件（id 5805〜5810）を更新、実行後のdry-runで残0件
+- 注意: サーバーの`sqlite3` CLIは古く、部分インデックス（`idx_payments_access_payment_no`）を読めず`malformed database schema`エラーになる。DBの中身を確認するときは`php -r`でPDOを使う
+- 本番Beaverには未適用。A-X-02の前に改めて判断する
