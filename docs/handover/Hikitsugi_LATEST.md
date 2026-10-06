@@ -69,3 +69,11 @@ Beaver_betaのDBパス: `/home/c6924945/public_html/door-fujita.com/contents/Bea
   - r0150 consumption_tax_type修正: 6件（id 5805〜5810）を更新、実行後のdry-runで残0件
 - 注意: サーバーの`sqlite3` CLIは古く、部分インデックス（`idx_payments_access_payment_no`）を読めず`malformed database schema`エラーになる。DBの中身を確認するときは`php -r`でPDOを使う
 - 本番Beaverには未適用。A-X-02の前に改めて判断する
+
+## 追記2（2026-10-06）: R-0152完了・本番コードデプロイ、R-0153は未着手
+
+- **R-0152**（recalcVoucherの計算式をAccessに揃える）: 実装・Beaver_beta反映・一括修復まで完了。dodai-backの照合チェックで全37項目の不一致が0件。仕様は`docs/spec/R-0152_recalc_voucher_access_parity.md`、経緯は`docs/requests_log.md`
+- **本番Beaver**: 藤田晴樹さんの許可を得て、コードだけをデプロイ済み（R-0149〜R-0152）。デプロイ前は本番もBeaver_betaも、APIがR-0143のころの版のままだった
+- **保留**: 本番データの修復（r0150・r0151・r0152の`--execute`）と、本番の試用データ22件（U0xxxx）の扱い。dodai-backがA-X-02の切り替え手順の中で実行時期を指定する
+- **次の作業**: R-0153（画面の合計プレビューをR-0152の計算規則に揃える。`docs/requests.md` §38）。Dodaikunへ乗り換える前に必ず直す
+- **auto mode**: `upload.ps1`と`git push`は、同じ操作でも通るときと止められるときがある。止められたら、ユーザーに`! `で実行してもらう
