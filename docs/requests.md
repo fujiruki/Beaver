@@ -1,6 +1,28 @@
 # 要望・リクエスト
 
-## 35. `/vouchers/sync`に得意先名・案件名の生データを追加してほしい（2026-10-04、dodai-back[AccessTategu側backpc指揮役]より）
+## 36. 伝票見出しの消費税区分(consumption_tax_type)初期値バグ修正（2026-10-06、dodai-back[AccessTategu側backpc指揮役]より、藤田晴樹さん了承済み）
+
+dodai-backからのクロスセッション依頼原文（要約せず記録）:
+
+> Beaver伝票作成画面の消費税区分の初期値バグについて、修正をお願いします（AccessTategu側セッションから、晴樹さん了承済みの依頼です）。
+>
+> 【症状】frontend/src/pages/VoucherEdit.tsx:103 で、伝票見出しの consumption_tax_type の初期値が '課税' になっている。'課税' は明細の tax_category 用の値で、見出しの値は '外税/伝票計' / '外税/請求計' 等。DBの既定値（api/schema.sql:154）は '外税/伝票計'。Beaverで新規作成した伝票が '課税' になり、AccessのBeaver版採用でそのまま混入した（Access beta の 12102〜12107。Access側は '外税/伝票計' に修正済み）。
+>
+> 【お願い】
+> 1. VoucherEdit.tsx の初期値を '外税/伝票計' に修正
+> 2. 可能ならAPI（vouchers作成/更新・同期受信）で見出しの consumption_tax_type に '課税' 等の定義外の値を受け付けないバリデーション
+> 3. Beaver_beta の vouchers で consumption_tax_type='課税' の件数を読み取りで確認し、'外税/伝票計' へ直す手順を用意（サーバー書き込みは晴樹さんが実行する運用。直す際は updated_at を進めるとAccess側に再度競合として上がる点に注意。進めない方がよい）
+> 4. 本番Beaverにも同じ値の伝票があるか確認
+>
+> 【背景】区分値のコードマスタ化（両システム共通の定義表・定数化・入口での検証）は AccessTategu の要望 R-152 として Dodaikun 乗り換え直前に実施予定。今回は最小限の修正のみ。
+
+### 調査結果
+仕様化: `docs/spec/R-0150_consumption_tax_type_default_fix.md`。
+
+- `VoucherEdit.tsx:103`の`defaultValues.consumption_tax_type: '課税'`が原因と確認（DB既定値・バックエンドのフォールバックは元々正しく`外税/伝票計`）
+- 許容値は4種類（`外税/伝票計`・`外税/請求計`・`内税/伝票計`・`内税/請求計`、`tools/migrate/02_import_to_beaver.php`の`mapTaxType()`に列挙あり）
+- 本番Beaver・Beaver_beta（2026-10-06読み取り確認）とも同じ6件（id 5805〜5810、`E02041`,`E02044`〜`E02047`,`S04600`、いずれも`status='draft'`のテストデータ）が`consumption_tax_type='課税'`。Beaver_beta側は`access_voucher_id`12102〜12107としてAccess側に同期済み（dodai-back報告の件と一致）
+- 対応: (1)フロントエンド初期値修正 (2)バックエンド4箇所に値域バリデーション追加 (3)既存データ修正用dry-run/--executeスクリプトを用意（`updated_at`は更新しない設計、実行は藤田晴樹さん本人）
 
 dodai-backからのクロスセッション依頼原文（要約せず記録、2通）:
 
