@@ -1,6 +1,29 @@
 # 要望・リクエスト
 
-## 36. 伝票見出しの消費税区分(consumption_tax_type)初期値バグ修正（2026-10-06、dodai-back[AccessTategu側backpc指揮役]より、藤田晴樹さん了承済み）
+## 37. R-0150のBeaver_beta・本番反映、既存データ修正の事前確認、明細同期（access_line_id）の抜本修正（2026-10-06、dodai-back[AccessTategu側backpc指揮役]より、藤田晴樹さん了承済み）
+
+dodai-backからのクロスセッション依頼原文（要約せず記録）:
+
+> R-0150 ありがとうございます。晴樹さんから「本番への反映も許す」と了承が出ました。R-0150 は Beaver_beta・本番へ反映してください。データ修正 `r0150_fix_consumption_tax_type.php --execute` は、本番の6件（id 5805〜5810）が本当にテストデータか（内容・作成日時）を読み取りで確認して晴樹さんに提示してから、晴樹さんの判断で実行してください（なぜ本番にbetaと同じテスト伝票があるのかも分かれば教えてください）。
+>
+> 続けて、次の明細同期の修正をお願いします（fableレビューに基づき晴樹さん承認済み。詳細は AccessTategu の docs/R-086_切替前チェックリスト_教訓.md §0）。
+>
+> 【背景】Access「Beaver版採用」で Beaver のみの伝票を取り込むと、access-link（sync_helpers.php:863-947）はヘッダの access_voucher_id のみ書き戻し、明細の access_line_id は NULL のまま（Beaver_beta で 12102〜12108 の7伝票17行）。また Access の Push は常に `lines_mode:"replace"` を送り（Access Df_Beaver連携Push.bas:175,322）、Beaver は replace で明細を全DELETE→INSERT（sync_helpers.php:421-460）するため、voucher_line_costs/prices が CASCADE で消え、Beaver の明細 id も振り直される。edited_in_beaver 保護は Access 経路では実質無効。
+>
+> 【依頼（TDD）】
+> 1. access-link API に任意の `lines:[{line_no, access_line_id}]` を追加。仕様: ヘッダ更新と同一トランザクション／line_no が当該伝票に存在しない・重複・ユニーク索引(voucher_id, access_line_id)抵触は 422 で全件ロールバック（部分適用禁止）／既に同じ値なら冪等に200、別の値で既にリンク済みなら409／明細の updated_at・edited_in_beaver は変更しない（変えると次回pullで誤検知）。lines 無しのリクエストは従来どおり動くこと（Access側は並行して実装し、送り始めます）。
+> 2. GET の明細に Beaver 側の明細 id を含める（vouchers.php:146 付近。キー名を決めたら教えてください）。
+> 3. Access→Beaver の明細 replace を access_line_id キーの upsert に変更: 一致=UPDATE（Beaver 行 id と costs/prices 子行を維持）、payload にあって Beaver に無い access_line_id=INSERT、Beaver 側にあって payload に無い行（access_line_id NULL の行も含む）=DELETE（Access採用=Access版が正）。edited_in_beaver 保護は外し、仕様書を実態に合わせる。lines_mode の扱いは互換を保つ形で判断してください。
+> 4. 既存17行の修復スクリプト（dry-run既定、--execute は晴樹さん実行）。対応表（Access伝票: line_no→Beaver明細id:Access明細id）:
+> 12102: 1→25485:25760, 2→25486:25761, 3→25487:25762 / 12103: 1→25492:25771 / 12104: 1→25493:25764, 2→25494:25765, 3→25495:25766 / 12105: 1→25496:25767, 2→25497:25768, 3→25498:25769, 4→25499:25770 / 12106: 1→25488:25772, 2→25489:25773 / 12107: 1→25490:25774, 2→25491:25775 / 12108: 1→25352:25776, 2→25353:25777
+> 条件: `WHERE id=? AND voucher_id=? AND access_line_id IS NULL`、事前に item_name・line_total がAccess側と一致することを確認（不一致なら中止）、バックアップ取得、実行後17件を照合。Access側の値が必要ならこちらで出します。
+>
+> 完了したら API の最終仕様（リクエスト/レスポンス例）を教えてください。Access側はそれに合わせます。
+
+### 対応方針（検討中）
+- R-0150のデプロイ: Beaver_betaは自動実行可（既存方針）。**本番への反映はdodai-back経由の間接承認のみでは実行せず、指揮役から藤田晴樹さん本人へ直接確認してから行う**（2026-09-25の無関係デプロイによる緊急インシデントの教訓を踏まえ、本番書き込み系は都度確認を徹底）
+- R-0150データ修正（本番6件）: 読み取りで内容・作成日時を確認し、晴樹さんへ提示。実行は晴樹さん判断
+- 明細同期の抜本修正（1〜4）: 新規要望としてSdDD手順に従い仕様化してから実装（規模が大きく、過去の同期障害の教訓もあるため拙速な実装を避ける）
 
 dodai-backからのクロスセッション依頼原文（要約せず記録）:
 
