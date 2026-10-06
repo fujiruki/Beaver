@@ -42,59 +42,7 @@ foreach ($migrations as $m) {
     }
 }
 
-// recalcVoucher を読み込むためのモック環境
-// vouchers.php は $pdo/$method/$path/$segments 等をグローバルに依存するため
-// 関数定義部分だけ抽出する代わりにインライン定義する
-function recalcVoucherTest(PDO $pdo, int $voucherId): void {
-    $stmt = $pdo->prepare('SELECT tax_input_type FROM vouchers WHERE id = ?');
-    $stmt->execute([$voucherId]);
-    $v = $stmt->fetch();
-
-    $taxStmt = $pdo->query('SELECT rate FROM tax_rates ORDER BY valid_from DESC LIMIT 1');
-    $taxRate = (float)$taxStmt->fetchColumn();
-
-    $lStmt = $pdo->prepare('SELECT line_type, line_total, tax_category FROM voucher_lines WHERE voucher_id = ?');
-    $lStmt->execute([$voucherId]);
-    $lines = $lStmt->fetchAll();
-
-    $taxable    = 0;
-    $nontaxable = 0;
-    $discount   = 0;
-
-    foreach ($lines as $l) {
-        $amt = (float)$l['line_total'];
-        if ($l['line_type'] === 'discount') {
-            $discount += $amt;
-        } elseif ($l['tax_category'] === 'taxable') {
-            $taxable += $amt;
-        } else {
-            $nontaxable += $amt;
-        }
-    }
-
-    if ($v['tax_input_type'] === 'inclusive') {
-        $taxAmount       = (int)floor($taxable * $taxRate / (1 + $taxRate));
-        $subtotalTaxable = $taxable - $taxAmount;
-        $total           = $taxable + $nontaxable - $discount;
-        $pdo->prepare('
-            UPDATE vouchers SET
-                subtotal_taxable = ?, subtotal_nontaxable = ?, subtotal_discount = ?,
-                tax_amount = ?, total_amount = ?, updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?
-        ')->execute([$subtotalTaxable, $nontaxable, $discount, $taxAmount, $total, $voucherId]);
-        return;
-    }
-
-    $taxAmount = (int)floor($taxable * $taxRate);
-    $total     = $taxable + $nontaxable - $discount + $taxAmount;
-
-    $pdo->prepare('
-        UPDATE vouchers SET
-            subtotal_taxable = ?, subtotal_nontaxable = ?, subtotal_discount = ?,
-            tax_amount = ?, total_amount = ?, updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?
-    ')->execute([$taxable, $nontaxable, $discount, $taxAmount, $total, $voucherId]);
-}
+require_once $ROOT . '/routes/sync_helpers.php';
 
 // テストハーネス
 $passed = 0;
@@ -169,7 +117,7 @@ echo "=== recalcVoucher inclusive 分岐テスト ===\n\n";
 runTest('T-01: 税込10005 → tax=909, subtotal_taxable=9096, total=10005', function () use ($pdo) {
     $id = createTestVoucher($pdo, 'inclusive');
     addLine($pdo, $id, 'normal', 10005.0, 'taxable');
-    recalcVoucherTest($pdo, $id);
+    recalcVoucher($pdo, $id);
     $v = fetchVoucher($pdo, $id);
     assertEq(909, (int)$v['tax_amount'], 'tax_amount');
     assertEq(9096, (int)$v['subtotal_taxable'], 'subtotal_taxable');
@@ -180,7 +128,7 @@ runTest('T-01: 税込10005 → tax=909, subtotal_taxable=9096, total=10005', fun
 runTest('T-02: 税込110000 → tax=10000, subtotal_taxable=100000, total=110000', function () use ($pdo) {
     $id = createTestVoucher($pdo, 'inclusive');
     addLine($pdo, $id, 'normal', 110000.0, 'taxable');
-    recalcVoucherTest($pdo, $id);
+    recalcVoucher($pdo, $id);
     $v = fetchVoucher($pdo, $id);
     assertEq(10000, (int)$v['tax_amount'], 'tax_amount');
     assertEq(100000, (int)$v['subtotal_taxable'], 'subtotal_taxable');
@@ -191,7 +139,7 @@ runTest('T-02: 税込110000 → tax=10000, subtotal_taxable=100000, total=110000
 runTest('T-03: 税込110010 → tax=10000, subtotal_taxable=100010, total=110010', function () use ($pdo) {
     $id = createTestVoucher($pdo, 'inclusive');
     addLine($pdo, $id, 'normal', 110010.0, 'taxable');
-    recalcVoucherTest($pdo, $id);
+    recalcVoucher($pdo, $id);
     $v = fetchVoucher($pdo, $id);
     assertEq(10000, (int)$v['tax_amount'], 'tax_amount');
     assertEq(100010, (int)$v['subtotal_taxable'], 'subtotal_taxable');
@@ -202,7 +150,7 @@ runTest('T-03: 税込110010 → tax=10000, subtotal_taxable=100010, total=110010
 runTest('T-04: 税込100000 → tax=9090, subtotal_taxable=90910, total=100000', function () use ($pdo) {
     $id = createTestVoucher($pdo, 'inclusive');
     addLine($pdo, $id, 'normal', 100000.0, 'taxable');
-    recalcVoucherTest($pdo, $id);
+    recalcVoucher($pdo, $id);
     $v = fetchVoucher($pdo, $id);
     assertEq(9090, (int)$v['tax_amount'], 'tax_amount');
     assertEq(90910, (int)$v['subtotal_taxable'], 'subtotal_taxable');
@@ -215,7 +163,7 @@ runTest('T-05: 割引あり 税込110000-5500 → tax=10000, taxable=100000, tot
     $id = createTestVoucher($pdo, 'inclusive');
     addLine($pdo, $id, 'normal',   110000.0, 'taxable');
     addLine($pdo, $id, 'discount',   5500.0, 'taxable');
-    recalcVoucherTest($pdo, $id);
+    recalcVoucher($pdo, $id);
     $v = fetchVoucher($pdo, $id);
     assertEq(10000, (int)$v['tax_amount'], 'tax_amount');
     assertEq(100000, (int)$v['subtotal_taxable'], 'subtotal_taxable');
@@ -226,7 +174,7 @@ runTest('T-05: 割引あり 税込110000-5500 → tax=10000, taxable=100000, tot
 runTest('T-06: exclusive 分岐回帰防止 → tax=10000, total=110000', function () use ($pdo) {
     $id = createTestVoucher($pdo, 'exclusive');
     addLine($pdo, $id, 'normal', 100000.0, 'taxable');
-    recalcVoucherTest($pdo, $id);
+    recalcVoucher($pdo, $id);
     $v = fetchVoucher($pdo, $id);
     assertEq(10000, (int)$v['tax_amount'], 'tax_amount');
     assertEq(100000, (int)$v['subtotal_taxable'], 'subtotal_taxable');
@@ -238,7 +186,7 @@ runTest('T-07: exclusive 割引あり 課税100000-割引10000 → tax=10000, ta
     $id = createTestVoucher($pdo, 'exclusive');
     addLine($pdo, $id, 'normal',   100000.0, 'taxable');
     addLine($pdo, $id, 'discount',  10000.0, 'taxable');
-    recalcVoucherTest($pdo, $id);
+    recalcVoucher($pdo, $id);
     $v = fetchVoucher($pdo, $id);
     assertEq(10000, (int)$v['tax_amount'], 'tax_amount');
     assertEq(100000, (int)$v['subtotal_taxable'], 'subtotal_taxable');

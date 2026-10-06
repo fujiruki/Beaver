@@ -1,6 +1,6 @@
 <?php
 /**
- * R-0151 (4): voucher_type='sales' の total_amount 等が明細との計算結果と不整合な伝票を一括修復する
+ * R-0151 (4): voucher_type='sales'/'estimate' の total_amount 等が明細との計算結果と不整合な伝票を一括修復する
  *
  * 起動: php api/manual/r0151_recalc_voucher_totals.php <db_path> [--execute]
  *
@@ -15,30 +15,41 @@ function r0151Differs(float $a, float $b): bool {
     return abs($a - $b) > 0.0001;
 }
 
-function r0151ComputeVoucherTotals(PDO $pdo, int $voucherId, float $taxRate, string $taxInputType): array {
-    $lStmt = $pdo->prepare('SELECT line_type, line_total, tax_category FROM voucher_lines WHERE voucher_id = ?');
-    $lStmt->execute([$voucherId]);
+function r0151TruncTowardZero(float $x): int {
+    return (int)round($x, 6);
+}
 
-    $taxable = 0.0; $nontaxable = 0.0; $discount = 0.0;
+// routes/sync_helpers.php の computeVoucherTotals() と同じ規則（サーバーへ単体転送するため複製。同値性はテストで保証）
+function r0151ComputeVoucherTotals(PDO $pdo, array $v): array {
+    $baseDate = $v['voucher_type'] === 'sales' && !empty($v['delivery_date']) ? $v['delivery_date'] : $v['voucher_date'];
+    $taxStmt = $pdo->prepare('SELECT rate FROM tax_rates WHERE valid_from <= ? ORDER BY valid_from DESC LIMIT 1');
+    $taxStmt->execute([substr((string)$baseDate, 0, 10)]);
+    $taxRate = (float)$taxStmt->fetchColumn();
+
+    $lStmt = $pdo->prepare('SELECT line_type, line_total, tax_category FROM voucher_lines WHERE voucher_id = ?');
+    $lStmt->execute([(int)$v['id']]);
+
+    $taxable = 0.0; $nontaxable = 0.0; $discountSum = 0.0;
     foreach ($lStmt->fetchAll() as $l) {
         $amt = (float)$l['line_total'];
         if ($l['line_type'] === 'discount') {
-            $discount += $amt;
+            $discountSum += $amt;
         } elseif ($l['tax_category'] === 'taxable') {
             $taxable += $amt;
         } else {
             $nontaxable += $amt;
         }
     }
+    $discount = abs($discountSum);
 
-    if ($taxInputType === 'inclusive') {
-        $taxAmount       = (float)(int)floor($taxable * $taxRate / (1 + $taxRate));
+    if ($v['tax_input_type'] === 'inclusive') {
+        $taxAmount       = r0151TruncTowardZero($taxable * $taxRate / (1 + $taxRate));
         $subtotalTaxable = $taxable - $taxAmount;
         $total           = $taxable + $nontaxable - $discount;
     } else {
-        $taxAmount       = (float)(int)floor($taxable * $taxRate);
+        $taxAmount       = $v['consumption_tax_type'] === '外税/請求計' ? 0 : r0151TruncTowardZero($taxable * $taxRate);
         $subtotalTaxable = $taxable;
-        $total           = $taxable + $nontaxable - $discount + $taxAmount;
+        $total           = $taxable + $taxAmount + $nontaxable - $discount;
     }
 
     return [
@@ -51,18 +62,15 @@ function r0151ComputeVoucherTotals(PDO $pdo, int $voucherId, float $taxRate, str
 }
 
 function r0151RecalcVoucherTotals(PDO $pdo, bool $execute = false): array {
-    $taxStmt = $pdo->query('SELECT rate FROM tax_rates ORDER BY valid_from DESC LIMIT 1');
-    $taxRate = (float)$taxStmt->fetchColumn();
-
     $vStmt = $pdo->query("
-        SELECT id, voucher_no, tax_input_type,
+        SELECT id, voucher_no, voucher_type, voucher_date, delivery_date, tax_input_type, consumption_tax_type,
                subtotal_taxable, subtotal_nontaxable, subtotal_discount, tax_amount, total_amount
-        FROM vouchers WHERE voucher_type = 'sales'
+        FROM vouchers WHERE voucher_type IN ('sales', 'estimate')
     ");
 
     $targets = [];
     foreach ($vStmt->fetchAll() as $v) {
-        $computed = r0151ComputeVoucherTotals($pdo, (int)$v['id'], $taxRate, (string)$v['tax_input_type']);
+        $computed = r0151ComputeVoucherTotals($pdo, $v);
 
         $changed = r0151Differs((float)$v['subtotal_taxable'],    $computed['subtotal_taxable'])
             || r0151Differs((float)$v['subtotal_nontaxable'], $computed['subtotal_nontaxable'])
@@ -74,6 +82,7 @@ function r0151RecalcVoucherTotals(PDO $pdo, bool $execute = false): array {
             $targets[] = [
                 'id'               => (int)$v['id'],
                 'voucher_no'       => $v['voucher_no'],
+                'voucher_type'     => $v['voucher_type'],
                 'old_total_amount' => (float)$v['total_amount'],
                 'new_total_amount' => $computed['total_amount'],
                 'computed'         => $computed,
@@ -86,6 +95,7 @@ function r0151RecalcVoucherTotals(PDO $pdo, bool $execute = false): array {
         'targets'      => array_map(fn($t) => [
             'id'               => $t['id'],
             'voucher_no'       => $t['voucher_no'],
+            'voucher_type'     => $t['voucher_type'],
             'old_total_amount' => $t['old_total_amount'],
             'new_total_amount' => $t['new_total_amount'],
         ], $targets),

@@ -103,60 +103,78 @@ function resolveCustomerId(PDO $pdo, ?string $accessCustomerNo): ?int {
 }
 
 /**
- * R-0151 (0): 伝票合計を再計算して vouchers を更新する。
- * 元は vouchers.php にのみ定義されていたが、syncVoucherUpsert/syncVoucherUpdate
- * （/projects/{id}/vouchers/sync 経由では vouchers.php が一切読み込まれない）からも
- * 呼べるようにするため、この共通ヘルパへ移動した。
+ * R-0152: 0方向への切り捨て（Access の Int/Fix 相当）。
+ * 浮動小数点誤差（173.99999999 等）で1円欠けないよう、小数第6位で丸めてから切り捨てる。
  */
-function recalcVoucher(PDO $pdo, int $voucherId): void {
-    $stmt = $pdo->prepare('SELECT tax_input_type FROM vouchers WHERE id = ?');
+function truncTowardZero(float $x): int {
+    return (int)round($x, 6);
+}
+
+/**
+ * R-0152: 伝票合計を明細から計算する（副作用なし）。Access CalcVoucherTotals と同じ規則。
+ * 返り値は vouchers の subtotal_taxable / subtotal_nontaxable / subtotal_discount / tax_amount / total_amount。
+ * 同じ規則を api/manual/r0151_recalc_voucher_totals.php が自己完結で複製しているため、変更時は両方を直すこと。
+ */
+function computeVoucherTotals(PDO $pdo, int $voucherId): array {
+    $stmt = $pdo->prepare('SELECT voucher_type, voucher_date, delivery_date, tax_input_type, consumption_tax_type FROM vouchers WHERE id = ?');
     $stmt->execute([$voucherId]);
     $v = $stmt->fetch();
 
-    $taxStmt = $pdo->query('SELECT rate FROM tax_rates ORDER BY valid_from DESC LIMIT 1');
+    $baseDate = $v['voucher_type'] === 'sales' && !empty($v['delivery_date']) ? $v['delivery_date'] : $v['voucher_date'];
+    $taxStmt = $pdo->prepare('SELECT rate FROM tax_rates WHERE valid_from <= ? ORDER BY valid_from DESC LIMIT 1');
+    $taxStmt->execute([substr((string)$baseDate, 0, 10)]);
     $taxRate = (float)$taxStmt->fetchColumn();
 
     $lStmt = $pdo->prepare('SELECT line_type, line_total, tax_category FROM voucher_lines WHERE voucher_id = ?');
     $lStmt->execute([$voucherId]);
-    $lines = $lStmt->fetchAll();
 
-    $taxable    = 0;
-    $nontaxable = 0;
-    $discount   = 0;
-
-    foreach ($lines as $l) {
+    $taxable = 0.0; $nontaxable = 0.0; $discountSum = 0.0;
+    foreach ($lStmt->fetchAll() as $l) {
         $amt = (float)$l['line_total'];
         if ($l['line_type'] === 'discount') {
-            $discount += $amt;
+            $discountSum += $amt;
         } elseif ($l['tax_category'] === 'taxable') {
             $taxable += $amt;
         } else {
             $nontaxable += $amt;
         }
     }
+    $discount = abs($discountSum);
 
     if ($v['tax_input_type'] === 'inclusive') {
-        $taxAmount       = (int)floor($taxable * $taxRate / (1 + $taxRate));
+        $taxAmount       = truncTowardZero($taxable * $taxRate / (1 + $taxRate));
         $subtotalTaxable = $taxable - $taxAmount;
         $total           = $taxable + $nontaxable - $discount;
-        $pdo->prepare('
-            UPDATE vouchers SET
-                subtotal_taxable = ?, subtotal_nontaxable = ?, subtotal_discount = ?,
-                tax_amount = ?, total_amount = ?, updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?
-        ')->execute([$subtotalTaxable, $nontaxable, $discount, $taxAmount, $total, $voucherId]);
-        return;
+    } else {
+        $taxAmount       = $v['consumption_tax_type'] === '外税/請求計' ? 0 : truncTowardZero($taxable * $taxRate);
+        $subtotalTaxable = $taxable;
+        $total           = $taxable + $taxAmount + $nontaxable - $discount;
     }
 
-    $taxAmount = (int)floor($taxable * $taxRate);
-    $total     = $taxable + $nontaxable - $discount + $taxAmount;
+    return [
+        'subtotal_taxable'    => $subtotalTaxable,
+        'subtotal_nontaxable' => $nontaxable,
+        'subtotal_discount'   => $discount,
+        'tax_amount'          => $taxAmount,
+        'total_amount'        => $total,
+    ];
+}
 
+/**
+ * R-0151 (0) / R-0152: 伝票合計を再計算して vouchers を更新する。
+ * $touchUpdatedAt=false は Access同期の受信経路用（updated_at を進めると次回pullでAccessへ送り返されるため）。
+ */
+function recalcVoucher(PDO $pdo, int $voucherId, bool $touchUpdatedAt = true): void {
+    $t = computeVoucherTotals($pdo, $voucherId);
     $pdo->prepare('
         UPDATE vouchers SET
             subtotal_taxable = ?, subtotal_nontaxable = ?, subtotal_discount = ?,
-            tax_amount = ?, total_amount = ?, updated_at = CURRENT_TIMESTAMP
+            tax_amount = ?, total_amount = ?' . ($touchUpdatedAt ? ', updated_at = CURRENT_TIMESTAMP' : '') . '
         WHERE id = ?
-    ')->execute([$taxable, $nontaxable, $discount, $taxAmount, $total, $voucherId]);
+    ')->execute([
+        $t['subtotal_taxable'], $t['subtotal_nontaxable'], $t['subtotal_discount'],
+        $t['tax_amount'], $t['total_amount'], $voucherId,
+    ]);
 }
 
 /**
@@ -538,7 +556,7 @@ function replaceSyncedLinesFromPayload(PDO $pdo, int $voucherId, array $data): ?
         return $lineError;
     }
 
-    recalcVoucher($pdo, $voucherId);
+    recalcVoucher($pdo, $voucherId, false);
     return null;
 }
 
