@@ -10,6 +10,7 @@ import DataTable, { useSortState } from '../components/DataTable';
 import type { DataTableColumn, SortDir, SortState } from '../components/DataTable';
 import type { Voucher, VoucherType, VoucherStatus } from '../types/voucher';
 import { isRecentVoucherDate } from '../lib/dateHighlight';
+import VoidVoucherButton from '../components/voucher/VoidVoucherButton';
 
 const TYPE_LABELS: Record<VoucherType, string> = { estimate: '見積', sales: '売上' };
 const STATUS_LABELS: Record<VoucherStatus, string> = {
@@ -191,6 +192,16 @@ export default function VoucherList() {
             引用: {v.source_estimate_no}
           </span>
         ) : null
+      ),
+    },
+    {
+      key: 'void_action',
+      label: '',
+      stopRowClick: true,
+      render: v => (
+        <VoidVoucherButton voucherId={v.id} onDone={() => {}}
+          disabled={v.access_billed_flag === 1 || v.status === 'billed' || v.status === 'void'}
+          style={{ padding: '2px 10px', fontSize: 12 }} />
       ),
     },
   ];

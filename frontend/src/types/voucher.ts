@@ -52,6 +52,8 @@ export interface Voucher {
   project_name?: string;
   /** 引用先売上の一覧（見積伝票のみ、詳細取得時に付加） */
   converted_sales?: ConvertedSalesSummary[];
+  /** R-0154: サーバ判定の「空の伝票」か（詳細取得時に付加） */
+  is_empty?: boolean;
   // R-0143 A-B-06: AccessTategu連携の同期状態
   /** Access採番の伝票ID。非nullなら「Access由来」、nullなら「Beaver作成」 */
   access_voucher_id?: number | null;

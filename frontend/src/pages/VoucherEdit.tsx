@@ -11,6 +11,7 @@ import { useAggregationCategories } from '../api/aggregationCategories';
 import VoucherHeader from '../components/voucher/VoucherHeader';
 import LineItemRow from '../components/voucher/LineItemRow';
 import ProfitRateBar from '../components/voucher/ProfitRateBar';
+import VoidVoucherButton from '../components/voucher/VoidVoucherButton';
 import TotalSummary from '../components/voucher/TotalSummary';
 import { useSmartBack } from '../hooks/useSmartBack';
 import { useAppSettings } from '../contexts/AppSettingsContext';
@@ -436,6 +437,9 @@ export default function VoucherEdit() {
                 disabled={reloadMutation.isPending}>
                 {reloadMutation.isPending ? '更新中...' : '原価再取得'}
               </button>
+            )}
+            {!isNew && canEdit && (
+              <VoidVoucherButton voucherId={voucherId} onDone={() => navigate('/vouchers')} />
             )}
             <button type="button" style={subBtnStyle}
               onClick={() => window.print()}>

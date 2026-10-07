@@ -66,6 +66,18 @@ export function useCreateVoucher() {
   });
 }
 
+/** R-0154: 伝票取消。中身あり=void＋履歴、空=物理削除（連携・参照ありはvoid） */
+export function useVoidVoucher() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, reason }: { id: number; reason?: string }) =>
+      api.delete<{ result: 'voided' | 'deleted' }>(`/vouchers/${id}`, { reason: reason ?? '' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [KEY] });
+    },
+  });
+}
+
 /** 伝票更新 */
 export function useUpdateVoucher(id: number) {
   const queryClient = useQueryClient();

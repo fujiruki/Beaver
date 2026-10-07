@@ -5,7 +5,7 @@
  * GET    /vouchers/{id}                   詳細（明細含む）
  * POST   /vouchers                        新規作成（ヘッダーのみ。明細は /lines で）
  * PUT    /vouchers/{id}                   ヘッダー更新
- * DELETE /vouchers/{id}                   void（無効化）
+ * DELETE /vouchers/{id}                   取消（R-0154: 中身あり=void+履歴／空=物理削除、連携・参照ありはvoid）
  * POST   /vouchers/{id}/convert-to-sales  見積→売上変換（ディープコピー）
  * POST   /vouchers/{id}/reload-snapshots  スナップショット一括再読み込み
  * GET    /vouchers/{id}/lines             明細一覧
@@ -22,6 +22,7 @@ $subId      = isset($segments[3]) && is_numeric($segments[3]) ? (int)$segments[3
 require_once __DIR__ . '/sync_helpers.php';
 require_once __DIR__ . '/list_helpers.php';
 require_once dirname(__DIR__) . '/search_helpers.php';
+require_once __DIR__ . '/history_helpers.php';
 
 // --- R-076 B2-3: Beaver発新規伝票の Access 採番IDを書き戻す ---
 // PATCH /vouchers/{id}/access-link
@@ -383,6 +384,24 @@ function assertVoucherEditable(PDO $pdo, int $voucherId): void {
     }
 }
 
+// R-0154: 品名が空白のみ・単価と行金額が0の行だけ（または明細なし）で、合計0の伝票を空とみなす。数量は見ない
+function voucherIsEmpty(PDO $pdo, int $voucherId): bool {
+    $stmt = $pdo->prepare("
+        SELECT COALESCE(v.total_amount, 0) = 0
+           AND NOT EXISTS (
+               SELECT 1 FROM voucher_lines l
+               WHERE l.voucher_id = v.id
+                 AND (TRIM(COALESCE(l.item_name, '')) <> ''
+                      OR COALESCE(l.price_body, 0) + COALESCE(l.price_hardware, 0) + COALESCE(l.price_glass, 0) <> 0
+                      OR COALESCE(l.line_total, 0) <> 0
+                      OR EXISTS (SELECT 1 FROM voucher_line_prices p WHERE p.voucher_line_id = l.id AND COALESCE(p.value, 0) <> 0))
+           )
+        FROM vouchers v WHERE v.id = ?
+    ");
+    $stmt->execute([$voucherId]);
+    return (bool)$stmt->fetchColumn();
+}
+
 // ---- POST /vouchers/migrate-fixed-columns ----
 // 固定列のデータを costs/prices サブテーブルへ一括移行する
 if ($method === 'POST' && !$resourceId && $path === '/vouchers/migrate-fixed-columns') {
@@ -507,6 +526,7 @@ switch ($method) {
             }
             unset($line);
             $row['lines'] = $lines;
+            $row['is_empty'] = voucherIsEmpty($pdo, $resourceId);
 
             // 双方向トレース: 見積の場合は引用先売上を逆引きして付加
             if ($row['voucher_type'] === 'estimate') {
@@ -928,9 +948,31 @@ switch ($method) {
         }
         if (!$resourceId) { http_response_code(400); echo json_encode(['error' => 'ID required']); exit; }
         assertVoucherEditable($pdo, $resourceId);
+        $reason = trim((string)((json_decode(file_get_contents('php://input'), true) ?? [])['reason'] ?? ''));
+        $pdo->beginTransaction();
+        $before = $pdo->prepare('SELECT * FROM vouchers WHERE id = ?');
+        $before->execute([$resourceId]);
+        $beforeRow = $before->fetch();
+        $isEmpty = voucherIsEmpty($pdo, $resourceId);
+        $ref = $pdo->prepare('
+            SELECT EXISTS (SELECT 1 FROM invoice_vouchers WHERE voucher_id = :id)
+                OR EXISTS (SELECT 1 FROM vouchers WHERE source_voucher_id = :id)
+        ');
+        $ref->execute([':id' => $resourceId]);
+        if ($isEmpty && $beforeRow['access_voucher_id'] === null && !$ref->fetchColumn()) {
+            $pdo->prepare('DELETE FROM vouchers WHERE id = ?')->execute([$resourceId]);
+            $pdo->commit();
+            echo json_encode(['result' => 'deleted']);
+            break;
+        }
         $pdo->prepare('UPDATE vouchers SET status = "void", updated_at = CURRENT_TIMESTAMP WHERE id = ?')
             ->execute([$resourceId]);
-        echo json_encode(['voided' => true]);
+        if (!$isEmpty) {
+            $before->execute([$resourceId]);
+            recordHistory($pdo, 'vouchers', $resourceId, 'void', $beforeRow, ['reason' => $reason], $before->fetch());
+        }
+        $pdo->commit();
+        echo json_encode(['result' => 'voided', 'voided' => true]);
         break;
 
     default:
