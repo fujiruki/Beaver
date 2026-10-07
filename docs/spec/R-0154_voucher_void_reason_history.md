@@ -1,0 +1,63 @@
+# R-0154: 画面からの伝票取消（理由・履歴を残す／空の伝票は物理削除）
+
+- 要望日: 2026-10-07（藤田晴樹さん、会話内で直接）
+- Access連携の方針: 2026-10-07 dodai-back回答（根拠 AccessTategu `Df_Beaver連携Push.bas`・`Df_Beaver連携.bas`）
+- 状態: 仕様確認待ち
+
+## 背景
+
+画面から伝票を取り消す手段がない（`DELETE /vouchers/{id}` を呼ぶ画面が存在しない）。APIの取消（`api/routes/vouchers.php:929-933`）は `status=void` と `updated_at` を更新するだけで、理由も `record_history` も残らない。
+
+## 用語
+
+- **空の明細行**: 品名が空（NULL・空文字・空白のみ）で、単価と行金額が0またはNULLの行。数量は見ない（行追加時に数量1が初期値で入るため）
+- **空の伝票**: 明細が1行もない、または全行が空の明細行であり、かつ `total_amount` が0またはNULLの伝票。得意先・件名・日付などヘッダーに値が入っていても空の伝票とみなす
+
+## 取消できない伝票（今の `assertVoucherEditable` を流用）
+
+- `access_billed_flag=1`（Accessで請求済み）
+- `status` が `billed` または `void`
+- 売上に引用済みの見積
+
+これらは409を返し、画面でも取消ボタンを無効化する。
+
+## 取消の動作
+
+| 伝票 | 理由の入力 | 処理 | 履歴 |
+|---|---|---|---|
+| 中身あり | 確認ダイアログで入力欄を出す（空欄可） | `status=void`、`updated_at` を進める | `record_history` に `entity=vouchers`、`action=void`、理由と取消前後の伝票を記録 |
+| 空・Access連携あり（`access_voucher_id` あり） | 聞かない（確認ダイアログのみ） | `status=void`、`updated_at` を進める | 残さない |
+| 空・Access連携なし | 聞かない（確認ダイアログのみ） | 物理削除（明細も削除） | 残さない |
+
+- 空の伝票でも、`invoice_vouchers` から参照されている、または他の伝票の `source_voucher_id` から参照されている場合は物理削除せず、連携ありと同じくvoidにする（外部キー違反を避けるため）
+- 空かどうかの判定はサーバー側で行う。画面はサーバーの判定に従って理由欄を出すかどうかを決める（取消前に判定を取得するAPIを用意する）
+- 履歴の理由は `before_json.related.reason` に入れる（A-X-01で使った `void_voucher_with_history.php` と同じ形式）
+
+## Access連携との約束（dodai-back回答より）
+
+1. 連携伝票（`access_voucher_id` あり）は、空でも物理削除しない。物理削除するとAccessの次回push・全件pushで作り直され、横断整合検査P2aがNGになる
+2. 請求済み（Access側の請求済み `access_billed_flag=1` を含む）は取消できない。Accessは請求済み伝票のvoidを無視するため、Beaverだけがvoidになる食い違い（検査P2d）が残る
+3. voidにするときは必ず `updated_at` を進める。Accessは「Beaverの`updated_at` > Accessの`last_synced_at`」のときだけ `deleted_at` を立てる
+4. 取消は戻せない（一方通行）。voidから戻す機能は作らない。Accessに復元の経路がないため
+5. 理由はAccessへ送らない。理由の正本はBeaverの `record_history`
+
+## 画面
+
+- 伝票編集画面: 操作ボタン列に「取消」ボタン。取消できない伝票では表示しないか無効化する
+- 伝票一覧: 各行に「取消」ボタン
+- 中身ありの場合のダイアログ: 「この伝票を取り消します。理由（任意）」＋入力欄＋「取り消す」「やめる」
+- 空の場合のダイアログ: 「中身が空の伝票です。削除します。よろしいですか？」（連携ありでvoidになる場合も同じ文言でよい）
+- 完了後: 編集画面からは伝票一覧へ戻る。一覧はその場で再読み込みする
+
+## 受け入れ条件（テスト）
+
+1. 中身ありの伝票を理由付きで取消 → `status=void`、`updated_at` が進む、`record_history` に理由と前後の状態が1件残る
+2. 中身ありで理由が空欄 → 取消でき、履歴は残る（理由は空）
+3. 明細0行・合計0の伝票（連携なし）→ 物理削除される（伝票も明細も消える）、履歴は残らない
+4. 品名空・単価0・金額0・数量1の行だけの伝票（連携なし）→ 空とみなされ物理削除される
+5. 得意先と件名だけ入った明細0行の伝票 → 空とみなされる
+6. 品名だけ入った行がある伝票 → 中身ありとして扱われる
+7. 空の連携伝票（`access_voucher_id` あり）→ 物理削除されずvoid、`updated_at` が進む、履歴は残らない
+8. 空でも `invoice_vouchers` か `source_voucher_id` から参照されている伝票 → voidになる
+9. `access_billed_flag=1`、`billed`、`void`、引用済み見積 → 409、何も変わらない
+10. Access同期の受信経路（`recalcVoucher(..., false)` 等）の挙動は変えない
