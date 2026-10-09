@@ -539,6 +539,10 @@ switch ($method) {
 
             echo json_encode($row);
         } else {
+            // R-0154 追加仕様2: 一覧の取消ボタンを無効表示するため、voidでない売上に引用済みの見積かを返す（assertVoucherEditableと同じ条件）
+            $quotedBySalesCol = 'CASE WHEN v.voucher_type = "estimate" AND EXISTS (
+                    SELECT 1 FROM vouchers s WHERE s.voucher_type = "sales" AND s.status <> "void" AND s.source_estimate_no = v.voucher_no
+                ) THEN 1 ELSE 0 END AS quoted_by_sales';
             $where = 'WHERE 1=1'; $params = [];
             if (!empty($_GET['voucher_type'])) { $where .= ' AND v.voucher_type = ?'; $params[] = $_GET['voucher_type']; }
             if (!empty($_GET['customer_id'])) { $where .= ' AND v.customer_id = ?'; $params[] = (int)$_GET['customer_id']; }
@@ -581,7 +585,7 @@ switch ($method) {
                     'DESC'
                 );
                 $stmt  = $pdo->prepare("
-                    SELECT v.*, c.name AS customer_name, p.name AS project_name
+                    SELECT v.*, c.name AS customer_name, p.name AS project_name, $quotedBySalesCol
                     FROM vouchers v
                     LEFT JOIN customers c ON c.id = v.customer_id
                     LEFT JOIN projects  p ON p.id = v.project_id
@@ -594,7 +598,7 @@ switch ($method) {
                 ]);
             } else {
                 $stmt = $pdo->prepare("
-                    SELECT v.*, c.name AS customer_name, p.name AS project_name
+                    SELECT v.*, c.name AS customer_name, p.name AS project_name, $quotedBySalesCol
                     FROM vouchers v
                     LEFT JOIN customers c ON c.id = v.customer_id
                     LEFT JOIN projects  p ON p.id = v.project_id

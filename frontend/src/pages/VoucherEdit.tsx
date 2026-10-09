@@ -17,6 +17,7 @@ import TotalSummary from '../components/voucher/TotalSummary';
 import { useSmartBack } from '../hooks/useSmartBack';
 import { useAppSettings } from '../contexts/AppSettingsContext';
 import type { VoucherType, VoucherStatus, TaxInputType, LineCategoryValue } from '../types/voucher';
+import { getVoucherEditBlockReason, getVoucherVoidBlockReason } from '../lib/voucherVoid';
 
 export type VoucherFormValues = {
   voucher_type: VoucherType;
@@ -113,19 +114,7 @@ const defaultValues: VoucherFormValues = {
   lines: [{ ...defaultLine }],
 };
 
-type VoucherEditState = Pick<import('../types/voucher').Voucher,
-  'voucher_type' | 'status' | 'converted_sales' | 'access_billed_flag'>;
-
-export function getVoucherEditBlockReason(voucher?: Partial<VoucherEditState>): string | null {
-  // R-0143 A-B-06: Accessで請求済みの伝票はstatusに関わらず編集不可（バックエンドは既に409を返す）
-  if (voucher?.access_billed_flag === 1) return 'Accessで請求済み';
-  if (voucher?.status === 'billed') return '請求済み';
-  if (voucher?.status === 'void') return '無効化済み';
-  if (voucher?.voucher_type === 'estimate' && voucher.converted_sales?.some(s => s.status !== 'void')) {
-    return '売上に引用済み';
-  }
-  return null;
-}
+export { getVoucherEditBlockReason };
 
 /** R-0154: 実行中の保存（明細行のblur保存など）が終わるのを待ち、すべて成功したかを返す */
 function settlePendingMutations(queryClient: QueryClient): Promise<boolean> {
@@ -476,8 +465,9 @@ export default function VoucherEdit() {
                 {reloadMutation.isPending ? '更新中...' : '原価再取得'}
               </button>
             )}
-            {!isNew && canEdit && (
-              <VoidVoucherButton voucherId={voucherId} beforeVoid={saveBeforeVoid} onDone={() => navigate('/vouchers')} />
+            {!isNew && voucher && voucher.status !== 'void' && (
+              <VoidVoucherButton voucherId={voucherId} beforeVoid={saveBeforeVoid} onDone={() => navigate('/vouchers')}
+                blockReason={getVoucherVoidBlockReason(voucher)} />
             )}
             <button type="button" style={subBtnStyle}
               onClick={() => window.print()}>

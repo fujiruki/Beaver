@@ -5,14 +5,14 @@ import type { Voucher } from '../../types/voucher';
 
 interface Props {
   voucherId: number;
-  disabled?: boolean;
+  blockReason?: string | null;
   beforeVoid?: () => Promise<boolean>;
   onDone: () => void;
   style?: React.CSSProperties;
 }
 
 /** R-0154: 伝票の取消ボタン。空の伝票は確認なしで即実行、中身ありは理由（任意）を聞く */
-export default function VoidVoucherButton({ voucherId, disabled, beforeVoid, onDone, style }: Props) {
+export default function VoidVoucherButton({ voucherId, blockReason, beforeVoid, onDone, style }: Props) {
   const voidMutation = useVoidVoucher();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [reason, setReason] = useState('');
@@ -50,7 +50,8 @@ export default function VoidVoucherButton({ voucherId, disabled, beforeVoid, onD
 
   return (
     <>
-      <button type="button" onClick={handleClick} disabled={disabled || busy} style={{ ...btnStyle, ...style }}>
+      <button type="button" onClick={handleClick} disabled={!!blockReason || busy} title={blockReason ?? undefined}
+        style={{ ...btnStyle, ...style, ...(blockReason ? blockedBtnStyle : {}) }}>
         {busy ? '取消中...' : '取消'}
       </button>
       {dialogOpen && (
@@ -94,4 +95,7 @@ const cancelBtnStyle: React.CSSProperties = {
 const confirmBtnStyle: React.CSSProperties = {
   padding: '8px 24px', background: '#dc2626', color: '#fff',
   border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 14, fontWeight: 'bold',
+};
+const blockedBtnStyle: React.CSSProperties = {
+  background: '#f1f5f9', color: '#94a3b8', borderColor: '#e2e8f0', cursor: 'not-allowed',
 };
