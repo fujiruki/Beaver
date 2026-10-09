@@ -38,7 +38,7 @@ const baseVoucher = {
 
 const requests: Array<{ url: string; method: string; body: any }> = [];
 
-function stubFetch({ putFails = false } = {}) {
+function stubFetch({ putFails = false, deleteResult = 'voided' } = {}) {
   let saved = false;
   vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
     const url = String(input);
@@ -54,7 +54,7 @@ function stubFetch({ putFails = false } = {}) {
       saved = true;
       return new Response(JSON.stringify({ ...baseVoucher, description: body?.description ?? null }));
     }
-    if (url.endsWith('/vouchers/5') && method === 'DELETE') return new Response(JSON.stringify({ result: 'voided' }));
+    if (url.endsWith('/vouchers/5') && method === 'DELETE') return new Response(JSON.stringify({ result: deleteResult }));
     if (url.endsWith('/vouchers/5')) {
       return new Response(JSON.stringify({ ...baseVoucher, is_empty: !saved }));
     }
@@ -155,5 +155,21 @@ describe('R-0154 追加仕様2: 未保存の入力があれば保存してから
     await screen.findByText('伝票一覧');
     expect(indexOf('PUT')).toBe(-1);
     expect(indexOf('DELETE')).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe('R-0154: 空の伝票を物理削除したら詳細を再取得しない', () => {
+  it('取消の結果が deleted なら、削除後に GET /vouchers/{id} を呼ばない', async () => {
+    const user = userEvent.setup();
+    stubFetch({ deleteResult: 'deleted' });
+    renderVoucher();
+    await screen.findByText('Beaver作成');
+    await user.click(screen.getByRole('button', { name: '取消' }));
+
+    await screen.findByText('伝票一覧');
+    await new Promise(r => setTimeout(r, 50));
+    const deleteIdx = indexOf('DELETE');
+    expect(deleteIdx).toBeGreaterThanOrEqual(0);
+    expect(lastGetIndex()).toBeLessThan(deleteIdx);
   });
 });
