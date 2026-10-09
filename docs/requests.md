@@ -8,7 +8,10 @@ R-0155の得意先パターン調査で、dodai-back（AccessTategu側backpc指�
 - dodai-backの案: Accessが送る`last_synced_at`よりBeaverの`updated_at`が新しければ409を返す（伝票の同期と同じ考え方）。Access側は409を競合として扱う対応が要る
 - 関連: Accessで得意先を削除してもBeaverへ何も送られない（問題2、Access側で削除を禁止し使用不可だけにする案）
 
-状態: 藤田晴樹さんの判断待ち（dodai-backが問題1・2の対応方針を直接確認する）
+- 2026-10-09 dodai-backが晴樹さんに直接確認し、問題1は直す方針で了承。問題2はAccess側で得意先の削除を禁止する（Beaver側の作業なし）
+- dodai-backのたたき台: Accessの得意先pushにAccess側の`last_synced_at`を載せる → Beaverの`updated_at`がそれより新しければ409とBeaverの現在値を返す → Accessは409を`tbl競合待ち`にconflictとして積み、競合解決画面で選ばせる
+
+状態: 修正の方針は了承済み。仕様はR-0155・R-0156の完了後にdodai-backと詰める
 
 ## 39. R-0155: Access⇔Beaverの同期・競合解消を「得意先→案件→伝票」の順にする（2026-10-09、藤田晴樹さんより会話内で直接）
 
@@ -46,7 +49,9 @@ A-X-01の手順8でE02046・E02047をAccessの競合解決画面から「Beaver�
 - dodai-backの調査: `/vouchers/sync`とpushの応答に`voucher_no`はあるが、Access側に保存する列がない。案1（競合解決画面にだけ表示）／案2（Accessの`vouchers`に`beaver_voucher_no`列を追加し、採用時・push成功時に保存、伝票画面と一覧にも表示、既存分は一度だけ全件pullで埋める）。どちらもBeaver APIの変更は不要
 - 藤田晴樹さんの回答（2026-10-09）原文: 「案2　何かあった時見比べたいから。」→ dodai-backへ伝達
 
-状態: 案2で決定。Access側（dodai-back）が実装。Beaver側の作業は、全件pullの時期の確認のみ
+- dodai-backが晴樹さんに直接確認し、表示は「競合解決画面」と「個別の伝票画面」のみ、一覧には出さないことに決定（2026-10-09）
+
+状態: 案2で決定。Access側（dodai-back）が実装。Beaver側の作業は、全件pullの時期の確認のみ（実行前にdodai-backから声がかかる）
 
 ## 38. R-0153: 伝票編集画面の合計プレビューをR-0152の計算規則に揃える（2026-10-06、dodai-back[AccessTategu側backpc指揮役]より。Dodaikun乗り換え前に必ず直す）
 
