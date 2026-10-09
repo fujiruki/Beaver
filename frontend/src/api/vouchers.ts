@@ -72,8 +72,16 @@ export function useVoidVoucher() {
   return useMutation({
     mutationFn: ({ id, reason }: { id: number; reason?: string }) =>
       api.delete<{ result: 'voided' | 'deleted' }>(`/vouchers/${id}`, { reason: reason ?? '' }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [KEY] });
+    onSuccess: async ({ result }, { id }) => {
+      if (result !== 'deleted') {
+        queryClient.invalidateQueries({ queryKey: [KEY] });
+        return;
+      }
+      await queryClient.cancelQueries({ queryKey: [KEY, id], exact: true });
+      queryClient.invalidateQueries({
+        queryKey: [KEY],
+        predicate: q => !(q.queryKey.length === 2 && q.queryKey[1] === id),
+      });
     },
   });
 }
