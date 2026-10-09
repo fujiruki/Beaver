@@ -59,7 +59,7 @@ if ($method === 'PATCH' && $resourceId && $subResource === 'carry-forward') {
     }
     $pdo->prepare('
         UPDATE customers
-        SET carry_forward_balance = :bal, updated_at = CURRENT_TIMESTAMP
+        SET carry_forward_balance = :bal
         WHERE id = :id
     ')->execute([':bal' => (float)$data['carry_forward_balance'], ':id' => $resourceId]);
     $stmt = $pdo->prepare('SELECT * FROM customers WHERE id = ?');
@@ -139,6 +139,18 @@ function customerAccessLink(PDO $pdo, int $customerId): void {
     ]);
 }
 
+// GET /customers/sync の1件と POST /customers の競合応答(R-0157)で共有する列。
+// carry_forward_balance は正本がAccess側のため絶対にSELECTしない
+const CUSTOMER_SYNC_COLUMNS = 'id, access_customer_no, code, name, name_kana, honorific_type, gender,
+                   postal_code, address1, address2, tel, mobile, fax, email, cutoff_day, memo,
+                   is_active, updated_at, last_synced_at';
+
+function customerSyncRowToJst(array $row): array {
+    $row['updated_at']     = utcToJst($row['updated_at']);
+    $row['last_synced_at'] = utcToJst($row['last_synced_at']);
+    return $row;
+}
+
 // --- AccessTategu連携契約 A-B-01: Beaver→Access 得意先同期用 軽量増分API ---
 // GET /customers/sync[?updated_after=YYYY-MM-DD HH:NN:SS (JST)][&limit=N][&cursor=ID]
 // 完全一致チェック（/customers/sync/anything を全件返却で誤通過させない）
@@ -153,14 +165,12 @@ if ($method === 'GET' && isset($segments[1]) && $segments[1] === 'sync' && !isse
     $updatedAfterRaw = $_GET['updated_after'] ?? null;
     $updatedAfterSql = null;
     if ($updatedAfterRaw !== null && $updatedAfterRaw !== '') {
-        $updatedAfterDt = DateTime::createFromFormat('Y-m-d H:i:s', $updatedAfterRaw, new DateTimeZone('Asia/Tokyo'));
-        if ($updatedAfterDt === false || $updatedAfterDt->format('Y-m-d H:i:s') !== $updatedAfterRaw) {
+        $updatedAfterSql = jstToUtc($updatedAfterRaw);
+        if ($updatedAfterSql === null) {
             http_response_code(400);
             echo json_encode(['error' => 'Invalid updated_after format']);
             exit;
         }
-        $updatedAfterDt->setTimezone(new DateTimeZone('UTC'));
-        $updatedAfterSql = $updatedAfterDt->format('Y-m-d H:i:s');
     }
 
     // pagination: デフォルト limit=1000、最大 5000、cursor は since_id 方式（id > cursor 昇順）
@@ -178,11 +188,7 @@ if ($method === 'GET' && isset($segments[1]) && $segments[1] === 'sync' && !isse
         $cursor = (int)$_GET['cursor'];
     }
 
-    // carry_forward_balance は正本がAccess側のため絶対にSELECTしない
-    $sql = 'SELECT id, access_customer_no, code, name, name_kana, honorific_type, gender,
-                   postal_code, address1, address2, tel, mobile, fax, email, cutoff_day, memo,
-                   is_active, updated_at, last_synced_at
-            FROM customers WHERE 1=1';
+    $sql = 'SELECT ' . CUSTOMER_SYNC_COLUMNS . ' FROM customers WHERE 1=1';
     $params = [];
     if ($updatedAfterSql !== null) {
         $sql .= ' AND updated_at > :updated_after';
@@ -217,11 +223,7 @@ if ($method === 'GET' && isset($segments[1]) && $segments[1] === 'sync' && !isse
         reset($rows);
     }
 
-    foreach ($rows as &$row) {
-        $row['updated_at']     = utcToJst($row['updated_at']);
-        $row['last_synced_at'] = utcToJst($row['last_synced_at']);
-    }
-    unset($row);
+    $rows = array_map('customerSyncRowToJst', $rows);
 
     $now = new DateTime('now', new DateTimeZone('Asia/Tokyo'));
     $response = [
@@ -298,6 +300,18 @@ switch ($method) {
             ? (string)$data['access_customer_no']
             : null;
 
+        // R-0157: base_synced_at（JST）より後に Beaver 側で更新されていれば上書きせず競合を返す
+        $baseSyncedAtUtc = null;
+        if (isset($data['base_synced_at']) && $data['base_synced_at'] !== '') {
+            $baseSyncedAtUtc = is_string($data['base_synced_at']) ? jstToUtc($data['base_synced_at']) : null;
+            if ($baseSyncedAtUtc === null) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Invalid base_synced_at format']);
+                break;
+            }
+        }
+        $force = ($data['force'] ?? false) === true;
+
         // access_customer_no が指定されていれば既存レコードを検索して upsert
         if ($accessCustomerNo !== null) {
             $checkStmt = $pdo->prepare('SELECT id, code FROM customers WHERE access_customer_no = ?');
@@ -313,6 +327,16 @@ switch ($method) {
 
             if ($existing) {
                 $existingId = $existing['id'];
+                if ($baseSyncedAtUtc !== null && !$force) {
+                    $conflictStmt = $pdo->prepare('SELECT ' . CUSTOMER_SYNC_COLUMNS . ' FROM customers WHERE id = ? AND updated_at > ?');
+                    $conflictStmt->execute([(int)$existingId, $baseSyncedAtUtc]);
+                    $current = $conflictStmt->fetch();
+                    if ($current) {
+                        http_response_code(409);
+                        echo json_encode(['error' => 'customer_conflict', 'customer' => customerSyncRowToJst($current)]);
+                        break;
+                    }
+                }
                 // 既存レコードを UPDATE して 200 返却
                 // R-075: codeはクライアント送信値を使わない。既存codeがNULL/空の場合のみ
                 // access_customer_noで埋める（B-2で整合済みの既存値は上書きしない）。

@@ -79,6 +79,16 @@ if (!function_exists('utcToJst')) {
 }
 
 /**
+ * JST の 'Y-m-d H:i:s'（厳密一致）を UTC の同形式に変換する。不正なら null。
+ */
+function jstToUtc(string $jstDateTime): ?string {
+    $dt = DateTime::createFromFormat('Y-m-d H:i:s', $jstDateTime, new DateTimeZone('Asia/Tokyo'));
+    if ($dt === false || $dt->format('Y-m-d H:i:s') !== $jstDateTime) return null;
+    $dt->setTimezone(new DateTimeZone('UTC'));
+    return $dt->format('Y-m-d H:i:s');
+}
+
+/**
  * shipped_at を ISO 8601 として検証。不正なら null。
  */
 function validateShippedAt(?string $value): ?string {
