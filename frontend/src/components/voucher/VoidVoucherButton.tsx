@@ -6,12 +6,13 @@ import type { Voucher } from '../../types/voucher';
 interface Props {
   voucherId: number;
   disabled?: boolean;
+  beforeVoid?: () => Promise<boolean>;
   onDone: () => void;
   style?: React.CSSProperties;
 }
 
 /** R-0154: 伝票の取消ボタン。空の伝票は確認なしで即実行、中身ありは理由（任意）を聞く */
-export default function VoidVoucherButton({ voucherId, disabled, onDone, style }: Props) {
+export default function VoidVoucherButton({ voucherId, disabled, beforeVoid, onDone, style }: Props) {
   const voidMutation = useVoidVoucher();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [reason, setReason] = useState('');
@@ -30,6 +31,7 @@ export default function VoidVoucherButton({ voucherId, disabled, onDone, style }
   const handleClick = async () => {
     setChecking(true);
     try {
+      if (beforeVoid && !(await beforeVoid())) return;
       const v = await api.get<Voucher>(`/vouchers/${voucherId}`);
       if (v.is_empty) {
         await run();

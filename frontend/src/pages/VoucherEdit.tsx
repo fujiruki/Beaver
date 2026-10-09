@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useForm, FormProvider, useFieldArray, useWatch } from 'react-hook-form';
+import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import {
   useVoucher, useCreateVoucher, useUpdateVoucher,
   useAddLine, useDeleteLine, useConvertToSales, useReloadSnapshots,
@@ -120,10 +121,25 @@ export function getVoucherEditBlockReason(voucher?: Partial<VoucherEditState>): 
   if (voucher?.access_billed_flag === 1) return 'Accessで請求済み';
   if (voucher?.status === 'billed') return '請求済み';
   if (voucher?.status === 'void') return '無効化済み';
-  if (voucher?.voucher_type === 'estimate' && (voucher.converted_sales?.length ?? 0) > 0) {
+  if (voucher?.voucher_type === 'estimate' && voucher.converted_sales?.some(s => s.status !== 'void')) {
     return '売上に引用済み';
   }
   return null;
+}
+
+/** R-0154: 実行中の保存（明細行のblur保存など）が終わるのを待ち、すべて成功したかを返す */
+function settlePendingMutations(queryClient: QueryClient): Promise<boolean> {
+  const cache = queryClient.getMutationCache();
+  const pending = cache.getAll().filter(m => m.state.status === 'pending');
+  return new Promise(resolve => {
+    const check = () => {
+      if (pending.some(m => m.state.status === 'pending')) return;
+      unsubscribe();
+      resolve(pending.every(m => m.state.status === 'success'));
+    };
+    const unsubscribe = cache.subscribe(check);
+    check();
+  });
 }
 
 /** R-0143 A-B-06: 'YYYY-MM-DD' を 'yyyy/mm/dd' に変換（不正値はそのまま返す） */
@@ -171,7 +187,8 @@ export default function VoucherEdit() {
       ...(isNew ? { lines: [{ ...defaultLine, cost_labor_rate: settings.defaultLaborRate }] } : {}),
     },
   });
-  const { control, handleSubmit, reset, watch, setValue } = form;
+  const { control, handleSubmit, reset, watch, setValue, formState: { isDirty } } = form;
+  const queryClient = useQueryClient();
 
   const { fields, append, remove, swap } = useFieldArray({ control, name: 'lines' });
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
@@ -269,8 +286,8 @@ export default function VoucherEdit() {
     line_total: l?.line_total ?? 0,
   }));
 
-  async function onSubmit(data: VoucherFormValues) {
-    const header = {
+  function toHeader(data: VoucherFormValues) {
+    return {
       voucher_type: data.voucher_type,
       status: data.status,
       customer_id: Number(data.customer_id),
@@ -287,6 +304,10 @@ export default function VoucherEdit() {
       sales_category_id: data.sales_category_id,
       validity_period: data.validity_period,
     };
+  }
+
+  async function onSubmit(data: VoucherFormValues) {
+    const header = toHeader(data);
     try {
       if (isNew) {
         if (createdVoucherIdRef.current === null) {
@@ -306,6 +327,23 @@ export default function VoucherEdit() {
     } catch {
       return;
     }
+  }
+
+  // R-0154 追加仕様2: 未保存の入力は保存してから取消の空判定へ進む。保存に失敗したら取消しない
+  async function saveBeforeVoid(): Promise<boolean> {
+    if (isDirty) {
+      let saved = false;
+      await handleSubmit(async data => {
+        try {
+          await updateMutation.mutateAsync(toHeader(data));
+          saved = true;
+        } catch {
+          return;
+        }
+      })();
+      if (!saved) return false;
+    }
+    return settlePendingMutations(queryClient);
   }
 
   function handleAddLine() {
@@ -439,7 +477,7 @@ export default function VoucherEdit() {
               </button>
             )}
             {!isNew && canEdit && (
-              <VoidVoucherButton voucherId={voucherId} onDone={() => navigate('/vouchers')} />
+              <VoidVoucherButton voucherId={voucherId} beforeVoid={saveBeforeVoid} onDone={() => navigate('/vouchers')} />
             )}
             <button type="button" style={subBtnStyle}
               onClick={() => window.print()}>

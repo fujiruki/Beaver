@@ -374,7 +374,7 @@ function assertVoucherEditable(PDO $pdo, int $voucherId): void {
         exit;
     }
     if ($voucher['voucher_type'] === 'estimate') {
-        $converted = $pdo->prepare('SELECT 1 FROM vouchers WHERE voucher_type = "sales" AND source_estimate_no = ? LIMIT 1');
+        $converted = $pdo->prepare('SELECT 1 FROM vouchers WHERE voucher_type = "sales" AND status <> "void" AND source_estimate_no = ? LIMIT 1');
         $converted->execute([$voucher['voucher_no']]);
         if ($converted->fetchColumn()) {
             http_response_code(409);
