@@ -1,5 +1,15 @@
 # 要望・リクエスト
 
+## 42. R-0158: Accessからの伝票pushがBeaver側の修正を黙って上書きする（2026-10-09、R-0157の確認中に発見）
+
+R-0157（得意先）と同じ問題が伝票にもある。指揮役が確認:
+
+- `POST /vouchers/sync`のヘッダーは`INSERT … ON CONFLICT(access_voucher_id) DO UPDATE`で、Beaverの`updated_at`を確かめずに上書きする（`api/routes/sync_helpers.php:365`付近）
+- 明細も、R-0151で「Access採用＝Access版が正」として`edited_in_beaver`による保護を外している
+- dodai-backと合意: R-0157は得意先だけを対象にし、伝票は別の要望として扱う
+
+状態: 未着手（R-0157の完了後に検討）
+
 ## 41. R-0157: Accessからの得意先pushがBeaver側の修正を黙って上書きする（2026-10-09、dodai-backの得意先パターン調査で発見）
 
 R-0155の得意先パターン調査で、dodai-back（AccessTategu側backpc指揮役）が発見。指揮役が`api/routes/customers.php:314-340`で確認済み:
@@ -11,7 +21,9 @@ R-0155の得意先パターン調査で、dodai-back（AccessTategu側backpc指�
 - 2026-10-09 dodai-backが晴樹さんに直接確認し、問題1は直す方針で了承。問題2はAccess側で得意先の削除を禁止する（Beaver側の作業なし）
 - dodai-backのたたき台: Accessの得意先pushにAccess側の`last_synced_at`を載せる → Beaverの`updated_at`がそれより新しければ409とBeaverの現在値を返す → Accessは409を`tbl競合待ち`にconflictとして積み、競合解決画面で選ばせる
 
-状態: 修正の方針は了承済み。仕様はR-0155・R-0156の完了後にdodai-backと詰める
+- 2026-10-09 dodai-backから仕様のたたき台を受領し、Beaver側の確認結果を回答。仕様書: `docs/spec/R-0157_customer_push_conflict_guard.md`
+
+状態: 仕様書の藤田晴樹さん確認待ち
 
 ## 39. R-0155: Access⇔Beaverの同期・競合解消を「得意先→案件→伝票」の順にする（2026-10-09、藤田晴樹さんより会話内で直接）
 
