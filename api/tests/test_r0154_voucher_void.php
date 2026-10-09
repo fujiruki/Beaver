@@ -390,6 +390,26 @@ try {
         assertEq(1, lineCount($pdo, $id), '明細が追加される');
     });
 
+    echo "\n=== R-0154 追加仕様2: 一覧に引用済みかどうかを返す ===\n";
+
+    runTest('12. 一覧の quoted_by_sales はvoidでない売上に引用済みの見積だけ1', function () use ($pdo, $port) {
+        $quoted = createVoucher($pdo, ['voucher_type' => 'estimate', 'voucher_no' => 'E-R0154-021']);
+        createVoucher($pdo, ['source_estimate_no' => 'E-R0154-021']);
+        $voidOnly = createVoucher($pdo, ['voucher_type' => 'estimate', 'voucher_no' => 'E-R0154-022']);
+        createVoucher($pdo, ['source_estimate_no' => 'E-R0154-022', 'status' => 'void']);
+        $plain = createVoucher($pdo, ['voucher_type' => 'estimate', 'voucher_no' => 'E-R0154-023']);
+
+        foreach (['/vouchers?voucher_type=estimate&page=1&per_page=200', '/vouchers?voucher_type=estimate'] as $path) {
+            $r = httpJson($port, 'GET', $path);
+            assertTrue(str_contains($r['status'], '200'), "GET $path 200: " . $r['status']);
+            $rows = $r['body']['data'] ?? $r['body'];
+            $byId = array_column($rows, 'quoted_by_sales', 'id');
+            assertEq(1, $byId[$quoted] ?? null, "$path 引用済み");
+            assertEq(0, $byId[$voidOnly] ?? null, "$path 引用先がvoidだけ");
+            assertEq(0, $byId[$plain] ?? null, "$path 引用なし");
+        }
+    });
+
     echo "\n=== R-0154 Access同期の受信経路は変えない ===\n";
 
     runTest('10. recalcVoucher(..., false) は updated_at・status を変えず履歴も残さない', function () use ($pdo) {
