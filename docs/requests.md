@@ -9,7 +9,13 @@ A-X-01の手順8（Beaver_betaの試用伝票E02046・E02047をAccessの競合�
 - 同期処理の本体はAccess側（AccessTategu `Df_Beaver連携.bas`）にあるため、2026-10-09 dodai-backへ現状の順番の確認と見直しを相談
 - あわせて「1，ぎゃくにそうやってbeaverでの編集と同期がテストできるからそれいいね」（E02046の仮の得意先「とりあえず登録用」は、採用後にBeaverで正しい得意先へ付け替え、Beaver→Accessの編集同期のテストにする）
 
-状態: dodai-backの回答待ち
+dodai-backの調査結果（2026-10-09、Access `Df_Beaver連携.bas`）:
+- 今の順番: 保留競合をpendingへ戻す → access-link再送 → push → 案件pull → 伝票pull → 得意先pull → 競合解決画面。競合解決画面は検知順に並ぶため、伝票が先・得意先が後に混ざって出る（案件は競合画面に出ず直接取り込み）
+- 新規伝票の採用時は`customer_access_no`をそのまま使い、得意先が未承認でも止めない。既存伝票の更新時は`customer_id`・`project_id`を更新しない（Beaverで伝票の得意先を付け替えてもAccessに反映されず、エラーも出ない）
+- 直し方の案（Access側のみ）: pullを得意先→案件→伝票の順に、競合解決画面で得意先を先に並べる、伝票採用時に得意先・案件も反映し、得意先が未承認なら採用を止めて「先に得意先を承認」と表示する。Beaver APIの変更は不要
+- 「得意先を採用したら、その得意先の伝票を自動で取り直す」まで望む場合だけBeaver側の対応が要る（access-link受信時に該当伝票の`updated_at`を進める）。dodai-backは採用を止める方式で十分という意見
+
+状態: 藤田晴樹さんの判断待ち（Access側の修正の承認、Beaver側の自動取り直しの要否）
 
 ## 38. R-0153: 伝票編集画面の合計プレビューをR-0152の計算規則に揃える（2026-10-06、dodai-back[AccessTategu側backpc指揮役]より。Dodaikun乗り換え前に必ず直す）
 
