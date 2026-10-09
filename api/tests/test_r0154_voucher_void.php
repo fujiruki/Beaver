@@ -363,6 +363,33 @@ try {
         $assertUnchanged409($id, '引用済み見積');
     });
 
+    echo "\n=== R-0154 追加仕様1: 引用先がvoidの売上は引用済みに数えない ===\n";
+
+    runTest('11a. 引用先の売上がvoidだけの見積 → 取消できる', function () use ($pdo, $port) {
+        $id = createVoucher($pdo, ['voucher_type' => 'estimate', 'voucher_no' => 'E-R0154-011', 'total_amount' => 1000]);
+        createLine($pdo, $id, '框戸', 1, 1000, 1000);
+        createVoucher($pdo, ['source_estimate_no' => 'E-R0154-011', 'status' => 'void']);
+
+        $r = httpJson($port, 'DELETE', "/vouchers/$id", ['reason' => '引用先取消済み']);
+        assertTrue(str_contains($r['status'], '200'), 'HTTP 200: ' . $r['status']);
+        assertEq('void', voucherRow($pdo, $id)['status'], 'status');
+    });
+
+    runTest('11b. voidでない売上も引用していれば → 409', function () use ($pdo, $assertUnchanged409) {
+        $id = createVoucher($pdo, ['voucher_type' => 'estimate', 'voucher_no' => 'E-R0154-012']);
+        createVoucher($pdo, ['source_estimate_no' => 'E-R0154-012', 'status' => 'void']);
+        createVoucher($pdo, ['source_estimate_no' => 'E-R0154-012']);
+        $assertUnchanged409($id, '引用済み見積（voidでない売上あり）');
+    });
+
+    runTest('11c. 引用先がvoidだけの見積は編集制限も解除される（明細を追加できる）', function () use ($pdo, $port) {
+        $id = createVoucher($pdo, ['voucher_type' => 'estimate', 'voucher_no' => 'E-R0154-013']);
+        createVoucher($pdo, ['source_estimate_no' => 'E-R0154-013', 'status' => 'void']);
+        $r = httpJson($port, 'POST', "/vouchers/$id/lines", ['item_name' => '障子', 'quantity' => 1]);
+        assertTrue(str_contains($r['status'], ' 20'), 'HTTP 2xx: ' . $r['status']);
+        assertEq(1, lineCount($pdo, $id), '明細が追加される');
+    });
+
     echo "\n=== R-0154 Access同期の受信経路は変えない ===\n";
 
     runTest('10. recalcVoucher(..., false) は updated_at・status を変えず履歴も残さない', function () use ($pdo) {
