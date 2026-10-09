@@ -10,21 +10,6 @@ R-0157（得意先）と同じ問題が伝票にもある。指揮役が確認:
 
 状態: 未着手（R-0157の完了後に検討）
 
-## 41. R-0157: Accessからの得意先pushがBeaver側の修正を黙って上書きする（2026-10-09、dodai-backの得意先パターン調査で発見）
-
-R-0155の得意先パターン調査で、dodai-back（AccessTategu側backpc指揮役）が発見。指揮役が`api/routes/customers.php:314-340`で確認済み:
-
-- 同じ得意先をAccessとBeaverの両方で修正した場合、同期はPushが先に走る。`POST /customers`は`access_customer_no`（またはcode）が一致する既存行を、Beaver側の`updated_at`を確かめずに無条件でUPDATEする。Beaver側の修正は黙って消え、競合も出ない
-- dodai-backの案: Accessが送る`last_synced_at`よりBeaverの`updated_at`が新しければ409を返す（伝票の同期と同じ考え方）。Access側は409を競合として扱う対応が要る
-- 関連: Accessで得意先を削除してもBeaverへ何も送られない（問題2、Access側で削除を禁止し使用不可だけにする案）
-
-- 2026-10-09 dodai-backが晴樹さんに直接確認し、問題1は直す方針で了承。問題2はAccess側で得意先の削除を禁止する（Beaver側の作業なし）
-- dodai-backのたたき台: Accessの得意先pushにAccess側の`last_synced_at`を載せる → Beaverの`updated_at`がそれより新しければ409とBeaverの現在値を返す → Accessは409を`tbl競合待ち`にconflictとして積み、競合解決画面で選ばせる
-
-- 2026-10-09 dodai-backから仕様のたたき台を受領し、Beaver側の確認結果を回答。仕様書: `docs/spec/R-0157_customer_push_conflict_guard.md`
-
-状態: 仕様書の藤田晴樹さん確認待ち
-
 ## 39. R-0155: Access⇔Beaverの同期・競合解消を「得意先→案件→伝票」の順にする（2026-10-09、藤田晴樹さんより会話内で直接）
 
 A-X-01の手順8（Beaver_betaの試用伝票E02046・E02047をAccessの競合解決画面で「Beaver版を採用」）の最中に出た要望。藤田晴樹さんの原文:
