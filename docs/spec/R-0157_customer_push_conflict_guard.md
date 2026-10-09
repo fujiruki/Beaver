@@ -35,7 +35,7 @@
 
 ## 偽の409を防ぐための変更
 
-- 繰越残高の編集（`PUT /customers/{id}/carry-forward`、`api/routes/customers.php:60-64`）は、`updated_at`を進めないようにする。`carry_forward_balance`はAccessと同期する項目ではないため、繰越だけを直したときに次のAccess pushが409にならないようにする。画面では得意先の`updated_at`を表示していない（2026-10-09確認）
+- 繰越残高の編集（`PATCH /customers/{id}/carry-forward`、`api/routes/customers.php:60-64`）は、`updated_at`を進めないようにする。`carry_forward_balance`はAccessと同期する項目ではないため、繰越だけを直したときに次のAccess pushが409にならないようにする。画面では得意先の`updated_at`を表示していない（2026-10-09確認）
 - 得意先のaccess-link（`api/routes/customers.php:100-116`）は今のまま（`updated_at`と`last_synced_at`に同じ時刻を入れる）。Accessが応答の時刻を`last_synced_at`に保存する前提
 
 ## Access側（dodai-backが実装、参考）
@@ -59,5 +59,5 @@
 7. `access_customer_no`で見つからず`code`のフォールバックで見つかった既存行にも、同じ判定が効く
 8. 新規作成（既存行なし）は`base_synced_at`があっても201（今と同じ）
 9. 既存のUNIQUE違反の409は本文・状態コードとも変わらない
-10. `PUT /customers/{id}/carry-forward`で`updated_at`が変わらない（`carry_forward_balance`は更新される）
+10. `PATCH /customers/{id}/carry-forward`で`updated_at`が変わらない（`carry_forward_balance`は更新される）
 11. JSTとUTCの変換: `base_synced_at`がJSTで`updated_at`（UTC）と同じ瞬間を指すとき、競合にならない
