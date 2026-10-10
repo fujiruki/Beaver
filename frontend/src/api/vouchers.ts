@@ -73,8 +73,10 @@ export function useCreateVoucher() {
 export function useVoidVoucher() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, reason }: { id: number; reason?: string }) =>
-      api.delete<{ result: 'voided' | 'deleted' }>(`/vouchers/${id}`, { reason: reason ?? '' }),
+    mutationFn: ({ id, reason, expected_updated_at }: { id: number; reason?: string; expected_updated_at?: string }) =>
+      api.delete<{ result: 'voided' | 'deleted'; voucher_updated_at?: string }>(`/vouchers/${id}`, {
+        reason: reason ?? '', expected_updated_at,
+      }),
     onSuccess: async ({ result }, { id }) => {
       if (result !== 'deleted') {
         queryClient.invalidateQueries({ queryKey: [KEY] });
@@ -93,7 +95,7 @@ export function useVoidVoucher() {
 export function useUpdateVoucher(id: number) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: Partial<VoucherInput>) => api.put<Voucher>(`/vouchers/${id}`, data),
+    mutationFn: (data: Partial<VoucherInput> & { expected_updated_at?: string }) => api.put<Voucher>(`/vouchers/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [KEY] });
       queryClient.invalidateQueries({ queryKey: [KEY, id] });
@@ -105,9 +107,9 @@ export function useUpdateVoucher(id: number) {
 export function useAddLine(voucherId: number) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: Partial<VoucherLine>) => {
+    mutationFn: (data: Partial<VoucherLine> & { expected_updated_at?: string }) => {
       const targetVoucherId = data.voucher_id ?? voucherId;
-      return api.post<VoucherLine>(`/vouchers/${targetVoucherId}/lines`, data);
+      return api.post<VoucherLine & { voucher_updated_at: string }>(`/vouchers/${targetVoucherId}/lines`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [KEY, voucherId] });
@@ -119,8 +121,8 @@ export function useAddLine(voucherId: number) {
 export function useUpdateLine(voucherId: number) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ lineId, data }: { lineId: number; data: Partial<VoucherLine> }) =>
-      api.put<VoucherLine>(`/vouchers/${voucherId}/lines/${lineId}`, data),
+    mutationFn: ({ lineId, data }: { lineId: number; data: Partial<VoucherLine> & { expected_updated_at?: string } }) =>
+      api.put<VoucherLine & { voucher_updated_at: string }>(`/vouchers/${voucherId}/lines/${lineId}`, data),
     onMutate: async ({ lineId, data }) => {
       await queryClient.cancelQueries({ queryKey: [KEY, voucherId] });
       const prev = queryClient.getQueryData<Voucher>([KEY, voucherId]);
@@ -147,8 +149,8 @@ export function useUpdateLine(voucherId: number) {
 export function useDeleteLine(voucherId: number) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (lineId: number) =>
-      api.delete<void>(`/vouchers/${voucherId}/lines/${lineId}`),
+    mutationFn: ({ lineId, expected_updated_at }: { lineId: number; expected_updated_at?: string }) =>
+      api.delete<{ deleted: boolean; voucher_updated_at: string }>(`/vouchers/${voucherId}/lines/${lineId}`, { expected_updated_at }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [KEY, voucherId] });
     },
@@ -185,7 +187,8 @@ export function useMigrateFixedColumns() {
 export function useReloadSnapshots(id: number) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => api.post<Voucher>(`/vouchers/${id}/reload-snapshots`, {}),
+    mutationFn: ({ expected_updated_at }: { expected_updated_at?: string } = {}) =>
+      api.post<{ reloaded: boolean; voucher_updated_at: string }>(`/vouchers/${id}/reload-snapshots`, { expected_updated_at }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [KEY, id] });
     },

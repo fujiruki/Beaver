@@ -5,6 +5,17 @@ import { APP_ID } from '../lib/appId';
 
 const BASE = `/contents/${APP_ID}/api`;
 
+export class ApiError extends Error {
+  status: number;
+  body: unknown;
+
+  constructor(status: number, body: unknown) {
+    super(`API error ${status}: ${JSON.stringify(body)}`);
+    this.status = status;
+    this.body = body;
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(BASE + path, init);
   if (res.status === 401) {
@@ -16,7 +27,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
   if (!res.ok) {
     const text = await res.text().catch(() => '');
-    throw new Error(`API error ${res.status}: ${text}`);
+    let body: unknown = text;
+    try { body = JSON.parse(text); } catch { /* JSON以外のエラー本文は文字列で保持する */ }
+    throw new ApiError(res.status, body);
   }
   return res.json() as Promise<T>;
 }

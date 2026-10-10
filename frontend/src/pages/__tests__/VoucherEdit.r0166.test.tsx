@@ -28,7 +28,10 @@ const requests: RequestRecord[] = [];
 
 function commonResponse(url: string) {
   if (url.endsWith('/customers')) return new Response(JSON.stringify([{ id: 1, name: '得意先A' }]));
-  if (url.endsWith('/projects') || url.endsWith('/aggregation-categories') || url.endsWith('/sales-categories')) return new Response('[]');
+  if (url.endsWith('/aggregation-categories')) return new Response(JSON.stringify([
+    { id: 1, code: 'body', name: '本体', measure_type: 'money', sort_order: 1 },
+  ]));
+  if (url.endsWith('/projects') || url.endsWith('/sales-categories')) return new Response('[]');
   return null;
 }
 

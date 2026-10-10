@@ -8,11 +8,12 @@ interface Props {
   blockReason?: string | null;
   beforeVoid?: () => Promise<boolean>;
   onDone: () => void;
+  performVoid?: (reason?: string) => Promise<void>;
   style?: React.CSSProperties;
 }
 
 /** R-0154: 伝票の取消ボタン。空の伝票は確認なしで即実行、中身ありは理由（任意）を聞く */
-export default function VoidVoucherButton({ voucherId, blockReason, beforeVoid, onDone, style }: Props) {
+export default function VoidVoucherButton({ voucherId, blockReason, beforeVoid, onDone, performVoid, style }: Props) {
   const voidMutation = useVoidVoucher();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [reason, setReason] = useState('');
@@ -20,7 +21,8 @@ export default function VoidVoucherButton({ voucherId, blockReason, beforeVoid, 
 
   const run = async (r?: string) => {
     try {
-      await voidMutation.mutateAsync({ id: voucherId, reason: r });
+      if (performVoid) await performVoid(r);
+      else await voidMutation.mutateAsync({ id: voucherId, reason: r });
       setDialogOpen(false);
       onDone();
     } catch (e) {

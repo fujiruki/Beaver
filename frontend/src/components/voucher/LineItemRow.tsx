@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react';
 import { useFormContext, useWatch } from 'react-hook-form';
 import { useCostCalcDynamic } from '../../hooks/useCostCalc';
 import { useAppSettings } from '../../contexts/AppSettingsContext';
-import { useUpdateLine } from '../../api/vouchers';
 import TateguSelector from './TateguSelector';
 import type { TateguItem } from '../../types/tateguItem';
 import type { LineCategoryValue } from '../../types/voucher';
@@ -17,8 +16,8 @@ type Props = {
   onSelect?: () => void;
   categories: AggregationCategoryMaster[];
   totalCols: number;
-  voucherId: number;
   isNew: boolean;
+  onSaveLine: (lineId: number, data: Record<string, unknown>) => Promise<void>;
 };
 
 export default function LineItemRow({
@@ -29,13 +28,12 @@ export default function LineItemRow({
   onSelect,
   categories,
   totalCols,
-  voucherId,
   isNew,
+  onSaveLine,
 }: Props) {
   const [selectorOpen, setSelectorOpen] = useState(false);
   const { register, setValue, getValues, control } = useFormContext<VoucherFormValues>();
   const { settings } = useAppSettings();
-  const updateLine = useUpdateLine(voucherId);
 
   const line = useWatch({ control, name: `lines.${index}` });
 
@@ -103,9 +101,7 @@ export default function LineItemRow({
     if (isNew) return;
     const cur = getValues(`lines.${index}`);
     if (!cur?.id) return;
-    updateLine.mutate({
-      lineId: cur.id,
-      data: {
+    void onSaveLine(cur.id, {
         location_name:  cur.location_name,
         item_name:       cur.item_name,
         line_type:       cur.line_type,
@@ -116,9 +112,8 @@ export default function LineItemRow({
         memo:            cur.memo,
         costs:           cur.costs,
         prices:          cur.prices,
-      } as any,
     });
-  }, [isNew, getValues, index, updateLine]);
+  }, [isNew, getValues, index, onSaveLine]);
 
   function handleTateguSelect(item: TateguItem) {
     setValue(`lines.${index}.tategu_item_id`, item.id);
@@ -145,13 +140,10 @@ export default function LineItemRow({
     if (!isNew) {
       const cur = getValues(`lines.${index}`);
       if (cur?.id) {
-        updateLine.mutate({
-          lineId: cur.id,
-          data: {
+        void onSaveLine(cur.id, {
             tategu_item_id: item.id,
             item_name: item.name,
             cost_labor_rate: item.cost_labor_rate,
-          } as any,
         });
       }
     }

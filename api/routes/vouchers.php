@@ -893,7 +893,7 @@ switch ($method) {
             $data = json_decode(file_get_contents('php://input'), true) ?? [];
             beginVoucherWrite($pdo, $resourceId, $data);
             assertVoucherEditable($pdo, $resourceId);
-            $fields = ['line_type','location_no','location_name','tategu_item_id','source_catalog_item_id',
+            $fields = ['line_no','line_type','location_no','location_name','tategu_item_id','source_catalog_item_id',
                        'item_name','quantity',
                        'cost_body','cost_hardware','cost_glass','cost_factory_hours','cost_site_hours','cost_labor_rate',
                        'price_body','price_hardware','price_glass','line_total','tax_category','memo'];

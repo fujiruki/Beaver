@@ -4,8 +4,9 @@ import { useForm, FormProvider, useFieldArray, useWatch } from 'react-hook-form'
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import {
   useVoucher, useCreateVoucher, useUpdateVoucher,
-  useAddLine, useDeleteLine, useConvertToSales, useReloadSnapshots,
+  useAddLine, useDeleteLine, useConvertToSales, useReloadSnapshots, useUpdateLine, useVoidVoucher,
 } from '../api/vouchers';
+import { api, ApiError } from '../api/client';
 import { useCustomers } from '../api/customers';
 import { useProjects } from '../api/projects';
 import { useAggregationCategories } from '../api/aggregationCategories';
@@ -16,7 +17,7 @@ import VoidVoucherButton from '../components/voucher/VoidVoucherButton';
 import TotalSummary from '../components/voucher/TotalSummary';
 import { useSmartBack } from '../hooks/useSmartBack';
 import { useAppSettings } from '../contexts/AppSettingsContext';
-import type { VoucherType, VoucherStatus, TaxInputType, LineCategoryValue } from '../types/voucher';
+import type { Voucher, VoucherType, VoucherStatus, TaxInputType, LineCategoryValue } from '../types/voucher';
 import { getVoucherEditBlockReason, getVoucherVoidBlockReason } from '../lib/voucherVoid';
 
 export type VoucherFormValues = {
@@ -122,6 +123,38 @@ const HEADER_FIELDS = new Set<keyof VoucherFormValues>([
 ]);
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error' | 'unsaved';
+type VoucherWriteResult = { updated_at?: string; voucher_updated_at?: string };
+
+function toFormValues(voucher: Voucher): VoucherFormValues {
+  return {
+    voucher_type: voucher.voucher_type,
+    status: voucher.status,
+    customer_id: String(voucher.customer_id),
+    project_id: voucher.project_id != null ? String(voucher.project_id) : '',
+    voucher_date: voucher.voucher_date,
+    delivery_date: voucher.delivery_date,
+    tax_input_type: voucher.tax_input_type,
+    consumption_tax_type: voucher.consumption_tax_type,
+    override_billing_date: voucher.override_billing_date,
+    trade_type: (voucher as any).trade_type ?? '掛売上',
+    description: (voucher as any).description ?? null,
+    profit_rate: voucher.profit_rate,
+    memo: voucher.memo,
+    sales_category_id: (voucher as any).sales_category_id ?? null,
+    validity_period: voucher.validity_period ?? null,
+    lines: voucher.lines.map(l => ({
+      id: l.id, line_no: l.line_no, line_type: l.line_type, location_no: l.location_no,
+      location_name: l.location_name, tategu_item_id: l.tategu_item_id,
+      source_catalog_item_id: l.source_catalog_item_id ?? null, item_name: l.item_name,
+      quantity: l.quantity, cost_body: l.cost_body, cost_hardware: l.cost_hardware,
+      cost_glass: l.cost_glass, cost_factory_hours: l.cost_factory_hours,
+      cost_site_hours: l.cost_site_hours, cost_labor_rate: l.cost_labor_rate,
+      snapshot_loaded_at: l.snapshot_loaded_at, price_body: l.price_body,
+      price_hardware: l.price_hardware, price_glass: l.price_glass, line_total: l.line_total,
+      tax_category: l.tax_category, memo: l.memo, costs: l.costs ?? [], prices: l.prices ?? [],
+    })),
+  };
+}
 
 function NavigationBlocker({ active }: { active: boolean }) {
   const blocker = useBlocker(active);
@@ -191,6 +224,8 @@ export default function VoucherEdit() {
   const deleteLineMutation = useDeleteLine(voucherId);
   const convertMutation = useConvertToSales(voucherId);
   const reloadMutation = useReloadSnapshots(voucherId);
+  const updateLineMutation = useUpdateLine(voucherId);
+  const voidMutation = useVoidVoucher();
 
   const form = useForm<VoucherFormValues>({
     defaultValues: {
@@ -212,56 +247,18 @@ export default function VoucherEdit() {
   const queuedHeaderRef = useRef<ReturnType<typeof toHeader> | null>(null);
   const failedHeaderRef = useRef<ReturnType<typeof toHeader> | null>(null);
   const savingHeaderRef = useRef(false);
+  const voucherUpdatedAtRef = useRef<string | null>(null);
+  const writeQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const staleRef = useRef(false);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [saveError, setSaveError] = useState<unknown>(null);
+  const [staleVoucher, setStaleVoucher] = useState<Voucher | null>(null);
 
   useEffect(() => {
     if (voucher && initializedVoucherIdRef.current !== voucher.id) {
-      const values: VoucherFormValues = {
-        voucher_type: voucher.voucher_type,
-        status: voucher.status,
-        customer_id: String(voucher.customer_id),
-        project_id: voucher.project_id != null ? String(voucher.project_id) : '',
-        voucher_date: voucher.voucher_date,
-        delivery_date: voucher.delivery_date,
-        tax_input_type: voucher.tax_input_type,
-        consumption_tax_type: voucher.consumption_tax_type,
-        override_billing_date: voucher.override_billing_date,
-        trade_type: (voucher as any).trade_type ?? '掛売上',
-        description: (voucher as any).description ?? null,
-        profit_rate: voucher.profit_rate,
-        memo: voucher.memo,
-        sales_category_id: (voucher as any).sales_category_id ?? null,
-        validity_period: voucher.validity_period ?? null,
-        lines: voucher.lines.map(l => ({
-          id: l.id,
-          line_no: l.line_no,
-          line_type: l.line_type,
-          location_no: l.location_no,
-          location_name: l.location_name,
-          tategu_item_id: l.tategu_item_id,
-          source_catalog_item_id: l.source_catalog_item_id ?? null,
-          item_name: l.item_name,
-          quantity: l.quantity,
-          cost_body: l.cost_body,
-          cost_hardware: l.cost_hardware,
-          cost_glass: l.cost_glass,
-          cost_factory_hours: l.cost_factory_hours,
-          cost_site_hours: l.cost_site_hours,
-          cost_labor_rate: l.cost_labor_rate,
-          snapshot_loaded_at: l.snapshot_loaded_at,
-          price_body: l.price_body,
-          price_hardware: l.price_hardware,
-          price_glass: l.price_glass,
-          line_total: l.line_total,
-          tax_category: l.tax_category,
-          memo: l.memo,
-          costs: l.costs ?? [],
-          prices: l.prices ?? [],
-        })),
-      };
-      reset(values);
+      reset(toFormValues(voucher));
+      voucherUpdatedAtRef.current = voucher.updated_at ?? null;
       initializedVoucherIdRef.current = voucher.id;
     }
   }, [voucher, reset]);
@@ -329,6 +326,31 @@ export default function VoucherEdit() {
     };
   }
 
+  function enqueueVoucherWrite<T extends VoucherWriteResult>(write: (expectedUpdatedAt: string | null) => Promise<T>): Promise<T> {
+    const result = writeQueueRef.current.then(async () => {
+      if (staleRef.current) throw new Error('stale_voucher');
+      try {
+        const response = await write(voucherUpdatedAtRef.current);
+        voucherUpdatedAtRef.current = response.voucher_updated_at ?? response.updated_at ?? voucherUpdatedAtRef.current;
+        return response;
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 409) {
+          const body = error.body as { error?: string; voucher?: Voucher };
+          if (body.error === 'stale_voucher' && body.voucher) {
+            staleRef.current = true;
+            queuedHeaderRef.current = null;
+            failedHeaderRef.current = toHeader(getValues());
+            setStaleVoucher(body.voucher);
+            setSaveStatus('unsaved');
+          }
+        }
+        throw error;
+      }
+    });
+    writeQueueRef.current = result.then(() => undefined, () => undefined);
+    return result;
+  }
+
   async function processHeaderQueue() {
     if (savingHeaderRef.current) return;
     savingHeaderRef.current = true;
@@ -338,7 +360,9 @@ export default function VoucherEdit() {
       setSaveStatus('saving');
       setSaveError(null);
       try {
-        await updateMutation.mutateAsync(header);
+        await enqueueVoucherWrite(expectedUpdatedAt => updateMutation.mutateAsync({
+          ...header, expected_updated_at: expectedUpdatedAt ?? undefined,
+        }));
         reset(getValues(), { keepValues: true });
         failedHeaderRef.current = null;
         setSavedAt(new Date());
@@ -400,7 +424,9 @@ export default function VoucherEdit() {
         }
         navigate(`/vouchers/${createdVoucherId}`);
       } else {
-        await updateMutation.mutateAsync(header);
+        await enqueueVoucherWrite(expectedUpdatedAt => updateMutation.mutateAsync({
+          ...header, expected_updated_at: expectedUpdatedAt ?? undefined,
+        }));
         closeGoBack();
       }
     } catch {
@@ -410,11 +436,14 @@ export default function VoucherEdit() {
 
   // R-0154 追加仕様2: 未保存の入力は保存してから取消の空判定へ進む。保存に失敗したら取消しない
   async function saveBeforeVoid(): Promise<boolean> {
+    if (staleRef.current) return false;
     if (isDirty) {
       let saved = false;
       await handleSubmit(async data => {
         try {
-          await updateMutation.mutateAsync(toHeader(data));
+          await enqueueVoucherWrite(expectedUpdatedAt => updateMutation.mutateAsync({
+            ...toHeader(data), expected_updated_at: expectedUpdatedAt ?? undefined,
+          }));
           saved = true;
         } catch {
           return;
@@ -445,7 +474,10 @@ export default function VoucherEdit() {
     if (isNew) {
       append({ ...defaultLine, line_no: nextNo, cost_labor_rate: settings.defaultLaborRate });
     } else {
-      addLineMutation.mutate({ ...defaultLine, line_no: nextNo, cost_labor_rate: settings.defaultLaborRate, voucher_id: voucherId } as any);
+      void enqueueVoucherWrite(expectedUpdatedAt => addLineMutation.mutateAsync({
+        ...defaultLine, line_no: nextNo, cost_labor_rate: settings.defaultLaborRate,
+        voucher_id: voucherId, expected_updated_at: expectedUpdatedAt ?? undefined,
+      } as any)).catch(() => undefined);
     }
   }
 
@@ -458,7 +490,9 @@ export default function VoucherEdit() {
     if (isNew) {
       append(dup);
     } else {
-      addLineMutation.mutate({ ...dup, voucher_id: voucherId } as any);
+      void enqueueVoucherWrite(expectedUpdatedAt => addLineMutation.mutateAsync({
+        ...dup, voucher_id: voucherId, expected_updated_at: expectedUpdatedAt ?? undefined,
+      } as any)).catch(() => undefined);
     }
   }
 
@@ -468,29 +502,73 @@ export default function VoucherEdit() {
     if (isNew) {
       append({ ...defaultLine, line_no: nextNo, cost_labor_rate: settings.defaultLaborRate });
     } else {
-      addLineMutation.mutate({ ...defaultLine, line_no: nextNo, cost_labor_rate: settings.defaultLaborRate, voucher_id: voucherId } as any);
+      void enqueueVoucherWrite(expectedUpdatedAt => addLineMutation.mutateAsync({
+        ...defaultLine, line_no: nextNo, cost_labor_rate: settings.defaultLaborRate,
+        voucher_id: voucherId, expected_updated_at: expectedUpdatedAt ?? undefined,
+      } as any)).catch(() => undefined);
     }
   }
 
   function handleMoveUp() {
     if (selectedIdx === null || selectedIdx === 0) return;
+    const moving = watchedLines?.[selectedIdx];
+    const displaced = watchedLines?.[selectedIdx - 1];
     swap(selectedIdx, selectedIdx - 1);
+    if (!isNew) {
+      if (moving?.id) void saveLine(moving.id, { line_no: selectedIdx });
+      if (displaced?.id) void saveLine(displaced.id, { line_no: selectedIdx + 1 });
+    }
     setSelectedIdx(selectedIdx - 1);
   }
 
   function handleMoveDown() {
     const len = watchedLines?.length ?? 0;
     if (selectedIdx === null || selectedIdx >= len - 1) return;
+    const moving = watchedLines?.[selectedIdx];
+    const displaced = watchedLines?.[selectedIdx + 1];
     swap(selectedIdx, selectedIdx + 1);
+    if (!isNew) {
+      if (moving?.id) void saveLine(moving.id, { line_no: selectedIdx + 2 });
+      if (displaced?.id) void saveLine(displaced.id, { line_no: selectedIdx + 1 });
+    }
     setSelectedIdx(selectedIdx + 1);
   }
 
   async function handleRemoveLine(index: number) {
     const lineId = watchedLines?.[index]?.id;
     if (!isNew && lineId) {
-      deleteLineMutation.mutate(lineId);
+      void enqueueVoucherWrite(expectedUpdatedAt => deleteLineMutation.mutateAsync({
+        lineId, expected_updated_at: expectedUpdatedAt ?? undefined,
+      })).catch(() => undefined);
     }
     remove(index);
+  }
+
+  async function saveLine(lineId: number, data: Record<string, unknown>) {
+    try {
+      await enqueueVoucherWrite(expectedUpdatedAt => updateLineMutation.mutateAsync({
+        lineId,
+        data: { ...data, expected_updated_at: expectedUpdatedAt ?? undefined },
+      }));
+    } catch { return; }
+  }
+
+  async function reloadLatestVoucher() {
+    const latest = await api.get<Voucher>(`/vouchers/${voucherId}`);
+    reset(toFormValues(latest));
+    queryClient.setQueryData(['vouchers', voucherId], latest);
+    voucherUpdatedAtRef.current = latest.updated_at ?? null;
+    staleRef.current = false;
+    failedHeaderRef.current = null;
+    setStaleVoucher(null);
+    setSaveError(null);
+    setSaveStatus('idle');
+  }
+
+  async function performVoid(reason?: string) {
+    await enqueueVoucherWrite(expectedUpdatedAt => voidMutation.mutateAsync({
+      id: voucherId, reason, expected_updated_at: expectedUpdatedAt ?? undefined,
+    }));
   }
 
   if (!isNew && isLoading) return <div>読み込み中...</div>;
@@ -509,6 +587,14 @@ export default function VoucherEdit() {
     <FormProvider {...form}>
       <div>
         <OptionalNavigationBlocker active={hasUnsavedChanges} />
+        {staleVoucher && (
+          <div role="alert" style={staleAlertStyle}>
+            <span>
+              ほかで更新されています（最終更新: {staleVoucher.updated_at}）。再読み込みすると、この画面で保存されていない入力は失われます。
+            </span>
+            <button type="button" onClick={() => void reloadLatestVoucher()} style={subBtnStyle}>再読み込み</button>
+          </div>
+        )}
         {/* トップバー */}
         <div style={{
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
@@ -576,13 +662,15 @@ export default function VoucherEdit() {
               </button>
             )}
             {!isReadOnly && !isNew && (
-              <button type="button" onClick={() => reloadMutation.mutate()} style={reloadBtnStyle}
+              <button type="button" onClick={() => void enqueueVoucherWrite(expectedUpdatedAt => reloadMutation.mutateAsync({
+                expected_updated_at: expectedUpdatedAt ?? undefined,
+              })).catch(() => undefined)} style={reloadBtnStyle}
                 disabled={reloadMutation.isPending}>
                 {reloadMutation.isPending ? '更新中...' : '原価再取得'}
               </button>
             )}
             {!isNew && voucher && voucher.status !== 'void' && (
-              <VoidVoucherButton voucherId={voucherId} beforeVoid={saveBeforeVoid} onDone={() => navigate('/vouchers')}
+              <VoidVoucherButton voucherId={voucherId} beforeVoid={saveBeforeVoid} performVoid={performVoid} onDone={() => navigate('/vouchers')}
                 blockReason={getVoucherVoidBlockReason(voucher)} />
             )}
             <button type="button" style={subBtnStyle}
@@ -726,8 +814,8 @@ export default function VoucherEdit() {
                     onSelect={() => setSelectedIdx(index)}
                     categories={categories}
                     totalCols={totalCols}
-                    voucherId={voucherId}
                     isNew={isNew}
+                    onSaveLine={saveLine}
                   />
                 ))}
               </tbody>
@@ -807,6 +895,11 @@ const convertBtnStyle: React.CSSProperties = {
 const reloadBtnStyle: React.CSSProperties = {
   padding: '5px 12px', background: '#0891b2', color: '#fff', border: 'none',
   borderRadius: 6, cursor: 'pointer', fontSize: 13,
+};
+const staleAlertStyle: React.CSSProperties = {
+  display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12,
+  marginBottom: 12, padding: '12px 16px', border: '2px solid #dc2626', borderRadius: 8,
+  background: '#fef2f2', color: '#991b1b', fontWeight: 'bold',
 };
 const subBtnStyle: React.CSSProperties = {
   padding: '5px 14px', background: '#f8fafc', border: '1px solid #cbd5e1',
