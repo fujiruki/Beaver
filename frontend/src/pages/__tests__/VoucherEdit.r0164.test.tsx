@@ -115,7 +115,7 @@ describe('R-0164 伝票ヘッダーの自動保存と離脱警告', () => {
     expect(await screen.findByText(/保存しました \d{2}:\d{2}/)).toBeTruthy();
   });
 
-  it('保存中・失敗・未保存では閉じる時に確認し、留まるを選ぶと残る', async () => {
+  it('保存中に閉じると確認せず画面にとどまり、保存完了後に移動する', async () => {
     const user = userEvent.setup();
     const { releasePut } = stubFetch({ holdPut: true });
     renderPage();
@@ -125,9 +125,10 @@ describe('R-0164 伝票ヘッダーの自動保存と離脱警告', () => {
     await user.tab();
     await screen.findByText('保存中…');
     await user.click(screen.getByRole('button', { name: '閉じる' }));
-    expect(confirm).toHaveBeenCalledWith('保存されていない変更があります。破棄して移動しますか？');
+    expect(confirm).not.toHaveBeenCalled();
     expect(screen.getByText('Beaver作成')).toBeTruthy();
     releasePut();
+    expect(await screen.findByText('伝票一覧')).toBeTruthy();
   });
 
   it('すべて保存済みなら閉じる時に確認せず離れる', async () => {

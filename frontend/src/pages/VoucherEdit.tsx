@@ -1,4 +1,4 @@
-import { useContext, useEffect, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { UNSAFE_DataRouterContext, useBlocker, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useForm, FormProvider, useFieldArray, useWatch } from 'react-hook-form';
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
@@ -156,19 +156,43 @@ function toFormValues(voucher: Voucher): VoucherFormValues {
   };
 }
 
-function NavigationBlocker({ active }: { active: boolean }) {
-  const blocker = useBlocker(active);
+function NavigationBlocker({ active, beforeLeave }: { active: boolean; beforeLeave: () => Promise<boolean> }) {
+  const navigate = useNavigate();
+  const activeRef = useRef(active);
+  activeRef.current = active;
+  const handlingRef = useRef(false);
+  const bypassRef = useRef(false);
+  const historyActionRef = useRef<'POP' | 'PUSH' | 'REPLACE'>('PUSH');
+  const shouldBlock = useCallback(({ historyAction }: { historyAction: 'POP' | 'PUSH' | 'REPLACE' }) => {
+    historyActionRef.current = historyAction;
+    return !bypassRef.current && activeRef.current;
+  }, []);
+  const blocker = useBlocker(shouldBlock);
   useEffect(() => {
     if (blocker.state !== 'blocked') return;
-    if (window.confirm(LEAVE_MESSAGE)) blocker.proceed();
-    else blocker.reset();
-  }, [blocker]);
+    const location = blocker.location;
+    const historyAction = historyActionRef.current;
+    blocker.reset();
+    if (handlingRef.current) return;
+    handlingRef.current = true;
+    void beforeLeave().then(leave => {
+      if (!leave) {
+        bypassRef.current = false;
+        return;
+      }
+      bypassRef.current = true;
+      if (historyAction === 'POP') navigate(-1);
+      else navigate(location.pathname + location.search + location.hash);
+    }).finally(() => {
+      handlingRef.current = false;
+    });
+  }, [blocker, beforeLeave, navigate]);
   return null;
 }
 
-function OptionalNavigationBlocker({ active }: { active: boolean }) {
+function OptionalNavigationBlocker({ active, beforeLeave }: { active: boolean; beforeLeave: () => Promise<boolean> }) {
   const dataRouter = useContext(UNSAFE_DataRouterContext);
-  return dataRouter ? <NavigationBlocker active={active} /> : null;
+  return dataRouter ? <NavigationBlocker active={active} beforeLeave={beforeLeave} /> : null;
 }
 
 export { getVoucherEditBlockReason };
@@ -194,6 +218,20 @@ function formatDateSlash(dateStr?: string | null): string {
   return dateStr.slice(0, 10).replaceAll('-', '/');
 }
 
+function isStaleVoucherError(error: unknown): boolean {
+  if (!(error instanceof ApiError) || error.status !== 409) return false;
+  return (error.body as { error?: unknown } | null)?.error === 'stale_voucher';
+}
+
+function formatSaveError(error: unknown): string {
+  if (error instanceof ApiError) {
+    const message = (error.body as { error?: unknown } | null)?.error;
+    if (typeof message === 'string') return message;
+    return `保存に失敗しました（HTTP ${error.status}）`;
+  }
+  return error instanceof Error ? error.message : String(error);
+}
+
 export default function VoucherEdit() {
   const { settings } = useAppSettings();
   const dataRouter = useContext(UNSAFE_DataRouterContext);
@@ -209,7 +247,7 @@ export default function VoucherEdit() {
   const initProjectId  = initProjectIdParam ? Number(initProjectIdParam) : null;
   const initType       = (searchParams.get('type') ?? 'estimate') as VoucherType;
 
-  const { data: voucher, isLoading } = useVoucher(voucherId);
+  const { data: voucher, isLoading, isFetchedAfterMount } = useVoucher(voucherId);
   const { data: customers = [] } = useCustomers();
   const { data: projects = [] } = useProjects();
   const { data: categories = [] } = useAggregationCategories();
@@ -247,6 +285,7 @@ export default function VoucherEdit() {
   const queuedHeaderRef = useRef<ReturnType<typeof toHeader> | null>(null);
   const failedHeaderRef = useRef<ReturnType<typeof toHeader> | null>(null);
   const savingHeaderRef = useRef(false);
+  const headerQueuePromiseRef = useRef<Promise<void>>(Promise.resolve());
   const voucherUpdatedAtRef = useRef<string | null>(null);
   const writeQueueRef = useRef<Promise<void>>(Promise.resolve());
   const staleRef = useRef(false);
@@ -256,12 +295,12 @@ export default function VoucherEdit() {
   const [staleVoucher, setStaleVoucher] = useState<Voucher | null>(null);
 
   useEffect(() => {
-    if (voucher && initializedVoucherIdRef.current !== voucher.id) {
+    if (voucher && isFetchedAfterMount && initializedVoucherIdRef.current !== voucher.id) {
       reset(toFormValues(voucher));
       voucherUpdatedAtRef.current = voucher.updated_at ?? null;
       initializedVoucherIdRef.current = voucher.id;
     }
-  }, [voucher, reset]);
+  }, [voucher, isFetchedAfterMount, reset]);
 
   useEffect(() => {
     if (isNew && initProjectIdParam && projects.some(project => String(project.id) === initProjectIdParam)) {
@@ -351,30 +390,34 @@ export default function VoucherEdit() {
     return result;
   }
 
-  async function processHeaderQueue() {
-    if (savingHeaderRef.current) return;
+  function processHeaderQueue(): Promise<void> {
+    if (savingHeaderRef.current) return headerQueuePromiseRef.current;
     savingHeaderRef.current = true;
-    while (queuedHeaderRef.current) {
-      const header = queuedHeaderRef.current;
-      queuedHeaderRef.current = null;
-      setSaveStatus('saving');
-      setSaveError(null);
-      try {
-        await enqueueVoucherWrite(expectedUpdatedAt => updateMutation.mutateAsync({
-          ...header, expected_updated_at: expectedUpdatedAt ?? undefined,
-        }));
-        reset(getValues(), { keepValues: true });
-        failedHeaderRef.current = null;
-        setSavedAt(new Date());
-        setSaveStatus('saved');
-      } catch (error) {
-        failedHeaderRef.current = header;
+    headerQueuePromiseRef.current = (async () => {
+      while (queuedHeaderRef.current) {
+        const header = queuedHeaderRef.current;
         queuedHeaderRef.current = null;
-        setSaveError(error);
-        setSaveStatus('error');
+        setSaveStatus('saving');
+        setSaveError(null);
+        try {
+          await enqueueVoucherWrite(expectedUpdatedAt => updateMutation.mutateAsync({
+            ...header, expected_updated_at: expectedUpdatedAt ?? undefined,
+          }));
+          reset(getValues(), { keepValues: true });
+          failedHeaderRef.current = null;
+          setSavedAt(new Date());
+          setSaveStatus('saved');
+        } catch (error) {
+          failedHeaderRef.current = header;
+          queuedHeaderRef.current = null;
+          setSaveError(error);
+          setSaveStatus(staleRef.current ? 'unsaved' : 'error');
+        }
       }
-    }
-    savingHeaderRef.current = false;
+    })().finally(() => {
+      savingHeaderRef.current = false;
+    });
+    return headerQueuePromiseRef.current;
   }
 
   async function queueHeaderSave() {
@@ -459,6 +502,18 @@ export default function VoucherEdit() {
     : saveStatus === 'saving' || saveStatus === 'error' || saveStatus === 'unsaved' || isDirty
       || addLineMutation.isPending || deleteLineMutation.isPending;
 
+  async function beforeLeave(): Promise<boolean> {
+    if (staleRef.current) return false;
+    const valid = await trigger(['customer_id', 'voucher_date']);
+    if (!valid) return window.confirm(LEAVE_MESSAGE);
+    if (!isNew && isDirty && !savingHeaderRef.current) queuedHeaderRef.current = toHeader(getValues());
+    await processHeaderQueue();
+    await writeQueueRef.current;
+    const mutationsSucceeded = await settlePendingMutations(queryClient);
+    if (staleRef.current || failedHeaderRef.current || !mutationsSucceeded) return false;
+    return true;
+  }
+
   useEffect(() => {
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
       if (!hasUnsavedChanges) return;
@@ -467,7 +522,7 @@ export default function VoucherEdit() {
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [hasUnsavedChanges]);
+  }, [hasUnsavedChanges, staleVoucher]);
 
   function handleAddLine() {
     const nextNo = (watchedLines?.length ?? 0) + 1;
@@ -586,7 +641,7 @@ export default function VoucherEdit() {
   return (
     <FormProvider {...form}>
       <div>
-        <OptionalNavigationBlocker active={hasUnsavedChanges} />
+        <OptionalNavigationBlocker active={hasUnsavedChanges} beforeLeave={beforeLeave} />
         {staleVoucher && (
           <div role="alert" style={staleAlertStyle}>
             <span>
@@ -683,10 +738,10 @@ export default function VoucherEdit() {
           </div>
         </div>
 
-        {mutError && saveStatus !== 'error' && (
+        {mutError && saveStatus !== 'error' && !isStaleVoucherError(mutError) && (
           <div style={{ marginBottom: 12, padding: '10px 14px', background: '#fee2e2',
             color: '#dc2626', borderRadius: 6, fontSize: 14 }}>
-            保存に失敗しました: {String(mutError)}
+            保存に失敗しました: {formatSaveError(mutError)}
           </div>
         )}
 
@@ -840,7 +895,7 @@ export default function VoucherEdit() {
               {!isNew && saveStatus === 'unsaved' && <span>未保存の変更があります</span>}
               {!isNew && saveStatus === 'error' && (
                 <span>
-                  保存に失敗しました: {String(saveError)}{' '}
+                  保存に失敗しました: {formatSaveError(saveError)}{' '}
                   <button type="button" onClick={retryHeaderSave} style={subBtnStyle}>再試行</button>
                 </span>
               )}

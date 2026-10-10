@@ -55,6 +55,8 @@ export function useVoucher(id: number) {
     queryKey: [KEY, id],
     queryFn: () => api.get<Voucher>(`/vouchers/${id}`),
     enabled: id > 0,
+    // 編集画面を開くたびにサーバーの最新版を基準にする
+    refetchOnMount: 'always',
   });
 }
 
