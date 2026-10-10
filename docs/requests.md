@@ -6,14 +6,6 @@ dodai-back（AccessTategu側backpc指揮役）がBeaver_betaの伝票5810（E020
 
 状態: 未着手
 
-## 43. R-0159: GET /projects/sync が updated_at をUTCのまま返す（2026-10-10、dodai-backより。Access側の番号はR-0162）
-
-- 症状: Accessで「Beaverと同期」を押すたびに、案件pullで「更新2件」が出る（Beaver_betaの案件id 2・8が毎回返ってくる）
-- 原因（指揮役が確認）: `api/routes/projects.php`の`GET /projects/sync`は`deleted_at`と`next_cursor_at`だけを`utcToJst`に通し、`updated_at`はUTCのまま返す。一方`updated_after`はJSTとして受け取りUTCに変換する。Accessが返ってきたUTCの値を次回の`updated_after`に使うため、境界が9時間前にずれる
-- 依頼: vouchers・customersのsyncと同じく、返す`updated_at`もJSTにする。Beaver_beta→本番の順に、A-X-02の前にデプロイする
-
-状態: 修正を受諾（2026-10-10）。仕様化・実装はこれから
-
 ## 42. R-0158: Accessからの伝票pushがBeaver側の修正を黙って上書きする（2026-10-09、R-0157の確認中に発見）
 
 R-0157（得意先）と同じ問題が伝票にもある。指揮役が確認:
