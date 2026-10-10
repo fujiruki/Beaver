@@ -1,6 +1,6 @@
 # 引き継ぎ資料 — Beaver（最新）
 
-**最終更新**: 2026-10-10（R-0157・R-0158・R-0159をBeaver_betaへデプロイ。本番は未デプロイ）
+**最終更新**: 2026-10-10 夜（R-0157〜R-0168をBeaver_betaへデプロイ。本番は未デプロイ）
 
 前回分は `docs/handover/Hikitsugi_2026-10-06.md`（R-0148〜R-0152、auto modeとの付き合い方）。それ以前は同ディレクトリの日付付きファイル。
 
@@ -36,9 +36,16 @@
 - **R-0157**（Accessからの得意先pushがBeaverの修正を黙って上書きしない。`base_synced_at`・`force`、409 `customer_conflict`。繰越残高の編集で`updated_at`を進めない）: 実装`2fe47d2`、dodai-backと通し確認4項目すべて合格
 - **R-0158**（伝票pushも同じ方式、409 `voucher_conflict`＋`void_reason`。Beaverでvoid済みの伝票はforceで取消解除し`record_history`に`unvoid`。R-0154の一方通行の例外は晴樹さんの判断、dodai-back経由）: ClaudeのAgentが週の上限で停止しCodexが引き継いで実装（`9197091`）。dodai-backの通し確認待ち。`void_reason`は取消解除後も過去の理由が入るので、Access側はstatus=voidのときだけ使う
 - **R-0159**（`GET /projects/sync`の`updated_at`をJSTで返す。Access側の番号R-0162）: `36b8465`。サーバーのPHP既定タイムゾーンはAsia/Tokyo（`updated_after`の`strtotime`解釈が依存）
-- **R-0161**（Accessからのリンクで伝票を開くと得意先欄が一瞬「-- 選択してください --」）: 記録のみ、優先度低
-- **A-X-02で本番に入れるもの**: R-0154（追加仕様含む）・R-0157・R-0158・R-0159。R-0158の「`base_synced_at`なしの既存伝票は400」への切り替えはA-X-02後にdodai-backの合図で行う
-- **Codexの呼び出し方**: `codex-onrequest.cmd exec -`（標準入力渡し）は何も実行せず終了コード2で終わった。`codex --cd C:/Fujiruki/Projects --sandbox workspace-write --ask-for-approval on-request exec "$(cat プロンプト.md)"`で直接呼ぶと動く
+- R-0158はdodai-backの通し確認B1〜B5・C〜Fすべて合格
+- **R-0163**（伝票画面の時刻をJSTに、Access№・最終更新を表示）: Beaver_betaへデプロイ済み、合格
+- **R-0164**（伝票ヘッダーの自動保存、保存ボタン廃止、離脱警告）／**R-0165**（伝票一覧で取消済みを既定で隠す）: Beaver_betaへデプロイ済み。晴樹さんは自動保存を「便利」と評価
+- **R-0166**（伝票の楽観的ロック。`expected_updated_at`、409 `stale_voucher`、画面は自動保存を止めて再読み込みを案内）: `993730f`、Beaver_betaで合格
+- **R-0168**（離れるときは保存の結果を待ち、409や失敗なら離れない。開くたびにサーバーから取り直す。生のJSONを出さない）: `c57248d`、Beaver_betaで合格。useBlockerで止めたまま非同期待ちすると`Invalid blocker state transition`になるため、即reset→保存待ち→自分でnavigateし直す設計にした。R-0164の離脱確認テスト1件は仕様変更に合わせて期待値を改めた（仕様書に明記）
+- **R-0161**（優先度を上げた。選択肢＝得意先・案件・売上種別がそろうまでフォームに値を入れず保存もしない。R-0168後に5809で選択欄が全部空に見えた。データは無事）: `b3a075b`、2026-10-10夜にBeaver_betaへデプロイ。dodai-backが5809で確認予定
+- **R-0167**（得意先画面にも楽観的ロックが無い）: 晴樹さんの判断待ち
+- vitestの`localhost:3000`へのECONNREFUSEDログはR-0161以前から出ている既存のもので、失敗には数えられない。Codexの実行環境ではこれを理由に止まることがある
+- **A-X-02で本番に入れるもの**: R-0154（追加仕様含む）・R-0157・R-0158・R-0159・R-0161・R-0163〜R-0166・R-0168。R-0158の「`base_synced_at`なしの既存伝票は400」への切り替えはA-X-02後にdodai-backの合図で行う
+- **Codexの呼び出し方**: `codex-onrequest.cmd exec -`（標準入力渡し）は何も実行せず終了コード2で終わった。`codex --cd C:/Fujiruki/Projects --sandbox workspace-write --ask-for-approval on-request exec "$(cat プロンプト.md)"`で直接呼ぶと動く。`--cd`をBeaverにすると`.git`が読み取り専用になりコミットできない（必ず親の`Projects`）
 
 ### 4. 未着手
 - R-0153（伝票編集画面の合計プレビューをR-0152の計算規則に揃える。`docs/requests.md` §38）。Dodaikunへ乗り換える前に必ず直す
