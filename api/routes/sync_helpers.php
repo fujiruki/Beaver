@@ -470,7 +470,7 @@ function syncVoucherUpsert(PDO $pdo, ?int $projectId): void {
             return;
         }
 
-        $recordsUnvoid = $existing && $force && $existing['status'] === 'void' && $status !== 'void';
+        $recordsUnvoid = $existing && $existing['status'] === 'void' && $status !== 'void';
 
         if ($existing) {
             $voucherNo = (string)$existing['voucher_no'];
@@ -597,7 +597,9 @@ function syncVoucherUpsert(PDO $pdo, ?int $projectId): void {
                 $voucherId,
                 'unvoid',
                 $existing,
-                ['reason' => 'Accessの競合解決で『Access版を採用』（force）により取消を解除'],
+                ['reason' => $force
+                    ? 'Accessの競合解決で『Access版を採用』（force）により取消を解除'
+                    : 'Accessからの同期で取消を解除'],
                 $afterStmt->fetch()
             );
         }
