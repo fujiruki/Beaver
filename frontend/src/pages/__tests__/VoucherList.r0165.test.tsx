@@ -45,7 +45,7 @@ describe('VoucherList 取消済み表示切替 (R-0165)', () => {
     await waitFor(() => expect(requestedUrls.length).toBeGreaterThan(0));
     const request = new URL(requestedUrls[requestedUrls.length - 1], 'http://localhost');
     expect(request.searchParams.get('exclude_void')).toBe('1');
-    expect(screen.getByRole('checkbox', { name: '取消済みも表示' })).not.toBeChecked();
+    expect((screen.getByRole('checkbox', { name: '取消済みも表示' }) as HTMLInputElement).checked).toBe(false);
   });
 
   it('受入条件5: トグルをオンにすると除外指定を外し、include_void=1で1ページ目に戻る', async () => {
@@ -56,14 +56,14 @@ describe('VoucherList 取消済み表示切替 (R-0165)', () => {
     await waitFor(() => {
       const request = new URL(requestedUrls[requestedUrls.length - 1], 'http://localhost');
       expect(request.searchParams.has('exclude_void')).toBe(false);
-      expect(screen.getByTestId('location')).toHaveTextContent('?include_void=1');
+      expect(screen.getByTestId('location').textContent).toBe('?include_void=1');
     });
   });
 
   it('受入条件6: include_void=1 のURLから開くとトグルをオンで復元する', async () => {
     renderPage('/vouchers?include_void=1');
     const toggle = await screen.findByRole('checkbox', { name: '取消済みも表示' });
-    expect(toggle).toBeChecked();
+    expect((toggle as HTMLInputElement).checked).toBe(true);
     await waitFor(() => expect(requestedUrls.length).toBeGreaterThan(0));
     const request = new URL(requestedUrls[requestedUrls.length - 1], 'http://localhost');
     expect(request.searchParams.has('exclude_void')).toBe(false);

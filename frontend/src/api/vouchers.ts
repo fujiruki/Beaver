@@ -11,6 +11,7 @@ type VoucherFilters = {
   status?: string;
   customer_id?: number;
   project_id?: number;
+  exclude_void?: boolean;
 };
 
 /** 伝票一覧取得（全件・KPI等用） */
@@ -18,6 +19,7 @@ export function useVouchers(filters?: VoucherFilters) {
   const params = new URLSearchParams();
   if (filters?.voucher_type) params.set('voucher_type', filters.voucher_type);
   if (filters?.status) params.set('status', filters.status);
+  if (filters?.exclude_void) params.set('exclude_void', '1');
   const qs = params.toString();
   return useQuery({
     queryKey: [KEY, filters],
@@ -36,6 +38,7 @@ export function useVouchersPaged(page: number, filters?: VoucherFilters, sort?: 
       if (filters?.status) params.set('status', filters.status);
       if (filters?.customer_id) params.set('customer_id', String(filters.customer_id));
       if (filters?.project_id) params.set('project_id', String(filters.project_id));
+      if (filters?.exclude_void) params.set('exclude_void', '1');
       // sort未指定時はsort/orderパラメータを付けない（既定の伝票日付降順を維持）
       if (sort) {
         params.set('sort', sort.key);

@@ -516,6 +516,9 @@ switch ($method) {
             if (!empty($_GET['customer_id'])) { $where .= ' AND v.customer_id = ?'; $params[] = (int)$_GET['customer_id']; }
             if (!empty($_GET['project_id']))  { $where .= ' AND v.project_id = ?';  $params[] = (int)$_GET['project_id']; }
             if (!empty($_GET['status']))      { $where .= ' AND v.status = ?';      $params[] = $_GET['status']; }
+            if (($_GET['exclude_void'] ?? '') === '1' && ($_GET['status'] ?? '') !== 'void') {
+                $where .= " AND v.status <> 'void'";
+            }
             if (!empty($_GET['q'])) {
                 [$searchClause, $searchParams] = buildMultiColumnSearchClause(
                     ['v.voucher_no', 'c.name', 'p.name', 'v.description', 'v.memo'],

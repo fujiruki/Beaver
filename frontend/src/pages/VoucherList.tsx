@@ -31,6 +31,7 @@ export default function VoucherList() {
   });
   const [typeFilter, setTypeFilter] = useState(() => searchParams.get('voucher_type') ?? '');
   const [statusFilter, setStatusFilter] = useState(() => searchParams.get('status') ?? '');
+  const [includeVoid, setIncludeVoid] = useState(() => searchParams.get('include_void') === '1');
   const [searchInput, setSearchInput] = useState(() => searchParams.get('q') ?? '');
   const [searchQuery, setSearchQuery] = useState(() => searchParams.get('q') ?? '');
   const isComposingRef = useRef(false);
@@ -53,6 +54,7 @@ export default function VoucherList() {
     status: statusFilter || undefined,
     customer_id: customerFilter ?? undefined,
     project_id: projectFilter ?? undefined,
+    exclude_void: statusFilter !== 'void' && !includeVoid,
   }, sort);
 
   const vouchers = data?.data ?? [];
@@ -65,6 +67,7 @@ export default function VoucherList() {
     statusFilter: string;
     customerFilter: number | null;
     projectFilter: number | null;
+    includeVoid: boolean;
     sort?: SortState;
   }, nextSearch = searchQuery) {
     const params = new URLSearchParams();
@@ -72,6 +75,7 @@ export default function VoucherList() {
     if (next.projectFilter) params.set('project_id', String(next.projectFilter));
     if (next.typeFilter) params.set('voucher_type', next.typeFilter);
     if (next.statusFilter) params.set('status', next.statusFilter);
+    if (next.includeVoid) params.set('include_void', '1');
     if (nextSearch) params.set('q', nextSearch);
     if (next.page > 1) params.set('page', String(next.page));
     if (next.sort) {
@@ -84,7 +88,7 @@ export default function VoucherList() {
   function commitSearch(value: string) {
     setSearchQuery(value);
     setPage(1);
-    syncUrl({ page: 1, typeFilter, statusFilter, customerFilter, projectFilter, sort }, value);
+    syncUrl({ page: 1, typeFilter, statusFilter, customerFilter, projectFilter, includeVoid, sort }, value);
   }
 
   function handleSearchChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -108,37 +112,43 @@ export default function VoucherList() {
   function handleTypeFilterChange(value: string) {
     setTypeFilter(value);
     setPage(1);
-    syncUrl({ page: 1, typeFilter: value, statusFilter, customerFilter, projectFilter, sort });
+    syncUrl({ page: 1, typeFilter: value, statusFilter, customerFilter, projectFilter, includeVoid, sort });
   }
 
   function handleStatusFilterChange(value: string) {
     setStatusFilter(value);
     setPage(1);
-    syncUrl({ page: 1, typeFilter, statusFilter: value, customerFilter, projectFilter, sort });
+    syncUrl({ page: 1, typeFilter, statusFilter: value, customerFilter, projectFilter, includeVoid, sort });
   }
 
   function handleCustomerChange(id: number | null) {
     setCustomerFilter(id);
     setProjectFilter(null);
     setPage(1);
-    syncUrl({ page: 1, typeFilter, statusFilter, customerFilter: id, projectFilter: null, sort });
+    syncUrl({ page: 1, typeFilter, statusFilter, customerFilter: id, projectFilter: null, includeVoid, sort });
   }
 
   function handleProjectChange(id: number | null) {
     setProjectFilter(id);
     setPage(1);
-    syncUrl({ page: 1, typeFilter, statusFilter, customerFilter, projectFilter: id, sort });
+    syncUrl({ page: 1, typeFilter, statusFilter, customerFilter, projectFilter: id, includeVoid, sort });
   }
 
   function handleSortChange(key: string, dir: SortDir) {
     setSortStorage(key, dir);
     setPage(1);
-    syncUrl({ page: 1, typeFilter, statusFilter, customerFilter, projectFilter, sort: { key, dir } });
+    syncUrl({ page: 1, typeFilter, statusFilter, customerFilter, projectFilter, includeVoid, sort: { key, dir } });
   }
 
   function handlePageChange(p: number) {
     setPage(p);
-    syncUrl({ page: p, typeFilter, statusFilter, customerFilter, projectFilter, sort });
+    syncUrl({ page: p, typeFilter, statusFilter, customerFilter, projectFilter, includeVoid, sort });
+  }
+
+  function handleIncludeVoidChange(checked: boolean) {
+    setIncludeVoid(checked);
+    setPage(1);
+    syncUrl({ page: 1, typeFilter, statusFilter, customerFilter, projectFilter, includeVoid: checked, sort });
   }
 
   function handleNewVoucher() {
@@ -264,6 +274,14 @@ export default function VoucherList() {
             <option value="void">無効</option>
           </select>
         </div>
+        <label style={{ gridColumn: '4', justifySelf: 'end', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={includeVoid}
+            onChange={e => handleIncludeVoidChange(e.target.checked)}
+          />
+          取消済みも表示
+        </label>
       </div>
 
       {isLoading ? (
