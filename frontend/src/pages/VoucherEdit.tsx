@@ -9,6 +9,7 @@ import {
 import { api, ApiError } from '../api/client';
 import { useCustomers } from '../api/customers';
 import { useProjects } from '../api/projects';
+import { useSalesCategories } from '../api/salesCategories';
 import { useAggregationCategories } from '../api/aggregationCategories';
 import VoucherHeader from '../components/voucher/VoucherHeader';
 import LineItemRow from '../components/voucher/LineItemRow';
@@ -248,8 +249,12 @@ export default function VoucherEdit() {
   const initType       = (searchParams.get('type') ?? 'estimate') as VoucherType;
 
   const { data: voucher, isLoading, isFetchedAfterMount } = useVoucher(voucherId);
-  const { data: customers = [] } = useCustomers();
-  const { data: projects = [] } = useProjects();
+  const customersQuery = useCustomers();
+  const projectsQuery = useProjects();
+  const salesCategoriesQuery = useSalesCategories();
+  const { data: customers = [] } = customersQuery;
+  const { data: projects = [] } = projectsQuery;
+  const { data: salesCategories = [] } = salesCategoriesQuery;
   const { data: categories = [] } = useAggregationCategories();
 
   const projectFallbackId = voucher?.project_id ?? initProjectId;
@@ -293,14 +298,19 @@ export default function VoucherEdit() {
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [saveError, setSaveError] = useState<unknown>(null);
   const [staleVoucher, setStaleVoucher] = useState<Voucher | null>(null);
+  const [formInitialized, setFormInitialized] = useState(isNew);
+  const optionsReady = customersQuery.isSuccess && projectsQuery.isSuccess && salesCategoriesQuery.isSuccess;
+  const optionsError = customersQuery.isError || projectsQuery.isError || salesCategoriesQuery.isError;
+  const formReady = optionsReady && (isNew || formInitialized);
 
   useEffect(() => {
-    if (voucher && isFetchedAfterMount && initializedVoucherIdRef.current !== voucher.id) {
+    if (voucher && isFetchedAfterMount && optionsReady && initializedVoucherIdRef.current !== voucher.id) {
       reset(toFormValues(voucher));
       voucherUpdatedAtRef.current = voucher.updated_at ?? null;
       initializedVoucherIdRef.current = voucher.id;
+      setFormInitialized(true);
     }
-  }, [voucher, isFetchedAfterMount, reset]);
+  }, [voucher, isFetchedAfterMount, optionsReady, reset]);
 
   useEffect(() => {
     if (isNew && initProjectIdParam && projects.some(project => String(project.id) === initProjectIdParam)) {
@@ -366,6 +376,7 @@ export default function VoucherEdit() {
   }
 
   function enqueueVoucherWrite<T extends VoucherWriteResult>(write: (expectedUpdatedAt: string | null) => Promise<T>): Promise<T> {
+    if (!formReady) return Promise.reject(new Error('フォームの初期化が完了していません'));
     const result = writeQueueRef.current.then(async () => {
       if (staleRef.current) throw new Error('stale_voucher');
       try {
@@ -421,7 +432,7 @@ export default function VoucherEdit() {
   }
 
   async function queueHeaderSave() {
-    if (isNew || isReadOnly || !canEdit) return;
+    if (!formReady || isNew || isReadOnly || !canEdit) return;
     const valid = await trigger(['customer_id', 'voucher_date']);
     if (!valid) {
       queuedHeaderRef.current = null;
@@ -453,6 +464,7 @@ export default function VoucherEdit() {
   }
 
   async function onSubmit(data: VoucherFormValues) {
+    if (!formReady) return;
     const header = toHeader(data);
     try {
       if (isNew) {
@@ -525,6 +537,7 @@ export default function VoucherEdit() {
   }, [hasUnsavedChanges, staleVoucher]);
 
   function handleAddLine() {
+    if (!formReady) return;
     const nextNo = (watchedLines?.length ?? 0) + 1;
     if (isNew) {
       append({ ...defaultLine, line_no: nextNo, cost_labor_rate: settings.defaultLaborRate });
@@ -537,6 +550,7 @@ export default function VoucherEdit() {
   }
 
   function handleDuplicateLine() {
+    if (!formReady) return;
     if (selectedIdx === null) return;
     const src = watchedLines?.[selectedIdx];
     if (!src) return;
@@ -552,6 +566,7 @@ export default function VoucherEdit() {
   }
 
   function handleInsertLine() {
+    if (!formReady) return;
     const insertAt = selectedIdx !== null ? selectedIdx + 1 : (watchedLines?.length ?? 0);
     const nextNo = insertAt + 1;
     if (isNew) {
@@ -565,6 +580,7 @@ export default function VoucherEdit() {
   }
 
   function handleMoveUp() {
+    if (!formReady) return;
     if (selectedIdx === null || selectedIdx === 0) return;
     const moving = watchedLines?.[selectedIdx];
     const displaced = watchedLines?.[selectedIdx - 1];
@@ -577,6 +593,7 @@ export default function VoucherEdit() {
   }
 
   function handleMoveDown() {
+    if (!formReady) return;
     const len = watchedLines?.length ?? 0;
     if (selectedIdx === null || selectedIdx >= len - 1) return;
     const moving = watchedLines?.[selectedIdx];
@@ -590,6 +607,7 @@ export default function VoucherEdit() {
   }
 
   async function handleRemoveLine(index: number) {
+    if (!formReady) return;
     const lineId = watchedLines?.[index]?.id;
     if (!isNew && lineId) {
       void enqueueVoucherWrite(expectedUpdatedAt => deleteLineMutation.mutateAsync({
@@ -600,6 +618,7 @@ export default function VoucherEdit() {
   }
 
   async function saveLine(lineId: number, data: Record<string, unknown>) {
+    if (!formReady) return;
     try {
       await enqueueVoucherWrite(expectedUpdatedAt => updateLineMutation.mutateAsync({
         lineId,
@@ -745,6 +764,13 @@ export default function VoucherEdit() {
           </div>
         )}
 
+        {optionsError && (
+          <div role="alert" style={{ marginBottom: 12, padding: '10px 14px', background: '#fee2e2',
+            color: '#dc2626', borderRadius: 6, fontSize: 14 }}>
+            選択肢を読み込めませんでした。再読み込みしてください
+          </div>
+        )}
+
         {/* R-0143 A-B-06: 請求済みロック表示 */}
         {!isNew && voucher?.access_billed_flag === 1 && (
           <div style={{ marginBottom: 12, padding: '10px 14px', background: '#fef2f2',
@@ -798,7 +824,11 @@ export default function VoucherEdit() {
           <VoucherHeader
             customers={customers}
             projects={projects}
-            readOnly={isReadOnly || (!isNew && !canEdit)}
+            salesCategories={salesCategories}
+            currentCustomerId={voucher?.customer_id ?? null}
+            currentProjectId={voucher?.project_id ?? null}
+            currentSalesCategoryId={voucher?.sales_category_id ?? null}
+            readOnly={!formReady || isReadOnly || (!isNew && !canEdit)}
             onTaxInputTypeChange={() => queueMicrotask(() => void queueHeaderSave())}
           />
 
@@ -864,7 +894,7 @@ export default function VoucherEdit() {
                     key={field.id}
                     index={index}
                     onRemove={() => handleRemoveLine(index)}
-                    readOnly={isReadOnly}
+                    readOnly={!formReady || isReadOnly}
                     selected={selectedIdx === index}
                     onSelect={() => setSelectedIdx(index)}
                     categories={categories}
@@ -877,7 +907,7 @@ export default function VoucherEdit() {
             </table>}
             {!isReadOnly && categories.length > 0 && (
               <div style={{ padding: '8px 12px', borderTop: '1px solid #f1f5f9' }}>
-                <button type="button" onClick={handleAddLine} style={addLineBtnStyle}>
+                <button type="button" onClick={handleAddLine} disabled={!formReady} style={addLineBtnStyle}>
                   + 行を追加
                 </button>
               </div>
@@ -908,7 +938,7 @@ export default function VoucherEdit() {
                   <button type="button" onClick={closeGoBack} style={cancelBtnStyle}>
                     キャンセル
                   </button>
-                  <button type="submit" disabled={isPending || voucher?.access_billed_flag === 1} style={submitBtnStyle}>
+                  <button type="submit" disabled={!formReady || isPending || voucher?.access_billed_flag === 1} style={submitBtnStyle}>
                     {isPending ? '保存中...' : '保存'}
                   </button>
                 </>

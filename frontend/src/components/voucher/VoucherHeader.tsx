@@ -2,11 +2,15 @@ import { useFormContext } from 'react-hook-form';
 import type { Customer } from '../../types/customer';
 import type { Project } from '../../types/project';
 import type { VoucherFormValues } from '../../pages/VoucherEdit';
-import { useSalesCategories } from '../../api/salesCategories';
+import type { SalesCategory } from '../../api/salesCategories';
 
 interface Props {
   customers: Customer[];
   projects: Project[];
+  salesCategories: SalesCategory[];
+  currentCustomerId?: number | null;
+  currentProjectId?: number | null;
+  currentSalesCategoryId?: number | null;
   readOnly?: boolean;
   onTaxInputTypeChange?: () => void;
 }
@@ -19,11 +23,14 @@ const STATUS_OPTIONS = [
   { value: 'void',      label: '無効'   },
 ];
 
-export default function VoucherHeader({ customers, projects, readOnly = false, onTaxInputTypeChange }: Props) {
+export default function VoucherHeader({
+  customers, projects, salesCategories, currentCustomerId, currentProjectId, currentSalesCategoryId,
+  readOnly = false, onTaxInputTypeChange,
+}: Props) {
   const { register, watch, setValue, formState: { errors } } = useFormContext<VoucherFormValues>();
   const taxInputType = watch('tax_input_type');
   const voucherType = watch('voucher_type');
-  const { data: salesCategories = [] } = useSalesCategories();
+  const salesCategoryId = watch('sales_category_id');
 
   return (
     <div style={{
@@ -42,6 +49,9 @@ export default function VoucherHeader({ customers, projects, readOnly = false, o
             disabled={readOnly}
           >
             <option value={0}>-- 選択してください --</option>
+            {currentCustomerId != null && !customers.some(c => c.id === currentCustomerId) && (
+              <option value={currentCustomerId}>（一覧にない得意先 id={currentCustomerId}）</option>
+            )}
             {customers.map(c => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
@@ -55,6 +65,9 @@ export default function VoucherHeader({ customers, projects, readOnly = false, o
             disabled={readOnly}
           >
             <option value="">-- 案件なし --</option>
+            {currentProjectId != null && !projects.some(p => p.id === currentProjectId) && (
+              <option value={currentProjectId}>（一覧にない案件 id={currentProjectId}）</option>
+            )}
             {projects.map(p => (
               <option key={p.id} value={p.id}>{p.name}</option>
             ))}
@@ -101,8 +114,16 @@ export default function VoucherHeader({ customers, projects, readOnly = false, o
         </Field>
 
         <Field label="売上種別">
-          <select {...register('sales_category_id', { setValueAs: v => v === '' ? null : Number(v) })} style={selStyle} disabled={readOnly}>
+          <select
+            {...register('sales_category_id', { setValueAs: v => v === '' ? null : Number(v) })}
+            value={salesCategoryId ?? ''}
+            style={selStyle}
+            disabled={readOnly}
+          >
             <option value="">-- 種別なし --</option>
+            {currentSalesCategoryId != null && !salesCategories.some(c => c.id === currentSalesCategoryId) && (
+              <option value={currentSalesCategoryId}>（一覧にない売上種別 id={currentSalesCategoryId}）</option>
+            )}
             {salesCategories.map(c => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}

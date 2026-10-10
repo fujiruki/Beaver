@@ -83,9 +83,11 @@ describe('R-0161 選択肢を待って伝票フォームを初期化する', () 
 
     releaseOptions();
 
-    await waitFor(() => expect(getSelect('customer_id').value).toBe('809'));
-    expect(getSelect('project_id').value).toBe('48');
-    expect(getSelect('sales_category_id').value).toBe('1');
+    await waitFor(() => {
+      expect(getSelect('customer_id').value).toBe('809');
+      expect(getSelect('project_id').value).toBe('48');
+      expect(getSelect('sales_category_id').value).toBe('1');
+    });
   });
 
   it('選択肢が届く前は保存せず、届いたあとのPUTでも選択値を保つ', async () => {
