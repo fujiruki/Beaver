@@ -137,6 +137,7 @@ if ($method === 'GET' && isset($segments[1]) && $segments[1] === 'sync' && !isse
     }
 
     foreach ($rows as &$row) {
+        $row['updated_at'] = utcToJst($row['updated_at']);
         $row['deleted_at'] = utcToJst($row['deleted_at']);
     }
     unset($row);
