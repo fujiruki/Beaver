@@ -37,6 +37,16 @@ Accessの伝票push（`POST /vouchers/sync`、`POST /projects/{id}/vouchers/sync
 - `force=true`で、既存の伝票が`void`、送られてきた`status`が`void`以外なら、Access版で置き換えて取消を解除する。そのとき`record_history`に`entity=vouchers`、`action=unvoid`で、解除前後の伝票と理由「Accessの競合解決で『Access版を採用』（force）により取消を解除」を記録する
 - 送られてきた`status`も`void`なら、今と同じ処理（履歴は残さない）
 
+## 追加（2026-10-10、dodai-backとの確認で決定）
+
+- 既存の伝票が`void`で、送られてきた`status`が`void`以外のときは、`force`の有無にかかわらず取消を解除し、`record_history`に`action=unvoid`を残す（forceなしの通常のpushで、`updated_at <= base_synced_at`のため競合にならずに取消が戻る場合も含む）。理由の文言は、forceありは「Accessの競合解決で『Access版を採用』（force）により取消を解除」、forceなしは「Accessからの同期で取消を解除」
+- きっかけ: B5の確認中、force以外の経路で取消が戻ると履歴が残らないと分かった。dodai-backの判断「取消を戻したことが記録に残らない経路は、無いほうが安全」
+
+追加の受け入れ条件:
+
+13. void済みの伝票に、forceなし・`base_synced_at`が`updated_at`以上（競合にならない）で`status=draft`のpush → 取消が解除され、`record_history`に`action=unvoid`（理由「Accessからの同期で取消を解除」）が1件残る
+14. void済みの伝票に、`base_synced_at`なしで`status=draft`のpush → 同じく`unvoid`が1件残る
+
 ## 対象外
 
 - `syncVoucherUpdate`（PUT経路）: Accessは使っていない（dodai-back確認、Access側はPOSTに統一）
