@@ -1,6 +1,6 @@
 # 引き継ぎ資料 — Beaver（最新）
 
-**最終更新**: 2026-10-09（A-X-01やり直しのBeaver側作業が完了、R-0154を実装しBeaver_betaへデプロイ）
+**最終更新**: 2026-10-10（R-0157・R-0158・R-0159をBeaver_betaへデプロイ。本番は未デプロイ）
 
 前回分は `docs/handover/Hikitsugi_2026-10-06.md`（R-0148〜R-0152、auto modeとの付き合い方）。それ以前は同ディレクトリの日付付きファイル。
 
@@ -31,6 +31,14 @@
 - R-0156（Accessの画面でBeaverの伝票番号E02046などを見えるようにする）: dodai-backが調査中
 - 修正前の再現テスト: E02046の得意先「とりあえず登録用」をBeaverで付け替えても、今のAccessには反映されない（既存伝票の採用時にcustomer_id・project_idを更新しないため）
 - 得意先の双方向同期テストは、Access側の受入シナリオU-3（S3・S4）で行う予定
+
+### 3.6 2026-10-09〜10 の追加（すべてBeaver_betaのみ、本番は未デプロイ）
+- **R-0157**（Accessからの得意先pushがBeaverの修正を黙って上書きしない。`base_synced_at`・`force`、409 `customer_conflict`。繰越残高の編集で`updated_at`を進めない）: 実装`2fe47d2`、dodai-backと通し確認4項目すべて合格
+- **R-0158**（伝票pushも同じ方式、409 `voucher_conflict`＋`void_reason`。Beaverでvoid済みの伝票はforceで取消解除し`record_history`に`unvoid`。R-0154の一方通行の例外は晴樹さんの判断、dodai-back経由）: ClaudeのAgentが週の上限で停止しCodexが引き継いで実装（`9197091`）。dodai-backの通し確認待ち。`void_reason`は取消解除後も過去の理由が入るので、Access側はstatus=voidのときだけ使う
+- **R-0159**（`GET /projects/sync`の`updated_at`をJSTで返す。Access側の番号R-0162）: `36b8465`。サーバーのPHP既定タイムゾーンはAsia/Tokyo（`updated_after`の`strtotime`解釈が依存）
+- **R-0161**（Accessからのリンクで伝票を開くと得意先欄が一瞬「-- 選択してください --」）: 記録のみ、優先度低
+- **A-X-02で本番に入れるもの**: R-0154（追加仕様含む）・R-0157・R-0158・R-0159。R-0158の「`base_synced_at`なしの既存伝票は400」への切り替えはA-X-02後にdodai-backの合図で行う
+- **Codexの呼び出し方**: `codex-onrequest.cmd exec -`（標準入力渡し）は何も実行せず終了コード2で終わった。`codex --cd C:/Fujiruki/Projects --sandbox workspace-write --ask-for-approval on-request exec "$(cat プロンプト.md)"`で直接呼ぶと動く
 
 ### 4. 未着手
 - R-0153（伝票編集画面の合計プレビューをR-0152の計算規則に揃える。`docs/requests.md` §38）。Dodaikunへ乗り換える前に必ず直す
