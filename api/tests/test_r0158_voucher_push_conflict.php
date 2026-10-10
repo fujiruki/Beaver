@@ -368,6 +368,36 @@ try {
         assertEq(1, (int)$pdo->query("SELECT COUNT(*) FROM voucher_line_prices WHERE voucher_line_id = $lineId")->fetchColumn(), 'prices を維持');
     });
 
+    runTest('受入条件13: void済みに forceなし・競合なしで status=draft → 取消解除、通常同期の unvoid 履歴1件', function () use ($pdo, $sync, $api, $UTC) {
+        $id = seedVoucher($pdo, $sync, 9013, $UTC);
+        voidWithReason($pdo, $api, $id, '通常同期前の取消');
+        $r = request('POST', $sync, payload(9013, 'Access版', 'Access明細', ['base_synced_at' => '2026-10-01 12:00:00']));
+        assertEq(200, $r['status'], 'status');
+        assertEq('draft', snapshot($pdo, $id)['voucher']['status'], 'status が draft に戻る');
+        assertEq(1, historyCount($pdo, $id, 'unvoid'), 'unvoid 履歴が1件');
+        $h = $pdo->query("SELECT * FROM record_history WHERE entity = 'vouchers' AND entity_id = $id AND action = 'unvoid'")->fetch();
+        $beforeJson = json_decode($h['before_json'], true);
+        $afterJson = json_decode((string)$h['after_json'], true);
+        assertEq('void', $beforeJson['row']['status'] ?? null, '解除前の伝票は void');
+        assertEq('draft', $afterJson['row']['status'] ?? null, '解除後の伝票は draft');
+        assertEq('Accessからの同期で取消を解除', $beforeJson['related']['reason'] ?? null, '理由');
+    });
+
+    runTest('受入条件14: void済みに base_synced_atなし・status=draft → 取消解除、通常同期の unvoid 履歴1件', function () use ($pdo, $sync, $api, $UTC) {
+        $id = seedVoucher($pdo, $sync, 9014, $UTC);
+        voidWithReason($pdo, $api, $id, '基準時刻なし同期前の取消');
+        $r = request('POST', $sync, payload(9014, 'Access版', 'Access明細'));
+        assertEq(200, $r['status'], 'status');
+        assertEq('draft', snapshot($pdo, $id)['voucher']['status'], 'status が draft に戻る');
+        assertEq(1, historyCount($pdo, $id, 'unvoid'), 'unvoid 履歴が1件');
+        $h = $pdo->query("SELECT * FROM record_history WHERE entity = 'vouchers' AND entity_id = $id AND action = 'unvoid'")->fetch();
+        $beforeJson = json_decode($h['before_json'], true);
+        $afterJson = json_decode((string)$h['after_json'], true);
+        assertEq('void', $beforeJson['row']['status'] ?? null, '解除前の伝票は void');
+        assertEq('draft', $afterJson['row']['status'] ?? null, '解除後の伝票は draft');
+        assertEq('Accessからの同期で取消を解除', $beforeJson['related']['reason'] ?? null, '理由');
+    });
+
 } finally {
     if (is_resource($serverProc)) {
         foreach ($serverPipes as $p) { if (is_resource($p)) fclose($p); }
