@@ -8,6 +8,7 @@ interface Props {
   customers: Customer[];
   projects: Project[];
   readOnly?: boolean;
+  onTaxInputTypeChange?: () => void;
 }
 
 const STATUS_OPTIONS = [
@@ -18,7 +19,7 @@ const STATUS_OPTIONS = [
   { value: 'void',      label: '無効'   },
 ];
 
-export default function VoucherHeader({ customers, projects, readOnly = false }: Props) {
+export default function VoucherHeader({ customers, projects, readOnly = false, onTaxInputTypeChange }: Props) {
   const { register, watch, setValue, formState: { errors } } = useFormContext<VoucherFormValues>();
   const taxInputType = watch('tax_input_type');
   const voucherType = watch('voucher_type');
@@ -137,7 +138,10 @@ export default function VoucherHeader({ customers, projects, readOnly = false }:
             <button
               type="button"
               disabled={readOnly}
-              onClick={() => setValue('tax_input_type', 'exclusive')}
+              onClick={() => {
+                setValue('tax_input_type', 'exclusive', { shouldDirty: true });
+                onTaxInputTypeChange?.();
+              }}
               style={{
                 padding: '6px 16px', fontSize: 13, fontWeight: 'bold', cursor: readOnly ? 'default' : 'pointer',
                 border: 'none', borderRight: '1px solid #cbd5e1',
@@ -151,7 +155,10 @@ export default function VoucherHeader({ customers, projects, readOnly = false }:
             <button
               type="button"
               disabled={readOnly}
-              onClick={() => setValue('tax_input_type', 'inclusive')}
+              onClick={() => {
+                setValue('tax_input_type', 'inclusive', { shouldDirty: true });
+                onTaxInputTypeChange?.();
+              }}
               style={{
                 padding: '6px 16px', fontSize: 13, fontWeight: 'bold', cursor: readOnly ? 'default' : 'pointer',
                 border: 'none',

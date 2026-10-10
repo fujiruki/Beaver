@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { createBrowserRouter, createRoutesFromElements, Route, RouterProvider } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import AppLayout from './components/layout/AppLayout';
 import { AppSettingsProvider } from './contexts/AppSettingsContext';
@@ -32,40 +32,40 @@ const queryClient = new QueryClient({
   },
 });
 
+const router = createBrowserRouter(createRoutesFromElements(
+  <Route path="/" element={<AppLayout />}>
+    <Route index element={<Dashboard />} />
+    <Route path="customers" element={<CustomerList />} />
+    <Route path="customers/new" element={<CustomerDetail />} />
+    <Route path="customers/:id" element={<CustomerDetail />} />
+    <Route path="customers/:id/carry-forward" element={<CarryForwardEdit />} />
+    <Route path="tategu" element={<TateguItemList />} />
+    <Route path="tategu/new" element={<TateguItemDetail />} />
+    <Route path="tategu/:id" element={<TateguItemDetail />} />
+    <Route path="projects" element={<ProjectList />} />
+    <Route path="projects/new" element={<ProjectDetail />} />
+    <Route path="projects/:id" element={<ProjectDetail />} />
+    <Route path="dandori" element={<DandoriBoard />} />
+    <Route path="vouchers" element={<VoucherList />} />
+    <Route path="vouchers/new" element={<VoucherEdit />} />
+    <Route path="vouchers/:id" element={<VoucherEdit />} />
+    <Route path="invoices" element={<InvoiceList />} />
+    <Route path="invoices/new" element={<InvoiceDetail />} />
+    <Route path="invoices/:id" element={<InvoiceDetail />} />
+    <Route path="settings/sales-categories" element={<SalesCategorySettings />} />
+    <Route path="settings/project-statuses" element={<ProjectStatusSettings />} />
+    <Route path="settings/app" element={<AppSettings />} />
+    <Route path="help" element={<Help />} />
+  </Route>,
+), { basename: `/contents/${APP_ID}` });
+
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AppSettingsProvider>
-        <BrowserRouter basename={`/contents/${APP_ID}`}>
-          <Suspense fallback={<div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>読み込み中...</div>}>
-            <Routes>
-              <Route path="/" element={<AppLayout />}>
-                <Route index element={<Dashboard />} />
-                <Route path="customers" element={<CustomerList />} />
-                <Route path="customers/new" element={<CustomerDetail />} />
-                <Route path="customers/:id" element={<CustomerDetail />} />
-                <Route path="customers/:id/carry-forward" element={<CarryForwardEdit />} />
-                <Route path="tategu" element={<TateguItemList />} />
-                <Route path="tategu/new" element={<TateguItemDetail />} />
-                <Route path="tategu/:id" element={<TateguItemDetail />} />
-                <Route path="projects" element={<ProjectList />} />
-                <Route path="projects/new" element={<ProjectDetail />} />
-                <Route path="projects/:id" element={<ProjectDetail />} />
-                <Route path="dandori" element={<DandoriBoard />} />
-                <Route path="vouchers" element={<VoucherList />} />
-                <Route path="vouchers/new" element={<VoucherEdit />} />
-                <Route path="vouchers/:id" element={<VoucherEdit />} />
-                <Route path="invoices" element={<InvoiceList />} />
-                <Route path="invoices/new" element={<InvoiceDetail />} />
-                <Route path="invoices/:id" element={<InvoiceDetail />} />
-                <Route path="settings/sales-categories" element={<SalesCategorySettings />} />
-                <Route path="settings/project-statuses" element={<ProjectStatusSettings />} />
-                <Route path="settings/app" element={<AppSettings />} />
-                <Route path="help" element={<Help />} />
-              </Route>
-            </Routes>
-          </Suspense>
-        </BrowserRouter>
+        <Suspense fallback={<div style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>読み込み中...</div>}>
+          <RouterProvider router={router} />
+        </Suspense>
       </AppSettingsProvider>
     </QueryClientProvider>
   );

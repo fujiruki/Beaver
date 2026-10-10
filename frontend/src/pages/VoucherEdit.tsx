@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { useContext, useEffect, useRef, useState } from 'react';
+import { UNSAFE_DataRouterContext, useBlocker, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useForm, FormProvider, useFieldArray, useWatch } from 'react-hook-form';
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import {
@@ -114,6 +114,30 @@ const defaultValues: VoucherFormValues = {
   lines: [{ ...defaultLine }],
 };
 
+const LEAVE_MESSAGE = '保存されていない変更があります。破棄して移動しますか？';
+const HEADER_FIELDS = new Set<keyof VoucherFormValues>([
+  'voucher_type', 'status', 'customer_id', 'project_id', 'voucher_date', 'delivery_date',
+  'tax_input_type', 'consumption_tax_type', 'override_billing_date', 'trade_type', 'description',
+  'profit_rate', 'memo', 'sales_category_id', 'validity_period',
+]);
+
+type SaveStatus = 'idle' | 'saving' | 'saved' | 'error' | 'unsaved';
+
+function NavigationBlocker({ active }: { active: boolean }) {
+  const blocker = useBlocker(active);
+  useEffect(() => {
+    if (blocker.state !== 'blocked') return;
+    if (window.confirm(LEAVE_MESSAGE)) blocker.proceed();
+    else blocker.reset();
+  }, [blocker]);
+  return null;
+}
+
+function OptionalNavigationBlocker({ active }: { active: boolean }) {
+  const dataRouter = useContext(UNSAFE_DataRouterContext);
+  return dataRouter ? <NavigationBlocker active={active} /> : null;
+}
+
 export { getVoucherEditBlockReason };
 
 /** R-0154: 実行中の保存（明細行のblur保存など）が終わるのを待ち、すべて成功したかを返す */
@@ -139,6 +163,7 @@ function formatDateSlash(dateStr?: string | null): string {
 
 export default function VoucherEdit() {
   const { settings } = useAppSettings();
+  const dataRouter = useContext(UNSAFE_DataRouterContext);
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
@@ -176,17 +201,24 @@ export default function VoucherEdit() {
       ...(isNew ? { lines: [{ ...defaultLine, cost_labor_rate: settings.defaultLaborRate }] } : {}),
     },
   });
-  const { control, handleSubmit, reset, watch, setValue, formState: { isDirty } } = form;
+  const { control, getValues, handleSubmit, reset, setValue, trigger, watch, formState: { isDirty } } = form;
   const queryClient = useQueryClient();
 
   const { fields, append, remove, swap } = useFieldArray({ control, name: 'lines' });
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const createdVoucherIdRef = useRef<number | null>(null);
   const savedNewLineCountRef = useRef(0);
+  const initializedVoucherIdRef = useRef<number | null>(null);
+  const queuedHeaderRef = useRef<ReturnType<typeof toHeader> | null>(null);
+  const failedHeaderRef = useRef<ReturnType<typeof toHeader> | null>(null);
+  const savingHeaderRef = useRef(false);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
+  const [savedAt, setSavedAt] = useState<Date | null>(null);
+  const [saveError, setSaveError] = useState<unknown>(null);
 
   useEffect(() => {
-    if (voucher) {
-      reset({
+    if (voucher && initializedVoucherIdRef.current !== voucher.id) {
+      const values: VoucherFormValues = {
         voucher_type: voucher.voucher_type,
         status: voucher.status,
         customer_id: String(voucher.customer_id),
@@ -228,7 +260,9 @@ export default function VoucherEdit() {
           costs: l.costs ?? [],
           prices: l.prices ?? [],
         })),
-      });
+      };
+      reset(values);
+      initializedVoucherIdRef.current = voucher.id;
     }
   }, [voucher, reset]);
 
@@ -295,6 +329,62 @@ export default function VoucherEdit() {
     };
   }
 
+  async function processHeaderQueue() {
+    if (savingHeaderRef.current) return;
+    savingHeaderRef.current = true;
+    while (queuedHeaderRef.current) {
+      const header = queuedHeaderRef.current;
+      queuedHeaderRef.current = null;
+      setSaveStatus('saving');
+      setSaveError(null);
+      try {
+        await updateMutation.mutateAsync(header);
+        reset(getValues(), { keepValues: true });
+        failedHeaderRef.current = null;
+        setSavedAt(new Date());
+        setSaveStatus('saved');
+      } catch (error) {
+        failedHeaderRef.current = header;
+        queuedHeaderRef.current = null;
+        setSaveError(error);
+        setSaveStatus('error');
+      }
+    }
+    savingHeaderRef.current = false;
+  }
+
+  async function queueHeaderSave() {
+    if (isNew || isReadOnly || !canEdit) return;
+    const valid = await trigger(['customer_id', 'voucher_date']);
+    if (!valid) {
+      queuedHeaderRef.current = null;
+      setSaveStatus('unsaved');
+      return;
+    }
+    const header = toHeader(getValues());
+    queuedHeaderRef.current = header;
+    void processHeaderQueue();
+  }
+
+  function handleHeaderBlur(event: React.FocusEvent<HTMLFormElement>) {
+    const target = event.target as unknown as HTMLInputElement;
+    if (target.tagName !== 'INPUT' || target.type === 'date' || !HEADER_FIELDS.has(target.name as keyof VoucherFormValues)) return;
+    void queueHeaderSave();
+  }
+
+  function handleHeaderChange(event: React.ChangeEvent<HTMLFormElement>) {
+    const target = event.target as unknown as HTMLInputElement | HTMLSelectElement;
+    if (!HEADER_FIELDS.has(target.name as keyof VoucherFormValues)) return;
+    if (target.tagName === 'SELECT' || (target as HTMLInputElement).type === 'date') {
+      queueMicrotask(() => void queueHeaderSave());
+    }
+  }
+
+  function retryHeaderSave() {
+    if (failedHeaderRef.current) queuedHeaderRef.current = failedHeaderRef.current;
+    void processHeaderQueue();
+  }
+
   async function onSubmit(data: VoucherFormValues) {
     const header = toHeader(data);
     try {
@@ -334,6 +424,21 @@ export default function VoucherEdit() {
     }
     return settlePendingMutations(queryClient);
   }
+
+  const hasUnsavedChanges = isNew
+    ? isDirty
+    : saveStatus === 'saving' || saveStatus === 'error' || saveStatus === 'unsaved' || isDirty
+      || addLineMutation.isPending || deleteLineMutation.isPending;
+
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!hasUnsavedChanges) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
 
   function handleAddLine() {
     const nextNo = (watchedLines?.length ?? 0) + 1;
@@ -403,6 +508,7 @@ export default function VoucherEdit() {
   return (
     <FormProvider {...form}>
       <div>
+        <OptionalNavigationBlocker active={hasUnsavedChanges} />
         {/* トップバー */}
         <div style={{
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
@@ -489,7 +595,7 @@ export default function VoucherEdit() {
           </div>
         </div>
 
-        {mutError && (
+        {mutError && saveStatus !== 'error' && (
           <div style={{ marginBottom: 12, padding: '10px 14px', background: '#fee2e2',
             color: '#dc2626', borderRadius: 6, fontSize: 14 }}>
             保存に失敗しました: {String(mutError)}
@@ -545,11 +651,12 @@ export default function VoucherEdit() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit(onSubmit)}>
+        <form onSubmit={handleSubmit(onSubmit)} onBlurCapture={handleHeaderBlur} onChangeCapture={handleHeaderChange}>
           <VoucherHeader
             customers={customers}
             projects={projects}
-            readOnly={isReadOnly}
+            readOnly={isReadOnly || (!isNew && !canEdit)}
+            onTaxInputTypeChange={() => queueMicrotask(() => void queueHeaderSave())}
           />
 
           <ProfitRateBar categories={categories} selectedIdx={selectedIdx} setSelectedIdx={setSelectedIdx} />
@@ -637,12 +744,23 @@ export default function VoucherEdit() {
           {/* 合計 + ボタン */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
             <TotalSummary lines={linesForCalc} taxInputType={watchedTaxInputType} taxRate={0.10} costLines={costLinesForCalc} />
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              {!isNew && saveStatus === 'saving' && <span>保存中…</span>}
+              {!isNew && saveStatus === 'saved' && savedAt && (
+                <span>保存しました {savedAt.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}</span>
+              )}
+              {!isNew && saveStatus === 'unsaved' && <span>未保存の変更があります</span>}
+              {!isNew && saveStatus === 'error' && (
+                <span>
+                  保存に失敗しました: {String(saveError)}{' '}
+                  <button type="button" onClick={retryHeaderSave} style={subBtnStyle}>再試行</button>
+                </span>
+              )}
               {isReadOnly ? (
                 <button type="button" onClick={backToProjectGoBack} style={cancelBtnStyle}>
                   ← 案件に戻る
                 </button>
-              ) : (
+              ) : isNew || !dataRouter ? (
                 <>
                   <button type="button" onClick={closeGoBack} style={cancelBtnStyle}>
                     キャンセル
@@ -651,7 +769,7 @@ export default function VoucherEdit() {
                     {isPending ? '保存中...' : '保存'}
                   </button>
                 </>
-              )}
+              ) : null}
             </div>
           </div>
         </form>

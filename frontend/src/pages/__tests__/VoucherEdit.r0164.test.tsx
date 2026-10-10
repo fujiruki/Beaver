@@ -48,7 +48,7 @@ function renderPage(path = '/vouchers/5') {
     { path: '/vouchers/:id', element: <VoucherEdit /> },
     { path: '/vouchers', element: <div>伝票一覧</div> },
     { path: '/done/:id', element: <div>保存後</div> },
-  ], { initialEntries: [path] });
+  ], { initialEntries: ['/vouchers', path], initialIndex: 1 });
   render(
     <QueryClientProvider client={client}>
       <AppSettingsProvider><RouterProvider router={router} /></AppSettingsProvider>
