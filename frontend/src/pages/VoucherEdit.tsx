@@ -432,9 +432,19 @@ export default function VoucherEdit() {
                 {voucher?.access_voucher_id != null ? 'Access由来' : 'Beaver作成'}
               </span>
             )}
+            {!isNew && voucher?.access_voucher_id != null && (
+              <span style={{ fontSize: 11, color: '#1e40af' }}>
+                Access№ {voucher.access_voucher_id}
+              </span>
+            )}
             {!isNew && voucher?.last_synced_at && (
               <span style={{ fontSize: 11, color: '#94a3b8' }}>
                 最終同期: {voucher.last_synced_at}
+              </span>
+            )}
+            {!isNew && (
+              <span style={{ fontSize: 11, color: '#94a3b8' }}>
+                最終更新: {voucher?.updated_at}
               </span>
             )}
           </div>

@@ -10,7 +10,7 @@ const baseVoucher = {
   voucher_date: '2026-10-10', delivery_date: null, tax_input_type: 'exclusive', consumption_tax_type: '外税/伝票計',
   override_billing_date: null, trade_type: '掛売上', description: null, profit_rate: 0.3, memo: null,
   sales_category_id: null, validity_period: null, subtotal_taxable: 0, tax_amount: 0, total_amount: 0, lines: [],
-  converted_sales: [], access_voucher_id: 12102, access_billed_flag: 0, access_billing_date: null,
+  converted_sales: [], access_voucher_id: 12102 as number | null, access_billed_flag: 0, access_billing_date: null,
   last_synced_at: '2026-10-10 16:08:09', updated_at: '2026-10-10 16:09:12', sync_pending: 0,
 };
 

@@ -167,6 +167,15 @@ function normalizeSalesCategoryId($value) {
     return $value;
 }
 
+function voucherTimesToJst(array $voucher): array {
+    foreach (['created_at', 'updated_at', 'last_synced_at'] as $field) {
+        if (array_key_exists($field, $voucher)) {
+            $voucher[$field] = utcToJst($voucher[$field]);
+        }
+    }
+    return $voucher;
+}
+
 // --- 明細行に建具台帳スナップショットをロード ---
 function loadSnapshot(PDO $pdo, int $lineId): void {
     $stmt = $pdo->prepare('SELECT tategu_item_id FROM voucher_lines WHERE id = ?');
@@ -495,6 +504,7 @@ switch ($method) {
                 $row['converted_sales'] = $csStmt->fetchAll();
             }
 
+            $row = voucherTimesToJst($row);
             echo json_encode($row);
         } else {
             // R-0154 追加仕様2: 一覧の取消ボタンを無効表示するため、voidでない売上に引用済みの見積かを返す（assertVoucherEditableと同じ条件）
@@ -688,7 +698,7 @@ switch ($method) {
             http_response_code(201);
             $s = $pdo->prepare('SELECT * FROM vouchers WHERE id = ?');
             $s->execute([$newId]);
-            echo json_encode($s->fetch());
+            echo json_encode(voucherTimesToJst($s->fetch()));
             } catch (Throwable $e) {
                 if ($pdo->inTransaction()) { $pdo->rollBack(); }
                 error_log('[convert-to-sales] ' . $e->getMessage());
@@ -825,7 +835,7 @@ switch ($method) {
         http_response_code(201);
         $s = $pdo->prepare('SELECT * FROM vouchers WHERE id = ?');
         $s->execute([$id]);
-        echo json_encode($s->fetch());
+        echo json_encode(voucherTimesToJst($s->fetch()));
         break;
 
     case 'PUT':
@@ -897,7 +907,7 @@ switch ($method) {
         recalcVoucher($pdo, $resourceId);
         $s = $pdo->prepare('SELECT * FROM vouchers WHERE id = ?');
         $s->execute([$resourceId]);
-        echo json_encode($s->fetch());
+        echo json_encode(voucherTimesToJst($s->fetch()));
         break;
 
     case 'DELETE':

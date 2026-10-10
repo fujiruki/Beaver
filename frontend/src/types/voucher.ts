@@ -65,6 +65,8 @@ export interface Voucher {
   access_billing_date?: string | null;
   /** サーバでの最終同期時刻 */
   last_synced_at?: string | null;
+  created_at?: string;
+  updated_at?: string;
   /** Access側で確認待ち（競合の可能性あり）の印 */
   sync_pending?: number;
 }
