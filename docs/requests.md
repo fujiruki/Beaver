@@ -6,18 +6,6 @@ dodai-back（AccessTategu側backpc指揮役）がBeaver_betaの伝票5810（E020
 
 状態: 未着手
 
-## 42. R-0158: Accessからの伝票pushがBeaver側の修正を黙って上書きする（2026-10-09、R-0157の確認中に発見）
-
-R-0157（得意先）と同じ問題が伝票にもある。指揮役が確認:
-
-- `POST /vouchers/sync`のヘッダーは`INSERT … ON CONFLICT(access_voucher_id) DO UPDATE`で、Beaverの`updated_at`を確かめずに上書きする（`api/routes/sync_helpers.php:365`付近）
-- 明細も、R-0151で「Access採用＝Access版が正」として`edited_in_beaver`による保護を外している
-- dodai-backと合意: R-0157は得意先だけを対象にし、伝票は別の要望として扱う
-
-- 2026-10-10 dodai-backからAPI案を受領（晴樹さん了承済みと伝達）。R-0157と同じ方式（`base_synced_at`・`force`・409 `voucher_conflict`）。指揮役の回答: 1リクエスト1伝票、409本文は`{"error":"voucher_conflict","voucher":{GET /vouchers/syncの1件と同じ形}}`、`base_synced_at`なしの既存伝票は切替前は上書きを許しA-X-02後に400へ切り替える、Beaverでvoid済みの伝票はforceでも戻さず409 `voucher_voided`にする案（晴樹さんに確認）。`syncVoucherUpdate`（PUT経路）をAccessが使っているかdodai-backに確認中
-
-状態: void済み伝票の扱いを藤田晴樹さんに確認中。確認後に仕様書を作成
-
 ## 39. R-0155: Access⇔Beaverの同期・競合解消を「得意先→案件→伝票」の順にする（2026-10-09、藤田晴樹さんより会話内で直接）
 
 A-X-01の手順8（Beaver_betaの試用伝票E02046・E02047をAccessの競合解決画面で「Beaver版を採用」）の最中に出た要望。藤田晴樹さんの原文:

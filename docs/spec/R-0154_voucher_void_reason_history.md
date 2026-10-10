@@ -70,7 +70,7 @@
 1. 連携伝票（`access_voucher_id` あり）は、空でも物理削除しない。物理削除するとAccessの次回push・全件pushで作り直され、横断整合検査P2aがNGになる
 2. 請求済み（Access側の請求済み `access_billed_flag=1` を含む）は取消できない。Accessは請求済み伝票のvoidを無視するため、Beaverだけがvoidになる食い違い（検査P2d）が残る
 3. voidにするときは必ず `updated_at` を進める。Accessは「Beaverの`updated_at` > Accessの`last_synced_at`」のときだけ `deleted_at` を立てる
-4. 取消は戻せない（一方通行）。voidから戻す機能は作らない。Accessに復元の経路がないため
+4. 取消は戻せない（一方通行）。voidから戻す機能は作らない。Accessに復元の経路がないため。例外（2026-10-10、R-0158）: Accessの競合解決画面で「Access版を採用」（force）を選んだ場合は取消を解除し、`record_history`に`action=unvoid`を残す
 5. 理由はAccessへ送らない。理由の正本はBeaverの `record_history`
 
 ## 画面
