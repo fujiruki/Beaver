@@ -1,5 +1,19 @@
 # 要望・リクエスト
 
+## 44. R-0161: Accessからのリンクで伝票を直接開くと、得意先欄が「-- 選択してください --」と表示される（2026-10-10、dodai-backより）
+
+dodai-back（AccessTategu側backpc指揮役）がBeaver_betaの伝票5810（E02047、竹本工務店）をAccessからのリンクで直接開いたところ、最初は得意先欄が「-- 選択してください --」になり、再表示すると竹本工務店になった。`customer_id`は変わっていない。得意先の候補一覧の読み込みより先に伝票の値をフォームに入れている可能性がある。優先度は低め。
+
+状態: 未着手
+
+## 43. R-0159: GET /projects/sync が updated_at をUTCのまま返す（2026-10-10、dodai-backより。Access側の番号はR-0162）
+
+- 症状: Accessで「Beaverと同期」を押すたびに、案件pullで「更新2件」が出る（Beaver_betaの案件id 2・8が毎回返ってくる）
+- 原因（指揮役が確認）: `api/routes/projects.php`の`GET /projects/sync`は`deleted_at`と`next_cursor_at`だけを`utcToJst`に通し、`updated_at`はUTCのまま返す。一方`updated_after`はJSTとして受け取りUTCに変換する。Accessが返ってきたUTCの値を次回の`updated_after`に使うため、境界が9時間前にずれる
+- 依頼: vouchers・customersのsyncと同じく、返す`updated_at`もJSTにする。Beaver_beta→本番の順に、A-X-02の前にデプロイする
+
+状態: 修正を受諾（2026-10-10）。仕様化・実装はこれから
+
 ## 42. R-0158: Accessからの伝票pushがBeaver側の修正を黙って上書きする（2026-10-09、R-0157の確認中に発見）
 
 R-0157（得意先）と同じ問題が伝票にもある。指揮役が確認:
@@ -8,7 +22,9 @@ R-0157（得意先）と同じ問題が伝票にもある。指揮役が確認:
 - 明細も、R-0151で「Access採用＝Access版が正」として`edited_in_beaver`による保護を外している
 - dodai-backと合意: R-0157は得意先だけを対象にし、伝票は別の要望として扱う
 
-状態: 未着手（R-0157の完了後に検討）
+- 2026-10-10 dodai-backからAPI案を受領（晴樹さん了承済みと伝達）。R-0157と同じ方式（`base_synced_at`・`force`・409 `voucher_conflict`）。指揮役の回答: 1リクエスト1伝票、409本文は`{"error":"voucher_conflict","voucher":{GET /vouchers/syncの1件と同じ形}}`、`base_synced_at`なしの既存伝票は切替前は上書きを許しA-X-02後に400へ切り替える、Beaverでvoid済みの伝票はforceでも戻さず409 `voucher_voided`にする案（晴樹さんに確認）。`syncVoucherUpdate`（PUT経路）をAccessが使っているかdodai-backに確認中
+
+状態: void済み伝票の扱いを藤田晴樹さんに確認中。確認後に仕様書を作成
 
 ## 39. R-0155: Access⇔Beaverの同期・競合解消を「得意先→案件→伝票」の順にする（2026-10-09、藤田晴樹さんより会話内で直接）
 
