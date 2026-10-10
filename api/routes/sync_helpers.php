@@ -5,8 +5,10 @@
  * - access_voucher_id を冪等性キーとした upsert
  * - 厳格 validation（customer_access_no / project_id 検証）
  * - INSERT 時は payload の status を使用し、未送信時は 'approved' にフォールバック
- * - 重複時は最新で上書きし、200 OK を黙って返す（Access に「重複」とは返さない）
+ * - 同期基準時刻よりBeaver側が新しい場合は上書きせず競合を返す
  */
+
+require_once __DIR__ . '/history_helpers.php';
 
 if (!function_exists('readJsonBody')) {
     function readJsonBody(): array {
@@ -86,6 +88,77 @@ function jstToUtc(string $jstDateTime): ?string {
     if ($dt === false || $dt->format('Y-m-d H:i:s') !== $jstDateTime) return null;
     $dt->setTimezone(new DateTimeZone('UTC'));
     return $dt->format('Y-m-d H:i:s');
+}
+
+const VOUCHER_SYNC_SELECT_COLUMNS = 'v.id, v.voucher_no, v.voucher_type, v.status, v.voucher_date,
+                   v.access_voucher_id, v.access_voucher_no, v.customer_id, v.project_id,
+                   v.total_amount, v.updated_at, v.last_synced_at,
+                   v.trade_type, v.consumption_tax_type, v.description,
+                   v.print_date_flag, v.print_tax_excl_flag, v.print_company_seal,
+                   v.sales_category_id, v.delivery_date, v.billing_date,
+                   v.source_estimate_no, v.validity_period,
+                   v.access_billed_flag, v.access_billing_date, v.access_receivable_id,
+                   c.access_customer_no AS customer_access_no,
+                   c.name AS beaver_customer_name, p.name AS beaver_project_name';
+
+function voucherSyncRowsToJst(PDO $pdo, array $rows): array {
+    $voucherIds = array_column($rows, 'id');
+    $linesByVoucherId = [];
+    if (!empty($voucherIds)) {
+        $placeholders = implode(',', array_fill(0, count($voucherIds), '?'));
+        $lineStmt = $pdo->prepare("
+            SELECT voucher_id, id AS beaver_line_id, access_line_id, line_no, item_name, quantity,
+                   price_body, price_hardware, price_glass, line_total,
+                   tax_category, memo, updated_at, edited_in_beaver
+            FROM voucher_lines
+            WHERE voucher_id IN ($placeholders)
+            ORDER BY voucher_id ASC, line_no ASC
+        ");
+        $lineStmt->execute($voucherIds);
+        foreach ($lineStmt->fetchAll() as $lineRow) {
+            $voucherId = (int)$lineRow['voucher_id'];
+            unset($lineRow['voucher_id']);
+            $lineRow['beaver_line_id'] = (int)$lineRow['beaver_line_id'];
+            $lineRow['access_line_id'] = $lineRow['access_line_id'] !== null ? (int)$lineRow['access_line_id'] : null;
+            $lineRow['edited_in_beaver'] = (int)$lineRow['edited_in_beaver'];
+            if ($lineRow['tax_category'] === 'taxable') $lineRow['tax_category'] = '課税';
+            if ($lineRow['tax_category'] === 'non_taxable') $lineRow['tax_category'] = '非課税';
+            $lineRow['updated_at'] = utcToJst($lineRow['updated_at']);
+            $linesByVoucherId[$voucherId][] = $lineRow;
+        }
+    }
+
+    foreach ($rows as &$row) {
+        $row['updated_at'] = utcToJst($row['updated_at']);
+        $row['last_synced_at'] = utcToJst($row['last_synced_at']);
+        $row['access_billed_flag'] = (int)$row['access_billed_flag'];
+        $row['lines'] = $linesByVoucherId[(int)$row['id']] ?? [];
+    }
+    unset($row);
+    return $rows;
+}
+
+function voucherSyncRowById(PDO $pdo, int $voucherId): ?array {
+    $stmt = $pdo->prepare('SELECT ' . VOUCHER_SYNC_SELECT_COLUMNS . '
+        FROM vouchers v
+        LEFT JOIN customers c ON c.id = v.customer_id
+        LEFT JOIN projects p ON p.id = v.project_id
+        WHERE v.id = ?');
+    $stmt->execute([$voucherId]);
+    $row = $stmt->fetch();
+    if (!$row) return null;
+    return voucherSyncRowsToJst($pdo, [$row])[0];
+}
+
+function latestVoucherVoidReason(PDO $pdo, int $voucherId): ?string {
+    $stmt = $pdo->prepare("SELECT json_extract(before_json, '$.related.reason')
+        FROM record_history
+        WHERE entity = 'vouchers' AND entity_id = ? AND action = 'void'
+        ORDER BY id DESC
+        LIMIT 1");
+    $stmt->execute([$voucherId]);
+    $reason = $stmt->fetchColumn();
+    return is_string($reason) ? $reason : null;
 }
 
 /**
@@ -266,6 +339,16 @@ function nextVoucherNoForSync(PDO $pdo, string $type): string {
 function syncVoucherUpsert(PDO $pdo, ?int $projectId): void {
     $data = readJsonBody();
 
+    $baseSyncedAtUtc = null;
+    if (isset($data['base_synced_at']) && $data['base_synced_at'] !== '') {
+        $baseSyncedAtUtc = is_string($data['base_synced_at']) ? jstToUtc($data['base_synced_at']) : null;
+        if ($baseSyncedAtUtc === null) {
+            respond(400, ['error' => 'Invalid base_synced_at format']);
+            return;
+        }
+    }
+    $force = ($data['force'] ?? false) === true;
+
     $accessVoucherId = isset($data['access_voucher_id']) ? (int)$data['access_voucher_id'] : 0;
     if ($accessVoucherId <= 0) {
         respond(400, ['error' => 'access_voucher_id は必須です']);
@@ -375,9 +458,19 @@ function syncVoucherUpsert(PDO $pdo, ?int $projectId): void {
         // race condition 回避: INSERT...ON CONFLICT(access_voucher_id) DO UPDATE で原子的に upsert する。
         // 既存行があるかを事前に判定するため、voucher_no の採番は事前に行うが、
         // CONFLICT 時は excluded.voucher_no を使わず既存の voucher_no を保持する。
-        $existsStmt = $pdo->prepare('SELECT id, voucher_no FROM vouchers WHERE access_voucher_id = ?');
+        $existsStmt = $pdo->prepare('SELECT * FROM vouchers WHERE access_voucher_id = ?');
         $existsStmt->execute([$accessVoucherId]);
         $existing = $existsStmt->fetch();
+
+        if ($existing && $baseSyncedAtUtc !== null && !$force && $existing['updated_at'] > $baseSyncedAtUtc) {
+            $current = voucherSyncRowById($pdo, (int)$existing['id']);
+            $current['void_reason'] = latestVoucherVoidReason($pdo, (int)$existing['id']);
+            $pdo->rollBack();
+            respond(409, ['error' => 'voucher_conflict', 'voucher' => $current]);
+            return;
+        }
+
+        $recordsUnvoid = $existing && $force && $existing['status'] === 'void' && $status !== 'void';
 
         if ($existing) {
             $voucherNo = (string)$existing['voucher_no'];
@@ -493,6 +586,20 @@ function syncVoucherUpsert(PDO $pdo, ?int $projectId): void {
             $projectAccessNo  = isset($data['project_access_no'])  ? (string)$data['project_access_no']  : null;
             $customerAccessNoForProject = $accessCustomerNo !== '' ? $accessCustomerNo : null;
             updateProjectCustomerFromSales($pdo, $projectAccessNo, $customerAccessNoForProject);
+        }
+
+        if ($recordsUnvoid) {
+            $afterStmt = $pdo->prepare('SELECT * FROM vouchers WHERE id = ?');
+            $afterStmt->execute([$voucherId]);
+            recordHistory(
+                $pdo,
+                'vouchers',
+                $voucherId,
+                'unvoid',
+                $existing,
+                ['reason' => 'Accessの競合解決で『Access版を採用』（force）により取消を解除'],
+                $afterStmt->fetch()
+            );
         }
 
         $pdo->commit();

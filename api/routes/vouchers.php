@@ -89,16 +89,7 @@ if ($method === 'GET' && isset($segments[1]) && $segments[1] === 'sync' && !isse
     // （syncVoucherUpsert が customer_access_no から customer_id を解決する経路と対になる）。
     // R-0149: 未リンクの新規得意先・案件でも競合解決画面で比較できるよう、
     // customers.name / projects.name の生データも返す（project_id自体がAccess/Beaver共通IDのため追加列は不要）。
-    $sql = 'SELECT v.id, v.voucher_no, v.voucher_type, v.status, v.voucher_date,
-                   v.access_voucher_id, v.access_voucher_no, v.customer_id, v.project_id,
-                   v.total_amount, v.updated_at, v.last_synced_at,
-                   v.trade_type, v.consumption_tax_type, v.description,
-                   v.print_date_flag, v.print_tax_excl_flag, v.print_company_seal,
-                   v.sales_category_id, v.delivery_date, v.billing_date,
-                   v.source_estimate_no, v.validity_period,
-                   v.access_billed_flag, v.access_billing_date, v.access_receivable_id,
-                   c.access_customer_no AS customer_access_no,
-                   c.name AS beaver_customer_name, p.name AS beaver_project_name
+    $sql = 'SELECT ' . VOUCHER_SYNC_SELECT_COLUMNS . '
             FROM vouchers v
             LEFT JOIN customers c ON c.id = v.customer_id
             LEFT JOIN projects p ON p.id = v.project_id
@@ -139,40 +130,7 @@ if ($method === 'GET' && isset($segments[1]) && $segments[1] === 'sync' && !isse
 
     // R-060 Phase2b/2c Stage2: 各伝票に明細行単位の状態（access_line_id/updated_at/edited_in_beaver等）を含める。
     // 明細行競合の検知・解決は Access 側に一本化するため、Beaver は現状を正直に返すだけでよい（§7.4）。
-    $voucherIds = array_column($rows, 'id');
-    $linesByVoucherId = [];
-    if (!empty($voucherIds)) {
-        $placeholders = implode(',', array_fill(0, count($voucherIds), '?'));
-        $lineStmt = $pdo->prepare("
-            SELECT voucher_id, id AS beaver_line_id, access_line_id, line_no, item_name, quantity,
-                   price_body, price_hardware, price_glass, line_total,
-                   tax_category, memo, updated_at, edited_in_beaver
-            FROM voucher_lines
-            WHERE voucher_id IN ($placeholders)
-            ORDER BY voucher_id ASC, line_no ASC
-        ");
-        $lineStmt->execute($voucherIds);
-        foreach ($lineStmt->fetchAll() as $lineRow) {
-            $vid = (int)$lineRow['voucher_id'];
-            unset($lineRow['voucher_id']);
-            $lineRow['beaver_line_id']    = (int)$lineRow['beaver_line_id'];
-            $lineRow['access_line_id']   = $lineRow['access_line_id'] !== null ? (int)$lineRow['access_line_id'] : null;
-            $lineRow['edited_in_beaver'] = (int)$lineRow['edited_in_beaver'];
-            if ($lineRow['tax_category'] === 'taxable') $lineRow['tax_category'] = '課税';
-            if ($lineRow['tax_category'] === 'non_taxable') $lineRow['tax_category'] = '非課税';
-            // R-076 B1-1: 明細の updated_at も UTC→JST に統一する。
-            $lineRow['updated_at']       = utcToJst($lineRow['updated_at']);
-            $linesByVoucherId[$vid][] = $lineRow;
-        }
-    }
-    foreach ($rows as &$row) {
-        // R-076 B1-1: ヘッダーの updated_at / last_synced_at を UTC→JST に統一する。
-        $row['updated_at']     = utcToJst($row['updated_at']);
-        $row['last_synced_at'] = utcToJst($row['last_synced_at']);
-        $row['access_billed_flag'] = (int)$row['access_billed_flag'];
-        $row['lines'] = $linesByVoucherId[(int)$row['id']] ?? [];
-    }
-    unset($row);
+    $rows = voucherSyncRowsToJst($pdo, $rows);
 
     $now = new DateTime('now', new DateTimeZone('Asia/Tokyo'));
     $response = [

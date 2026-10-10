@@ -191,7 +191,8 @@ try {
         assertConflict($pdo, $r, $id, $before, '');
         $v = $r['body']['voucher'];
         assertEq('Beaver版', $v['memo'] ?? ($v['description'] ?? 'Beaver版'), 'memo');
-        assertEq(null, $v['void_reason'] ?? 'missing', 'void_reason は null');
+        assertTrue(array_key_exists('void_reason', $v), 'void_reason キーがある');
+        assertEq(null, $v['void_reason'], 'void_reason は null');
         assertEq(['Beaver明細'], array_column($v['lines'] ?? [], 'item_name'), 'lines は Beaver の現在値');
 
         $g = request('GET', "$api/vouchers/sync");
