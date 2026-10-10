@@ -176,6 +176,73 @@ function voucherTimesToJst(array $voucher): array {
     return $voucher;
 }
 
+function voucherDetail(PDO $pdo, int $voucherId): ?array {
+    $stmt = $pdo->prepare('
+        SELECT v.*, c.name AS customer_name, p.name AS project_name
+        FROM vouchers v
+        LEFT JOIN customers c ON c.id = v.customer_id
+        LEFT JOIN projects p ON p.id = v.project_id
+        WHERE v.id = ?
+    ');
+    $stmt->execute([$voucherId]);
+    $voucher = $stmt->fetch();
+    if (!$voucher) return null;
+
+    $lineStmt = $pdo->prepare('SELECT * FROM voucher_lines WHERE voucher_id = ? ORDER BY line_no');
+    $lineStmt->execute([$voucherId]);
+    $lines = $lineStmt->fetchAll();
+    foreach ($lines as &$line) attachLineSubtables($pdo, $line);
+    unset($line);
+    $voucher['lines'] = $lines;
+    $voucher['is_empty'] = voucherIsEmpty($pdo, $voucherId);
+
+    if ($voucher['voucher_type'] === 'estimate') {
+        $convertedStmt = $pdo->prepare(
+            'SELECT id, voucher_no, status, voucher_date, quoted_at FROM vouchers WHERE source_estimate_no = ? AND voucher_type = "sales" ORDER BY id'
+        );
+        $convertedStmt->execute([$voucher['voucher_no']]);
+        $voucher['converted_sales'] = $convertedStmt->fetchAll();
+    }
+    return voucherTimesToJst($voucher);
+}
+
+function beginVoucherWrite(PDO $pdo, int $voucherId, array $data): void {
+    $expected = $data['expected_updated_at'] ?? null;
+    $expectedUtc = null;
+    if ($expected !== null && $expected !== '') {
+        $expectedUtc = is_string($expected) ? jstToUtc($expected) : null;
+        if ($expectedUtc === null) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Invalid expected_updated_at format']);
+            exit;
+        }
+    }
+
+    $pdo->beginTransaction();
+    $stmt = $pdo->prepare('SELECT updated_at FROM vouchers WHERE id = ?');
+    $stmt->execute([$voucherId]);
+    $updatedAt = $stmt->fetchColumn();
+    if ($updatedAt === false) {
+        $pdo->rollBack();
+        http_response_code(404);
+        echo json_encode(['error' => 'Not found']);
+        exit;
+    }
+    if ($expectedUtc !== null && $updatedAt > $expectedUtc) {
+        $voucher = voucherDetail($pdo, $voucherId);
+        $pdo->rollBack();
+        http_response_code(409);
+        echo json_encode(['error' => 'stale_voucher', 'voucher' => $voucher]);
+        exit;
+    }
+}
+
+function voucherUpdatedAtJst(PDO $pdo, int $voucherId): string {
+    $stmt = $pdo->prepare('SELECT updated_at FROM vouchers WHERE id = ?');
+    $stmt->execute([$voucherId]);
+    return utcToJst($stmt->fetchColumn());
+}
+
 // --- 明細行に建具台帳スナップショットをロード ---
 function loadSnapshot(PDO $pdo, int $lineId): void {
     $stmt = $pdo->prepare('SELECT tategu_item_id FROM voucher_lines WHERE id = ?');
@@ -474,37 +541,8 @@ switch ($method) {
             break;
         }
         if ($resourceId) {
-            $stmt = $pdo->prepare('
-                SELECT v.*, c.name AS customer_name, p.name AS project_name
-                FROM vouchers v
-                LEFT JOIN customers c ON c.id = v.customer_id
-                LEFT JOIN projects  p ON p.id = v.project_id
-                WHERE v.id = ?
-            ');
-            $stmt->execute([$resourceId]);
-            $row = $stmt->fetch();
+            $row = voucherDetail($pdo, $resourceId);
             if (!$row) { http_response_code(404); echo json_encode(['error' => 'Not found']); exit; }
-
-            $stmt2 = $pdo->prepare('SELECT * FROM voucher_lines WHERE voucher_id = ? ORDER BY line_no');
-            $stmt2->execute([$resourceId]);
-            $lines = $stmt2->fetchAll();
-            foreach ($lines as &$line) {
-                attachLineSubtables($pdo, $line);
-            }
-            unset($line);
-            $row['lines'] = $lines;
-            $row['is_empty'] = voucherIsEmpty($pdo, $resourceId);
-
-            // 双方向トレース: 見積の場合は引用先売上を逆引きして付加
-            if ($row['voucher_type'] === 'estimate') {
-                $csStmt = $pdo->prepare(
-                    'SELECT id, voucher_no, status, voucher_date, quoted_at FROM vouchers WHERE source_estimate_no = ? AND voucher_type = "sales" ORDER BY id'
-                );
-                $csStmt->execute([$row['voucher_no']]);
-                $row['converted_sales'] = $csStmt->fetchAll();
-            }
-
-            $row = voucherTimesToJst($row);
             echo json_encode($row);
         } else {
             // R-0154 追加仕様2: 一覧の取消ボタンを無効表示するため、voidでない売上に引用済みの見積かを返す（assertVoucherEditableと同じ条件）
@@ -713,20 +751,26 @@ switch ($method) {
 
         // ---- スナップショット一括再読み込み ----
         if ($resourceId && $subAction === 'reload-snapshots') {
+            $data = json_decode(file_get_contents('php://input'), true) ?? [];
+            beginVoucherWrite($pdo, $resourceId, $data);
+            assertVoucherEditable($pdo, $resourceId);
             $lines = $pdo->prepare('SELECT id FROM voucher_lines WHERE voucher_id = ? AND tategu_item_id IS NOT NULL');
             $lines->execute([$resourceId]);
             foreach ($lines->fetchAll() as $line) {
                 loadSnapshot($pdo, (int)$line['id']);
             }
             recalcVoucher($pdo, $resourceId);
-            echo json_encode(['reloaded' => true]);
+            $voucherUpdatedAt = voucherUpdatedAtJst($pdo, $resourceId);
+            $pdo->commit();
+            echo json_encode(['reloaded' => true, 'voucher_updated_at' => $voucherUpdatedAt]);
             break;
         }
 
         // ---- 明細追加 ----
         if ($resourceId && $subAction === 'lines') {
-            assertVoucherEditable($pdo, $resourceId);
             $data = json_decode(file_get_contents('php://input'), true) ?? [];
+            beginVoucherWrite($pdo, $resourceId, $data);
+            assertVoucherEditable($pdo, $resourceId);
             $maxStmt = $pdo->prepare('SELECT COALESCE(MAX(line_no), 0) + 1 FROM voucher_lines WHERE voucher_id = ?');
             $maxStmt->execute([$resourceId]);
             $lineNo = (int)$maxStmt->fetchColumn();
@@ -783,6 +827,8 @@ switch ($method) {
             $s->execute([$lineId]);
             $newLine = $s->fetch();
             attachLineSubtables($pdo, $newLine);
+            $newLine['voucher_updated_at'] = voucherUpdatedAtJst($pdo, $resourceId);
+            $pdo->commit();
             echo json_encode($newLine);
             break;
         }
@@ -844,8 +890,9 @@ switch ($method) {
     case 'PUT':
         // ---- 明細更新 ----
         if ($resourceId && $subAction === 'lines' && $subId) {
-            assertVoucherEditable($pdo, $resourceId);
             $data = json_decode(file_get_contents('php://input'), true) ?? [];
+            beginVoucherWrite($pdo, $resourceId, $data);
+            assertVoucherEditable($pdo, $resourceId);
             $fields = ['line_type','location_no','location_name','tategu_item_id','source_catalog_item_id',
                        'item_name','quantity',
                        'cost_body','cost_hardware','cost_glass','cost_factory_hours','cost_site_hours','cost_labor_rate',
@@ -879,13 +926,16 @@ switch ($method) {
             $s->execute([$subId]);
             $updatedLine = $s->fetch();
             attachLineSubtables($pdo, $updatedLine);
+            $updatedLine['voucher_updated_at'] = voucherUpdatedAtJst($pdo, $resourceId);
+            $pdo->commit();
             echo json_encode($updatedLine);
             break;
         }
         // ---- 伝票ヘッダー更新 ----
         if (!$resourceId) { http_response_code(400); echo json_encode(['error' => 'ID required']); exit; }
-        assertVoucherEditable($pdo, $resourceId);
         $data = json_decode(file_get_contents('php://input'), true) ?? [];
+        beginVoucherWrite($pdo, $resourceId, $data);
+        assertVoucherEditable($pdo, $resourceId);
         if (array_key_exists('consumption_tax_type', $data) && !isValidConsumptionTaxType((string)$data['consumption_tax_type'])) {
             http_response_code(400);
             echo json_encode(['error' => 'consumption_tax_type は ' . implode('/', allowedConsumptionTaxTypes()) . ' のいずれかで指定してください']);
@@ -910,21 +960,28 @@ switch ($method) {
         recalcVoucher($pdo, $resourceId);
         $s = $pdo->prepare('SELECT * FROM vouchers WHERE id = ?');
         $s->execute([$resourceId]);
-        echo json_encode(voucherTimesToJst($s->fetch()));
+        $updatedVoucher = voucherTimesToJst($s->fetch());
+        $pdo->commit();
+        echo json_encode($updatedVoucher);
         break;
 
     case 'DELETE':
         if ($resourceId && $subAction === 'lines' && $subId) {
+            $data = array_merge($_GET, json_decode(file_get_contents('php://input'), true) ?? []);
+            beginVoucherWrite($pdo, $resourceId, $data);
             assertVoucherEditable($pdo, $resourceId);
             $pdo->prepare('DELETE FROM voucher_lines WHERE id = ?')->execute([$subId]);
             recalcVoucher($pdo, $resourceId);
-            echo json_encode(['deleted' => true]);
+            $voucherUpdatedAt = voucherUpdatedAtJst($pdo, $resourceId);
+            $pdo->commit();
+            echo json_encode(['deleted' => true, 'voucher_updated_at' => $voucherUpdatedAt]);
             break;
         }
         if (!$resourceId) { http_response_code(400); echo json_encode(['error' => 'ID required']); exit; }
+        $data = array_merge($_GET, json_decode(file_get_contents('php://input'), true) ?? []);
+        beginVoucherWrite($pdo, $resourceId, $data);
         assertVoucherEditable($pdo, $resourceId);
-        $reason = trim((string)((json_decode(file_get_contents('php://input'), true) ?? [])['reason'] ?? ''));
-        $pdo->beginTransaction();
+        $reason = trim((string)($data['reason'] ?? ''));
         $before = $pdo->prepare('SELECT * FROM vouchers WHERE id = ?');
         $before->execute([$resourceId]);
         $beforeRow = $before->fetch();
@@ -946,8 +1003,9 @@ switch ($method) {
             $before->execute([$resourceId]);
             recordHistory($pdo, 'vouchers', $resourceId, 'void', $beforeRow, ['reason' => $reason], $before->fetch());
         }
+        $voucherUpdatedAt = voucherUpdatedAtJst($pdo, $resourceId);
         $pdo->commit();
-        echo json_encode(['result' => 'voided', 'voided' => true]);
+        echo json_encode(['result' => 'voided', 'voided' => true, 'voucher_updated_at' => $voucherUpdatedAt]);
         break;
 
     default:
