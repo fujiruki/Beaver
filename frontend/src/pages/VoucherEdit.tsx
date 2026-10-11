@@ -691,12 +691,28 @@ export default function VoucherEdit() {
     <FormProvider {...form}>
       <div>
         <OptionalNavigationBlocker active={hasUnsavedChanges} beforeLeave={beforeLeave} />
-        {staleVoucher && (
-          <div role="alert" style={staleAlertStyle}>
-            <span>
-              ほかで更新されています（最終更新: {staleVoucher.updated_at}）。再読み込みすると、この画面で保存されていない入力は失われます。
-            </span>
-            <button type="button" onClick={() => void reloadLatestVoucher()} style={subBtnStyle}>再読み込み</button>
+        {/* R-0172: 保存状態（R-0166 の再読み込み案内を含む）は表示領域の右下に固定表示する */}
+        {!isNew && (staleVoucher || saveStatus !== 'idle') && (
+          <div data-testid="save-status" style={saveStatusBoxStyle}>
+            {staleVoucher && (
+              <div role="alert" style={staleAlertStyle}>
+                <span>
+                  ほかで更新されています（最終更新: {staleVoucher.updated_at}）。再読み込みすると、この画面で保存されていない入力は失われます。
+                </span>
+                <button type="button" onClick={() => void reloadLatestVoucher()} style={subBtnStyle}>再読み込み</button>
+              </div>
+            )}
+            {saveStatus === 'saving' && <span>保存中…</span>}
+            {saveStatus === 'saved' && savedAt && (
+              <span>保存しました {savedAt.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}</span>
+            )}
+            {saveStatus === 'unsaved' && <span>未保存の変更があります</span>}
+            {saveStatus === 'error' && (
+              <span>
+                保存に失敗しました: {formatSaveError(saveError)}{' '}
+                <button type="button" onClick={retrySave} style={subBtnStyle}>再試行</button>
+              </span>
+            )}
           </div>
         )}
         {/* トップバー */}
@@ -949,17 +965,6 @@ export default function VoucherEdit() {
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
             <TotalSummary lines={linesForCalc} taxInputType={watchedTaxInputType} taxRate={0.10} costLines={costLinesForCalc} />
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              {!isNew && saveStatus === 'saving' && <span>保存中…</span>}
-              {!isNew && saveStatus === 'saved' && savedAt && (
-                <span>保存しました {savedAt.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}</span>
-              )}
-              {!isNew && saveStatus === 'unsaved' && <span>未保存の変更があります</span>}
-              {!isNew && saveStatus === 'error' && (
-                <span>
-                  保存に失敗しました: {formatSaveError(saveError)}{' '}
-                  <button type="button" onClick={retrySave} style={subBtnStyle}>再試行</button>
-                </span>
-              )}
               {isReadOnly ? (
                 <button type="button" onClick={backToProjectGoBack} style={cancelBtnStyle}>
                   ← 案件に戻る
@@ -1011,6 +1016,12 @@ const convertBtnStyle: React.CSSProperties = {
 const reloadBtnStyle: React.CSSProperties = {
   padding: '5px 12px', background: '#0891b2', color: '#fff', border: 'none',
   borderRadius: 6, cursor: 'pointer', fontSize: 13,
+};
+const saveStatusBoxStyle: React.CSSProperties = {
+  position: 'fixed', right: 16, bottom: 16, zIndex: 100, maxWidth: 'calc(100vw - 32px)',
+  display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8,
+  padding: '8px 14px', background: '#fff', border: '1px solid #cbd5e1', borderRadius: 8,
+  boxShadow: '0 4px 16px rgba(0,0,0,0.12)', fontSize: 13,
 };
 const staleAlertStyle: React.CSSProperties = {
   display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12,
