@@ -38,15 +38,21 @@ const navItems = [
   { to: '/customers',  icon: '👥', label: '得意先' },
   { to: '/projects',   icon: '📁', label: '案件' },
   { to: '/dandori',    icon: '📅', label: '段取り' },
-  { to: '/vouchers',   icon: '🧾', label: '伝票' },
+  { to: '/vouchers?voucher_type=estimate', icon: '📝', label: '見積' },
+  { to: '/vouchers?voucher_type=sales',    icon: '🧾', label: '売上' },
   { to: '/tategu',     icon: '🚪', label: '建具台帳' },
   { to: '/invoices',   icon: '💰', label: '請求' },
   { to: '/settings/app', icon: '⚙️', label: 'アプリ設定' },
   { to: '/help',       icon: '❓', label: 'ヘルプ' },
 ];
 
-function isNavItemActive(pathname: string, item: { to: string }): boolean {
-  return item.to === '/' ? pathname === '/' : pathname.startsWith(item.to);
+function isNavItemActive(pathname: string, search: string, item: { to: string }): boolean {
+  const [path, query] = item.to.split('?');
+  if (path === '/') return pathname === '/';
+  if (!pathname.startsWith(path)) return false;
+  // R-0169: 見積/売上タブは一覧の種別フィルタ（voucher_type）が一致するときだけ選択中にする
+  const current = new URLSearchParams(search);
+  return [...new URLSearchParams(query)].every(([k, v]) => current.get(k) === v);
 }
 
 export default function AppLayout() {
@@ -64,9 +70,9 @@ export default function AppLayout() {
 
   useEffect(() => {
     // R-0112: タブ名が「frontend」等になり分かりづらい問題への対応
-    const current = navItems.find(item => isNavItemActive(location.pathname, item));
+    const current = navItems.find(item => isNavItemActive(location.pathname, location.search, item));
     document.title = current ? `${current.label} - Beaver` : 'Beaver';
-  }, [location.pathname]);
+  }, [location.pathname, location.search]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', fontFamily: 'sans-serif', fontSize: settings.fontSize }}>
@@ -82,7 +88,7 @@ export default function AppLayout() {
         <span style={{ fontWeight: 'bold', fontSize: 14, color: '#94a3b8' }}>Beaver</span>
         <nav style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           {navItems.map((item, index) => {
-            const active = isNavItemActive(location.pathname, item);
+            const active = isNavItemActive(location.pathname, location.search, item);
             return (
               <div key={item.to} style={{ display: 'flex', alignItems: 'center' }}>
                 {index > 0 && (
@@ -175,24 +181,27 @@ export default function AppLayout() {
           <div style={{ padding: '8px 16px 20px', fontWeight: 'bold', fontSize: 14, color: '#94a3b8' }}>
             Beaver
           </div>
-          {navItems.map(({ to, label }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={to === '/'}
-              onClick={() => setNavOpen(false)}
-              style={({ isActive }) => ({
-                display: 'block',
-                padding: '10px 16px',
-                color: isActive ? '#fff' : '#cbd5e1',
-                background: isActive ? '#334155' : 'transparent',
-                textDecoration: 'none',
-                fontSize: 14,
-              })}
-            >
-              {label}
-            </NavLink>
-          ))}
+          {navItems.map(item => {
+            const active = isNavItemActive(location.pathname, location.search, item);
+            return (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.to === '/'}
+                onClick={() => setNavOpen(false)}
+                style={{
+                  display: 'block',
+                  padding: '10px 16px',
+                  color: active ? '#fff' : '#cbd5e1',
+                  background: active ? '#334155' : 'transparent',
+                  textDecoration: 'none',
+                  fontSize: 14,
+                }}
+              >
+                {item.label}
+              </NavLink>
+            );
+          })}
 
           <div style={{ marginTop: 'auto' }}>
             {me && (

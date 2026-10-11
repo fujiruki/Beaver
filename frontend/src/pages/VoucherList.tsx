@@ -21,7 +21,13 @@ const STATUS_COLORS: Record<VoucherStatus, string> = {
   draft: '#94a3b8', submitted: '#3b82f6', approved: '#10b981', billed: '#8b5cf6', void: '#ef4444',
 };
 
+// R-0169: メニューの見積/売上タブで種別が変わったら、URLの条件で一覧を作り直す
 export default function VoucherList() {
+  const [searchParams] = useSearchParams();
+  return <VoucherListBody key={searchParams.get('voucher_type') ?? ''} />;
+}
+
+function VoucherListBody() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
