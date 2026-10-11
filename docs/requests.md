@@ -1,5 +1,19 @@
 # 要望・リクエスト
 
+## 50. R-0171: 売値の内訳（本体・金物・ガラス）が同期で0になる（2026-10-11、dodai-backより。E03981で晴樹さん発見）
+
+### 原文（dodai-back）
+> E03981 の件で、前回の見立て（Access 側の取り込みで売値が落ちた）を訂正します。原因は Beaver の /vouchers/sync でした。
+> 【根拠】Access に取り込む前の 11:18 の /vouchers/sync の応答（このときは access_voucher_id=None）で、1行目 51257 はすでに price_body 0・price_hardware 0・line_total 38600 でした。Access は受け取った 0 をそのまま入れ、そのまま送り返しただけです。
+> 【原因の見込み】画面の明細保存（LineItemRow.tsx:100-115）は prices / costs の内訳テーブルだけを更新し、旧形式の列 price_body 等は更新しない。/vouchers/sync（voucherSyncRowsToJst）は旧形式の列だけを返し、内訳テーブルを読まない。
+> 【お願い（本番切替前に必要）】
+> 1. /vouchers/sync の price_body / price_hardware / price_glass を、内訳テーブルの MAIN / HARDWARE / GLASS から返す（無ければ旧形式の列）。
+> 2. Access から届いた price_body 等（upsertSyncedLines）を内訳テーブルにも反映する。
+> 3. 原価（cost_*、時間、労務単価）を同期の対象にするかは、晴樹さんの判断を仰ぎます。今は双方向とも送っていません。
+
+### 状態
+1・2は仕様化して実装中（`docs/spec/R-0171_price_breakdown_sync.md`）。3は晴樹さんの判断待ち。
+
 ## 49. R-0170: 取消（void）した伝票を伝票画面から下書きに戻す操作（2026-10-11、藤田晴樹さんよりdodai-back経由）
 
 晴樹さんの原文: 「Beaver_beta で案件P00052 を開いてみた。S04600 という伝票が紐づいてるね。案件画面で開いたら無効の伝票も表示されてるな。まあ、これはいいとしよう。で、無効だけどクリックしたら伝票画面を開けた。これもいいとしよう。ただ、せっかく開けたのに編集はできない。それはそれでいいけど、、、『ステータスを下書きに戻す』操作ができてもいいなとおもった。」
