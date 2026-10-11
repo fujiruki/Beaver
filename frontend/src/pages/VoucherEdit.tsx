@@ -18,7 +18,7 @@ import VoidVoucherButton from '../components/voucher/VoidVoucherButton';
 import UnvoidVoucherButton from '../components/voucher/UnvoidVoucherButton';
 import TotalSummary from '../components/voucher/TotalSummary';
 import { useSmartBack } from '../hooks/useSmartBack';
-import { useAppSettings } from '../contexts/AppSettingsContext';
+import { useDefaultLaborRate } from '../api/settings';
 import type { Voucher, VoucherLine, VoucherType, VoucherStatus, TaxInputType, LineCategoryValue } from '../types/voucher';
 import { getVoucherEditBlockReason, getVoucherVoidBlockReason } from '../lib/voucherVoid';
 
@@ -246,7 +246,7 @@ function formatSaveError(error: unknown): string {
 }
 
 export default function VoucherEdit() {
-  const { settings } = useAppSettings();
+  const defaultLaborRate = useDefaultLaborRate();
   const dataRouter = useContext(UNSAFE_DataRouterContext);
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
@@ -289,7 +289,7 @@ export default function VoucherEdit() {
       ...(isNew && initProjectIdParam ? { project_id: initProjectIdParam } : {}),
       ...(isNew && initCustomerIdParam ? { customer_id: initCustomerIdParam } : {}),
       ...(isNew ? { voucher_type: initType } : {}),
-      ...(isNew ? { lines: [{ ...defaultLine, cost_labor_rate: settings.defaultLaborRate }] } : {}),
+      ...(isNew ? { lines: [{ ...defaultLine, cost_labor_rate: defaultLaborRate }] } : {}),
     },
   });
   const { control, getValues, handleSubmit, reset, setValue, trigger, watch, formState: { isDirty } } = form;
@@ -316,6 +316,16 @@ export default function VoucherEdit() {
   const optionsReady = customersQuery.isSuccess && projectsQuery.isSuccess && salesCategoriesQuery.isSuccess;
   const optionsError = customersQuery.isError || projectsQuery.isError || salesCategoriesQuery.isError;
   const formReady = optionsReady && (isNew || formInitialized);
+
+  // R-0174: 会社設定は非同期に届くため、新規伝票の最初の行が手つかずなら届いた既定労務単価を入れる
+  const initialLaborRateAppliedRef = useRef(false);
+  useEffect(() => {
+    if (!isNew || initialLaborRateAppliedRef.current || !defaultLaborRate) return;
+    initialLaborRateAppliedRef.current = true;
+    const first = getValues('lines.0');
+    if (!first || first.id || first.tategu_item_id || form.getFieldState('lines.0.cost_labor_rate').isDirty) return;
+    setValue('lines.0.cost_labor_rate', defaultLaborRate);
+  }, [isNew, defaultLaborRate, getValues, setValue, form]);
 
   useEffect(() => {
     if (voucher && isFetchedAfterMount && optionsReady && initializedVoucherIdRef.current !== voucher.id) {
@@ -563,9 +573,9 @@ export default function VoucherEdit() {
     if (!formReady) return;
     const nextNo = (watchedLines?.length ?? 0) + 1;
     if (isNew) {
-      append({ ...defaultLine, line_no: nextNo, cost_labor_rate: settings.defaultLaborRate });
+      append({ ...defaultLine, line_no: nextNo, cost_labor_rate: defaultLaborRate });
     } else {
-      addLineOnServer({ ...defaultLine, line_no: nextNo, cost_labor_rate: settings.defaultLaborRate });
+      addLineOnServer({ ...defaultLine, line_no: nextNo, cost_labor_rate: defaultLaborRate });
     }
   }
 
@@ -588,9 +598,9 @@ export default function VoucherEdit() {
     const insertAt = selectedIdx !== null ? selectedIdx + 1 : (watchedLines?.length ?? 0);
     const nextNo = insertAt + 1;
     if (isNew) {
-      append({ ...defaultLine, line_no: nextNo, cost_labor_rate: settings.defaultLaborRate });
+      append({ ...defaultLine, line_no: nextNo, cost_labor_rate: defaultLaborRate });
     } else {
-      addLineOnServer({ ...defaultLine, line_no: nextNo, cost_labor_rate: settings.defaultLaborRate });
+      addLineOnServer({ ...defaultLine, line_no: nextNo, cost_labor_rate: defaultLaborRate });
     }
   }
 

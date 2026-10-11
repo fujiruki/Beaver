@@ -4,6 +4,7 @@ import { useAppSettings } from '../contexts/AppSettingsContext';
 import { useAggregationCategories, useSyncAggregationCategories } from '../api/aggregationCategories';
 import { useMigrateFixedColumns } from '../api/vouchers';
 import { useSyncStatus } from '../api/sync';
+import { useCompanySettings, useUpdateCompanySettings } from '../api/settings';
 
 export default function AppSettings() {
   const navigate = useNavigate();
@@ -11,6 +12,8 @@ export default function AppSettings() {
   const { data: categories } = useAggregationCategories();
   const { data: syncStatus } = useSyncStatus();
   const syncMutation = useSyncAggregationCategories();
+  const { data: companySettings } = useCompanySettings();
+  const updateCompanySettings = useUpdateCompanySettings();
   const migrateMutation = useMigrateFixedColumns();
   const [migrateResult, setMigrateResult] = useState<{ migrated_costs: number; migrated_prices: number } | null>(null);
 
@@ -73,11 +76,16 @@ export default function AppSettings() {
           <label className="block text-xs font-semibold text-slate-500 mb-2">既定労務単価</label>
           <div className="flex items-center gap-3">
             <input
+              key={companySettings?.default_labor_rate ?? ''}
               type="number"
               min={0}
               step={100}
-              value={settings.defaultLaborRate}
-              onChange={e => update({ defaultLaborRate: Math.max(0, Number(e.target.value) || 0) })}
+              defaultValue={companySettings?.default_labor_rate ?? ''}
+              disabled={!companySettings}
+              onBlur={e => {
+                const rate = Math.max(0, Number(e.target.value) || 0);
+                if (rate !== Number(companySettings?.default_labor_rate)) updateCompanySettings.mutate({ default_labor_rate: rate });
+              }}
               className="w-32 px-2 py-1.5 border border-slate-300 rounded text-sm font-mono text-right"
             />
             <span className="text-sm text-slate-500">円／時間</span>
