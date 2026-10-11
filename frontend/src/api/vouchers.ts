@@ -1,9 +1,14 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { api } from './client';
 import type { Voucher, VoucherInput, VoucherLine } from '../types/voucher';
 import type { PaginatedResponse, SortParam } from '../types/pagination';
 
 const KEY = 'vouchers';
+
+/** 案件画面の伝票一覧（状態・金額）は projects 側のクエリに含まれるため、伝票を変えたら一緒に取り直す */
+function invalidateProjects(queryClient: QueryClient) {
+  queryClient.invalidateQueries({ queryKey: ['projects'] });
+}
 
 type VoucherFilters = {
   q?: string;
@@ -66,6 +71,7 @@ export function useCreateVoucher() {
   return useMutation({
     mutationFn: (data: VoucherInput) => api.post<Voucher>('/vouchers', data),
     onSuccess: () => {
+      invalidateProjects(queryClient);
       queryClient.invalidateQueries({ queryKey: [KEY] });
     },
   });
@@ -80,6 +86,7 @@ export function useVoidVoucher() {
         reason: reason ?? '', expected_updated_at,
       }),
     onSuccess: async ({ result }, { id }) => {
+      invalidateProjects(queryClient);
       if (result !== 'deleted') {
         queryClient.invalidateQueries({ queryKey: [KEY] });
         return;
@@ -101,7 +108,10 @@ export function useUnvoidVoucher() {
       api.post<{ result: 'unvoided'; voucher_updated_at: string }>(`/vouchers/${id}/unvoid`, {
         reason: reason ?? '', expected_updated_at,
       }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: [KEY] }),
+    onSuccess: () => {
+      invalidateProjects(queryClient);
+      return queryClient.invalidateQueries({ queryKey: [KEY] });
+    },
   });
 }
 
@@ -111,6 +121,7 @@ export function useUpdateVoucher(id: number) {
   return useMutation({
     mutationFn: (data: Partial<VoucherInput> & { expected_updated_at?: string }) => api.put<Voucher>(`/vouchers/${id}`, data),
     onSuccess: () => {
+      invalidateProjects(queryClient);
       queryClient.invalidateQueries({ queryKey: [KEY] });
       queryClient.invalidateQueries({ queryKey: [KEY, id] });
     },
@@ -126,6 +137,7 @@ export function useAddLine(voucherId: number) {
       return api.post<VoucherLine & { voucher_updated_at: string }>(`/vouchers/${targetVoucherId}/lines`, data);
     },
     onSuccess: () => {
+      invalidateProjects(queryClient);
       queryClient.invalidateQueries({ queryKey: [KEY, voucherId] });
     },
   });
@@ -154,6 +166,7 @@ export function useUpdateLine(voucherId: number) {
       }
     },
     onSettled: () => {
+      invalidateProjects(queryClient);
       queryClient.invalidateQueries({ queryKey: [KEY, voucherId] });
     },
   });
@@ -166,6 +179,7 @@ export function useDeleteLine(voucherId: number) {
     mutationFn: ({ lineId, expected_updated_at }: { lineId: number; expected_updated_at?: string }) =>
       api.delete<{ deleted: boolean; voucher_updated_at: string }>(`/vouchers/${voucherId}/lines/${lineId}`, { expected_updated_at }),
     onSuccess: () => {
+      invalidateProjects(queryClient);
       queryClient.invalidateQueries({ queryKey: [KEY, voucherId] });
     },
   });
@@ -177,6 +191,7 @@ export function useConvertToSales(id: number) {
   return useMutation({
     mutationFn: () => api.post<Voucher>(`/vouchers/${id}/convert-to-sales`, {}),
     onSuccess: () => {
+      invalidateProjects(queryClient);
       queryClient.invalidateQueries({ queryKey: [KEY] });
     },
   });
