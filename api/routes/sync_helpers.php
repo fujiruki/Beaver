@@ -112,7 +112,14 @@ function voucherSyncRowsToJst(PDO $pdo, array $rows): array {
                    CASE WHEN lp.voucher_line_id IS NULL THEN l.price_body ELSE lp.main END AS price_body,
                    CASE WHEN lp.voucher_line_id IS NULL THEN l.price_hardware ELSE lp.hardware END AS price_hardware,
                    CASE WHEN lp.voucher_line_id IS NULL THEN l.price_glass ELSE lp.glass END AS price_glass,
-                   l.line_total, l.tax_category, l.memo, l.updated_at, l.edited_in_beaver
+                   l.line_total, l.tax_category, l.memo, l.updated_at, l.edited_in_beaver,
+                   l.location_name,
+                   CASE WHEN lc.voucher_line_id IS NULL THEN l.cost_body ELSE lc.main END AS cost_body,
+                   CASE WHEN lc.voucher_line_id IS NULL THEN l.cost_hardware ELSE lc.hardware END AS cost_hardware,
+                   CASE WHEN lc.voucher_line_id IS NULL THEN l.cost_glass ELSE lc.glass END AS cost_glass,
+                   CASE WHEN lc.voucher_line_id IS NULL THEN l.cost_factory_hours ELSE lc.factory_time END AS cost_factory_hours,
+                   CASE WHEN lc.voucher_line_id IS NULL THEN l.cost_site_hours ELSE lc.site_time END AS cost_site_hours,
+                   l.cost_labor_rate
             FROM voucher_lines l
             LEFT JOIN (
                 SELECT voucher_line_id,
@@ -122,6 +129,16 @@ function voucherSyncRowsToJst(PDO $pdo, array $rows): array {
                 FROM voucher_line_prices
                 GROUP BY voucher_line_id
             ) lp ON lp.voucher_line_id = l.id
+            LEFT JOIN (
+                SELECT voucher_line_id,
+                       TOTAL(CASE WHEN category_code = 'MAIN' THEN value END) AS main,
+                       TOTAL(CASE WHEN category_code = 'HARDWARE' THEN value END) AS hardware,
+                       TOTAL(CASE WHEN category_code = 'GLASS' THEN value END) AS glass,
+                       TOTAL(CASE WHEN category_code = 'FACTORY_TIME' THEN value END) AS factory_time,
+                       TOTAL(CASE WHEN category_code = 'SITE_TIME' THEN value END) AS site_time
+                FROM voucher_line_costs
+                GROUP BY voucher_line_id
+            ) lc ON lc.voucher_line_id = l.id
             WHERE l.voucher_id IN ($placeholders)
             ORDER BY l.voucher_id ASC, l.line_no ASC
         ");
@@ -753,6 +770,7 @@ function upsertSyncedLines(PDO $pdo, int $voucherId, array $lines): ?array {
             'tax_category'   => $taxCategory === '課税' ? 'taxable' : 'non_taxable',
             'memo'           => $line['memo'] ?? null,
             'access_line_id' => $accessLineId,
+            'cost_fields'    => syncedLineCostFields($line),
         ];
 
         if ($accessLineId !== null && isset($existingByAccessId[$accessLineId])) {
@@ -802,6 +820,8 @@ function upsertSyncedLines(PDO $pdo, int $voucherId, array $lines): ?array {
             ':id'            => $u['id'],
         ]);
         syncLinePriceBreakdown($pdo, $u['id'], $u);
+        applySyncedLineCostFields($pdo, $u['id'], $u['cost_fields']);
+        syncLineCostBreakdown($pdo, $u['id'], $u['cost_fields']);
     }
 
     if (!empty($toInsert)) {
@@ -833,10 +853,56 @@ function upsertSyncedLines(PDO $pdo, int $voucherId, array $lines): ?array {
                 ':source'         => 'access',
                 ':access_line_id' => $n['access_line_id'],
             ]);
+            applySyncedLineCostFields($pdo, (int)$pdo->lastInsertId(), $n['cost_fields']);
         }
     }
 
     return null;
+}
+
+/**
+ * R-0173: payload にあるキーだけを取り出す（無いキーは変えないため）。
+ */
+function syncedLineCostFields(array $line): array {
+    $fields = [];
+    if (array_key_exists('location_name', $line)) {
+        $fields['location_name'] = $line['location_name'] === null ? null : (string)$line['location_name'];
+    }
+    foreach (['cost_body', 'cost_hardware', 'cost_glass', 'cost_factory_hours', 'cost_site_hours', 'cost_labor_rate'] as $k) {
+        if (array_key_exists($k, $line)) $fields[$k] = (float)$line[$k];
+    }
+    return $fields;
+}
+
+function applySyncedLineCostFields(PDO $pdo, int $lineId, array $fields): void {
+    if (empty($fields)) return;
+    $sets = implode(', ', array_map(fn($k) => "$k = ?", array_keys($fields)));
+    $pdo->prepare("UPDATE voucher_lines SET $sets WHERE id = ?")->execute([...array_values($fields), $lineId]);
+}
+
+/**
+ * R-0173: 内訳テーブル（voucher_line_costs）を持つ行だけ、受け取った原価5キーで該当コードを上書きする。
+ * 行が無いコードは値が0でなければ aggregation_category_master に合わせて追加する。他コードの行は触らない。
+ */
+function syncLineCostBreakdown(PDO $pdo, int $lineId, array $fields): void {
+    $map = ['cost_body' => 'MAIN', 'cost_hardware' => 'HARDWARE', 'cost_glass' => 'GLASS',
+            'cost_factory_hours' => 'FACTORY_TIME', 'cost_site_hours' => 'SITE_TIME'];
+    if (empty(array_intersect_key($fields, $map))) return;
+    $cnt = $pdo->prepare('SELECT COUNT(*) FROM voucher_line_costs WHERE voucher_line_id = ?');
+    $cnt->execute([$lineId]);
+    if ((int)$cnt->fetchColumn() === 0) return;
+
+    $upd = $pdo->prepare('UPDATE voucher_line_costs SET value = ? WHERE voucher_line_id = ? AND category_code = ?');
+    $ins = $pdo->prepare('INSERT INTO voucher_line_costs (voucher_line_id, category_code, category_name, measure_type, value, sort_order)
+        SELECT ?, code, name, measure_type, ?, sort_order FROM aggregation_category_master WHERE code = ?');
+    foreach ($map as $field => $code) {
+        if (!array_key_exists($field, $fields)) continue;
+        $val = $fields[$field];
+        $upd->execute([$val, $lineId, $code]);
+        if ($upd->rowCount() === 0 && $val != 0) {
+            $ins->execute([$lineId, $val, $code]);
+        }
+    }
 }
 
 /**
