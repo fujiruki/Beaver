@@ -46,6 +46,7 @@ php "$root/api/tests/test_r0143_merge_duplicate_customers.php" >/tmp/bv_r0143_me
 php "$root/api/tests/test_r0151_fix_access_line_ids.php" >/tmp/bv_r0151_fix_access_line_ids.log 2>&1 || fail "[test_r0151_fix_access_line_ids] $(tail -n 8 /tmp/bv_r0151_fix_access_line_ids.log)"
 php "$root/api/tests/test_r0171_price_breakdown_sync.php" >/tmp/bv_r0171_price_breakdown_sync.log 2>&1 || fail "[test_r0171_price_breakdown_sync] $(tail -n 8 /tmp/bv_r0171_price_breakdown_sync.log)"
 php "$root/api/tests/test_r0173_line_cost_sync.php" >/tmp/bv_r0173_line_cost_sync.log 2>&1 || fail "[test_r0173_line_cost_sync] $(tail -n 8 /tmp/bv_r0173_line_cost_sync.log)"
+php "$root/api/tests/test_r0170_voucher_unvoid.php" >/tmp/bv_r0170_voucher_unvoid.log 2>&1 || fail "[test_r0170_voucher_unvoid] $(tail -n 8 /tmp/bv_r0170_voucher_unvoid.log)"
 
 rm -f "$root"/api/tests/*.sqlite 2>/dev/null
 exit 0
