@@ -303,8 +303,7 @@ function saveLineCosts(PDO $pdo, int $lineId, array $costs): void {
             ':sort_order'      => (int)($c['sort_order'] ?? 0),
         ]);
     }
-    if (empty($costs)) return;
-    // R-0173: 同期（GET /vouchers/sync・Access）が読む旧形式の列も内訳の値で揃える
+    // R-0173: 同期（GET /vouchers/sync・Access）が読む旧形式の列も内訳の値で揃える（空なら0。改訂 2026-10-11）
     $byCode = ['MAIN' => 0.0, 'HARDWARE' => 0.0, 'GLASS' => 0.0, 'FACTORY_TIME' => 0.0, 'SITE_TIME' => 0.0];
     foreach ($costs as $c) {
         if (array_key_exists($c['category_code'], $byCode)) $byCode[$c['category_code']] += (float)($c['value'] ?? 0);
@@ -329,8 +328,7 @@ function saveLinePrices(PDO $pdo, int $lineId, array $prices): void {
             ':sort_order'      => (int)($p['sort_order'] ?? 0),
         ]);
     }
-    if (empty($prices)) return;
-    // R-0171: 同期（GET /vouchers/sync・Access）が読む旧形式の列も内訳の値で揃える
+    // R-0171: 同期（GET /vouchers/sync・Access）が読む旧形式の列も内訳の値で揃える（空なら0。改訂 2026-10-11）
     $byCode = ['MAIN' => 0.0, 'HARDWARE' => 0.0, 'GLASS' => 0.0];
     foreach ($prices as $p) {
         if (array_key_exists($p['category_code'], $byCode)) $byCode[$p['category_code']] += (float)($p['value'] ?? 0);
