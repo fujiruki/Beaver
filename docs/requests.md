@@ -1,5 +1,26 @@
 # 要望・リクエスト
 
+## 52. R-0173: 明細の取付場所・原価・時間・労務単価を Access と双方向で同期する（2026-10-11、藤田晴樹さん決定、dodai-back経由。Access側はR-0174予定）
+
+### 原文（dodai-back）
+> 晴樹さんが決めた仕様（2026-10-11）をお伝えします。明細行のうち、次の項目を Access と Beaver の両方向で同期します。
+> | 取付場所 | voucher_lines.location_name | 明細の取付場所 |
+> | 原価/本体 | cost_1 | 原価の内訳 MAIN（旧 cost_body） |
+> | 原価/金物 | cost_2 | 原価の内訳 HARDWARE（旧 cost_hardware） |
+> | 原価/ガラス | cost_3 | 原価の内訳 GLASS（旧 cost_glass） |
+> | 工場時間(h) | 新設（既存の cost_4「作業時間」をここへ移す） | cost_factory_hours（または内訳） |
+> | 現場時間(h) | 新設 | cost_site_hours（または内訳） |
+> | 労務単価 | cost_labor_rate | cost_labor_rate |
+> - 労務費は「労務単価 ×（工場時間＋現場時間）」で、単価は1行に1つです（Beaver と同じ）。
+> - Access の建具台帳にも、工場時間と現場時間を分けた入力欄を追加します（Access 側の作業です）。
+> Beaver 側にお願いしたいこと:
+> 1. /vouchers/sync の明細に、上の7項目を足して返す。キー名の案は location_name / cost_body / cost_hardware / cost_glass / cost_factory_hours / cost_site_hours / cost_labor_rate。売値と同じく、内訳がある行は内訳から返す。
+> 2. Access からの push（lines_mode=replace）で、同じキーを受け取って反映する。キーが無いときは既存の値を変えない。
+> 3. キー名と、内訳のコードを決めて返事をください。
+
+### 状態
+仕様化して実装中（`docs/spec/R-0173_line_cost_sync.md`）。
+
 ## 51. R-0172: 伝票画面の保存状態を表示領域の右下に固定表示する（2026-10-11、藤田晴樹さんよりdodai-back経由）
 
 ### 原文（dodai-back）
