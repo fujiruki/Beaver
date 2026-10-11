@@ -10,6 +10,8 @@ type Props = {
   categories: AggregationCategoryMaster[];
   selectedIdx: number | null;
   setSelectedIdx: (idx: number | null) => void;
+  isNew?: boolean;
+  onSaveLine?: (lineId: number, data: Record<string, unknown>) => Promise<void>;
 };
 
 /**
@@ -56,10 +58,14 @@ export function calcCategorySellPrices(
   return newPrices;
 }
 
-export default function ProfitRateBar({ categories, selectedIdx, setSelectedIdx }: Props) {
+export default function ProfitRateBar({ categories, selectedIdx, setSelectedIdx, isNew = false, onSaveLine }: Props) {
   const { profitRate, setProfitRate } = useVoucherStore();
   const { getValues, setValue } = useFormContext<VoucherFormValues>();
   const { settings } = useAppSettings();
+
+  function saveApplied(line: LineFormValues, data: Record<string, unknown>) {
+    if (!isNew && line.id && onSaveLine) void onSaveLine(line.id, data);
+  }
 
   function applyToLine(index: number, line: LineFormValues) {
     if (line.line_type !== 'normal') return;
@@ -75,7 +81,9 @@ export default function ProfitRateBar({ categories, selectedIdx, setSelectedIdx 
         newPrices.sort((a, b) => a.sort_order - b.sort_order);
         setValue(`lines.${index}.prices`, newPrices);
         const unitPrice = newPrices.reduce((s, p) => s + p.value, 0);
-        setValue(`lines.${index}.line_total`, unitPrice * (line.quantity ?? 1));
+        const lineTotal = unitPrice * (line.quantity ?? 1);
+        setValue(`lines.${index}.line_total`, lineTotal);
+        saveApplied(line, { prices: newPrices, line_total: lineTotal });
       }
     } else {
       // フォールバック: 固定列モード
@@ -95,6 +103,7 @@ export default function ProfitRateBar({ categories, selectedIdx, setSelectedIdx 
       setValue(`lines.${index}.price_body`, lineTotal);
       setValue(`lines.${index}.price_hardware`, 0);
       setValue(`lines.${index}.price_glass`, 0);
+      saveApplied(line, { price_body: lineTotal, price_hardware: 0, price_glass: 0, line_total: lineTotal });
     }
   }
 

@@ -854,7 +854,7 @@ export default function VoucherEdit() {
             onTaxInputTypeChange={() => queueMicrotask(() => void queueHeaderSave())}
           />
 
-          <ProfitRateBar categories={categories} selectedIdx={selectedIdx} setSelectedIdx={setSelectedIdx} />
+          <ProfitRateBar categories={categories} selectedIdx={selectedIdx} setSelectedIdx={setSelectedIdx} isNew={isNew} onSaveLine={saveLine} />
 
           {/* 明細行 */}
           {!isReadOnly && (
