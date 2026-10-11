@@ -13,7 +13,12 @@ dodai-backからの注意点（原文）:
 - Access で deleted_at が立った伝票が、Beaver の下書き戻しで Access 側でも復活するか（dodai-back が確認）
 - 下書きに戻せない条件（Access で請求済み、空の伝票を物理削除したものなど）
 
-状態: 未着手（急ぎではない）
+dodai-backの回答（2026-10-11、Accessのコードで確認、beta実機は未確認）:
+- Access で削除済みの伝票に Beaver から更新が届くと、ClassifySyncState が access_deleted を返し、競合待ち（pending）に入る。自動では復活しない
+- 競合解決画面で「Beaver版を採用」を押すと Access 側も復活する（Access R-0168）
+- void 以外の値で updated_at が進めば /vouchers/sync に乗るので、Access 側の追加対応は不要の見込み
+
+状態: 未着手（急ぎではない。仕様案を晴樹さんに確認中）
 
 ## 48. R-0169: 上部メニューの「伝票」タブを「見積」と「売上」の2つに分ける（2026-10-10、藤田晴樹さんよりdodai-back経由）
 
