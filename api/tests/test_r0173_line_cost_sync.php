@@ -354,6 +354,32 @@ try {
         assertEq($beforeRows, costRows($pdo, $lineId), '内訳は変わらない');
     });
 
+    runTest('画面で空の costs を保存すると旧列も0になる（改訂 2026-10-11）', function () use ($port, $testDbPath) {
+        pushVoucher($port, 73007, [basePushLine(7307)]);
+        $pdo = r0173Pdo($testDbPath);
+        $voucherId = (int)$pdo->query('SELECT id FROM vouchers WHERE access_voucher_id = 73007')->fetchColumn();
+        $lineId = lineIdOf($pdo, 73007);
+        $pdo->exec("UPDATE voucher_lines SET cost_body = 3000, cost_hardware = 400, cost_glass = 50,
+                    cost_factory_hours = 1.5, cost_site_hours = 0.5, cost_labor_rate = 4200 WHERE id = $lineId");
+        $pdo = null;
+
+        $put = httpJson($port, "/vouchers/$voucherId/lines/$lineId", 'PUT', ['costs' => []]);
+        assertTrue(str_contains($put['status'], '200'), 'PUT 200: ' . $put['status']);
+
+        $pdo = r0173Pdo($testDbPath);
+        $cols = costCols($pdo, $lineId);
+        assertEq(0.0, $cols['cost_body'], '旧列 cost_body');
+        assertEq(0.0, $cols['cost_hardware'], '旧列 cost_hardware');
+        assertEq(0.0, $cols['cost_glass'], '旧列 cost_glass');
+        assertEq(0.0, $cols['cost_factory_hours'], '旧列 cost_factory_hours');
+        assertEq(0.0, $cols['cost_site_hours'], '旧列 cost_site_hours');
+        assertEq(4200.0, $cols['cost_labor_rate'], '労務単価は変えない');
+        $pdo = null;
+
+        $line = syncedLine($port, 73007);
+        assertEq(0.0, (float)$line['cost_body'], 'sync cost_body');
+    });
+
 } finally {
     if (is_resource($serverProc)) {
         foreach ($serverPipes as $p) { if (is_resource($p)) fclose($p); }

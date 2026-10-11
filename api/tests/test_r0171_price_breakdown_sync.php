@@ -324,6 +324,30 @@ try {
         assertEq(50.0, (float)$row['price_hardware'], '旧形式 price_hardware');
     });
 
+    runTest('画面で空の prices を保存すると旧形式の列も0になる（改訂 2026-10-11）', function () use ($port, $testDbPath) {
+        pushVoucher($port, 71007, [
+            ['line_no' => 1, 'access_line_id' => 9701, 'item_name' => '框戸', 'quantity' => 1,
+             'price_body' => 5000, 'price_hardware' => 700, 'price_glass' => 300, 'line_total' => 6000, 'tax_category' => '課税'],
+        ]);
+        $pdo = r0171Pdo($testDbPath);
+        $voucherId = (int)$pdo->query('SELECT id FROM vouchers WHERE access_voucher_id = 71007')->fetchColumn();
+        $lineId = lineIdOf($pdo, 71007);
+        $pdo = null;
+
+        $put = httpJson($port, "/vouchers/$voucherId/lines/$lineId", 'PUT', ['line_total' => 0, 'prices' => []]);
+        assertTrue(str_contains($put['status'], '200'), 'PUT 200: ' . $put['status']);
+
+        $pdo = r0171Pdo($testDbPath);
+        $row = $pdo->query("SELECT price_body, price_hardware, price_glass FROM voucher_lines WHERE id = $lineId")->fetch();
+        assertEq(0.0, (float)$row['price_body'], '旧形式 price_body');
+        assertEq(0.0, (float)$row['price_hardware'], '旧形式 price_hardware');
+        assertEq(0.0, (float)$row['price_glass'], '旧形式 price_glass');
+        $pdo = null;
+
+        $line = syncedLine($port, 71007);
+        assertEq(0.0, (float)$line['price_body'], 'sync price_body');
+    });
+
 } finally {
     if (is_resource($serverProc)) {
         foreach ($serverPipes as $p) { if (is_resource($p)) fclose($p); }
