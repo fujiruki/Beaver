@@ -114,3 +114,7 @@
 | 2026-10-10 | R-0161: 伝票画面は選択肢（得意先・案件・売上種別）の読み込みが終わってからフォームに値を入れ、それまで自動保存しない（優先度を上げ、A-X-02前に必須） | Beaver_betaへデプロイ済み・2026-10-10晴樹さんが5809で確認し合格（本番は未デプロイ、前バックアップ`database_beta_20261010_pre_r0161.sqlite`） | [docs/spec/R-0161_voucher_form_wait_for_options.md](spec/R-0161_voucher_form_wait_for_options.md) |
 | 2026-10-11 | R-0171: 売値の内訳（本体・金物・ガラス）を同期で送受信する（E03981で晴樹さん発見、dodai-back経由） | Beaver_betaへデプロイ（本番は未デプロイ）。原価の同期は晴樹さん判断待ち | [docs/spec/R-0171_price_breakdown_sync.md](spec/R-0171_price_breakdown_sync.md)。テスト`986f0db`・実装`b79dab6`。空のpricesを保存しても旧形式の列は0にしない（内訳0件の行は旧形式の列で表示する考え方に合わせる） |
 | 2026-10-11 | R-0173: 明細の取付場所・原価・時間・労務単価を Access と双方向で同期する（晴樹さん決定、dodai-back経由。Access側R-0174） | Beaver_betaへデプロイ（本番は未デプロイ） | [docs/spec/R-0173_line_cost_sync.md](spec/R-0173_line_cost_sync.md)。テスト`1f7ddcb`・実装`4b51e74` |
+| 2026-10-11 | R-0170: 取消した伝票を伝票画面から「下書きに戻す」（POST /vouchers/{id}/unvoid、履歴 unvoid） | Beaver_betaへデプロイ（本番は未デプロイ） | [docs/spec/R-0170_voucher_unvoid.md](spec/R-0170_voucher_unvoid.md)。晴樹さん了承。テスト`3b48dce`・実装`abed2c9` |
+| 2026-10-11 | R-0169: 上部メニューの「伝票」を「見積」「売上」に分ける | Beaver_betaへデプロイ（本番は未デプロイ） | [docs/spec/R-0169_voucher_menu_split.md](spec/R-0169_voucher_menu_split.md)。テスト`478a47a`・実装`ee95307`（一覧は voucher_type が変わると描き直す） |
+| 2026-10-11 | R-0172: 伝票画面の保存状態を表示領域の右下に固定表示 | Beaver_betaへデプロイ（本番は未デプロイ） | [docs/spec/R-0172_save_status_fixed.md](spec/R-0172_save_status_fixed.md)。テスト`89e20fc`・実装`bedc730` |
+| 2026-10-11 | R-0171/R-0173 改訂: 空の内訳を保存したときも旧列を0にする（晴樹さん判断） | Beaver_betaへデプロイ（本番は未デプロイ） | テスト`b85bea0`・実装`0df3655` |
