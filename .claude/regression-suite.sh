@@ -44,6 +44,7 @@ php "$root/api/tests/test_sync_status.php"       >/tmp/bv_sync_status.log 2>&1 |
 php "$root/api/tests/test_r0143_baseline_snapshot.php" >/tmp/bv_r0143_baseline.log 2>&1 || fail "[test_r0143_baseline_snapshot] $(tail -n 8 /tmp/bv_r0143_baseline.log)"
 php "$root/api/tests/test_r0143_merge_duplicate_customers.php" >/tmp/bv_r0143_merge.log 2>&1 || fail "[test_r0143_merge_duplicate_customers] $(tail -n 8 /tmp/bv_r0143_merge.log)"
 php "$root/api/tests/test_r0151_fix_access_line_ids.php" >/tmp/bv_r0151_fix_access_line_ids.log 2>&1 || fail "[test_r0151_fix_access_line_ids] $(tail -n 8 /tmp/bv_r0151_fix_access_line_ids.log)"
+php "$root/api/tests/test_r0171_price_breakdown_sync.php" >/tmp/bv_r0171_price_breakdown_sync.log 2>&1 || fail "[test_r0171_price_breakdown_sync] $(tail -n 8 /tmp/bv_r0171_price_breakdown_sync.log)"
 
 rm -f "$root"/api/tests/*.sqlite 2>/dev/null
 exit 0

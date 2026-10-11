@@ -321,6 +321,14 @@ function saveLinePrices(PDO $pdo, int $lineId, array $prices): void {
             ':sort_order'      => (int)($p['sort_order'] ?? 0),
         ]);
     }
+    if (empty($prices)) return;
+    // R-0171: 同期（GET /vouchers/sync・Access）が読む旧形式の列も内訳の値で揃える
+    $byCode = ['MAIN' => 0.0, 'HARDWARE' => 0.0, 'GLASS' => 0.0];
+    foreach ($prices as $p) {
+        if (array_key_exists($p['category_code'], $byCode)) $byCode[$p['category_code']] += (float)($p['value'] ?? 0);
+    }
+    $pdo->prepare('UPDATE voucher_lines SET price_body = ?, price_hardware = ?, price_glass = ? WHERE id = ?')
+        ->execute([$byCode['MAIN'], $byCode['HARDWARE'], $byCode['GLASS'], $lineId]);
 }
 
 // --- 固定列からのフォールバック変換 ---

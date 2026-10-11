@@ -106,13 +106,24 @@ function voucherSyncRowsToJst(PDO $pdo, array $rows): array {
     $linesByVoucherId = [];
     if (!empty($voucherIds)) {
         $placeholders = implode(',', array_fill(0, count($voucherIds), '?'));
+        // R-0171: 内訳テーブル（voucher_line_prices）がある行はその MAIN/HARDWARE/GLASS を返す（fallbackPrices と同じ考え方）
         $lineStmt = $pdo->prepare("
-            SELECT voucher_id, id AS beaver_line_id, access_line_id, line_no, item_name, quantity,
-                   price_body, price_hardware, price_glass, line_total,
-                   tax_category, memo, updated_at, edited_in_beaver
-            FROM voucher_lines
-            WHERE voucher_id IN ($placeholders)
-            ORDER BY voucher_id ASC, line_no ASC
+            SELECT l.voucher_id, l.id AS beaver_line_id, l.access_line_id, l.line_no, l.item_name, l.quantity,
+                   CASE WHEN lp.voucher_line_id IS NULL THEN l.price_body ELSE lp.main END AS price_body,
+                   CASE WHEN lp.voucher_line_id IS NULL THEN l.price_hardware ELSE lp.hardware END AS price_hardware,
+                   CASE WHEN lp.voucher_line_id IS NULL THEN l.price_glass ELSE lp.glass END AS price_glass,
+                   l.line_total, l.tax_category, l.memo, l.updated_at, l.edited_in_beaver
+            FROM voucher_lines l
+            LEFT JOIN (
+                SELECT voucher_line_id,
+                       TOTAL(CASE WHEN category_code = 'MAIN' THEN value END) AS main,
+                       TOTAL(CASE WHEN category_code = 'HARDWARE' THEN value END) AS hardware,
+                       TOTAL(CASE WHEN category_code = 'GLASS' THEN value END) AS glass
+                FROM voucher_line_prices
+                GROUP BY voucher_line_id
+            ) lp ON lp.voucher_line_id = l.id
+            WHERE l.voucher_id IN ($placeholders)
+            ORDER BY l.voucher_id ASC, l.line_no ASC
         ");
         $lineStmt->execute($voucherIds);
         foreach ($lineStmt->fetchAll() as $lineRow) {
@@ -790,6 +801,7 @@ function upsertSyncedLines(PDO $pdo, int $voucherId, array $lines): ?array {
             ':memo'          => $u['memo'],
             ':id'            => $u['id'],
         ]);
+        syncLinePriceBreakdown($pdo, $u['id'], $u);
     }
 
     if (!empty($toInsert)) {
@@ -825,6 +837,32 @@ function upsertSyncedLines(PDO $pdo, int $voucherId, array $lines): ?array {
     }
 
     return null;
+}
+
+/**
+ * R-0171: 内訳テーブルを持つ行だけ、受け取った price_* で MAIN/HARDWARE/GLASS を上書きする。
+ * 行が無いコードは値が0でなければ追加する。それ以外のコードの行は触らない。
+ */
+function syncLinePriceBreakdown(PDO $pdo, int $lineId, array $line): void {
+    $cnt = $pdo->prepare('SELECT COUNT(*) FROM voucher_line_prices WHERE voucher_line_id = ?');
+    $cnt->execute([$lineId]);
+    if ((int)$cnt->fetchColumn() === 0) return;
+
+    $map = [
+        ['field' => 'price_body',     'code' => 'MAIN',     'name' => '本体',   'sort' => 1],
+        ['field' => 'price_hardware', 'code' => 'HARDWARE', 'name' => '金物',   'sort' => 2],
+        ['field' => 'price_glass',    'code' => 'GLASS',    'name' => 'ガラス', 'sort' => 3],
+    ];
+    $upd = $pdo->prepare('UPDATE voucher_line_prices SET value = ? WHERE voucher_line_id = ? AND category_code = ?');
+    $ins = $pdo->prepare("INSERT INTO voucher_line_prices (voucher_line_id, category_code, category_name, measure_type, value, sort_order)
+        VALUES (?, ?, ?, 'money', ?, ?)");
+    foreach ($map as $m) {
+        $val = (float)$line[$m['field']];
+        $upd->execute([$val, $lineId, $m['code']]);
+        if ($upd->rowCount() === 0 && $val != 0) {
+            $ins->execute([$lineId, $m['code'], $m['name'], $val, $m['sort']]);
+        }
+    }
 }
 
 /**
