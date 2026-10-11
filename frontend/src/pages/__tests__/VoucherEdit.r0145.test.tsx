@@ -34,12 +34,14 @@ function makeVoucher(lines: any[]) {
 
 let categories: any[] = [];
 let voucherLines: any[] = [];
+let companySettings: any = {};
 
 beforeEach(() => {
   localStorage.clear();
   requests.length = 0;
   categories = [{ id: 1, code: 'MAIN', name: '本体', measure_type: 'money', sort_order: 1 }];
   voucherLines = [makeLine({ id: 1, item_name: '明細1' })];
+  companySettings = {};
   vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
     const url = String(input);
     const method = init?.method ?? 'GET';
@@ -49,6 +51,7 @@ beforeEach(() => {
     if (url.endsWith('/projects')) return new Response(JSON.stringify([]));
     if (url.endsWith('/aggregation-categories')) return new Response(JSON.stringify(categories));
     if (url.endsWith('/sales-categories')) return new Response('[]');
+    if (method === 'GET' && url.endsWith('/settings')) return new Response(JSON.stringify(companySettings));
     if (url.endsWith('/vouchers/6')) return new Response(JSON.stringify(makeVoucher(voucherLines)));
     if (method === 'POST' && url.endsWith('/vouchers/6/lines')) return new Response(JSON.stringify({ id: 99 }), { status: 201 });
     return new Response('{}');
@@ -69,8 +72,8 @@ function renderExisting() {
 }
 
 describe('VoucherEdit R-0145 (A) 既存伝票の労務単価デフォルト値', () => {
-  it('既存伝票へ「+ 行を追加」すると設定の既定労務単価がPOSTされる', async () => {
-    localStorage.setItem('bv_app_settings', JSON.stringify({ defaultLaborRate: 3000 }));
+  it('既存伝票へ「+ 行を追加」すると会社設定の既定労務単価がPOSTされる（R-0174）', async () => {
+    companySettings = { id: 1, default_labor_rate: 3000 };
     const user = userEvent.setup();
     renderExisting();
     await screen.findByDisplayValue('明細1');
@@ -81,8 +84,8 @@ describe('VoucherEdit R-0145 (A) 既存伝票の労務単価デフォルト値',
     });
   });
 
-  it('既存伝票へ「行を挿入」すると設定の既定労務単価がPOSTされる', async () => {
-    localStorage.setItem('bv_app_settings', JSON.stringify({ defaultLaborRate: 3000 }));
+  it('既存伝票へ「行を挿入」すると会社設定の既定労務単価がPOSTされる（R-0174）', async () => {
+    companySettings = { id: 1, default_labor_rate: 3000 };
     const user = userEvent.setup();
     renderExisting();
     await screen.findByDisplayValue('明細1');
