@@ -159,6 +159,7 @@ function toFormValues(voucher: Voucher): VoucherFormValues {
 
 function NavigationBlocker({ active, beforeLeave }: { active: boolean; beforeLeave: () => Promise<boolean> }) {
   const navigate = useNavigate();
+  const basename = useContext(UNSAFE_DataRouterContext)?.basename ?? '/';
   const activeRef = useRef(active);
   activeRef.current = active;
   const handlingRef = useRef(false);
@@ -183,11 +184,17 @@ function NavigationBlocker({ active, beforeLeave }: { active: boolean; beforeLea
       }
       bypassRef.current = true;
       if (historyAction === 'POP') navigate(-1);
-      else navigate(location.pathname + location.search + location.hash);
+      else {
+        // blocker.location は basename 込みのため、navigate で二重付与されないよう除去する
+        const pathname = basename !== '/' && location.pathname.startsWith(basename)
+          ? location.pathname.slice(basename.length) || '/'
+          : location.pathname;
+        navigate(pathname + location.search + location.hash);
+      }
     }).finally(() => {
       handlingRef.current = false;
     });
-  }, [blocker, beforeLeave, navigate]);
+  }, [blocker, beforeLeave, navigate, basename]);
   return null;
 }
 
