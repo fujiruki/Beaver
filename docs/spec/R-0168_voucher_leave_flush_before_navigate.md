@@ -67,3 +67,6 @@ Beaverに下書きを保存する仕組みはない。伝票詳細のクエリ�
 ## 対象外
 
 - 得意先画面（R-0167で別途判断）
+
+## 不具合修正（2026-10-11）
+- 離脱ガードが止めた遷移をやり直すとき、`blocker.location.pathname` は basename 込みのため、そのまま `navigate` に渡すとベースパスが二重になり404になった（案件画面から見積を新規作成して保存、晴樹さん発見・dodai-back経由）。再遷移前に basename を取り除く。回帰テスト `frontend/src/pages/__tests__/VoucherEdit.basename.test.tsx`（コミット 4c480aa / f58ddb1）。
