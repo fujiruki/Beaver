@@ -15,3 +15,6 @@
 - 画面経由で prices（MAIN 35700, HARDWARE 2900）を保存した行が、/vouchers/sync で price_body 35700・price_hardware 2900・price_glass 0 になる。旧形式の列も揃う。
 - 内訳テーブルが無い行は旧形式の列の値を返す。
 - replace で price_body 等を受け取ると、内訳テーブルを持つ行の MAIN/HARDWARE/GLASS が更新され、他コードの行は残る。GET /vouchers/{id} の prices に反映される。
+
+## 改訂（2026-10-11 藤田晴樹さん判断）
+画面から空の prices を保存したとき（内訳を全部消したとき）は、旧列も0にする。内訳0件の行は旧列で表示されるため、旧列を残すと消したはずの値が画面に戻り、Access にも送られてしまうため。
