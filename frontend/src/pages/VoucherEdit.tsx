@@ -18,7 +18,7 @@ import VoidVoucherButton from '../components/voucher/VoidVoucherButton';
 import TotalSummary from '../components/voucher/TotalSummary';
 import { useSmartBack } from '../hooks/useSmartBack';
 import { useAppSettings } from '../contexts/AppSettingsContext';
-import type { Voucher, VoucherType, VoucherStatus, TaxInputType, LineCategoryValue } from '../types/voucher';
+import type { Voucher, VoucherLine, VoucherType, VoucherStatus, TaxInputType, LineCategoryValue } from '../types/voucher';
 import { getVoucherEditBlockReason, getVoucherVoidBlockReason } from '../lib/voucherVoid';
 
 export type VoucherFormValues = {
@@ -143,17 +143,21 @@ function toFormValues(voucher: Voucher): VoucherFormValues {
     memo: voucher.memo,
     sales_category_id: (voucher as any).sales_category_id ?? null,
     validity_period: voucher.validity_period ?? null,
-    lines: voucher.lines.map(l => ({
-      id: l.id, line_no: l.line_no, line_type: l.line_type, location_no: l.location_no,
-      location_name: l.location_name, tategu_item_id: l.tategu_item_id,
-      source_catalog_item_id: l.source_catalog_item_id ?? null, item_name: l.item_name,
-      quantity: l.quantity, cost_body: l.cost_body, cost_hardware: l.cost_hardware,
-      cost_glass: l.cost_glass, cost_factory_hours: l.cost_factory_hours,
-      cost_site_hours: l.cost_site_hours, cost_labor_rate: l.cost_labor_rate,
-      snapshot_loaded_at: l.snapshot_loaded_at, price_body: l.price_body,
-      price_hardware: l.price_hardware, price_glass: l.price_glass, line_total: l.line_total,
-      tax_category: l.tax_category, memo: l.memo, costs: l.costs ?? [], prices: l.prices ?? [],
-    })),
+    lines: voucher.lines.map(toLineFormValues),
+  };
+}
+
+function toLineFormValues(l: VoucherLine): LineFormValues {
+  return {
+    id: l.id, line_no: l.line_no, line_type: l.line_type, location_no: l.location_no,
+    location_name: l.location_name, tategu_item_id: l.tategu_item_id,
+    source_catalog_item_id: l.source_catalog_item_id ?? null, item_name: l.item_name,
+    quantity: l.quantity, cost_body: l.cost_body, cost_hardware: l.cost_hardware,
+    cost_glass: l.cost_glass, cost_factory_hours: l.cost_factory_hours,
+    cost_site_hours: l.cost_site_hours, cost_labor_rate: l.cost_labor_rate,
+    snapshot_loaded_at: l.snapshot_loaded_at, price_body: l.price_body,
+    price_hardware: l.price_hardware, price_glass: l.price_glass, line_total: l.line_total,
+    tax_category: l.tax_category, memo: l.memo, costs: l.costs ?? [], prices: l.prices ?? [],
   };
 }
 
@@ -296,6 +300,7 @@ export default function VoucherEdit() {
   const initializedVoucherIdRef = useRef<number | null>(null);
   const queuedHeaderRef = useRef<ReturnType<typeof toHeader> | null>(null);
   const failedHeaderRef = useRef<ReturnType<typeof toHeader> | null>(null);
+  const failedLineRef = useRef<{ lineId: number; data: Record<string, unknown> } | null>(null);
   const savingHeaderRef = useRef(false);
   const headerQueuePromiseRef = useRef<Promise<void>>(Promise.resolve());
   const voucherUpdatedAtRef = useRef<string | null>(null);
@@ -465,7 +470,9 @@ export default function VoucherEdit() {
     }
   }
 
-  function retryHeaderSave() {
+  function retrySave() {
+    const failedLine = failedLineRef.current;
+    if (failedLine) void saveLine(failedLine.lineId, failedLine.data);
     if (failedHeaderRef.current) queuedHeaderRef.current = failedHeaderRef.current;
     void processHeaderQueue();
   }
@@ -543,16 +550,20 @@ export default function VoucherEdit() {
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [hasUnsavedChanges, staleVoucher]);
 
+  // サーバーは行を末尾に作るため、作成した行（id付き）をフォームの末尾に足し、以降のblur保存をPUTにする
+  function addLineOnServer(line: LineFormValues) {
+    void enqueueVoucherWrite(expectedUpdatedAt => addLineMutation.mutateAsync({
+      ...line, voucher_id: voucherId, expected_updated_at: expectedUpdatedAt ?? undefined,
+    } as any)).then(created => append(toLineFormValues(created)), () => undefined);
+  }
+
   function handleAddLine() {
     if (!formReady) return;
     const nextNo = (watchedLines?.length ?? 0) + 1;
     if (isNew) {
       append({ ...defaultLine, line_no: nextNo, cost_labor_rate: settings.defaultLaborRate });
     } else {
-      void enqueueVoucherWrite(expectedUpdatedAt => addLineMutation.mutateAsync({
-        ...defaultLine, line_no: nextNo, cost_labor_rate: settings.defaultLaborRate,
-        voucher_id: voucherId, expected_updated_at: expectedUpdatedAt ?? undefined,
-      } as any)).catch(() => undefined);
+      addLineOnServer({ ...defaultLine, line_no: nextNo, cost_labor_rate: settings.defaultLaborRate });
     }
   }
 
@@ -566,9 +577,7 @@ export default function VoucherEdit() {
     if (isNew) {
       append(dup);
     } else {
-      void enqueueVoucherWrite(expectedUpdatedAt => addLineMutation.mutateAsync({
-        ...dup, voucher_id: voucherId, expected_updated_at: expectedUpdatedAt ?? undefined,
-      } as any)).catch(() => undefined);
+      addLineOnServer(dup);
     }
   }
 
@@ -579,10 +588,7 @@ export default function VoucherEdit() {
     if (isNew) {
       append({ ...defaultLine, line_no: nextNo, cost_labor_rate: settings.defaultLaborRate });
     } else {
-      void enqueueVoucherWrite(expectedUpdatedAt => addLineMutation.mutateAsync({
-        ...defaultLine, line_no: nextNo, cost_labor_rate: settings.defaultLaborRate,
-        voucher_id: voucherId, expected_updated_at: expectedUpdatedAt ?? undefined,
-      } as any)).catch(() => undefined);
+      addLineOnServer({ ...defaultLine, line_no: nextNo, cost_labor_rate: settings.defaultLaborRate });
     }
   }
 
@@ -626,12 +632,21 @@ export default function VoucherEdit() {
 
   async function saveLine(lineId: number, data: Record<string, unknown>) {
     if (!formReady) return;
+    setSaveStatus('saving');
+    setSaveError(null);
     try {
       await enqueueVoucherWrite(expectedUpdatedAt => updateLineMutation.mutateAsync({
         lineId,
         data: { ...data, expected_updated_at: expectedUpdatedAt ?? undefined },
       }));
-    } catch { return; }
+      failedLineRef.current = null;
+      setSavedAt(new Date());
+      setSaveStatus('saved');
+    } catch (error) {
+      failedLineRef.current = { lineId, data };
+      setSaveError(error);
+      setSaveStatus(staleRef.current ? 'unsaved' : 'error');
+    }
   }
 
   async function reloadLatestVoucher() {
@@ -933,7 +948,7 @@ export default function VoucherEdit() {
               {!isNew && saveStatus === 'error' && (
                 <span>
                   保存に失敗しました: {formatSaveError(saveError)}{' '}
-                  <button type="button" onClick={retryHeaderSave} style={subBtnStyle}>再試行</button>
+                  <button type="button" onClick={retrySave} style={subBtnStyle}>再試行</button>
                 </span>
               )}
               {isReadOnly ? (
