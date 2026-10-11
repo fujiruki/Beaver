@@ -4,7 +4,7 @@ import { useForm, FormProvider, useFieldArray, useWatch } from 'react-hook-form'
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import {
   useVoucher, useCreateVoucher, useUpdateVoucher,
-  useAddLine, useDeleteLine, useConvertToSales, useReloadSnapshots, useUpdateLine, useVoidVoucher,
+  useAddLine, useDeleteLine, useConvertToSales, useReloadSnapshots, useUpdateLine, useVoidVoucher, useUnvoidVoucher,
 } from '../api/vouchers';
 import { api, ApiError } from '../api/client';
 import { useCustomers } from '../api/customers';
@@ -15,6 +15,7 @@ import VoucherHeader from '../components/voucher/VoucherHeader';
 import LineItemRow from '../components/voucher/LineItemRow';
 import ProfitRateBar from '../components/voucher/ProfitRateBar';
 import VoidVoucherButton from '../components/voucher/VoidVoucherButton';
+import UnvoidVoucherButton from '../components/voucher/UnvoidVoucherButton';
 import TotalSummary from '../components/voucher/TotalSummary';
 import { useSmartBack } from '../hooks/useSmartBack';
 import { useAppSettings } from '../contexts/AppSettingsContext';
@@ -280,6 +281,7 @@ export default function VoucherEdit() {
   const reloadMutation = useReloadSnapshots(voucherId);
   const updateLineMutation = useUpdateLine(voucherId);
   const voidMutation = useVoidVoucher();
+  const unvoidMutation = useUnvoidVoucher();
 
   const form = useForm<VoucherFormValues>({
     defaultValues: {
@@ -667,6 +669,12 @@ export default function VoucherEdit() {
     }));
   }
 
+  async function performUnvoid(reason: string) {
+    await enqueueVoucherWrite(expectedUpdatedAt => unvoidMutation.mutateAsync({
+      id: voucherId, reason, expected_updated_at: expectedUpdatedAt ?? undefined,
+    }));
+  }
+
   if (!isNew && isLoading) return <div>読み込み中...</div>;
 
   const isPending = createMutation.isPending || updateMutation.isPending || addLineMutation.isPending;
@@ -769,6 +777,7 @@ export default function VoucherEdit() {
               <VoidVoucherButton voucherId={voucherId} beforeVoid={saveBeforeVoid} performVoid={performVoid} onDone={() => navigate('/vouchers')}
                 blockReason={getVoucherVoidBlockReason(voucher)} />
             )}
+            {!isNew && voucher?.status === 'void' && <UnvoidVoucherButton performUnvoid={performUnvoid} />}
             <button type="button" style={subBtnStyle}
               onClick={() => window.print()}>
               プレビュー

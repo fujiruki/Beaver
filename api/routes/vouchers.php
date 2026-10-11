@@ -7,6 +7,7 @@
  * PUT    /vouchers/{id}                   ヘッダー更新
  * DELETE /vouchers/{id}                   取消（R-0154: 中身あり=void+履歴／空=物理削除、連携・参照ありはvoid）
  * POST   /vouchers/{id}/convert-to-sales  見積→売上変換（ディープコピー）
+ * POST   /vouchers/{id}/unvoid            取消を下書きに戻す（R-0170）
  * POST   /vouchers/{id}/reload-snapshots  スナップショット一括再読み込み
  * GET    /vouchers/{id}/lines             明細一覧
  * POST   /vouchers/{id}/lines             明細追加
@@ -760,6 +761,29 @@ switch ($method) {
                 http_response_code(500);
                 echo json_encode(['error' => '変換処理に失敗しました']);
             }
+            break;
+        }
+
+        // R-0170: 取消（void）した伝票を下書きに戻す
+        if ($resourceId && $subAction === 'unvoid') {
+            $data = json_decode(file_get_contents('php://input'), true) ?? [];
+            beginVoucherWrite($pdo, $resourceId, $data);
+            $stmt = $pdo->prepare('SELECT * FROM vouchers WHERE id = ?');
+            $stmt->execute([$resourceId]);
+            $beforeRow = $stmt->fetch();
+            if ($beforeRow['status'] !== 'void') {
+                $pdo->rollBack();
+                http_response_code(409);
+                echo json_encode(['error' => '取消された伝票ではありません']);
+                exit;
+            }
+            $pdo->prepare('UPDATE vouchers SET status = "draft", updated_at = CURRENT_TIMESTAMP WHERE id = ?')->execute([$resourceId]);
+            $stmt->execute([$resourceId]);
+            recordHistory($pdo, 'vouchers', $resourceId, 'unvoid', $beforeRow,
+                ['reason' => trim((string)($data['reason'] ?? ''))], $stmt->fetch());
+            $voucherUpdatedAt = voucherUpdatedAtJst($pdo, $resourceId);
+            $pdo->commit();
+            echo json_encode(['result' => 'unvoided', 'voucher_updated_at' => $voucherUpdatedAt]);
             break;
         }
 

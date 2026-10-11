@@ -93,6 +93,18 @@ export function useVoidVoucher() {
   });
 }
 
+/** R-0170: 取消（void）した伝票を下書きに戻す */
+export function useUnvoidVoucher() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, reason, expected_updated_at }: { id: number; reason?: string; expected_updated_at?: string }) =>
+      api.post<{ result: 'unvoided'; voucher_updated_at: string }>(`/vouchers/${id}/unvoid`, {
+        reason: reason ?? '', expected_updated_at,
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: [KEY] }),
+  });
+}
+
 /** 伝票更新 */
 export function useUpdateVoucher(id: number) {
   const queryClient = useQueryClient();
