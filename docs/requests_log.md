@@ -118,3 +118,5 @@
 | 2026-10-11 | R-0169: 上部メニューの「伝票」を「見積」「売上」に分ける | Beaver_betaへデプロイ（本番は未デプロイ） | [docs/spec/R-0169_voucher_menu_split.md](spec/R-0169_voucher_menu_split.md)。テスト`478a47a`・実装`ee95307`（一覧は voucher_type が変わると描き直す） |
 | 2026-10-11 | R-0172: 伝票画面の保存状態を表示領域の右下に固定表示 | Beaver_betaへデプロイ（本番は未デプロイ） | [docs/spec/R-0172_save_status_fixed.md](spec/R-0172_save_status_fixed.md)。テスト`89e20fc`・実装`bedc730` |
 | 2026-10-11 | R-0171/R-0173 改訂: 空の内訳を保存したときも旧列を0にする（晴樹さん判断） | Beaver_betaへデプロイ（本番は未デプロイ） | テスト`b85bea0`・実装`0df3655` |
+| 2026-10-12 | R-0170 不具合修正: 下書きに戻した後、案件画面で無効のまま表示される（伝票の変更時に projects クエリも無効化） | Beaver_betaへデプロイ（本番は未デプロイ） | テスト`958b44b`・修正`320704e` |
+| 2026-10-12 | R-0174: 新しい明細行の労務単価の初期値を会社設定（company_settings.default_labor_rate）から取る（晴樹さん決定、Access側R-0174とは別番号） | Beaver_betaへデプロイ（本番は未デプロイ） | [docs/spec/R-0174_default_labor_rate_from_company_settings.md](spec/R-0174_default_labor_rate_from_company_settings.md)。テスト`ac19a8e`・実装`8039c1e`。AppSettingsContext の defaultLaborRate は未使用のまま残置 |
