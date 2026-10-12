@@ -1,57 +1,67 @@
 # 引き継ぎ資料 — Beaver（最新）
 
-**最終更新**: 2026-10-10 夜（R-0157〜R-0168をBeaver_betaへデプロイ。本番は未デプロイ）
+**最終更新**: 2026-10-12 朝（2026-10-11〜12にR-0169〜R-0174と不具合修正4件をBeaver_betaへデプロイ。本番は未デプロイ）
 
-前回分は `docs/handover/Hikitsugi_2026-10-06.md`（R-0148〜R-0152、auto modeとの付き合い方）。それ以前は同ディレクトリの日付付きファイル。
+前回分は `docs/handover/Hikitsugi_2026-10-10.md`（A-X-01完了、R-0154〜R-0168）。それ以前は同ディレクトリの日付付きファイル。
+
+## 最初に
+
+- **実装はCodexへ（2026-10-12 晴樹さん指示、番頭経由）**: 実装・TDD修正はできるだけCodex（`codex:codex-rescue` か直接呼び出し）に任せる。顧客情報・個人情報・口座情報など機密を含む作業はClaude側で行う。前セッションはClaudeのAgentに任せ続けていたので切り替えること
+- **Codexの呼び出し方**: `codex --cd C:/Fujiruki/Projects --sandbox workspace-write --ask-for-approval on-request exec "$(cat プロンプト.md)" </dev/null`。`codex-onrequest.cmd`に標準入力で渡すと何もせず終わる。`--cd`をBeaverにすると`.git`が読み取り専用になる
+- **Beaver_betaへのデプロイ前後はdodai-backに一言連絡**（共同確認中のため）。DBを書き換える変更はデプロイ前に`api/backups/`へコピー
+- テスト用の伝票はE03981（id 11709）・E03982・5809（E02046）。**5810（E02047）は実務の伝票なのでテストに使わない**
 
 ## 現在地
 
-### 1. A-X-01（Access⇔Beaver_beta全件連携のやり直し）— 完了（2026-10-09、横断整合検査NG 0/37）
-- 2026-10-07: 本番DBからBeaver_betaを再複製し、基準線R-0140(3)を記録。r0150・r0151の予行演習を実施
-- 2026-10-08: Access側不具合（last_synced_atの1秒ずれ等）のため、手順3からやり直し。Beaver_betaを`database_beta_20261007_pre_applyrun.sqlite`へ戻し、ApplyRun後にA-B-10（重複4組の統合）・+10000変換・シード伝票5,772件削除・5792のvoidを実施
-- 2026-10-09: 全件push（5,889件）後の照合が見込みどおり。dodai-backの手順7でも得意先の承認待ち0件、横断整合検査のNGは試用伝票6件由来のP2e・P6aのみ
-- 手順8（2026-10-09）: 晴樹さんが画面から試用伝票を処理。E02041は物理削除、S04600・E02044・E02045はvoid（理由付き履歴あり）。E02046・E02047は残すことになり、Access競合解決画面で「Beaver版を採用」→ access_voucher_id 12101・12102、明細のaccess_line_idも返ってきた
-- Beaver_betaのバックアップは`api/backups/database_beta_2026100[7-9]_*.sqlite`に段階ごとに保存してある
+### 1. 2026-10-11〜12 にBeaver_betaへ入れたもの（本番は未デプロイ）
+| 件 | 内容 | コミット | beta確認 |
+|:--|:--|:--|:--|
+| 不具合 | 新規伝票保存後の遷移でベースパスが二重→404（R-0168離脱ガードの再遷移でbasename込みのパスを渡していた） | `f58ddb1` | 合格（E03981） |
+| 不具合 | 既存伝票で追加した明細行がフォームに入らず、blurで保存されない／明細保存で保存状態が変わらない | `f325668` | 未確認 |
+| 不具合 | 「原価から売値を設定」（ProfitRateBar）が売値・金額をフォームに入れるだけで保存しない | `87d1796` | R-0173の往復で合格 |
+| R-0171 | 売値の内訳（voucher_line_prices MAIN/HARDWARE/GLASS）を/vouchers/syncで返し、Accessのreplaceを内訳にも反映。画面保存で旧列も揃える | `b79dab6` | 合格 |
+| R-0173 | 明細の取付場所・原価5項目・労務単価を双方向同期（キーが無いときは変えない。労務単価は列のみ）。Access側はR-0174 | `4b51e74` | 合格（E03981） |
+| 改訂 | 内訳を全部消して保存したら旧列も0（R-0171/R-0173、晴樹さん判断） | `0df3655` | — |
+| R-0170 | 取消した伝票に「下書きに戻す」（POST /vouchers/{id}/unvoid、履歴unvoid） | `abed2c9` | 合格（E03982、Access往復も） |
+| R-0169 | 上部メニューの「伝票」を「見積」「売上」に分ける | `ee95307` | 未確認 |
+| R-0172 | 伝票画面の保存状態を右下に固定表示 | `bedc730` | 未確認 |
+| 不具合 | 下書きに戻した後、案件画面で無効のまま（伝票の変更時にprojectsクエリも無効化） | `320704e` | 確認依頼中 |
+| R-0174 | 新しい行の労務単価の初期値を会社設定`company_settings.default_labor_rate`（betaは5000）から取る。設定画面もこの値を編集 | `8039c1e` | 確認依頼中 |
 
-### 2. R-0154（画面からの伝票取消）— 実装済み・Beaver_betaへデプロイ済み（追加仕様含む）・本番は未デプロイ
-- 仕様: `docs/spec/R-0154_voucher_void_reason_history.md`。中身ありは理由（任意）付きでvoid＋`record_history`、空は確認なしで物理削除、Access連携伝票は空でもvoid
-- コミット: テスト`4ed2793`、実装`41cee6a`
-- 追加仕様（2026-10-09、晴樹さん決定）: voidの売上は引用済み判定から除外（5806も5807取消後に取消可能）、未保存入力は保存してから空判定。テスト`5858f81`・実装`455e4d6`、Beaver_betaへデプロイ済み（前バックアップ`database_beta_20261009_pre_r0154b.sqlite`）
-- 確認待ち: 引用先の売上をすべて取り消した見積から「引用して売上」で再び売上を作れてよいか／引用先一覧に取消済みの売上も載るが目印を付けるか
+- バックアップ: `database_beta_20261011_pre_r0171.sqlite`・`_pre_r0173`・`_pre_r0170`
+- 仕様書はすべて`docs/spec/R-01xx_*.md`、台帳は`docs/requests_log.md`
+- R-0174は**Beaverの番号**。Access側のR-0174（原価同期）とは別物
+- `AppSettingsContext`の`defaultLaborRate`（localStorage）は未使用のまま残してある（消すと既存テストも消すことになるため）
+
+### 2. 晴樹さんの判断待ち
+- **R-0167**（得意先画面の楽観的ロック。開きっぱなしの画面で保存すると、同期で入った新しい内容を黙って上書きする）: 2026-10-11に平易に説明済み。指揮役のおすすめは「本番切替前に入れる」。「入れて」と言われたらR-0166と同じ作りで実装
+- R-0154の確認待ち: 引用先の売上をすべて取り消した見積から再び売上を作れてよいか／引用先一覧の取消済み売上に目印を付けるか
 
 ### 3. A-X-02（本番Beaverの切替）の手順メモ（Beaver側）
+- **本番に入れるもの**: R-0154（追加仕様含む）・R-0157・R-0158・R-0159・R-0161・R-0163〜R-0166・R-0168〜R-0174と上の不具合修正すべて。R-0158の「`base_synced_at`なしの既存伝票は400」への切り替えはA-X-02後にdodai-backの合図で行う
 - 本番データの修復（r0150・r0151・r0152の`--execute`）はdodai-backが実行時期を指定する。r0151はシード伝票の削除後に実行すると対象が約21件に絞れる
-- **順番の変更（2026-10-09 dodai-back）**: 試用伝票は本番の手順7（同期）の前、手順4.5（シード削除）の近くで本番Beaverから消す。Accessの競合待ちに出さないため。本番にR-0154（追加仕様含む）をデプロイしてから行う
+- 試用伝票は本番の手順7（同期）の前、手順4.5（シード削除）の近くで本番Beaverから消す。本番にR-0154をデプロイしてから行う
 - 5792相当の「Accessで削除済みの伝票」は`~/void_voucher_with_history.php <db> <id> <期待access_voucher_id> "<理由>" [--execute]`で履歴付きvoidにする（サーバーのホームに配置済み）
-- **Beaverにしかない伝票の確認（2026-10-09 dodai-back提案）**: A-X-02の直前に本番で`access_voucher_id`がNULLの伝票を一覧で出し、晴樹さんに1件ずつ「残す（Access側で『Beaver版を採用』して取り込む）か、消すか」を確認する。試用伝票のうちE02046（id 5809）・E02047（id 5810）は晴樹さんが残すと決めたので削除対象から外し、手順7の同期のあとにAccess画面で採用する。採用すると`access-link`（明細つき）で`access_voucher_id`・`access_line_id`が返ってくる。5809の得意先は仮の「とりあえず登録用」なので、本当の得意先に付け替えるか晴樹さんに確認する
-- 本番の試用データ22件（U0xxxx）の扱いも、dodai-backがA-X-02の中で判断する
-- **売値0の行の確認（2026-10-11 dodai-back）**: R-0171以前の取り込みでは、Beaverで作った伝票の売値の内訳がAccessに0で届いていた。本番切替前に、本番AccessにBeaver由来で売値0の行が無いことを確かめる（本番AccessにはまだBeaver由来の伝票を取り込んでいないので、問題ない見込み）
+- A-X-02の直前に本番で`access_voucher_id`がNULLの伝票を一覧にし、晴樹さんに残すか消すかを1件ずつ確認する。E02046（5809）・E02047（5810）は残す。5809の得意先は仮の「とりあえず登録用」なので付け替えを確認
+- 本番の試用データ22件（U0xxxx）の扱いはdodai-backが判断
+- 本番切替前に、本番AccessにBeaver由来で売値0の行が無いことを確かめる（R-0171以前の取り込みで起きていた。本番AccessにはまだBeaver由来の伝票が無い見込み）
+- **本番の会社設定`default_labor_rate`の値を確認**してから切り替える（R-0174で新しい行の初期値になる）
 
-### 3.5 進行中の相談（dodai-back）
-- R-0155（同期・競合解消を得意先→案件→伝票の順に）: 晴樹さん承認済み、Access側で実装中。Beaver APIの変更は不要の見込み。「得意先を承認したら止めていた伝票を自動で取り直す」の要否は、dodai-backが作る得意先パターン表（新規・片側修正・両側修正・無効化・伝票の付け替え）を見て晴樹さんが判断する。Beaverには得意先の物理削除経路はない（`DELETE /customers/{id}`は`is_active=0`）
-- R-0156（Accessの画面でBeaverの伝票番号E02046などを見えるようにする）: dodai-backが調査中
-- 修正前の再現テスト: E02046の得意先「とりあえず登録用」をBeaverで付け替えても、今のAccessには反映されない（既存伝票の採用時にcustomer_id・project_idを更新しないため）
-- 得意先の双方向同期テストは、Access側の受入シナリオU-3（S3・S4）で行う予定
+### 4. dodai-backと進行中
+- R-0155（同期を得意先→案件→伝票の順に）・R-0156（Access画面でBeaverの伝票番号を見せる）: Access側の作業
+- Access側の受入シナリオU-3で得意先の双方向同期を確認予定
 
-### 3.6 2026-10-09〜10 の追加（すべてBeaver_betaのみ、本番は未デプロイ）
-- **R-0157**（Accessからの得意先pushがBeaverの修正を黙って上書きしない。`base_synced_at`・`force`、409 `customer_conflict`。繰越残高の編集で`updated_at`を進めない）: 実装`2fe47d2`、dodai-backと通し確認4項目すべて合格
-- **R-0158**（伝票pushも同じ方式、409 `voucher_conflict`＋`void_reason`。Beaverでvoid済みの伝票はforceで取消解除し`record_history`に`unvoid`。R-0154の一方通行の例外は晴樹さんの判断、dodai-back経由）: ClaudeのAgentが週の上限で停止しCodexが引き継いで実装（`9197091`）。dodai-backの通し確認待ち。`void_reason`は取消解除後も過去の理由が入るので、Access側はstatus=voidのときだけ使う
-- **R-0159**（`GET /projects/sync`の`updated_at`をJSTで返す。Access側の番号R-0162）: `36b8465`。サーバーのPHP既定タイムゾーンはAsia/Tokyo（`updated_after`の`strtotime`解釈が依存）
-- R-0158はdodai-backの通し確認B1〜B5・C〜Fすべて合格
-- **R-0163**（伝票画面の時刻をJSTに、Access№・最終更新を表示）: Beaver_betaへデプロイ済み、合格
-- **R-0164**（伝票ヘッダーの自動保存、保存ボタン廃止、離脱警告）／**R-0165**（伝票一覧で取消済みを既定で隠す）: Beaver_betaへデプロイ済み。晴樹さんは自動保存を「便利」と評価
-- **R-0166**（伝票の楽観的ロック。`expected_updated_at`、409 `stale_voucher`、画面は自動保存を止めて再読み込みを案内）: `993730f`、Beaver_betaで合格
-- **R-0168**（離れるときは保存の結果を待ち、409や失敗なら離れない。開くたびにサーバーから取り直す。生のJSONを出さない）: `c57248d`、Beaver_betaで合格。useBlockerで止めたまま非同期待ちすると`Invalid blocker state transition`になるため、即reset→保存待ち→自分でnavigateし直す設計にした。R-0164の離脱確認テスト1件は仕様変更に合わせて期待値を改めた（仕様書に明記）
-- **R-0161**（優先度を上げた。選択肢＝得意先・案件・売上種別がそろうまでフォームに値を入れず保存もしない。R-0168後に5809で選択欄が全部空に見えた。データは無事）: `b3a075b`、2026-10-10夜にBeaver_betaへデプロイ。dodai-backが5809で確認予定
-- **R-0167**（得意先画面にも楽観的ロックが無い）: 晴樹さんの判断待ち
-- vitestの`localhost:3000`へのECONNREFUSEDログはR-0161以前から出ている既存のもので、失敗には数えられない。Codexの実行環境ではこれを理由に止まることがある
-- **A-X-02で本番に入れるもの**: R-0154（追加仕様含む）・R-0157・R-0158・R-0159・R-0161・R-0163〜R-0166・R-0168・R-0171（2026-10-11のベースパス二重・明細自動保存の不具合修正を含む）。R-0158の「`base_synced_at`なしの既存伝票は400」への切り替えはA-X-02後にdodai-backの合図で行う
-- **Codexの呼び出し方**: `codex-onrequest.cmd exec -`（標準入力渡し）は何も実行せず終了コード2で終わった。`codex --cd C:/Fujiruki/Projects --sandbox workspace-write --ask-for-approval on-request exec "$(cat プロンプト.md)"`で直接呼ぶと動く。`--cd`をBeaverにすると`.git`が読み取り専用になりコミットできない（必ず親の`Projects`）
-
-### 4. 未着手
+### 5. 未着手
 - R-0153（伝票編集画面の合計プレビューをR-0152の計算規則に揃える。`docs/requests.md` §38）。Dodaikunへ乗り換える前に必ず直す
 
+## 知っておくと早いこと
+- Accessの`lines_mode=replace`は`access_line_id`キーのupsert。payloadに無い既存行は消える（`access_line_id`がまだ無いBeaver追加行も）。price_*はキーが無いと0、原価系（R-0173）はキーが無いと変えない
+- 明細の内訳は`voucher_line_prices`／`voucher_line_costs`が正、旧列`price_*`/`cost_*`は内訳0件の行の表示用（`fallbackPrices`/`fallbackCosts`）。労務単価は列`cost_labor_rate`のみ
+- 伝票画面のフォームは開いたときに1回だけ値を入れる（R-0166）。フォームだけ`setValue`して保存しない経路があると、画面と DB がずれる（ProfitRateBarがそうだった）
+- `blocker.location.pathname`はbasename込み（`/contents/Beaver_beta/...`）
+
 ## 運用メモ
-- auto modeは、Beaver_betaのDB書き換え・`upload.ps1`の実行を止めることが多い。止められたら、コマンドを1行にまとめて晴樹さんに`! `で実行してもらう。バックアップ（cp）と読み取りは通ることが多い
-- サーバーの`sqlite3` CLIは古く使えない。DBの確認は`php -r`でPDOを使う
+- auto modeは、Beaver_betaのDB書き換え・`upload.ps1`の実行を止めることがある。止められたら、コマンドを1行にまとめて晴樹さんに`! `で実行してもらう
+- サーバーの`sqlite3` CLIは使えない。DBの確認は`php -r`でPDOを使う
 - dodai-back（AccessTategu側backpc指揮役）とはSendMessageでやり取りする
+- `upload.ps1 -Beta`に`-KeepLocalDB`は絶対に付けない
