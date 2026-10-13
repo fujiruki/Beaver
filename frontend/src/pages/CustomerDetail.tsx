@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useCustomer, useCreateCustomer, useUpdateCustomer } from '../api/customers';
@@ -7,6 +7,8 @@ import CustomerFormFields from '../components/CustomerFormFields';
 import HistoryDrawer from '../components/history/HistoryDrawer';
 import { useSmartBack } from '../hooks/useSmartBack';
 import type { CustomerInput } from '../types/customer';
+import type { Customer } from '../types/customer';
+import { ApiError } from '../api/client';
 
 export default function CustomerDetail() {
   const navigate = useNavigate();
@@ -15,12 +17,15 @@ export default function CustomerDetail() {
   const customerId = id ? Number(id) : 0;
   const isNew = !id;
 
-  const { data: customer, isLoading } = useCustomer(customerId);
+  const { data: customer, isLoading, refetch } = useCustomer(customerId);
   const createMutation = useCreateCustomer();
   const updateMutation = useUpdateCustomer(customerId);
   const { data: billingEditSetting } = useBillingEditEnabled();
   const billingEditEnabled = billingEditSetting?.billing_edit_enabled ?? false;
   const [showHistory, setShowHistory] = useState(false);
+  const initializedRef = useRef(false);
+  const expectedUpdatedAtRef = useRef<string | null>(null);
+  const [staleCustomer, setStaleCustomer] = useState<Customer | null>(null);
 
   const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<CustomerInput>({
     defaultValues: {
@@ -34,11 +39,13 @@ export default function CustomerDetail() {
   });
 
   useEffect(() => {
-    if (customer) {
+    if (customer && !initializedRef.current) {
       reset({
         ...customer,
         cutoff_day: customer.cutoff_day === 0 ? 31 : customer.cutoff_day,
       });
+      expectedUpdatedAtRef.current = customer.updated_at;
+      initializedRef.current = true;
     }
   }, [customer, reset]);
 
@@ -46,9 +53,32 @@ export default function CustomerDetail() {
     if (isNew) {
       await createMutation.mutateAsync(data);
     } else {
-      await updateMutation.mutateAsync(data);
+      try {
+        await updateMutation.mutateAsync({
+          ...data,
+          expected_updated_at: expectedUpdatedAtRef.current ?? undefined,
+        });
+      } catch (error) {
+        if (error instanceof ApiError && error.status === 409) {
+          const body = error.body as { error?: string; customer?: Customer };
+          if (body.error === 'stale_customer' && body.customer) {
+            setStaleCustomer(body.customer);
+            return;
+          }
+        }
+        return;
+      }
     }
     goBack();
+  }
+
+  async function reloadCustomer() {
+    const result = await refetch();
+    const latest = result.data ?? staleCustomer;
+    if (!latest) return;
+    reset({ ...latest, cutoff_day: latest.cutoff_day === 0 ? 31 : latest.cutoff_day });
+    expectedUpdatedAtRef.current = latest.updated_at;
+    setStaleCustomer(null);
   }
 
   if (!isNew && isLoading) return <div>読み込み中...</div>;
@@ -94,6 +124,13 @@ export default function CustomerDetail() {
       {mutError && (
         <div style={{ marginBottom: 16, padding: '10px 14px', background: '#fee2e2', color: '#dc2626', borderRadius: 6, fontSize: 14 }}>
           保存に失敗しました: {String(mutError)}
+        </div>
+      )}
+
+      {staleCustomer && (
+        <div style={{ marginBottom: 16, padding: '12px 14px', background: '#fef3c7', color: '#92400e', borderRadius: 6, fontSize: 14 }}>
+          ほかで更新されています（最終更新: {staleCustomer.updated_at}）。再読み込みすると、この画面で保存されていない入力は失われます。
+          <button type="button" onClick={reloadCustomer} style={{ ...backBtnStyle, marginLeft: 12 }}>再読み込み</button>
         </div>
       )}
 

@@ -5,6 +5,7 @@ import Pagination from '../components/Pagination';
 import DataTable, { useSortState } from '../components/DataTable';
 import type { DataTableColumn, SortDir, SortState } from '../components/DataTable';
 import type { Customer } from '../types/customer';
+import { ApiError } from '../api/client';
 
 export default function CustomerList() {
   const navigate = useNavigate();
@@ -20,8 +21,9 @@ export default function CustomerList() {
   const [sort, setSortStorage] = useSortState('customers',
     urlSortKey ? { key: urlSortKey, dir: searchParams.get('order') === 'desc' ? 'desc' : 'asc' } : undefined);
   const isComposingRef = useRef(false);
-  const { data, isLoading, error } = useCustomersPaged(page, search, sort);
+  const { data, isLoading, error, refetch } = useCustomersPaged(page, search, sort);
   const deleteMutation = useDeleteCustomer();
+  const [deleteConflict, setDeleteConflict] = useState(false);
 
   const customers = data?.data ?? [];
   const meta = data?.meta;
@@ -66,9 +68,19 @@ export default function CustomerList() {
     }
   }
 
-  function handleDelete(id: number, name: string) {
+  async function handleDelete(customer: Customer) {
+    const { id, name, updated_at } = customer;
     if (!confirm(`「${name}」を削除しますか？`)) return;
-    deleteMutation.mutate(id);
+    setDeleteConflict(false);
+    try {
+      await deleteMutation.mutateAsync({ id, expected_updated_at: updated_at });
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 409 &&
+          (error.body as { error?: string }).error === 'stale_customer') {
+        setDeleteConflict(true);
+        await refetch();
+      }
+    }
   }
 
   function handleSortChange(key: string, dir: SortDir) {
@@ -103,7 +115,7 @@ export default function CustomerList() {
           </button>
           {' '}
           <button
-            onClick={() => handleDelete(c.id, c.name)}
+            onClick={() => handleDelete(c)}
             style={btnSmStyle('#dc2626')}
             disabled={deleteMutation.isPending}
           >
@@ -138,6 +150,12 @@ export default function CustomerList() {
           style={{ padding: '6px 10px', border: '1px solid #cbd5e1', borderRadius: 6, fontSize: 13, width: 240 }}
         />
       </div>
+
+      {deleteConflict && (
+        <div style={{ marginBottom: 12, padding: '10px 14px', background: '#fef3c7', color: '#92400e', borderRadius: 6, fontSize: 14 }}>
+          ほかで更新されています。一覧を読み込み直しました。もう一度確認してから削除してください。
+        </div>
+      )}
 
       <div style={{ background: '#fff', borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
         <div className="md:hidden" data-testid="customer-mobile-list">

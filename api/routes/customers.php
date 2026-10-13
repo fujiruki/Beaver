@@ -151,6 +151,43 @@ function customerSyncRowToJst(array $row): array {
     return $row;
 }
 
+function customerRowToJst(array $row): array {
+    $row['updated_at'] = utcToJst($row['updated_at']);
+    $row['last_synced_at'] = utcToJst($row['last_synced_at']);
+    return $row;
+}
+
+function beginCustomerWrite(PDO $pdo, int $customerId, array $data): array {
+    $expected = $data['expected_updated_at'] ?? null;
+    $expectedUtc = null;
+    if ($expected !== null && $expected !== '') {
+        $expectedUtc = is_string($expected) ? jstToUtc($expected) : null;
+        if ($expectedUtc === null) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Invalid expected_updated_at format']);
+            exit;
+        }
+    }
+
+    $pdo->beginTransaction();
+    $stmt = $pdo->prepare('SELECT * FROM customers WHERE id = ?');
+    $stmt->execute([$customerId]);
+    $customer = $stmt->fetch();
+    if (!$customer) {
+        $pdo->rollBack();
+        http_response_code(404);
+        echo json_encode(['error' => 'Not found']);
+        exit;
+    }
+    if ($expectedUtc !== null && $customer['updated_at'] > $expectedUtc) {
+        $pdo->rollBack();
+        http_response_code(409);
+        echo json_encode(['error' => 'stale_customer', 'customer' => customerRowToJst($customer)]);
+        exit;
+    }
+    return $customer;
+}
+
 // --- AccessTategu連携契約 A-B-01: Beaver→Access 得意先同期用 軽量増分API ---
 // GET /customers/sync[?updated_after=YYYY-MM-DD HH:NN:SS (JST)][&limit=N][&cursor=ID]
 // 完全一致チェック（/customers/sync/anything を全件返却で誤通過させない）
@@ -250,7 +287,7 @@ switch ($method) {
                 echo json_encode(['error' => 'Not found']);
                 exit;
             }
-            echo json_encode($row);
+            echo json_encode(customerRowToJst($row));
         } else {
             // 一覧
             $where = 'WHERE 1=1';
@@ -283,13 +320,13 @@ switch ($method) {
                 $stmt  = $pdo->prepare("SELECT * FROM customers $where $sortClause LIMIT $perPage OFFSET $offset");
                 $stmt->execute($params);
                 echo json_encode([
-                    'data' => $stmt->fetchAll(),
+                    'data' => array_map('customerRowToJst', $stmt->fetchAll()),
                     'meta' => ['total' => $total, 'page' => $page, 'per_page' => $perPage, 'last_page' => (int)ceil($total / $perPage)],
                 ]);
             } else {
                 $stmt = $pdo->prepare("SELECT * FROM customers $where ORDER BY code");
                 $stmt->execute($params);
-                echo json_encode($stmt->fetchAll());
+                echo json_encode(array_map('customerRowToJst', $stmt->fetchAll()));
             }
         }
         break;
@@ -445,6 +482,7 @@ switch ($method) {
     case 'PUT':
         if (!$resourceId) { http_response_code(400); echo json_encode(['error' => 'ID required']); exit; }
         $data = json_decode(file_get_contents('php://input'), true) ?? [];
+        $beforeRow = beginCustomerWrite($pdo, $resourceId, $data);
         // carry_forward_balance は PATCH /carry-forward 専用。通常更新では変更不可
         // R-075: codeはユーザーが変更できない（自動採番のみ）ため更新対象から除外
         // R-0140 (2) B-04: access_customer_no も PATCH /access-link 専用（誤操作防止）のため除外
@@ -460,27 +498,43 @@ switch ($method) {
                 $params[":$f"] = $data[$f];
             }
         }
-        if (empty($sets)) { http_response_code(400); echo json_encode(['error' => 'No fields']); exit; }
+        if (empty($sets)) {
+            $pdo->rollBack();
+            http_response_code(400);
+            echo json_encode(['error' => 'No fields']);
+            exit;
+        }
         $sets[] = 'updated_at = CURRENT_TIMESTAMP';
         $params[':id'] = $resourceId;
         // R-0098: 更新前の状態をUndo用に記録する（差分がある場合のみ）
-        $beforeStmt = $pdo->prepare('SELECT * FROM customers WHERE id = ?');
-        $beforeStmt->execute([$resourceId]);
-        $beforeRow = $beforeStmt->fetch();
-        $pdo->prepare('UPDATE customers SET ' . implode(', ', $sets) . ' WHERE id = :id')->execute($params);
-        $stmt = $pdo->prepare('SELECT * FROM customers WHERE id = ?');
-        $stmt->execute([$resourceId]);
-        $afterRow = $stmt->fetch();
-        if ($beforeRow) {
+        try {
+            $pdo->prepare('UPDATE customers SET ' . implode(', ', $sets) . ' WHERE id = :id')->execute($params);
+            $stmt = $pdo->prepare('SELECT * FROM customers WHERE id = ?');
+            $stmt->execute([$resourceId]);
+            $afterRow = $stmt->fetch();
             recordCustomerUpdateIfChanged($pdo, $beforeRow, $afterRow);
+            $pdo->commit();
+        } catch (PDOException $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            if (str_contains($e->getMessage(), 'UNIQUE constraint failed')) {
+                $violated = classifyUniqueViolationColumn($e->getMessage()) ?? 'code';
+                http_response_code(409);
+                echo json_encode(['error' => "$violated が既に存在します", 'column' => $violated]);
+                break;
+            }
+            throw $e;
         }
-        echo json_encode($afterRow);
+        echo json_encode(customerRowToJst($afterRow));
         break;
 
     case 'DELETE':
         if (!$resourceId) { http_response_code(400); echo json_encode(['error' => 'ID required']); exit; }
+        $body = json_decode(file_get_contents('php://input'), true) ?? [];
+        $data = array_merge($_GET, $body);
+        beginCustomerWrite($pdo, $resourceId, $data);
         $pdo->prepare('UPDATE customers SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
             ->execute([$resourceId]);
+        $pdo->commit();
         echo json_encode(['deleted' => true]);
         break;
 

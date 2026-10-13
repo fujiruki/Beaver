@@ -55,7 +55,7 @@ export function useCreateCustomer() {
 export function useUpdateCustomer(id: number) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: CustomerInput) => api.put<Customer>(`/customers/${id}`, data),
+    mutationFn: (data: CustomerInput & { expected_updated_at?: string }) => api.put<Customer>(`/customers/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [KEY] });
       queryClient.invalidateQueries({ queryKey: [KEY, id] });
@@ -80,7 +80,8 @@ export function useUpdateCarryForward(id: number) {
 export function useDeleteCustomer() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: number) => api.delete<void>(`/customers/${id}`),
+    mutationFn: ({ id, expected_updated_at }: { id: number; expected_updated_at?: string }) =>
+      api.delete<void>(`/customers/${id}`, expected_updated_at ? { expected_updated_at } : undefined),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [KEY] });
     },
