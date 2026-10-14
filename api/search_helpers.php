@@ -40,18 +40,20 @@ if (!function_exists('normalizeSimilarCustomerText')) {
     function normalizeSimilarCustomerText(?string $value): string {
         $normalized = mb_convert_kana((string)$value, 'asKV');
         $normalized = str_replace(
-            ['株式会社', '有限会社', '合同会社', '合資会社', '合名会社', '(株)', '(有)', '(合)', '㈱', '㈲',
-             '（株）', '（有）', '（合）'],
+            ['株式会社', '有限会社', '合同会社', '合資会社', '合名会社', '一般社団法人', '医療法人',
+             '社会福祉法人', '学校法人', '宗教法人', '(株)', '(有)', '(合)', '㈱', '㈲'],
             '',
             $normalized
         );
         $normalized = mb_convert_kana($normalized, 'c');
         $normalized = str_replace(
-            ['かぶしきがいしゃ', 'かぶしきかいしゃ', 'ゆうげんがいしゃ', 'ゆうげんかいしゃ', 'ごうどうがいしゃ'],
+            ['かぶしきがいしゃ', 'かぶしきかいしゃ', 'ゆうげんがいしゃ', 'ゆうげんかいしゃ', 'ごうどうがいしゃ',
+             'か)', '(か', 'ゆ)', '(ゆ'],
             '',
             $normalized
         );
-        return preg_replace('/[\s\p{P}\p{S}]+/u', '', $normalized) ?? '';
+        $normalized = preg_replace('/[\s\p{P}\p{S}]+/u', '', $normalized) ?? '';
+        return preg_replace('/(?:御中|様|殿|邸|宅)+$/u', '', $normalized) ?? '';
     }
 }
 
@@ -59,6 +61,7 @@ if (!function_exists('normalizeSimilarCustomerTel')) {
     /** R-0176: 電話番号を数字だけにする。 */
     function normalizeSimilarCustomerTel(?string $value): string {
         $normalized = mb_convert_kana((string)$value, 'n');
-        return preg_replace('/\D/u', '', $normalized) ?? '';
+        $normalized = preg_replace('/\D/u', '', $normalized) ?? '';
+        return str_starts_with($normalized, '81') ? '0' . substr($normalized, 2) : $normalized;
     }
 }
