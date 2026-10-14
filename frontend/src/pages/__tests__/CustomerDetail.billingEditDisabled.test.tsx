@@ -51,11 +51,11 @@ describe('CustomerDetail R-0143 A-B-05 請求・入金編集の封印', () => {
     expect(screen.queryByRole('link', { name: '修正する' })).toBeNull();
   });
 
-  it('billing_edit_enabled=trueでは繰越残高の「修正する」リンクが描画される（回帰確認）', async () => {
+  it('billing_edit_enabled=trueでも繰越残高の「修正する」リンクが描画されない', async () => {
     stubFetch(true);
     renderPage();
 
     await screen.findByText('¥1,000');
-    expect(screen.getByRole('link', { name: '修正する' })).toBeTruthy();
+    expect(screen.queryByRole('link', { name: '修正する' })).toBeNull();
   });
 });

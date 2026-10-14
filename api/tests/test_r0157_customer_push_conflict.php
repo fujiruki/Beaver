@@ -253,12 +253,13 @@ try {
         assertEq(['error' => 'code が既に存在します', 'code' => '730'], $r['body'], 'body');
     });
 
-    runTest('受入条件10: carry-forward で updated_at が変わらず、carry_forward_balance は更新される', function () use ($pdo, $base, $UTC) {
+    runTest('受入条件10: carry-forward は403で残高とupdated_atが変わらない', function () use ($pdo, $base, $UTC) {
         $id = seedCustomer($pdo, '740', '740', '繰越', $UTC);
         $r = request('PATCH', "$base/$id/carry-forward", ['carry_forward_balance' => 12345]);
-        assertEq(200, $r['status'], 'status');
+        assertEq(403, $r['status'], 'status');
+        assertEq('carry_forward_is_access_owned', $r['body']['error'] ?? null, 'error');
         $row = fetchRow($pdo, $id);
-        assertEq(12345.0, (float)$row['carry_forward_balance'], 'carry_forward_balance');
+        assertEq(1000.0, (float)$row['carry_forward_balance'], 'carry_forward_balance');
         assertEq($UTC, $row['updated_at'], 'updated_at は変わらない');
     });
 

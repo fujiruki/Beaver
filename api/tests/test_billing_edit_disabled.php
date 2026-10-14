@@ -245,10 +245,10 @@ try {
         assertTrue(str_contains($r['status'], '200'), 'HTTP 200: ' . $r['status']);
     });
 
-    runTest('PATCH /customers/{id}/carry-forward は billing_edit_disabled で409、変更されない', function () use ($pdoFalse, $portFalse, $fxFalse) {
+    runTest('PATCH /customers/{id}/carry-forward は請求編集無効でもAccess正本のため403、変更されない', function () use ($pdoFalse, $portFalse, $fxFalse) {
         $r = httpJson($portFalse, 'PATCH', "/customers/{$fxFalse['custId']}/carry-forward", ['carry_forward_balance' => 9999]);
-        assertTrue(str_contains($r['status'], '409'), 'HTTP 409: ' . $r['status']);
-        assertEq('billing_edit_disabled', $r['body']['error'] ?? null, 'error');
+        assertTrue(str_contains($r['status'], '403'), 'HTTP 403: ' . $r['status']);
+        assertEq('carry_forward_is_access_owned', $r['body']['error'] ?? null, 'error');
         $bal = (float)$pdoFalse->query("SELECT carry_forward_balance FROM customers WHERE id = {$fxFalse['custId']}")->fetchColumn();
         assertEq(1000.0, $bal, '繰越残高は変更されていない');
     });
@@ -298,11 +298,13 @@ try {
         assertTrue(str_contains($r['status'], '200') || str_contains($r['status'], '201'), 'HTTP 200/201: ' . $r['status']);
     });
 
-    runTest('PATCH /customers/{id}/carry-forward は従来どおり200で更新される', function () use ($pdoTrue, $portTrue, $fxTrue) {
+    runTest('PATCH /customers/{id}/carry-forward は請求編集有効でもAccess正本のため403、変更されない', function () use ($pdoTrue, $portTrue, $fxTrue) {
+        $before = (float)$pdoTrue->query("SELECT carry_forward_balance FROM customers WHERE id = {$fxTrue['custId']}")->fetchColumn();
         $r = httpJson($portTrue, 'PATCH', "/customers/{$fxTrue['custId']}/carry-forward", ['carry_forward_balance' => 2500]);
-        assertTrue(str_contains($r['status'], '200'), 'HTTP 200: ' . $r['status']);
+        assertTrue(str_contains($r['status'], '403'), 'HTTP 403: ' . $r['status']);
+        assertEq('carry_forward_is_access_owned', $r['body']['error'] ?? null, 'error');
         $bal = (float)$pdoTrue->query("SELECT carry_forward_balance FROM customers WHERE id = {$fxTrue['custId']}")->fetchColumn();
-        assertEq(2500.0, $bal, '繰越残高が更新される');
+        assertEq($before, $bal, '繰越残高は変更されていない');
     });
 
 } finally {
