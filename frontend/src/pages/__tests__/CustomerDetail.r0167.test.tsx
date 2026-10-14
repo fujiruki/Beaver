@@ -66,6 +66,7 @@ describe('R-0167 得意先詳細の楽観的ロック', () => {
     expect(screen.getByRole('button', { name: '再読み込み' })).toBeTruthy();
     expect(screen.getByDisplayValue('入力中の値')).toBeTruthy();
     expect(screen.queryByText('得意先一覧')).toBeNull();
+    expect(screen.queryByText(/保存に失敗しました/)).toBeNull();
   });
 
   it('再読み込みで最新値を反映し、次の保存は新しいupdated_atを送る', async () => {
@@ -98,6 +99,7 @@ describe('R-0167 得意先詳細の楽観的ロック', () => {
     await user.click(screen.getByRole('button', { name: '再読み込み' }));
     await waitFor(() => expect(screen.getByDisplayValue('サーバー最新値')).toBeTruthy());
     expect(screen.queryByText(/ほかで更新されています/)).toBeNull();
+    expect(screen.queryByText(/保存に失敗しました/)).toBeNull();
     const latestName = screen.getByDisplayValue('サーバー最新値');
     await user.clear(latestName);
     await user.type(latestName, '再編集');
