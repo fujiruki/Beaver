@@ -63,19 +63,6 @@ export function useUpdateCustomer(id: number) {
   });
 }
 
-/** 繰越残高例外修正 */
-export function useUpdateCarryForward(id: number) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (balance: number) =>
-      api.patch<Customer>(`/customers/${id}/carry-forward`, { carry_forward_balance: balance }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [KEY] });
-      queryClient.invalidateQueries({ queryKey: [KEY, id] });
-    },
-  });
-}
-
 /** 得意先削除 */
 export function useDeleteCustomer() {
   const queryClient = useQueryClient();

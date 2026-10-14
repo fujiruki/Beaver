@@ -8,7 +8,6 @@ import { APP_ID } from './lib/appId';
 const Dashboard            = lazy(() => import('./pages/Dashboard'));
 const CustomerList         = lazy(() => import('./pages/CustomerList'));
 const CustomerDetail       = lazy(() => import('./pages/CustomerDetail'));
-const CarryForwardEdit     = lazy(() => import('./pages/CarryForwardEdit'));
 const TateguItemList       = lazy(() => import('./pages/TateguItemList'));
 const TateguItemDetail     = lazy(() => import('./pages/TateguItemDetail'));
 const ProjectList          = lazy(() => import('./pages/ProjectList'));
@@ -38,7 +37,6 @@ const router = createBrowserRouter(createRoutesFromElements(
     <Route path="customers" element={<CustomerList />} />
     <Route path="customers/new" element={<CustomerDetail />} />
     <Route path="customers/:id" element={<CustomerDetail />} />
-    <Route path="customers/:id/carry-forward" element={<CarryForwardEdit />} />
     <Route path="tategu" element={<TateguItemList />} />
     <Route path="tategu/new" element={<TateguItemDetail />} />
     <Route path="tategu/:id" element={<TateguItemDetail />} />

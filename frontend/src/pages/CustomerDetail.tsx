@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useCustomer, useCreateCustomer, useUpdateCustomer } from '../api/customers';
-import { useBillingEditEnabled } from '../api/settings';
 import CustomerFormFields from '../components/CustomerFormFields';
 import HistoryDrawer from '../components/history/HistoryDrawer';
 import { useSmartBack } from '../hooks/useSmartBack';
@@ -20,8 +19,6 @@ export default function CustomerDetail() {
   const { data: customer, isLoading, refetch } = useCustomer(customerId);
   const createMutation = useCreateCustomer();
   const updateMutation = useUpdateCustomer(customerId);
-  const { data: billingEditSetting } = useBillingEditEnabled();
-  const billingEditEnabled = billingEditSetting?.billing_edit_enabled ?? false;
   const [showHistory, setShowHistory] = useState(false);
   const initializedRef = useRef(false);
   const expectedUpdatedAtRef = useRef<string | null>(null);
@@ -142,7 +139,6 @@ export default function CustomerDetail() {
           watch={watch}
           code={customer?.code}
           carryForwardBalance={customer?.carry_forward_balance}
-          carryForwardEditLink={!isNew && id && billingEditEnabled ? `/customers/${id}/carry-forward` : undefined}
         />
 
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>

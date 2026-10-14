@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
 import type { FieldErrors, UseFormRegister, UseFormSetValue, UseFormWatch } from 'react-hook-form';
 import type { CustomerInput } from '../types/customer';
 import { nextKanaValue } from '../lib/kanaAutoFill';
@@ -20,10 +19,9 @@ interface Props {
   watch: UseFormWatch<CustomerInput>;
   code?: string | null;
   carryForwardBalance?: number;
-  carryForwardEditLink?: string;
 }
 
-export default function CustomerFormFields({ register, errors, setValue, watch, code, carryForwardBalance, carryForwardEditLink }: Props) {
+export default function CustomerFormFields({ register, errors, setValue, watch, code, carryForwardBalance }: Props) {
   const kanaRef = useRef('');
   const [kanaLocked, setKanaLocked] = useState(false);
 
@@ -125,11 +123,6 @@ export default function CustomerFormFields({ register, errors, setValue, watch, 
               <span style={{ fontSize: 14, color: '#1e293b' }}>
                 {carryForwardBalance != null ? `¥${carryForwardBalance.toLocaleString()}` : '—'}
               </span>
-              {carryForwardEditLink && (
-                <Link to={carryForwardEditLink} style={{ fontSize: 12, color: '#2563eb', textDecoration: 'underline' }}>
-                  修正する
-                </Link>
-              )}
             </div>
           </Field>
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: 20, paddingBottom: 2 }}>
