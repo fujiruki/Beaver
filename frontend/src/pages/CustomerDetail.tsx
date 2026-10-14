@@ -76,12 +76,15 @@ export default function CustomerDetail() {
     reset({ ...latest, cutoff_day: latest.cutoff_day === 0 ? 31 : latest.cutoff_day });
     expectedUpdatedAtRef.current = latest.updated_at;
     setStaleCustomer(null);
+    updateMutation.reset();
   }
 
   if (!isNew && isLoading) return <div>読み込み中...</div>;
 
   const isPending = createMutation.isPending || updateMutation.isPending;
   const mutError  = createMutation.error || updateMutation.error;
+  const isStaleCustomerError = mutError instanceof ApiError && mutError.status === 409 &&
+    (mutError.body as { error?: string }).error === 'stale_customer';
 
   return (
     <div style={{ maxWidth: 720 }}>
@@ -118,7 +121,7 @@ export default function CustomerDetail() {
         />
       )}
 
-      {mutError && (
+      {mutError && !isStaleCustomerError && (
         <div style={{ marginBottom: 16, padding: '10px 14px', background: '#fee2e2', color: '#dc2626', borderRadius: 6, fontSize: 14 }}>
           保存に失敗しました: {String(mutError)}
         </div>
