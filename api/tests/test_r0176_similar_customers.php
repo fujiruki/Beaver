@@ -8,6 +8,7 @@
 declare(strict_types=1);
 
 $root = dirname(__DIR__);
+require_once $root . '/search_helpers.php';
 $dbPath = __DIR__ . '/test_r0176_similar_customers_' . getmypid() . '.sqlite';
 $bootstrap = __DIR__ . '/_server_bootstrap_r0176.php';
 @unlink($dbPath);
@@ -113,13 +114,26 @@ runTest('2. カナはひらがな・半角カナを正規化して一致する',
     }
 });
 
+runTest('2b. カナの法人格略記を除いて一致する', function () use ($port, $companyId): void {
+    foreach (['ｶ)ﾔﾏﾀﾞｺｳﾑﾃﾝ', '（カヤマダコウムテン', 'ﾕ)ﾔﾏﾀﾞｺｳﾑﾃﾝ', '(ユヤマダコウムテン'] as $kana) {
+        assertSameValue('やまだこうむてん', normalizeSimilarCustomerText($kana), "$kana の正規化");
+        $rows = getJson($port, ['name_kana' => $kana]);
+        assertSameValue($companyId, (int)($rows[0]['id'] ?? 0), "$kana の候補");
+    }
+});
+
 runTest('3. 電話・携帯・FAXに数字だけで一致し、5桁以下は照合しない', function () use ($port, $companyId): void {
-    foreach (['0612345678', '09011112222', '0698765432'] as $tel) {
+    foreach (['0612345678', '+81-6-1234-5678', '09011112222', '+81-90-1111-2222', '0698765432'] as $tel) {
         $rows = getJson($port, ['tel' => $tel]);
         assertSameValue($companyId, (int)($rows[0]['id'] ?? 0), "$tel の候補");
         assertTrue(in_array('tel', $rows[0]['matched'] ?? [], true), 'matchedにtel');
     }
     assertSameValue([], getJson($port, ['tel' => '12345']), '5桁は空配列');
+});
+
+runTest('3b. +81表記は国内電話番号へ正規化する', function (): void {
+    assertSameValue('0612345678', normalizeSimilarCustomerTel('+81-6-1234-5678'), '固定電話');
+    assertSameValue('09011112222', normalizeSimilarCustomerTel('＋８１（９０）１１１１－２２２２'), '携帯電話');
 });
 
 runTest('4. 無効な得意先も候補になる', function () use ($port, $inactiveId): void {
@@ -128,7 +142,29 @@ runTest('4. 無効な得意先も候補になる', function () use ($port, $inac
     assertSameValue(0, (int)($rows[0]['is_active'] ?? 1), 'is_active=0');
 });
 
-runTest('5. 1文字の名前と全空入力は空配列', function () use ($port): void {
+runTest('5. 末尾の敬称を繰り返し除いて一致する', function () use ($pdo, $port): void {
+    $id = addCustomer($pdo, ['code' => '003', 'name' => '青空工房', 'name_kana' => 'アオゾラコウボウ様']);
+    foreach (['青空工房様', '青空工房御中', '青空工房殿', '青空工房邸', '青空工房宅', '青空工房様御中殿邸宅'] as $name) {
+        assertSameValue('青空工房', normalizeSimilarCustomerText($name), "$name の正規化");
+        $rows = getJson($port, ['name' => $name]);
+        assertSameValue($id, (int)($rows[0]['id'] ?? 0), "$name の候補");
+    }
+    $rows = getJson($port, ['name_kana' => 'アオゾラコウボウ']);
+    assertSameValue($id, (int)($rows[0]['id'] ?? 0), 'カナ末尾の敬称も除く');
+});
+
+runTest('5b. 追加の法人格と全角括弧の略記を除いて一致する', function () use ($pdo, $port): void {
+    $forms = ['一般社団法人', '医療法人', '社会福祉法人', '学校法人', '宗教法人', '（株）', '（有）', '（合）'];
+    foreach ($forms as $index => $form) {
+        $baseName = '法人照合' . chr(65 + $index);
+        $id = addCustomer($pdo, ['code' => 'H' . $index, 'name' => $form . ' ' . $baseName]);
+        assertSameValue($baseName, normalizeSimilarCustomerText($form . ' ' . $baseName), "$form の正規化");
+        $rows = getJson($port, ['name' => $baseName]);
+        assertSameValue($id, (int)($rows[0]['id'] ?? 0), "$form の候補");
+    }
+});
+
+runTest('5c. 1文字の名前と全空入力は空配列', function () use ($port): void {
     assertSameValue([], getJson($port, ['name' => '山']), '1文字');
     assertSameValue([], getJson($port, ['name' => '', 'name_kana' => '', 'tel' => '']), '全空');
 });
