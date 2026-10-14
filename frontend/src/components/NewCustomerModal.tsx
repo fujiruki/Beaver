@@ -2,11 +2,13 @@ import { useForm } from 'react-hook-form';
 import { useCreateCustomer } from '../api/customers';
 import CustomerFormFields from './CustomerFormFields';
 import type { Customer, CustomerInput } from '../types/customer';
+import SimilarCustomerSuggestions from './SimilarCustomerSuggestions';
+import type { SimilarCustomer } from '../api/customers';
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  onCreated: (customer: Customer) => void;
+  onCreated: (customer: Pick<Customer, 'id'>) => void;
 }
 
 export default function NewCustomerModal({ isOpen, onClose, onCreated }: Props) {
@@ -36,6 +38,12 @@ export default function NewCustomerModal({ isOpen, onClose, onCreated }: Props) 
     onClose();
   }
 
+  function handleExistingCustomer(customer: SimilarCustomer) {
+    reset();
+    onCreated(customer);
+    onClose();
+  }
+
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 200,
@@ -56,6 +64,15 @@ export default function NewCustomerModal({ isOpen, onClose, onCreated }: Props) 
 
         <form onSubmit={handleSubmit(onSubmit)} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <CustomerFormFields register={register} errors={errors} setValue={setValue} watch={watch} />
+
+          <SimilarCustomerSuggestions
+            enabled
+            name={watch('name')}
+            name_kana={watch('name_kana') ?? undefined}
+            tel={watch('tel') ?? undefined}
+            mobile={watch('mobile') ?? undefined}
+            onSelect={handleExistingCustomer}
+          />
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
             <button type="button" onClick={handleClose} style={cancelBtnStyle}>

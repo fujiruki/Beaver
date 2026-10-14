@@ -133,6 +133,69 @@ function customerSyncRowToJst(array $row): array {
     return $row;
 }
 
+// GET /customers/similar — R-0176 新規登録時の二重登録防止
+if ($method === 'GET' && isset($segments[1]) && $segments[1] === 'similar') {
+    if (isset($segments[2])) {
+        http_response_code(404);
+        echo json_encode(['error' => 'Not found', 'path' => $path]);
+        exit;
+    }
+
+    $inputName = normalizeSimilarCustomerText($_GET['name'] ?? '');
+    $inputKana = normalizeSimilarCustomerText($_GET['name_kana'] ?? '');
+    $inputTel = normalizeSimilarCustomerTel($_GET['tel'] ?? '');
+    $matchName = mb_strlen($inputName) >= 2;
+    $matchKana = mb_strlen($inputKana) >= 2;
+    $matchTel = strlen($inputTel) >= 6;
+
+    if (!$matchName && !$matchKana && !$matchTel) {
+        echo json_encode([]);
+        exit;
+    }
+
+    $rows = $pdo->query('SELECT id, code, name, name_kana, tel, mobile, fax, address1, is_active, access_customer_no FROM customers')
+        ->fetchAll();
+    $candidates = [];
+    foreach ($rows as $row) {
+        $matched = [];
+        if ($matchTel) {
+            foreach (['tel', 'mobile', 'fax'] as $column) {
+                if ($inputTel === normalizeSimilarCustomerTel($row[$column])) {
+                    $matched[] = 'tel';
+                    break;
+                }
+            }
+        }
+        if ($matchName) {
+            $rowName = normalizeSimilarCustomerText($row['name']);
+            if ($rowName !== '' && (str_contains($rowName, $inputName) || str_contains($inputName, $rowName))) {
+                $matched[] = 'name';
+            }
+        }
+        if ($matchKana) {
+            $rowKana = normalizeSimilarCustomerText($row['name_kana']);
+            if ($rowKana !== '' && (str_contains($rowKana, $inputKana) || str_contains($inputKana, $rowKana))) {
+                $matched[] = 'name_kana';
+            }
+        }
+        if ($matched === []) continue;
+
+        unset($row['fax']);
+        $row['matched'] = $matched;
+        $row['_rank'] = in_array('tel', $matched, true) ? 0 : (in_array('name', $matched, true) ? 1 : 2);
+        $candidates[] = $row;
+    }
+
+    usort($candidates, static function (array $left, array $right): int {
+        return $left['_rank'] <=> $right['_rank'] ?: strcmp((string)$left['code'], (string)$right['code']);
+    });
+    $candidates = array_slice($candidates, 0, 10);
+    foreach ($candidates as &$candidate) unset($candidate['_rank']);
+    unset($candidate);
+    echo json_encode($candidates);
+    exit;
+}
+
 function customerRowToJst(array $row): array {
     $row['updated_at'] = utcToJst($row['updated_at']);
     $row['last_synced_at'] = utcToJst($row['last_synced_at']);

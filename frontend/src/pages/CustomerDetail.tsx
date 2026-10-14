@@ -8,6 +8,7 @@ import { useSmartBack } from '../hooks/useSmartBack';
 import type { CustomerInput } from '../types/customer';
 import type { Customer } from '../types/customer';
 import { ApiError } from '../api/client';
+import SimilarCustomerSuggestions from '../components/SimilarCustomerSuggestions';
 
 export default function CustomerDetail() {
   const navigate = useNavigate();
@@ -142,6 +143,15 @@ export default function CustomerDetail() {
           watch={watch}
           code={customer?.code}
           carryForwardBalance={customer?.carry_forward_balance}
+        />
+
+        <SimilarCustomerSuggestions
+          enabled={isNew}
+          name={watch('name')}
+          name_kana={watch('name_kana') ?? undefined}
+          tel={watch('tel') ?? undefined}
+          mobile={watch('mobile') ?? undefined}
+          onSelect={(similar) => navigate(`/customers/${similar.id}`)}
         />
 
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>

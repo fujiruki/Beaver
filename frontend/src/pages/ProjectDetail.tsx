@@ -98,7 +98,7 @@ export default function ProjectDetail() {
     setValue('customer_id', id ?? 0);
   }
 
-  async function handleCustomerCreated(customer: Customer) {
+  async function handleCustomerCreated(customer: Pick<Customer, 'id'>) {
     await refetchCustomers();
     setCustomerId(customer.id);
     setValue('customer_id', customer.id);

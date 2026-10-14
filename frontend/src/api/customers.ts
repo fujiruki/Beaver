@@ -5,6 +5,63 @@ import type { PaginatedResponse, SortParam } from '../types/pagination';
 
 const KEY = 'customers';
 
+export interface SimilarCustomer {
+  id: number;
+  code: string | null;
+  name: string;
+  name_kana: string | null;
+  tel: string | null;
+  mobile: string | null;
+  address1: string | null;
+  is_active: number;
+  access_customer_no: string | null;
+  matched: Array<'tel' | 'name' | 'name_kana'>;
+}
+
+export interface SimilarCustomerParams {
+  name?: string;
+  name_kana?: string;
+  tel?: string;
+  mobile?: string;
+}
+
+async function fetchSimilarCustomers(params: SimilarCustomerParams): Promise<SimilarCustomer[]> {
+  const phones = [params.tel, params.mobile].filter((value): value is string => Boolean(value));
+  const requests = (phones.length > 0 ? phones : ['']).map((tel) => {
+    const query = new URLSearchParams();
+    if (params.name) query.set('name', params.name);
+    if (params.name_kana) query.set('name_kana', params.name_kana);
+    if (tel) query.set('tel', tel);
+    return api.get<SimilarCustomer[]>(`/customers/similar?${query}`);
+  });
+  const responses = await Promise.all(requests);
+  const merged = new Map<number, SimilarCustomer>();
+  for (const customer of responses.flat()) {
+    const current = merged.get(customer.id);
+    if (!current) {
+      merged.set(customer.id, customer);
+      continue;
+    }
+    current.matched = [...new Set([...current.matched, ...customer.matched])];
+  }
+  const rank = (customer: SimilarCustomer) => customer.matched.includes('tel')
+    ? 0
+    : (customer.matched.includes('name') ? 1 : 2);
+  return [...merged.values()]
+    .sort((left, right) => rank(left) - rank(right) || (left.code ?? '').localeCompare(right.code ?? ''))
+    .slice(0, 10);
+}
+
+/** 新規登録フォーム用の似た得意先候補取得。 */
+export function useSimilarCustomers(params: SimilarCustomerParams, enabled: boolean) {
+  return useQuery({
+    queryKey: [KEY, 'similar', params.name, params.name_kana, params.tel, params.mobile],
+    queryFn: () => fetchSimilarCustomers(params),
+    enabled,
+    retry: false,
+  });
+}
+
 /** 得意先一覧取得（全件・ドロップダウン用） */
 export function useCustomers() {
   return useQuery({

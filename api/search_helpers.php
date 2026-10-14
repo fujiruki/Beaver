@@ -34,3 +34,31 @@ if (!function_exists('buildMultiColumnSearchClause')) {
         return [implode(' AND ', $andClauses), $params];
     }
 }
+
+if (!function_exists('normalizeSimilarCustomerText')) {
+    /** R-0176: 似た得意先の名前・カナ照合用に表記揺れを除く。 */
+    function normalizeSimilarCustomerText(?string $value): string {
+        $normalized = mb_convert_kana((string)$value, 'asKV');
+        $normalized = str_replace(
+            ['株式会社', '有限会社', '合同会社', '合資会社', '合名会社', '(株)', '(有)', '(合)', '㈱', '㈲',
+             '（株）', '（有）', '（合）'],
+            '',
+            $normalized
+        );
+        $normalized = mb_convert_kana($normalized, 'c');
+        $normalized = str_replace(
+            ['かぶしきがいしゃ', 'かぶしきかいしゃ', 'ゆうげんがいしゃ', 'ゆうげんかいしゃ', 'ごうどうがいしゃ'],
+            '',
+            $normalized
+        );
+        return preg_replace('/[\s\p{P}\p{S}]+/u', '', $normalized) ?? '';
+    }
+}
+
+if (!function_exists('normalizeSimilarCustomerTel')) {
+    /** R-0176: 電話番号を数字だけにする。 */
+    function normalizeSimilarCustomerTel(?string $value): string {
+        $normalized = mb_convert_kana((string)$value, 'n');
+        return preg_replace('/\D/u', '', $normalized) ?? '';
+    }
+}
