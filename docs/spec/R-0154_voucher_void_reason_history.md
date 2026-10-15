@@ -65,6 +65,15 @@
 3. 伝票一覧でも、引用済みかどうかを判定して無効表示にする（今は押してからサーバーの409で分かる）。判定に必要な情報が一覧のレスポンスに無ければ、サーバーで付け足す
 4. 取消できる伝票のボタンは今の見た目のまま
 
+## 追加仕様3（2026-10-15、dodai-backの同期パターン表S5の確認で決定）
+
+取消（void）した伝票を、取消前に開いていた古い画面から書き換えようとしても拒否されることを、ルートごとにテストで固定する。
+
+- 伝票画面からの書き込み（`PUT /vouchers/{id}`、明細の`POST`・`PUT`・`DELETE`、`POST /vouchers/{id}/reload-snapshots`、`DELETE /vouchers/{id}`）は、`expected_updated_at`を付けない場合でも、voidなら`assertVoucherEditable`により409で拒否し、伝票・明細を変えない（R-0166の`expected_updated_at`付きなら、先に409 `stale_voucher`になる）
+- `POST /vouchers/{id}/convert-to-sales`: 引用元の見積がvoidなら409 `{"error":"無効化済みの伝票は引用できません"}`で、売上を作らない（今は通ってしまう）
+- `POST /invoices`（請求編集が有効なとき）: `voucher_ids`にvoidの伝票が含まれていたら409 `{"error":"無効化済みの伝票は請求できません","voucher_ids":[…]}`で、請求書も作らず伝票も変えない（今はvoidの伝票がbilledになってしまう）
+- `POST /vouchers/{id}/unvoid`（R-0170）は対象外（voidを戻す操作なので通る）。Access同期のAPIも対象外
+
 ## Access連携との約束（dodai-back回答より）
 
 1. 連携伝票（`access_voucher_id` あり）は、空でも物理削除しない。物理削除するとAccessの次回push・全件pushで作り直され、横断整合検査P2aがNGになる
