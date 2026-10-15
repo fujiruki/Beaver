@@ -127,3 +127,13 @@ dodai-backの依頼（晴樹さんの指示「自分でできないところま�
 | ③ 退避 | `backups/database_beaver_beta_20261015_2330_pre_rc2_seed_purge.sqlite` | 23:30 | 1秒未満 | — |
 | ③ dry-run | `r0143_purge_seed_cluster_vouchers.php database.sqlite "2026-03-17 20:04"` | 23:30:49 | 1秒未満 | 対象5,772、安全チェック違反0 |
 | ③ 実行 | 同`--execute` | 23:30:57.60〜57.84 | 0.24秒 | 5,772件削除。伝票30（access_voucher_idあり24・なし6）、明細193、孤児0、得意先823、案件61、integrity ok |
+
+## rc2 R7 ⑤ A-B-10（2026-10-15 23:35）
+
+Access ④ApplyRun（23:33〜23:35、applied 825・failed 0、link 819・insert 6・upsert 4）の後。組はrc1と同じ4組（50←1、652←824、754←796、781←814）で、事前の読み取りで有効かつaccess_customer_noなしは796・814・824の3件だけと確認。
+
+| # | 内容 | 時刻 | 所要 | 結果 |
+|:--|:--|:--|:--|:--|
+| 退避 | `backups/database_beaver_beta_20261015_2335_pre_rc2_ab10.sqlite` | 23:35 | 1秒未満 | — |
+| dry-run | 4組 | 23:35:34.75〜34.80 | 0.05秒 | 案件3件の付け替え予定、伝票・請求・入金0 |
+| 実行 | 4組 | 23:35:42.93〜42.98 | 0.05秒 | 統合4組・案件3件付け替え。得意先829（有効815）、access_customer_noあり825、有効でなし0、統合元への参照0、孤児0、integrity ok |
