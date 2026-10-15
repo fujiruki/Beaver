@@ -40,3 +40,28 @@
 ## 元に戻すとき
 
 `Beaver_beta/api/backups/database_beta_20261015_1930_pre_rc1_prod_copy.sqlite`を`database.sqlite`へ`cp`して`chmod 666`する（`-wal`が0 bytesであることを確認してから）。
+
+# rc1 R7: R-0140(3) 基準線記録と R-0140(5) 見積 +10000 変換（2026-10-15 22:12、Beaver_beta＝本番写し）
+
+dodai-backの依頼（晴樹さん了承済み）。本番当日と同じ手順で、`api/manual/rc1_r7_baseline_and_plus10000.php`をサーバーのホームに置き、`php rc1_r7.php <YYYYMMDD_HHMM> Beaver_beta`で実行した（今回は晴樹さんが`!`で実行）。本番当日は第2引数を`Beaver`にする。ログ: `Beaver_beta/api/backups/rc1_r7_log_20261015_2212.json`
+
+| # | 内容 | 時刻 | 所要 | 結果 |
+|:--|:--|:--|:--|:--|
+| 0 | 退避（VACUUM INTO） | 22:12:34 | 0.054秒 | `backups/database_beaver_beta_20261015_2212_pre_rc1_r7.sqlite` |
+| 1 | 基準線（`manual/r0143_baseline_snapshot.php`） | 22:12:35 | 0.062秒 | `backups/rc1_r7_baseline_20261015_2212.json` |
+| 2 | 変換前の確認 | 22:12:35 | — | 下表 |
+| 3 | `manual/r0140_5_estimate_no_plus10000.sql`（1トランザクション、2文） | 22:12:35 | 0.001秒 | 売上の`source_estimate_no` 6行、見積の`access_voucher_id` 13行を変換 |
+| 4 | 変換後の確認 | 22:12:35 | — | 下表、integrity ok |
+
+基準線: G-14-1（access_voucher_idなし）5,778／G-14-2 見積13・売上11／G-14-3 最大4,618／G-14-4（edited_in_beaver=1の明細）13行、G-14-5 6伝票（5805 E02041・5806 E02044・5807 S04600・5808 E02045・5809 E02046・5810 E02047、すべてaccess_voucher_idなし）／G-14-6 7／G-19 823／G-20 800／G-21 22／G-22 同名19組
+
+| 確認 | 変換前 | 変換後 |
+|:--|--:|--:|
+| 見積で access_voucher_id ≤ 10000 | 13 | 0 |
+| access_voucher_id < 10000（種別） | 見積13・売上11 | 売上11 |
+| access_voucher_id ≥ 10000（種別） | なし | 見積13 |
+| access_voucher_id の重複 | 0 | 0 |
+| +10000後に既存番号と衝突 | 0 | — |
+| 売上の数値の source_estimate_no < 10000 | 6 | 0 |
+| 売上の source_estimate_no が指す見積が無い | 0 | 0 |
+| 得意先／案件／伝票／明細 | 823／61／5,802／25,496 | 同じ |
