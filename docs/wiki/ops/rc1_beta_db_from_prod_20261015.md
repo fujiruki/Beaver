@@ -78,3 +78,14 @@ R7の基準線で、access_voucher_idを持たない伝票が5,778件あると�
 | 3 | 確認 | 22:17 | — | 伝票30（access_voucher_idあり24・なし6）、明細193、孤児の明細・内訳0、得意先823、案件61、integrity ok |
 
 重複得意先の統合（A-B-10）は、Access側の得意先突合（ApplyRun）の後にdodai-backの合図で行う。
+
+# rc1 R7追加: A-B-10 重複得意先の統合（2026-10-15 22:21、Beaver_beta＝本番写し）
+
+Access側の得意先突合ApplyRun（22:18〜22:20、beaver_link 819・beaver_insert 6・beaver_upsert 3、失敗0）の後、dodai-backの合図で実行。組はA-X-01と同じ4組で、今回のデータでも同じ組になることを確かめた（同名・統合先だけがaccess_customer_noを持つ組が3つ、残る1は無効化済みで参照0）。
+
+| # | 内容 | 時刻 | 所要 | 結果 |
+|:--|:--|:--|:--|:--|
+| 0 | 退避（VACUUM INTO） | 22:21 | 1秒未満 | `backups/database_beaver_beta_20261015_2221_pre_rc1_ab10.sqlite` |
+| 1 | dry-run: `php manual/r0143_merge_duplicate_customers.php database.sqlite '[{"keep_id":50,"dup_id":1},{"keep_id":652,"dup_id":824},{"keep_id":754,"dup_id":796},{"keep_id":781,"dup_id":814}]' --dry-run` | 22:21:27 | 0.05秒 | 付け替え予定: 案件3件（824・796・814から各1）、伝票・請求・入金0 |
+| 2 | 実行（`--dry-run`なし） | 22:21:49.09〜49.13 | 0.05秒 | 4組を統合、案件3件を付け替え、統合元4件を論理削除 |
+| 3 | 確認 | 22:21 | — | 得意先829（有効815）、access_customer_noあり825、有効でaccess_customer_noなし0、統合元を指す案件・伝票0、案件の得意先の孤児0、integrity ok |
