@@ -192,3 +192,7 @@ Access ⑥全件再push（00:56〜01:05、sent 5,894・failed 0）の後。未�
 | 実行 | 同`--execute` | 01:05:53.44〜54.06 | 0.6秒（照合込み） | void、record_history id=5 |
 
 照合（voidを除く）: 見積1,951／売上3,943、明細25,769、access_voucher_idなし6（5805〜5810）、重複0、voucher_noの重複0、売上の合計の再計算の食い違い0（r0151が挙げるのはvoidの5792のみ）、伝票総数5,901（void 1）、integrity ok。**rc4のBeaver側R7はすべて期待どおり**
+
+# rc4 合格と、Beaver_betaの保持（2026-10-16）
+
+dodai-backより: rc4はR1〜R9すべて合格（Access記録`a96338a`、AccessTategu `docs/R-086_リハーサル記録.md`）。**いまのBeaver_beta（rc4の⑦まで終えた状態）は、藤田晴樹さんの受入確認（S4）に使うので、入れ替え・書き換えをしない**。コードのデプロイも、S4が終わるまではdodai-backと相談してから行う。
