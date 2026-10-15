@@ -89,3 +89,22 @@ Access側の得意先突合ApplyRun（22:18〜22:20、beaver_link 819・beaver_i
 | 1 | dry-run: `php manual/r0143_merge_duplicate_customers.php database.sqlite '[{"keep_id":50,"dup_id":1},{"keep_id":652,"dup_id":824},{"keep_id":754,"dup_id":796},{"keep_id":781,"dup_id":814}]' --dry-run` | 22:21:27 | 0.05秒 | 付け替え予定: 案件3件（824・796・814から各1）、伝票・請求・入金0 |
 | 2 | 実行（`--dry-run`なし） | 22:21:49.09〜49.13 | 0.05秒 | 4組を統合、案件3件を付け替え、統合元4件を論理削除 |
 | 3 | 確認 | 22:21 | — | 得意先829（有効815）、access_customer_noあり825、有効でaccess_customer_noなし0、統合元を指す案件・伝票0、案件の得意先の孤児0、integrity ok |
+
+# rc1 手順6の照合と、5792の履歴付きvoid（2026-10-15 22:33〜22:36、Beaver_beta＝本番写し）
+
+Access側の全件再push（22:23〜22:32、sent=5,892・failed=0）の後、設計書2 §5-3手順6の照合を読み取りで行った（22:33:54）。期待との差は伝票5792（S04594、access_voucher_id 4613、Accessで削除済み・今回のpushで更新されず）の1件分だけだった。A-X-01と同じく履歴付きvoidにした（Access側の手順書から抜けていた、rc1の発見事項）。
+
+| # | 内容 | 時刻 | 所要 | 結果 |
+|:--|:--|:--|:--|:--|
+| 0 | 退避（VACUUM INTO） | 22:36 | 1秒未満 | `backups/database_beaver_beta_20261015_2236_pre_rc1_void5792.sqlite` |
+| 1 | dry-run: `php ~/void_voucher_with_history.php database.sqlite 5792 4613 "Access で削除済みの伝票（切替時の整合。A-X-01 と同じ扱い）"` | 22:36:34 | 1秒未満 | draft → void予定 |
+| 2 | 実行（`--execute`） | 22:36:44.20〜44.24 | 0.05秒 | void、record_history id=5（action void） |
+
+| 照合（手順6） | void前 22:33 | void後（voidを除く） 22:36 | 期待 |
+|:--|--:|--:|--:|
+| access_voucher_idあり 見積／売上 | 1,949／3,944 | 1,949／3,943 | 1,949／3,943 |
+| access_voucher_idなし | 6（5805〜5810） | 6 | 6 |
+| access_voucher_idありの伝票の明細 | 25,766 | 25,764 | 25,764 |
+| 伝票総数／access_voucher_idの重複 | 5,899／0 | 5,899（うちvoid 1）／0 | —／0 |
+| 売上の合計の再計算の食い違い | 1（5792） | 0（r0151のdry-runが挙げるのはvoidの5792だけ） | 0 |
+| voucher_noの重複／残した24件 | 0／24件 | 同じ | 0 |
