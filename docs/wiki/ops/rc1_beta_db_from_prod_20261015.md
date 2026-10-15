@@ -108,3 +108,13 @@ Access側の全件再push（22:23〜22:32、sent=5,892・failed=0）の後、設
 | 伝票総数／access_voucher_idの重複 | 5,899／0 | 5,899（うちvoid 1）／0 | —／0 |
 | 売上の合計の再計算の食い違い | 1（5792） | 0（r0151のdry-runが挙げるのはvoidの5792だけ） | 0 |
 | voucher_noの重複／残した24件 | 0／24件 | 同じ | 0 |
+
+# rc2: Beaver_betaのDBを再び本番の写しに入れ替え（2026-10-15 23:13）
+
+dodai-backの依頼（晴樹さんの指示「自分でできないところまでは全部やってくれ」）。rc1と同じ`api/manual/rc1_copy_prod_db_to_beta.php`で実行。
+
+- 退避: `Beaver_beta/api/backups/database_beta_20261015_2313_pre_rc1_prod_copy.sqlite`（7,692,288 bytes、0.06秒。rc1の手順6まで終えた状態）
+- 本番の写し: 7,168,000 bytes、0.05秒。本番DBのmd5・サイズ・更新時刻（2026-10-05 15:00）は不変。スキーマ差分なし（migration不要）
+- 入れ替え: 23:13:58（`chmod 666`＋`mv`）
+- 件数: 得意先823、案件61、伝票5,802（見積1,895・売上3,907）、明細25,496。integrity ok
+- 本番フォルダの`database.sqlite-shm`の更新時刻が23:13:57に変わった（読み取り専用で開いたため。`-wal`は0 bytesのまま）
