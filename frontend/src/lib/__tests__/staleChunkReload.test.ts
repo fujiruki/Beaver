@@ -9,6 +9,7 @@ describe('R-0178: 古いチャンクの読み込み失敗時の自動再読み�
 
   beforeEach(() => {
     sessionStorage.clear();
+    document.body.innerHTML = '';
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-10-15T00:00:00.000Z'));
     reload = vi.fn();
@@ -32,6 +33,20 @@ describe('R-0178: 古いチャンクの読み込み失敗時の自動再読み�
 
     expect(reload).toHaveBeenCalledTimes(1);
     expect(sessionStorage.getItem(storageKey)).toBe(String(Date.now()));
+    removeHandler();
+  });
+
+  it('自動再読み込みの直前に日本語の案内を表示する', () => {
+    reload.mockImplementation(() => {
+      expect(document.body.textContent).toContain(
+        'Beaverが新しくなりました。画面を読み込み直しています…',
+      );
+    });
+    const removeHandler = installStaleChunkReloadHandler();
+
+    window.dispatchEvent(new Event('vite:preloadError', { cancelable: true }));
+
+    expect(reload).toHaveBeenCalledTimes(1);
     removeHandler();
   });
 
