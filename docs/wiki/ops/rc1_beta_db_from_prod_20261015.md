@@ -118,3 +118,12 @@ dodai-backの依頼（晴樹さんの指示「自分でできないところま�
 - 入れ替え: 23:13:58（`chmod 666`＋`mv`）
 - 件数: 得意先823、案件61、伝票5,802（見積1,895・売上3,907）、明細25,496。integrity ok
 - 本番フォルダの`database.sqlite-shm`の更新時刻が23:13:57に変わった（読み取り専用で開いたため。`-wal`は0 bytesのまま）
+
+## rc2 R7 ①基準線＋+10000、③シード削除（2026-10-15 23:30）
+
+| # | 内容 | 時刻 | 所要 | 結果 |
+|:--|:--|:--|:--|:--|
+| ① | `rc1_r7_baseline_and_plus10000.php 20261015_2330 Beaver_beta`（退避`backups/database_beaver_beta_20261015_2330_pre_rc1_r7.sqlite`→基準線→+10000） | 23:30:42 | 退避0.053秒・基準線0.061秒・変換0.001秒 | 基準線はrc1と同じ値（G-14-1 5,778、G-14-2 見積13・売上11、G-14-3 4,618、G-14-4 13、G-14-6 7、G-19 823、G-20 800、G-21 22、G-22 19組）。変換: 売上source_estimate_no 6行・見積access_voucher_id 13行。変換後: 見積≤10000 0、重複0、衝突0、孤児0、integrity ok |
+| ③ 退避 | `backups/database_beaver_beta_20261015_2330_pre_rc2_seed_purge.sqlite` | 23:30 | 1秒未満 | — |
+| ③ dry-run | `r0143_purge_seed_cluster_vouchers.php database.sqlite "2026-03-17 20:04"` | 23:30:49 | 1秒未満 | 対象5,772、安全チェック違反0 |
+| ③ 実行 | 同`--execute` | 23:30:57.60〜57.84 | 0.24秒 | 5,772件削除。伝票30（access_voucher_idあり24・なし6）、明細193、孤児0、得意先823、案件61、integrity ok |
