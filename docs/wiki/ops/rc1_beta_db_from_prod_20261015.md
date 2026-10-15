@@ -65,3 +65,16 @@ dodai-backの依頼（晴樹さん了承済み）。本番当日と同じ手順�
 | 売上の数値の source_estimate_no < 10000 | 6 | 0 |
 | 売上の source_estimate_no が指す見積が無い | 0 | 0 |
 | 得意先／案件／伝票／明細 | 823／61／5,802／25,496 | 同じ |
+
+# rc1 R7追加: 手順4.5 シード伝票の削除（2026-10-15 22:16〜22:17、Beaver_beta＝本番写し）
+
+R7の基準線で、access_voucher_idを持たない伝票が5,778件あると判明（dodai-backから「全件再pushで二重になる恐れ」）。うち5,772件は2026-03-17 20:04台の単発シード（見積M00001〜M02027、売上U00011〜U04588、Access未同期）で、A-X-01でも手順4.5で消していたもの。Access側の手順書から抜けていた（rc1の発見事項）。dodai-backの依頼（晴樹さん了承済み）で実行。
+
+| # | 内容 | 時刻 | 所要 | 結果 |
+|:--|:--|:--|:--|:--|
+| 0 | 退避（VACUUM INTO） | 22:16 | 1秒未満 | `backups/database_beaver_beta_20261015_2216_pre_rc1_seed_purge.sqlite` |
+| 1 | dry-run: `php manual/r0143_purge_seed_cluster_vouchers.php database.sqlite "2026-03-17 20:04"` | 22:16:59 | 1秒未満 | 対象5,772、請求済み0・請求書紐付き0・edited_in_beaver 0 |
+| 2 | 実行: 同じコマンドに`--execute` | 22:17:18.86〜22:17:19.09 | 0.23秒 | 5,772件削除 |
+| 3 | 確認 | 22:17 | — | 伝票30（access_voucher_idあり24・なし6）、明細193、孤児の明細・内訳0、得意先823、案件61、integrity ok |
+
+重複得意先の統合（A-B-10）は、Access側の得意先突合（ApplyRun）の後にdodai-backの合図で行う。
