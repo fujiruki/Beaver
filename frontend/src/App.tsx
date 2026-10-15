@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import AppLayout from './components/layout/AppLayout';
 import { AppSettingsProvider } from './contexts/AppSettingsContext';
 import { APP_ID } from './lib/appId';
+import { RootErrorPage } from './components/RootErrorPage';
 
 const Dashboard            = lazy(() => import('./pages/Dashboard'));
 const CustomerList         = lazy(() => import('./pages/CustomerList'));
@@ -32,7 +33,7 @@ const queryClient = new QueryClient({
 });
 
 const router = createBrowserRouter(createRoutesFromElements(
-  <Route path="/" element={<AppLayout />}>
+  <Route path="/" element={<AppLayout />} errorElement={<RootErrorPage />}>
     <Route index element={<Dashboard />} />
     <Route path="customers" element={<CustomerList />} />
     <Route path="customers/new" element={<CustomerDetail />} />

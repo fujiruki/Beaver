@@ -15,6 +15,7 @@ describe('R-0178: ルートのエラー画面', () => {
     const reload = vi.fn();
     // @ts-expect-error テストで再読み込みを観測できるlocationへ置き換える
     delete window.location;
+    // @ts-expect-error テスト用locationの代入を許可する
     window.location = { ...originalLocation, reload } as Location;
 
     render(<RootErrorPage />);
