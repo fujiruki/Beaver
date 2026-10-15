@@ -643,6 +643,12 @@ switch ($method) {
             if (!$orig || $orig['voucher_type'] !== 'estimate') {
                 http_response_code(400); echo json_encode(['error' => '見積伝票のみ変換可']); exit;
             }
+            // R-0154 追加仕様3: 取消済みの見積から売上を派生させない
+            if ($orig['status'] === 'void') {
+                http_response_code(409);
+                echo json_encode(['error' => '無効化済みの伝票は引用できません']);
+                exit;
+            }
             $today = date('Y-m-d');
             // nextVoucherNo は内部で独自トランザクションを完結させるため、外側 beginTransaction の前に呼ぶ
             $newNo = nextVoucherNo($pdo, 'sales');

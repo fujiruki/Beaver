@@ -355,8 +355,24 @@ switch ($method) {
 
         $data = json_decode(file_get_contents('php://input'), true) ?? [];
 
-        // R-0143 A-B-02: voucher_idsにAccessで請求済みの伝票が含まれる場合は請求書自体を作らず409
+        // R-0154 追加仕様3: void伝票を含む場合は請求書自体を作らず409
         if (!empty($data['voucher_ids']) && is_array($data['voucher_ids'])) {
+            $voidVoucherIds = [];
+            foreach ($data['voucher_ids'] as $vid) {
+                $bStmt = $pdo->prepare('SELECT status FROM vouchers WHERE id = ?');
+                $bStmt->execute([(int)$vid]);
+                $voucher = $bStmt->fetch();
+                if ($voucher && $voucher['status'] === 'void') {
+                    $voidVoucherIds[] = (int)$vid;
+                }
+            }
+            if ($voidVoucherIds !== []) {
+                http_response_code(409);
+                echo json_encode(['error' => '無効化済みの伝票は請求できません', 'voucher_ids' => $voidVoucherIds]);
+                exit;
+            }
+
+            // R-0143 A-B-02: voucher_idsにAccessで請求済みの伝票が含まれる場合は請求書自体を作らず409
             foreach ($data['voucher_ids'] as $vid) {
                 $bStmt = $pdo->prepare('SELECT access_billed_flag, access_billing_date FROM vouchers WHERE id = ?');
                 $bStmt->execute([(int)$vid]);
