@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
@@ -92,7 +92,9 @@ describe('R-0180 得意先画面の離脱ガード', () => {
     const user = userEvent.setup();
     const name = document.querySelector('[name="name"]')!;
     await user.type(name, '新規得意先');
-    expect(screen.getByText('未保存の変更があります')).toBeTruthy();
+    const title = screen.getByRole('heading', { name: '得意先 新規登録' });
+    const saveStatus = within(title.parentElement!).getByText('未保存の変更があります');
+    expect(saveStatus.style.position).not.toBe('fixed');
 
     const dirtyEvent = new Event('beforeunload', { cancelable: true });
     const preventDefault = vi.spyOn(dirtyEvent, 'preventDefault');
