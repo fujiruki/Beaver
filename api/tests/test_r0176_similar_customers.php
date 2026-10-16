@@ -179,5 +179,16 @@ runTest('6. 最大10件で電話一致が名前一致より先', function () use
     assertSameValue($telId, (int)$rows[0]['id'], '電話一致が先頭');
 });
 
+runTest('7. 既存側の名前・カナが2文字未満なら照合しない', function () use ($pdo, $port): void {
+    addCustomer($pdo, ['code' => 'SHORT-TEXT', 'name' => '田', 'name_kana' => 'ﾀ']);
+    assertSameValue([], getJson($port, ['name' => '田中住建']), '1文字の既存名');
+    assertSameValue([], getJson($port, ['name_kana' => 'タナカジュウケン']), '1文字の既存カナ');
+});
+
+runTest('8. 既存側の電話が5桁以下なら照合しない', function () use ($pdo, $port): void {
+    addCustomer($pdo, ['code' => 'SHORT-TEL', 'name' => '短い電話', 'tel' => '12345']);
+    assertSameValue([], getJson($port, ['tel' => '123456']), '5桁の既存電話');
+});
+
 echo "PASS: $passed, FAIL: $failed\n";
 exit($failed === 0 ? 0 : 1);
