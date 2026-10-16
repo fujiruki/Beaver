@@ -19,9 +19,14 @@ interface Props {
   watch: UseFormWatch<CustomerInput>;
   code?: string | null;
   carryForwardBalance?: number;
+  similarCustomerCount?: number;
+  onShowSimilarCustomers?: () => void;
 }
 
-export default function CustomerFormFields({ register, errors, setValue, watch, code, carryForwardBalance }: Props) {
+export default function CustomerFormFields({
+  register, errors, setValue, watch, code, carryForwardBalance,
+  similarCustomerCount = 0, onShowSimilarCustomers,
+}: Props) {
   const kanaRef = useRef('');
   const [kanaLocked, setKanaLocked] = useState(false);
 
@@ -52,6 +57,11 @@ export default function CustomerFormFields({ register, errors, setValue, watch, 
                 kanaRef.current = '';
               }}
             />
+            {similarCustomerCount > 0 && (
+              <button type="button" onClick={onShowSimilarCustomers} style={similarHintStyle}>
+                似た得意先が{similarCustomerCount}件あります（画面下を確認）
+              </button>
+            )}
           </Field>
           <Field label="フリガナ">
             <input
@@ -178,4 +188,8 @@ const inputStyle: React.CSSProperties = {
 };
 const checkLabelStyle: React.CSSProperties = {
   display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, color: '#334155', cursor: 'pointer',
+};
+const similarHintStyle: React.CSSProperties = {
+  display: 'block', marginTop: 6, padding: 0, background: 'transparent', border: 0,
+  color: '#b45309', cursor: 'pointer', fontSize: 12, textDecoration: 'underline', textAlign: 'left',
 };

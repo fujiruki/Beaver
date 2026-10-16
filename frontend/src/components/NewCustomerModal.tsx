@@ -1,8 +1,9 @@
+import { useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { useCreateCustomer } from '../api/customers';
 import CustomerFormFields from './CustomerFormFields';
 import type { Customer, CustomerInput } from '../types/customer';
-import SimilarCustomerSuggestions from './SimilarCustomerSuggestions';
+import SimilarCustomerSuggestions, { useSimilarCustomerSuggestions } from './SimilarCustomerSuggestions';
 import type { SimilarCustomer } from '../api/customers';
 
 interface Props {
@@ -13,6 +14,7 @@ interface Props {
 
 export default function NewCustomerModal({ isOpen, onClose, onCreated }: Props) {
   const createMutation = useCreateCustomer();
+  const suggestionsRef = useRef<HTMLElement>(null);
 
   const { register, handleSubmit, setValue, watch, reset, formState: { errors } } = useForm<CustomerInput>({
     defaultValues: {
@@ -24,6 +26,13 @@ export default function NewCustomerModal({ isOpen, onClose, onCreated }: Props) 
       is_active: 1,
     },
   });
+
+  const similarCustomers = useSimilarCustomerSuggestions({
+    name: watch('name'),
+    name_kana: watch('name_kana') ?? undefined,
+    tel: watch('tel') ?? undefined,
+    mobile: watch('mobile') ?? undefined,
+  }, isOpen);
 
   if (!isOpen) return null;
 
@@ -63,14 +72,18 @@ export default function NewCustomerModal({ isOpen, onClose, onCreated }: Props) 
         )}
 
         <form onSubmit={handleSubmit(onSubmit)} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <CustomerFormFields register={register} errors={errors} setValue={setValue} watch={watch} />
+          <CustomerFormFields
+            register={register}
+            errors={errors}
+            setValue={setValue}
+            watch={watch}
+            similarCustomerCount={similarCustomers.length}
+            onShowSimilarCustomers={() => suggestionsRef.current?.scrollIntoView({ behavior: 'smooth' })}
+          />
 
           <SimilarCustomerSuggestions
-            enabled
-            name={watch('name')}
-            name_kana={watch('name_kana') ?? undefined}
-            tel={watch('tel') ?? undefined}
-            mobile={watch('mobile') ?? undefined}
+            ref={suggestionsRef}
+            customers={similarCustomers}
             onSelect={handleExistingCustomer}
           />
 

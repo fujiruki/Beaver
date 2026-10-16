@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useContext, useEffect, useRef, useState } from 'react';
+import { UNSAFE_DataRouterContext, useBlocker, useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useCustomer, useCreateCustomer, useUpdateCustomer } from '../api/customers';
 import CustomerFormFields from '../components/CustomerFormFields';
@@ -8,7 +8,29 @@ import { useSmartBack } from '../hooks/useSmartBack';
 import type { CustomerInput } from '../types/customer';
 import type { Customer } from '../types/customer';
 import { ApiError } from '../api/client';
-import SimilarCustomerSuggestions from '../components/SimilarCustomerSuggestions';
+import SimilarCustomerSuggestions, { useSimilarCustomerSuggestions } from '../components/SimilarCustomerSuggestions';
+
+const LEAVE_MESSAGE = '保存していない入力があります。このページを離れますか？';
+
+function NavigationBlocker({ active, bypassRef }: { active: boolean; bypassRef: React.RefObject<boolean> }) {
+  const blocker = useBlocker(() => active && !bypassRef.current);
+  useEffect(() => {
+    if (blocker.state !== 'blocked') return;
+    if (window.confirm(LEAVE_MESSAGE)) {
+      bypassRef.current = true;
+      blocker.proceed();
+    } else {
+      blocker.reset();
+    }
+  }, [blocker, bypassRef]);
+  return null;
+}
+
+function OptionalNavigationBlocker({ active, bypassRef }: { active: boolean; bypassRef: React.RefObject<boolean> }) {
+  return useContext(UNSAFE_DataRouterContext)
+    ? <NavigationBlocker active={active} bypassRef={bypassRef} />
+    : null;
+}
 
 export default function CustomerDetail() {
   const navigate = useNavigate();
@@ -23,9 +45,11 @@ export default function CustomerDetail() {
   const [showHistory, setShowHistory] = useState(false);
   const initializedRef = useRef(false);
   const expectedUpdatedAtRef = useRef<string | null>(null);
+  const allowLeaveRef = useRef(false);
+  const suggestionsRef = useRef<HTMLElement>(null);
   const [staleCustomer, setStaleCustomer] = useState<Customer | null>(null);
 
-  const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<CustomerInput>({
+  const { register, handleSubmit, reset, setValue, watch, formState: { errors, isDirty } } = useForm<CustomerInput>({
     defaultValues: {
       honorific_type: '御中',
       cutoff_day: 31,
@@ -35,6 +59,22 @@ export default function CustomerDetail() {
       is_active: 1,
     },
   });
+  const similarCustomers = useSimilarCustomerSuggestions({
+    name: watch('name'),
+    name_kana: watch('name_kana') ?? undefined,
+    tel: watch('tel') ?? undefined,
+    mobile: watch('mobile') ?? undefined,
+  }, isNew);
+
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (!isDirty || allowLeaveRef.current) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isDirty]);
 
   useEffect(() => {
     if (customer && !initializedRef.current) {
@@ -48,11 +88,16 @@ export default function CustomerDetail() {
   }, [customer, reset]);
 
   async function onSubmit(data: CustomerInput) {
+    let savedCustomer: Customer;
     if (isNew) {
-      await createMutation.mutateAsync(data);
+      try {
+        savedCustomer = await createMutation.mutateAsync(data);
+      } catch {
+        return;
+      }
     } else {
       try {
-        await updateMutation.mutateAsync({
+        savedCustomer = await updateMutation.mutateAsync({
           ...data,
           expected_updated_at: expectedUpdatedAtRef.current ?? undefined,
         });
@@ -67,6 +112,8 @@ export default function CustomerDetail() {
         return;
       }
     }
+    reset(savedCustomer);
+    allowLeaveRef.current = true;
     goBack();
   }
 
@@ -89,6 +136,10 @@ export default function CustomerDetail() {
 
   return (
     <div style={{ maxWidth: 720 }}>
+      <OptionalNavigationBlocker active={isDirty} bypassRef={allowLeaveRef} />
+      {isDirty && (
+        <div data-testid="save-status" style={saveStatusBoxStyle}>未保存の変更があります</div>
+      )}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
         <button onClick={goBack} style={backBtnStyle}>← 戻る</button>
         <h1 style={{ margin: 0, fontSize: 20, fontWeight: 'bold' }}>
@@ -143,15 +194,17 @@ export default function CustomerDetail() {
           watch={watch}
           code={customer?.code}
           carryForwardBalance={customer?.carry_forward_balance}
+          similarCustomerCount={similarCustomers.length}
+          onShowSimilarCustomers={() => suggestionsRef.current?.scrollIntoView({ behavior: 'smooth' })}
         />
 
         <SimilarCustomerSuggestions
-          enabled={isNew}
-          name={watch('name')}
-          name_kana={watch('name_kana') ?? undefined}
-          tel={watch('tel') ?? undefined}
-          mobile={watch('mobile') ?? undefined}
-          onSelect={(similar) => navigate(`/customers/${similar.id}`)}
+          ref={suggestionsRef}
+          customers={similarCustomers}
+          onSelect={(similar) => {
+            allowLeaveRef.current = true;
+            navigate(`/customers/${similar.id}`);
+          }}
         />
 
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
@@ -190,4 +243,10 @@ const submitBtnStyle: React.CSSProperties = {
 const projectsBtnStyle: React.CSSProperties = {
   padding: '8px 16px', background: '#f0f9ff', color: '#2563eb', border: '1px solid #bfdbfe',
   borderRadius: 6, cursor: 'pointer', fontSize: 14,
+};
+const saveStatusBoxStyle: React.CSSProperties = {
+  position: 'fixed', right: 16, bottom: 16, zIndex: 100, maxWidth: 'calc(100vw - 32px)',
+  display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8,
+  padding: '8px 14px', background: '#fff', border: '1px solid #cbd5e1', borderRadius: 8,
+  boxShadow: '0 4px 16px rgba(0,0,0,0.12)', fontSize: 13,
 };

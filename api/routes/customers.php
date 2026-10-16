@@ -143,10 +143,13 @@ if ($method === 'GET' && isset($segments[1]) && $segments[1] === 'similar') {
 
     $inputName = normalizeSimilarCustomerText($_GET['name'] ?? '');
     $inputKana = normalizeSimilarCustomerText($_GET['name_kana'] ?? '');
-    $inputTel = normalizeSimilarCustomerTel($_GET['tel'] ?? '');
+    $inputTels = array_values(array_filter([
+        normalizeSimilarCustomerTel($_GET['tel'] ?? ''),
+        normalizeSimilarCustomerTel($_GET['mobile'] ?? ''),
+    ], static fn(string $tel): bool => strlen($tel) >= 6));
     $matchName = mb_strlen($inputName) >= 2;
     $matchKana = mb_strlen($inputKana) >= 2;
-    $matchTel = strlen($inputTel) >= 6;
+    $matchTel = $inputTels !== [];
 
     if (!$matchName && !$matchKana && !$matchTel) {
         echo json_encode([]);
@@ -160,7 +163,8 @@ if ($method === 'GET' && isset($segments[1]) && $segments[1] === 'similar') {
         $matched = [];
         if ($matchTel) {
             foreach (['tel', 'mobile', 'fax'] as $column) {
-                if ($inputTel === normalizeSimilarCustomerTel($row[$column])) {
+                $rowTel = normalizeSimilarCustomerTel($row[$column]);
+                if (strlen($rowTel) >= 6 && in_array($rowTel, $inputTels, true)) {
                     $matched[] = 'tel';
                     break;
                 }
@@ -168,13 +172,13 @@ if ($method === 'GET' && isset($segments[1]) && $segments[1] === 'similar') {
         }
         if ($matchName) {
             $rowName = normalizeSimilarCustomerText($row['name']);
-            if ($rowName !== '' && (str_contains($rowName, $inputName) || str_contains($inputName, $rowName))) {
+            if (mb_strlen($rowName) >= 2 && (str_contains($rowName, $inputName) || str_contains($inputName, $rowName))) {
                 $matched[] = 'name';
             }
         }
         if ($matchKana) {
             $rowKana = normalizeSimilarCustomerText($row['name_kana']);
-            if ($rowKana !== '' && (str_contains($rowKana, $inputKana) || str_contains($inputKana, $rowKana))) {
+            if (mb_strlen($rowKana) >= 2 && (str_contains($rowKana, $inputKana) || str_contains($inputKana, $rowKana))) {
                 $matched[] = 'name_kana';
             }
         }

@@ -1,33 +1,43 @@
-import { useEffect, useState } from 'react';
+import { forwardRef, useEffect, useState } from 'react';
 import { useSimilarCustomers, type SimilarCustomer, type SimilarCustomerParams } from '../api/customers';
 
-interface Props extends SimilarCustomerParams {
-  enabled: boolean;
+interface Props {
+  customers: SimilarCustomer[];
   onSelect: (customer: SimilarCustomer) => void;
 }
 
 const MATCH_LABELS = { tel: '電話', name: '名前', name_kana: 'カナ' } as const;
 
-export default function SimilarCustomerSuggestions({ enabled, onSelect, ...values }: Props) {
+export function useSimilarCustomerSuggestions(values: SimilarCustomerParams, enabled: boolean) {
   const [debounced, setDebounced] = useState(values);
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled) {
+      setDebounced(values);
+      return;
+    }
     const timer = window.setTimeout(() => setDebounced(values), 300);
     return () => window.clearTimeout(timer);
   }, [enabled, values.name, values.name_kana, values.tel, values.mobile]);
 
   const hasInput = Boolean(debounced.name || debounced.name_kana || debounced.tel || debounced.mobile);
   const { data } = useSimilarCustomers(debounced, enabled && hasInput);
-  if (!enabled || !data?.length) return null;
+  return data ?? [];
+}
+
+const SimilarCustomerSuggestions = forwardRef<HTMLElement, Props>(function SimilarCustomerSuggestions(
+  { customers, onSelect },
+  ref,
+) {
+  if (!customers.length) return null;
 
   return (
-    <section style={{ padding: 16, border: '1px solid #f59e0b', borderRadius: 8, background: '#fffbeb' }}>
+    <section ref={ref} style={{ padding: 16, border: '1px solid #f59e0b', borderRadius: 8, background: '#fffbeb' }}>
       <p style={{ margin: '0 0 10px', fontWeight: 'bold', color: '#92400e' }}>
         似た得意先があります。同じ得意先ならそちらを使ってください
       </p>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {data.map((customer) => (
+        {customers.map((customer) => (
           <button
             key={customer.id}
             type="button"
@@ -48,4 +58,6 @@ export default function SimilarCustomerSuggestions({ enabled, onSelect, ...value
       </div>
     </section>
   );
-}
+});
+
+export default SimilarCustomerSuggestions;

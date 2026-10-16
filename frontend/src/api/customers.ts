@@ -26,30 +26,12 @@ export interface SimilarCustomerParams {
 }
 
 async function fetchSimilarCustomers(params: SimilarCustomerParams): Promise<SimilarCustomer[]> {
-  const phones = [params.tel, params.mobile].filter((value): value is string => Boolean(value));
-  const requests = (phones.length > 0 ? phones : ['']).map((tel) => {
-    const query = new URLSearchParams();
-    if (params.name) query.set('name', params.name);
-    if (params.name_kana) query.set('name_kana', params.name_kana);
-    if (tel) query.set('tel', tel);
-    return api.get<SimilarCustomer[]>(`/customers/similar?${query}`);
-  });
-  const responses = await Promise.all(requests);
-  const merged = new Map<number, SimilarCustomer>();
-  for (const customer of responses.flat()) {
-    const current = merged.get(customer.id);
-    if (!current) {
-      merged.set(customer.id, customer);
-      continue;
-    }
-    current.matched = [...new Set([...current.matched, ...customer.matched])];
-  }
-  const rank = (customer: SimilarCustomer) => customer.matched.includes('tel')
-    ? 0
-    : (customer.matched.includes('name') ? 1 : 2);
-  return [...merged.values()]
-    .sort((left, right) => rank(left) - rank(right) || (left.code ?? '').localeCompare(right.code ?? ''))
-    .slice(0, 10);
+  const query = new URLSearchParams();
+  if (params.name) query.set('name', params.name);
+  if (params.name_kana) query.set('name_kana', params.name_kana);
+  if (params.tel) query.set('tel', params.tel);
+  if (params.mobile) query.set('mobile', params.mobile);
+  return api.get<SimilarCustomer[]>(`/customers/similar?${query}`);
 }
 
 /** 新規登録フォーム用の似た得意先候補取得。 */
