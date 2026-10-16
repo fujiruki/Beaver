@@ -133,6 +133,7 @@ export default function CustomerDetail() {
   const mutError  = createMutation.error || updateMutation.error;
   const isStaleCustomerError = mutError instanceof ApiError && mutError.status === 409 &&
     (mutError.body as { error?: string }).error === 'stale_customer';
+  const isAuthenticationError = mutError instanceof ApiError && mutError.status === 401;
 
   return (
     <div style={{ maxWidth: 720 }}>
@@ -173,7 +174,7 @@ export default function CustomerDetail() {
         />
       )}
 
-      {mutError && !isStaleCustomerError && (
+      {mutError && !isStaleCustomerError && !isAuthenticationError && (
         <div style={{ marginBottom: 16, padding: '10px 14px', background: '#fee2e2', color: '#dc2626', borderRadius: 6, fontSize: 14 }}>
           保存に失敗しました: {String(mutError)}
         </div>

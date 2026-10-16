@@ -49,6 +49,12 @@ function authGateIsExempt(string $path, string $method): bool
     return false;
 }
 
+/** 同期トークンがない場合に、画面のログイン認証へ切り替える書き込みかを判定する。 */
+function authGateAllowsUserAuthentication(string $path, string $method): bool
+{
+    return $method === 'POST' && ($path === '/customers' || $path === '/feedback');
+}
+
 /** R-0110: 番頭AI向けの固定トークン認証（Authorization: Bearer <BANTO_API_TOKEN>） */
 function authGateHasValidBantoToken(): bool
 {

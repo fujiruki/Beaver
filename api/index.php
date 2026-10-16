@@ -69,13 +69,17 @@ try {
             exit;
         }
     } elseif (authGateIsExempt($path, $method)) {
-        // --- 認証ゲート (R-0143 A-B-08) ---
-        // 免除＝df_sessionログイン不要という意味であり、SYNC_TOKEN_REQUIRED=true の間は
-        // Authorization: Bearer <SYNC_API_TOKEN> が無ければ401にする
+        // --- 認証ゲート (R-0143 A-B-08 / R-0181) ---
         if (SYNC_TOKEN_REQUIRED && !authGateHasValidSyncToken()) {
-            http_response_code(401);
-            echo json_encode(['error' => 'unauthenticated']);
-            exit;
+            if (authGateAllowsUserAuthentication($path, $method) && AUTH_DRIVER !== 'none') {
+                if (!authGateHasValidBantoToken()) {
+                    auth_require_user(json: true);
+                }
+            } else {
+                http_response_code(401);
+                echo json_encode(['error' => 'unauthenticated']);
+                exit;
+            }
         }
     } elseif (
         // --- 認証ゲート (R-0109 / R-0110) ---

@@ -5,6 +5,7 @@ import CustomerFormFields from './CustomerFormFields';
 import type { Customer, CustomerInput } from '../types/customer';
 import SimilarCustomerSuggestions, { useSimilarCustomerSuggestions } from './SimilarCustomerSuggestions';
 import type { SimilarCustomer } from '../api/customers';
+import { ApiError } from '../api/client';
 
 interface Props {
   isOpen: boolean;
@@ -37,9 +38,13 @@ export default function NewCustomerModal({ isOpen, onClose, onCreated }: Props) 
   if (!isOpen) return null;
 
   async function onSubmit(data: CustomerInput) {
-    const created = await createMutation.mutateAsync(data);
-    reset();
-    onCreated(created);
+    try {
+      const created = await createMutation.mutateAsync(data);
+      reset();
+      onCreated(created);
+    } catch {
+      return;
+    }
   }
 
   function handleClose() {
@@ -65,7 +70,7 @@ export default function NewCustomerModal({ isOpen, onClose, onCreated }: Props) 
       }}>
         <h2 style={{ margin: '0 0 20px', fontSize: 17, fontWeight: 'bold' }}>新規得意先登録</h2>
 
-        {createMutation.error && (
+        {createMutation.error && !(createMutation.error instanceof ApiError && createMutation.error.status === 401) && (
           <div style={{ marginBottom: 12, padding: '8px 12px', background: '#fee2e2', color: '#dc2626', borderRadius: 6, fontSize: 13 }}>
             保存に失敗しました: {String(createMutation.error)}
           </div>

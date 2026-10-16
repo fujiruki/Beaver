@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useAppSettings } from '../../contexts/AppSettingsContext';
 import { useMe } from '../../api/me';
 import FeedbackModal from '../feedback/FeedbackModal';
+import { AUTH_REQUIRED_EVENT, AUTH_RESTORED_EVENT } from '../../api/client';
 
 function handleLogout() {
   const redirect = encodeURIComponent(window.location.href);
@@ -61,11 +62,25 @@ export default function AppLayout() {
   const buildTime = new Date(__BUILD_TIME__);
   const [now, setNow] = useState(() => new Date());
   const [navOpen, setNavOpen] = useState(false);
+  const [loginUrl, setLoginUrl] = useState<string | null>(null);
   const location = useLocation();
 
   useEffect(() => {
     const intervalId = window.setInterval(() => setNow(new Date()), 60_000);
     return () => window.clearInterval(intervalId);
+  }, []);
+
+  useEffect(() => {
+    const showLoginGuide = (event: Event) => {
+      setLoginUrl((event as CustomEvent<{ loginUrl: string }>).detail.loginUrl);
+    };
+    const hideLoginGuide = () => setLoginUrl(null);
+    window.addEventListener(AUTH_REQUIRED_EVENT, showLoginGuide);
+    window.addEventListener(AUTH_RESTORED_EVENT, hideLoginGuide);
+    return () => {
+      window.removeEventListener(AUTH_REQUIRED_EVENT, showLoginGuide);
+      window.removeEventListener(AUTH_RESTORED_EVENT, hideLoginGuide);
+    };
   }, []);
 
   useEffect(() => {
@@ -76,6 +91,18 @@ export default function AppLayout() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', fontFamily: 'sans-serif', fontSize: settings.fontSize }}>
+      {loginUrl && (
+        <div role="alert" style={{
+          position: 'fixed', top: 12, left: '50%', transform: 'translateX(-50%)', zIndex: 100,
+          display: 'flex', alignItems: 'center', gap: 12, maxWidth: 'calc(100vw - 32px)',
+          padding: '10px 14px', borderRadius: 8, background: '#fef3c7', color: '#92400e',
+          border: '1px solid #f59e0b', boxShadow: '0 4px 16px rgba(0,0,0,0.18)',
+        }}>
+          <span>ログインが切れました。ログインし直してください</span>
+          <button type="button" onClick={() => window.open(loginUrl, '_blank')}>ログインし直す</button>
+          <button type="button" aria-label="案内を閉じる" onClick={() => setLoginUrl(null)}>×</button>
+        </div>
+      )}
       {/* PC向けヘッダー（R-0139） */}
       <header
         className="hidden md:flex"

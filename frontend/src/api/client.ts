@@ -5,6 +5,9 @@ import { APP_ID } from '../lib/appId';
 
 const BASE = `/contents/${APP_ID}/api`;
 
+export const AUTH_REQUIRED_EVENT = 'beaver:auth-required';
+export const AUTH_RESTORED_EVENT = 'beaver:auth-restored';
+
 export class ApiError extends Error {
   status: number;
   body: unknown;
@@ -18,11 +21,18 @@ export class ApiError extends Error {
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(BASE + path, init);
+  const method = (init?.method ?? 'GET').toUpperCase();
+  const isWrite = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method);
   if (res.status === 401) {
     const body: { loginUrl?: string } | null = await res.clone().json().catch(() => null);
-    if (body?.loginUrl) {
+    if (!isWrite && body?.loginUrl) {
       window.location.href = body.loginUrl;
       return new Promise<T>(() => {}); // 遷移するまで呼び出し元を待たせる
+    }
+    if (isWrite) {
+      const loginUrl = body?.loginUrl
+        ?? `/contents/auth/login?redirect=${encodeURIComponent(window.location.href)}`;
+      window.dispatchEvent(new CustomEvent(AUTH_REQUIRED_EVENT, { detail: { loginUrl } }));
     }
   }
   if (!res.ok) {
@@ -31,6 +41,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     try { body = JSON.parse(text); } catch { /* JSON以外のエラー本文は文字列で保持する */ }
     throw new ApiError(res.status, body);
   }
+  if (isWrite) window.dispatchEvent(new Event(AUTH_RESTORED_EVENT));
   return res.json() as Promise<T>;
 }
 
