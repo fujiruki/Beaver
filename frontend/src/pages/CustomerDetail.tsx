@@ -138,14 +138,14 @@ export default function CustomerDetail() {
   return (
     <div style={{ maxWidth: 720 }}>
       <OptionalNavigationBlocker active={isDirty} bypassRef={allowLeaveRef} />
-      {isDirty && (
-        <div data-testid="save-status" style={saveStatusBoxStyle}>未保存の変更があります</div>
-      )}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
         <button onClick={goBack} style={backBtnStyle}>← 戻る</button>
         <h1 style={{ margin: 0, fontSize: 20, fontWeight: 'bold' }}>
           {isNew ? '得意先 新規登録' : '得意先 編集'}
         </h1>
+        {isDirty && (
+          <div data-testid="save-status" style={saveStatusBoxStyle}>未保存の変更があります</div>
+        )}
         {/* R-0143 A-B-06: 同期バッジ */}
         {!isNew && (
           <span style={{
@@ -246,8 +246,6 @@ const projectsBtnStyle: React.CSSProperties = {
   borderRadius: 6, cursor: 'pointer', fontSize: 14,
 };
 const saveStatusBoxStyle: React.CSSProperties = {
-  position: 'fixed', right: 16, bottom: 16, zIndex: 100, maxWidth: 'calc(100vw - 32px)',
-  display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8,
-  padding: '8px 14px', background: '#fff', border: '1px solid #cbd5e1', borderRadius: 8,
-  boxShadow: '0 4px 16px rgba(0,0,0,0.12)', fontSize: 13,
+  padding: '6px 12px', background: '#ffedd5', color: '#9a3412',
+  border: '1px solid #fb923c', borderRadius: 6, fontSize: 13, fontWeight: 'bold',
 };
