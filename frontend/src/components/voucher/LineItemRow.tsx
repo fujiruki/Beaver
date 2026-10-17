@@ -23,6 +23,7 @@ const formatNumber = (value: number | null | undefined) =>
   Number.isFinite(Number(value)) ? Number(value).toLocaleString('ja-JP', { maximumFractionDigits: 10 }) : '';
 
 const parseNumber = (value: string) => Number(value.replace(/,/g, '')) || 0;
+const formatWorkCategoryName = (name: string) => name.replace(/時間$/, 'h');
 
 type FormattedNumberInputProps = {
   label: string;
@@ -32,9 +33,10 @@ type FormattedNumberInputProps = {
   onBlur: () => void;
   disabled: boolean;
   width: number;
+  grouped?: boolean;
 };
 
-function FormattedNumberInput({ label, placeholder, value, onValueChange, onBlur, disabled, width }: FormattedNumberInputProps) {
+function FormattedNumberInput({ label, placeholder, value, onValueChange, onBlur, disabled, width, grouped = false }: FormattedNumberInputProps) {
   const [displayValue, setDisplayValue] = useState(() => formatNumber(value));
   const focusedRef = useRef(false);
 
@@ -60,7 +62,7 @@ function FormattedNumberInput({ label, placeholder, value, onValueChange, onBlur
         onBlur();
       }}
       disabled={disabled}
-      style={{ ...inputStyle, width, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}
+      style={{ ...(grouped ? groupedInputStyle : inputStyle), width, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}
     />
   );
 }
@@ -184,6 +186,7 @@ export default function LineItemRow({
     onChange: (raw: string) => void,
     width = 72,
     placeholder?: string,
+    grouped = false,
   ) => (
     <FormattedNumberInput
       label={label}
@@ -193,6 +196,7 @@ export default function LineItemRow({
       onBlur={saveLineToDb}
       disabled={readOnly}
       width={width}
+      grouped={grouped}
     />
   );
 
@@ -256,15 +260,17 @@ export default function LineItemRow({
           )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
-          <div style={joinedGroupStyle}>
+          <div data-testid="location-quantity-group" style={joinedGroupStyle}>
             <input
               aria-label="取付場所"
               {...register(`lines.${index}.location_name`)}
               disabled={readOnly || lineType !== 'normal'}
               onBlur={saveLineToDb}
-              style={{ ...joinedInputStyle, width: 170 }}
+              style={{ ...groupedInputStyle, width: 170 }}
             />
-            {numericInput('数量', quantity, raw => setValue(`lines.${index}.quantity`, parseNumber(raw)), 56)}
+            <span style={joinedCellStyle}>
+              {numericInput('数量', quantity, raw => setValue(`lines.${index}.quantity`, parseNumber(raw)), 56, undefined, true)}
+            </span>
           </div>
           <button
             type="button"
@@ -289,20 +295,20 @@ export default function LineItemRow({
           <>
             <div style={{ ...bandStyle, background: '#eef6ee' }}>
               <span style={{ ...bandLabelStyle, color: '#2f6f3a' }}>売値</span>
-              <div style={joinedGroupStyle}>
+              <div data-testid="price-group" style={joinedGroupStyle}>
                 {moneyCategories.map(category => (
                   <span key={category.code} style={joinedCellStyle}>
-                    {numericInput(`売値 ${category.name}`, getValue(prices, category.code), raw => setCategoryValue('prices', category, raw), 72, category.name)}
+                    {numericInput(`売値 ${category.name}`, getValue(prices, category.code), raw => setCategoryValue('prices', category, raw), 72, category.name, true)}
                   </span>
                 ))}
               </div>
-              <div style={{ ...joinedGroupStyle, width: 162 }}>
+              <div data-testid="tax-group" style={{ ...joinedGroupStyle, width: 162 }}>
                 <select
                   aria-label="課税"
                   {...register(`lines.${index}.tax_category`)}
                   disabled={readOnly}
                   onBlur={saveLineToDb}
-                  style={{ ...joinedInputStyle, width: 162 }}
+                  style={{ ...groupedInputStyle, width: 162 }}
                 >
                   <option value="taxable">課税</option>
                   <option value="non_taxable">非課税</option>
@@ -315,21 +321,21 @@ export default function LineItemRow({
             </div>
             <div style={{ ...bandStyle, background: '#fdf3e7' }}>
               <span style={{ ...bandLabelStyle, color: '#9a5b13' }}>原価・作業</span>
-              <div style={joinedGroupStyle}>
+              <div data-testid="cost-group" style={joinedGroupStyle}>
                 {moneyCategories.map(category => (
                   <span key={category.code} style={joinedCellStyle}>
-                    {numericInput(`原価 ${category.name}`, getValue(costs, category.code), raw => setCategoryValue('costs', category, raw), 72, category.name)}
+                    {numericInput(`原価 ${category.name}`, getValue(costs, category.code), raw => setCategoryValue('costs', category, raw), 72, category.name, true)}
                   </span>
                 ))}
               </div>
-              <div style={joinedGroupStyle}>
+              <div data-testid="work-group" style={joinedGroupStyle}>
                 {timeCategories.map(category => (
                   <span key={category.code} style={joinedCellStyle}>
-                    {numericInput(category.name, getValue(costs, category.code), raw => setCategoryValue('costs', category, raw), 54)}
+                    {numericInput(formatWorkCategoryName(category.name), getValue(costs, category.code), raw => setCategoryValue('costs', category, raw), 54, undefined, true)}
                   </span>
                 ))}
                 <span style={joinedCellStyle}>
-                  {numericInput('労務単価', laborRate, raw => setValue(`lines.${index}.cost_labor_rate`, parseNumber(raw)), 72)}
+                  {numericInput('労務単価', laborRate, raw => setValue(`lines.${index}.cost_labor_rate`, parseNumber(raw)), 72, undefined, true)}
                 </span>
               </div>
               <div style={resultStyle}>
@@ -385,12 +391,11 @@ const joinedCellStyle: React.CSSProperties = {
   marginLeft: -1,
 };
 
-const joinedInputStyle: React.CSSProperties = {
-  height: 18,
+const groupedInputStyle: React.CSSProperties = {
+  height: 20,
   padding: '0 6px',
   border: 0,
-  borderLeft: '1px solid #d8dde3',
-  marginLeft: -1,
+  borderRadius: 0,
   boxSizing: 'border-box',
   background: '#fff',
   fontSize: 12,

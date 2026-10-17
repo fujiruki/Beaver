@@ -946,7 +946,7 @@ export default function VoucherEdit() {
                 <span style={{ width: 167 }} />
                 <span style={{ display: 'flex' }}>
                   {timeCategories.map(category => (
-                    <span key={category.code} style={{ width: 54, textAlign: 'center' }}>{category.name}</span>
+                    <span key={category.code} style={{ width: 54, textAlign: 'center' }}>{category.name.replace(/時間$/, 'h')}</span>
                   ))}
                   <span style={{ width: 72, textAlign: 'center' }}>労務単価</span>
                 </span>

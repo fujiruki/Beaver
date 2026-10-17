@@ -131,12 +131,12 @@ describe('R-0184 明細入力レイアウト F3 詰め版', () => {
 
     for (const testId of ['location-quantity-group', 'price-group', 'cost-group', 'work-group', 'tax-group']) {
       const group = within(row).getByTestId(testId);
-      expect(group.style.border).toBe('1px solid rgb(182, 189, 198)');
+      expect(group.style.border).toBe('1px solid #b6bdc6');
       expect(group.style.borderRadius).toBe('5px');
       expect(group.style.overflow).toBe('hidden');
-      expect(group.style.background).toBe('rgb(255, 255, 255)');
+      expect(group.style.background).toBe('#fff');
 
-      for (const input of within(group).getAllByRole(/textbox|combobox/)) {
+      for (const input of group.querySelectorAll<HTMLElement>('input, select')) {
         expect(input.style.border).toBe('0px');
         expect(input.style.borderRadius).toBe('0px');
       }
