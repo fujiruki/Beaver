@@ -715,8 +715,6 @@ export default function VoucherEdit() {
 
   const moneyCategories = categories.filter(c => c.measure_type === 'money');
   const timeCategories  = categories.filter(c => c.measure_type === 'time');
-  // 列数計算（行選択ラジオ含む）
-  const totalCols = 4 + moneyCategories.length + 3 + moneyCategories.length + timeCategories.length + 7 + 1;
 
   return (
     <FormProvider {...form}>
@@ -928,63 +926,44 @@ export default function VoucherEdit() {
                 disabled={selectedIdx === null || (watchedLines?.length ?? 0) - 1 === selectedIdx} style={rowOpBtnStyle}>▼</button>
             </div>
           )}
-          <div style={{ background: '#fff', borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-            marginBottom: 16, overflow: 'auto' }}>
-            {categories.length === 0 ? (
+          <div style={{ background: '#fff', marginBottom: 16, overflowX: 'auto' }}>
+            {!formReady ? (
+              <div style={{ padding: 16, color: '#64748b' }}>明細を読み込んでいます…</div>
+            ) : categories.length === 0 ? (
               <div role="alert" style={{ padding: 16, color: '#b45309', background: '#fffbeb' }}>
                 集計区分が未同期のため明細を編集できません。設定画面から同期してください
               </div>
-            ) : <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-              <thead>
-                <tr style={{ background: '#f8fafc' }}>
-                  <Th>No</Th>
-                  <Th>取付場所</Th>
-                  <Th>内容</Th>
-                  <Th>数量</Th>
-                  {moneyCategories.map(c => (
-                    <Th key={`ph-${c.code}`} style={{ borderLeft: moneyCategories[0].code === c.code ? '2px solid #bfdbfe' : undefined }}>
-                      売値/{c.name}
-                    </Th>
+            ) : <div style={{ width: 'fit-content', minWidth: 1320 }}>
+              <div data-testid="line-item-heading" style={lineHeadingStyle}>
+                <span style={{ width: 42 }}>No</span>
+                <span style={{ width: 330 }}>取付建具／取付場所・数量・備考</span>
+                <span style={{ width: 67 }} />
+                <span style={{ display: 'flex' }}>
+                  {moneyCategories.map(category => (
+                    <span key={category.code} style={{ width: 72, textAlign: 'center' }}>{category.name}</span>
                   ))}
-                  <Th right>単価</Th>
-                  <Th right>金額</Th>
-                  <Th>課税</Th>
-                  {moneyCategories.map(c => (
-                    <Th key={`ch-${c.code}`} style={{ borderLeft: moneyCategories[0].code === c.code ? '2px solid #d1fae5' : undefined }}>
-                      原価/{c.name}
-                    </Th>
+                </span>
+                <span style={{ width: 167 }} />
+                <span style={{ display: 'flex' }}>
+                  {timeCategories.map(category => (
+                    <span key={category.code} style={{ width: 54, textAlign: 'center' }}>{category.name}</span>
                   ))}
-                  {timeCategories.map(c => (
-                    <Th key={`th-${c.code}`}>{c.name}(h)</Th>
-                  ))}
-                  <Th>労務単価</Th>
-                  <Th right>労務費</Th>
-                  <Th right>材料原価</Th>
-                  <Th right>製造原価</Th>
-                  <Th right>利益</Th>
-                  <Th right>利益率</Th>
-                  <Th right>粗利率</Th>
-                  <Th right>日割粗利</Th>
-                  <Th>選択</Th>
-                </tr>
-              </thead>
-              <tbody>
-                {fields.map((field, index) => (
-                  <LineItemRow
-                    key={field.id}
-                    index={index}
-                    onRemove={() => handleRemoveLine(index)}
-                    readOnly={!formReady || isReadOnly}
-                    selected={selectedIdx === index}
-                    onSelect={() => setSelectedIdx(index)}
-                    categories={categories}
-                    totalCols={totalCols}
-                    isNew={isNew}
-                    onSaveLine={saveLine}
-                  />
-                ))}
-              </tbody>
-            </table>}
+                  <span style={{ width: 72, textAlign: 'center' }}>労務単価</span>
+                </span>
+              </div>
+              {fields.map((field, index) => (
+                <LineItemRow
+                  key={field.id}
+                  index={index}
+                  readOnly={!formReady || isReadOnly}
+                  selected={selectedIdx === index}
+                  onSelect={() => setSelectedIdx(index)}
+                  categories={categories}
+                  isNew={isNew}
+                  onSaveLine={saveLine}
+                />
+              ))}
+            </div>}
             {!isReadOnly && categories.length > 0 && (
               <div style={{ padding: '8px 12px', borderTop: '1px solid #f1f5f9' }}>
                 <button type="button" onClick={handleAddLine} disabled={!formReady} style={addLineBtnStyle}>
@@ -1017,16 +996,6 @@ export default function VoucherEdit() {
         </form>
       </div>
     </FormProvider>
-  );
-}
-
-function Th({ children, right, style }: { children?: React.ReactNode; right?: boolean; style?: React.CSSProperties }) {
-  return (
-    <th style={{ padding: '8px 6px', textAlign: right ? 'right' : 'left', fontSize: 12,
-      color: '#64748b', fontWeight: 'bold', borderBottom: '1px solid #e2e8f0', whiteSpace: 'nowrap',
-      ...style }}>
-      {children}
-    </th>
   );
 }
 
@@ -1068,4 +1037,9 @@ const subBtnStyle: React.CSSProperties = {
 const rowOpBtnStyle: React.CSSProperties = {
   padding: '4px 12px', background: '#f8fafc', border: '1px solid #cbd5e1',
   borderRadius: 6, cursor: 'pointer', fontSize: 12, color: '#475569',
+};
+const lineHeadingStyle: React.CSSProperties = {
+  display: 'flex', alignItems: 'center', height: 24, padding: '0 4px', boxSizing: 'border-box',
+  borderBottom: '1px solid #d0d7de', background: '#f6f8fa', color: '#57606a',
+  fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap',
 };

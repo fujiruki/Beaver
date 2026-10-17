@@ -83,7 +83,7 @@ describe('R-0164 既存伝票の明細行はフォーカスが外れたときに
     await user.click(screen.getByRole('button', { name: '+ 行を追加' }));
     await waitFor(() => expect(linePosts()).toHaveLength(1));
     const itemName = await waitFor(() => {
-      const el = document.querySelector('input[name="lines.1.item_name"]') as HTMLInputElement | null;
+      const el = document.querySelector('[name="lines.1.item_name"]') as HTMLTextAreaElement | null;
       expect(el).not.toBeNull();
       return el!;
     });
@@ -101,7 +101,7 @@ describe('R-0164 既存伝票の明細行はフォーカスが外れたときに
     stubFetch();
     renderPage();
     await screen.findByText('Beaver作成');
-    const itemName = document.querySelector('input[name="lines.0.item_name"]') as HTMLInputElement;
+    const itemName = document.querySelector('[name="lines.0.item_name"]') as HTMLTextAreaElement;
     await user.type(itemName, '追記');
     await user.tab();
     await waitFor(() => expect(linePuts(51)).toHaveLength(1));

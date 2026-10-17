@@ -106,15 +106,14 @@ describe('VoucherEdit R-0145 (C) 原価から売値を設定ボタンの適用�
   });
 
   async function getPriceInputs() {
-    const rows = screen.getAllByRole('row');
-    // rows[0]=ヘッダー, rows[1]=明細1本体行, rows[2]=明細1備考行, rows[3]=明細2本体行, rows[4]=明細2備考行
-    const row1Price = within(rows[1]).getAllByPlaceholderText('本体')[0] as HTMLInputElement;
-    const row2Price = within(rows[3]).getAllByPlaceholderText('本体')[0] as HTMLInputElement;
+    const rows = screen.getAllByTestId(/^line-item-\d+$/);
+    const row1Price = within(rows[0]).getByRole('textbox', { name: '売値 本体' }) as HTMLInputElement;
+    const row2Price = within(rows[1]).getByRole('textbox', { name: '売値 本体' }) as HTMLInputElement;
     return { row1Price, row2Price };
   }
 
   function valueOf(input: HTMLInputElement): number {
-    return Number(input.value);
+    return Number(input.value.replace(/,/g, ''));
   }
 
   it('行選択中は選択行のみ更新され、他の行は変化しない', async () => {

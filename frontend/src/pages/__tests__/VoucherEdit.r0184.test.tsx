@@ -92,7 +92,7 @@ describe('R-0184 明細入力レイアウト F3 詰め版', () => {
       expect(within(row).getByRole('textbox', { name })).not.toBeNull();
     }
     for (const label of ['単価', '金額', '材料原価', '労務費', '製造原価', '利益', '利益率', '粗利率', '日割粗利']) {
-      expect(within(row).getByText(new RegExp(`^${label}`))).not.toBeNull();
+      expect(within(row).getByText(new RegExp(`^${label}(?:\\s|$)`))).not.toBeNull();
     }
     const calculationResults = ['材料原価', '労務費', '製造原価'].map(label =>
       within(row).getByText(new RegExp(`^${label}`)),

@@ -116,7 +116,7 @@ describe('R-0166 伝票画面の楽観的ロック', () => {
     await user.type(description, '変更');
     await user.tab();
     await waitFor(() => expect(voucherWrites()).toHaveLength(1));
-    const itemName = document.querySelector('input[name="lines.0.item_name"]') as HTMLInputElement;
+    const itemName = document.querySelector('[name="lines.0.item_name"]') as HTMLTextAreaElement;
     await user.type(itemName, '追記');
     await user.tab();
     await new Promise(resolve => setTimeout(resolve, 20));

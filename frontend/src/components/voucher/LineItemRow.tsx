@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useFormContext, useWatch } from 'react-hook-form';
 import { useCostCalcDynamic } from '../../hooks/useCostCalc';
 import { useAppSettings } from '../../contexts/AppSettingsContext';
@@ -11,108 +11,127 @@ import { calcLineProfitSummary } from '../../lib/voucherCalc';
 
 type Props = {
   index: number;
-  onRemove: () => void;
   readOnly?: boolean;
   selected?: boolean;
   onSelect?: () => void;
   categories: AggregationCategoryMaster[];
-  totalCols: number;
   isNew: boolean;
   onSaveLine: (lineId: number, data: Record<string, unknown>) => Promise<void>;
 };
 
+const formatNumber = (value: number | null | undefined) =>
+  Number.isFinite(Number(value)) ? Number(value).toLocaleString('ja-JP', { maximumFractionDigits: 10 }) : '';
+
+const parseNumber = (value: string) => Number(value.replace(/,/g, '')) || 0;
+
+type FormattedNumberInputProps = {
+  label: string;
+  placeholder?: string;
+  value: number;
+  onValueChange: (raw: string) => void;
+  onBlur: () => void;
+  disabled: boolean;
+  width: number;
+};
+
+function FormattedNumberInput({ label, placeholder, value, onValueChange, onBlur, disabled, width }: FormattedNumberInputProps) {
+  const [displayValue, setDisplayValue] = useState(() => formatNumber(value));
+  const focusedRef = useRef(false);
+
+  useEffect(() => {
+    if (!focusedRef.current) setDisplayValue(formatNumber(value));
+  }, [value]);
+
+  return (
+    <input
+      aria-label={label}
+      placeholder={placeholder}
+      inputMode="decimal"
+      value={displayValue}
+      onFocus={() => { focusedRef.current = true; }}
+      onChange={event => {
+        const raw = event.target.value;
+        setDisplayValue(raw === '' ? '' : formatNumber(parseNumber(raw)));
+        onValueChange(raw);
+      }}
+      onBlur={() => {
+        focusedRef.current = false;
+        setDisplayValue(formatNumber(value));
+        onBlur();
+      }}
+      disabled={disabled}
+      style={{ ...inputStyle, width, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}
+    />
+  );
+}
+
 export default function LineItemRow({
   index,
-  onRemove: _onRemove,
   readOnly = false,
   selected,
   onSelect,
   categories,
-  totalCols,
   isNew,
   onSaveLine,
 }: Props) {
   const [selectorOpen, setSelectorOpen] = useState(false);
+  const [memoOpen, setMemoOpen] = useState(false);
   const { register, setValue, getValues, control } = useFormContext<VoucherFormValues>();
   const { settings } = useAppSettings();
-
   const line = useWatch({ control, name: `lines.${index}` });
-
   const costs: LineCategoryValue[] = line?.costs ?? [];
   const prices: LineCategoryValue[] = line?.prices ?? [];
   const laborRate = line?.cost_labor_rate ?? 0;
   const quantity = line?.quantity ?? 1;
-
-  const moneyCategories = categories.filter(c => c.measure_type === 'money');
-  const timeCategories  = categories.filter(c => c.measure_type === 'time');
-
+  const moneyCategories = categories.filter(category => category.measure_type === 'money');
+  const timeCategories = categories.filter(category => category.measure_type === 'time');
   const { manufactureCost, materialCost, laborCost } = useCostCalcDynamic(costs, laborRate);
 
-  // line_total = sum(prices) * quantity
   useEffect(() => {
-    const unitPrice = prices.reduce((s, p) => s + (p.value || 0), 0);
+    const unitPrice = prices.reduce((sum, price) => sum + (price.value || 0), 0);
     setValue(`lines.${index}.line_total`, unitPrice * quantity);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(prices), quantity, index, setValue]);
 
-  function getCostValue(code: string): number {
-    return costs.find(c => c.category_code === code)?.value ?? 0;
-  }
-  function getPriceValue(code: string): number {
-    return prices.find(c => c.category_code === code)?.value ?? 0;
-  }
+  useEffect(() => {
+    if (line?.memo) setMemoOpen(true);
+  }, [line?.memo]);
 
-  function setCostValue(code: string, raw: string) {
-    const value = parseFloat(raw) || 0;
-    const cat = categories.find(c => c.code === code);
-    if (!cat) return;
-    const updated = costs.filter(c => c.category_code !== code);
+  const getValue = (values: LineCategoryValue[], code: string) =>
+    values.find(value => value.category_code === code)?.value ?? 0;
+
+  function setCategoryValue(kind: 'costs' | 'prices', category: AggregationCategoryMaster, raw: string) {
+    const current = kind === 'costs' ? costs : prices;
+    const value = parseNumber(raw);
+    const updated = current.filter(item => item.category_code !== category.code);
     if (value !== 0) {
       updated.push({
-        category_code: code,
-        category_name: cat.name,
-        measure_type: cat.measure_type,
+        category_code: category.code,
+        category_name: category.name,
+        measure_type: category.measure_type,
         value,
-        sort_order: cat.sort_order,
+        sort_order: category.sort_order,
       });
       updated.sort((a, b) => a.sort_order - b.sort_order);
     }
-    setValue(`lines.${index}.costs`, updated);
-  }
-
-  function setPriceValue(code: string, raw: string) {
-    const value = parseFloat(raw) || 0;
-    const cat = categories.find(c => c.code === code);
-    if (!cat) return;
-    const updated = prices.filter(c => c.category_code !== code);
-    if (value !== 0) {
-      updated.push({
-        category_code: code,
-        category_name: cat.name,
-        measure_type: cat.measure_type,
-        value,
-        sort_order: cat.sort_order,
-      });
-      updated.sort((a, b) => a.sort_order - b.sort_order);
-    }
-    setValue(`lines.${index}.prices`, updated);
+    setValue(`lines.${index}.${kind}`, updated);
   }
 
   const saveLineToDb = useCallback(() => {
     if (isNew) return;
-    const cur = getValues(`lines.${index}`);
-    if (!cur?.id) return;
-    void onSaveLine(cur.id, {
-        location_name:  cur.location_name,
-        item_name:       cur.item_name,
-        line_type:       cur.line_type,
-        quantity:        cur.quantity,
-        cost_labor_rate: cur.cost_labor_rate,
-        line_total:      cur.line_total,
-        tax_category:    cur.tax_category,
-        memo:            cur.memo,
-        costs:           cur.costs,
-        prices:          cur.prices,
+    const current = getValues(`lines.${index}`);
+    if (!current?.id) return;
+    void onSaveLine(current.id, {
+      location_name: current.location_name,
+      item_name: current.item_name,
+      line_type: current.line_type,
+      quantity: current.quantity,
+      cost_labor_rate: current.cost_labor_rate,
+      line_total: current.line_total,
+      tax_category: current.tax_category,
+      memo: current.memo,
+      costs: current.costs,
+      prices: current.prices,
     });
   }, [isNew, getValues, index, onSaveLine]);
 
@@ -126,264 +145,314 @@ export default function LineItemRow({
     setValue(`lines.${index}.cost_site_hours`, item.cost_site_hours);
     setValue(`lines.${index}.cost_labor_rate`, item.cost_labor_rate);
     setValue(`lines.${index}.snapshot_loaded_at`, new Date().toISOString());
-
-    if (item.cost_breakdown && item.cost_breakdown.length > 0) {
-      const newCosts: LineCategoryValue[] = item.cost_breakdown.map(bd => ({
-        category_code: bd.category_code,
-        category_name: bd.category_name,
-        measure_type: bd.measure_type,
-        value: bd.value,
-        sort_order: bd.sort_order,
-      }));
-      setValue(`lines.${index}.costs`, newCosts);
+    if (item.cost_breakdown?.length) {
+      setValue(`lines.${index}.costs`, item.cost_breakdown.map(value => ({ ...value })));
     }
-    // 選択直後に保存（tategu_item_id はバックエンドが snapshot ロードするので別途送信）
     if (!isNew) {
-      const cur = getValues(`lines.${index}`);
-      if (cur?.id) {
-        void onSaveLine(cur.id, {
-            tategu_item_id: item.id,
-            item_name: item.name,
-            cost_labor_rate: item.cost_labor_rate,
+      const current = getValues(`lines.${index}`);
+      if (current?.id) {
+        void onSaveLine(current.id, {
+          tategu_item_id: item.id,
+          item_name: item.name,
+          cost_labor_rate: item.cost_labor_rate,
         });
       }
     }
   }
 
   const lineType = line?.line_type ?? 'normal';
-  const unitPrice = prices.reduce((s, p) => s + (p.value || 0), 0);
+  const unitPrice = prices.reduce((sum, price) => sum + (price.value || 0), 0);
   const lineTotal = unitPrice * quantity;
-  const mfgCostTotal = manufactureCost * quantity;
+  const manufactureCostTotal = manufactureCost * quantity;
   const materialCostTotal = materialCost * quantity;
   const laborCostTotal = laborCost * quantity;
-  const totalTimeHours = costs.filter(c => c.measure_type === 'time').reduce((s, c) => s + (c.value || 0), 0) * quantity;
-  const {
-    profit: grossProfit,
-    profitRate: grossProfitRate,
-    grossMarginRate,
-    dailyGrossProfit,
-  } = calcLineProfitSummary(
+  const totalTimeHours = costs
+    .filter(cost => cost.measure_type === 'time')
+    .reduce((sum, cost) => sum + (cost.value || 0), 0) * quantity;
+  const summary = calcLineProfitSummary(
     lineTotal,
     materialCostTotal,
     laborCostTotal,
     totalTimeHours,
     settings.hoursPerDay,
   );
+  const rowBackground = selected ? '#eff6ff' : '#fff';
 
-  const rowBg = selected ? '#eff6ff' : 'transparent';
+  const numericInput = (
+    label: string,
+    value: number,
+    onChange: (raw: string) => void,
+    width = 72,
+    placeholder?: string,
+  ) => (
+    <FormattedNumberInput
+      label={label}
+      placeholder={placeholder}
+      value={value}
+      onValueChange={onChange}
+      onBlur={saveLineToDb}
+      disabled={readOnly}
+      width={width}
+    />
+  );
 
   return (
-    <>
-      <tr style={{ background: rowBg, cursor: 'pointer' }} onClick={onSelect}>
-        {/* No */}
-        <td style={tdStyle}>
-          <span style={{ fontSize: 11, color: '#94a3b8' }}>{(line?.line_no ?? index + 1)}</span>
-        </td>
-        {/* 取付場所 */}
-        <td style={tdStyle}>
-          {lineType === 'normal' && (
-            <input {...register(`lines.${index}.location_name`)} placeholder="場所"
-              style={{ ...cellInputStyle, width: 72 }} disabled={readOnly}
-              onBlur={saveLineToDb} />
-          )}
-        </td>
-        {/* 内容 */}
-        <td style={tdStyle}>
-          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-            <select {...register(`lines.${index}.line_type`)} style={{ ...cellInputStyle, width: 58 }} disabled={readOnly}
-              onBlur={saveLineToDb}>
-              <option value="normal">通常</option>
-              <option value="discount">値引</option>
-              <option value="subtotal">小計</option>
-            </select>
-            <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 2 }}>
-              {line?.tategu_item_id && <span title="建具台帳から引用" style={{ fontSize: 12 }}>🔨</span>}
-              {line?.source_catalog_item_id && <span title="カタログから引用" style={{ fontSize: 12 }}>📦</span>}
-              <input {...register(`lines.${index}.item_name`)} placeholder="品名"
-                style={{ ...cellInputStyle, width: 120 }} disabled={readOnly}
-                onBlur={saveLineToDb} />
-            </div>
-            {!readOnly && lineType === 'normal' && (
-              <button type="button" onClick={e => { e.stopPropagation(); setSelectorOpen(true); }} style={selectBtnStyle} title="建具台帳から選択">
-                📋
-              </button>
-            )}
-          </div>
-          {!readOnly && (
-            <TateguSelector isOpen={selectorOpen} onClose={() => setSelectorOpen(false)} onSelect={handleTateguSelect} />
-          )}
-        </td>
-        {/* 数量 */}
-        <td style={tdStyle}>
-          <input type="number" {...register(`lines.${index}.quantity`, { valueAsNumber: true })}
-            style={{ ...cellInputStyle, width: 52 }} disabled={readOnly}
-            onBlur={saveLineToDb} />
-        </td>
-        {/* 売値 money型区分 */}
-        {moneyCategories.map((cat, ci) => (
-          <td key={`p-${cat.code}`} style={{ ...tdStyle, borderLeft: ci === 0 ? '2px solid #bfdbfe' : undefined }}>
-            {lineType === 'normal' && (
-              <input
-                type="number"
-                value={getPriceValue(cat.code)}
-                onChange={e => setPriceValue(cat.code, e.target.value)}
-                onBlur={saveLineToDb}
-                style={{ ...cellInputStyle, width: 72 }}
-                disabled={readOnly}
-                placeholder={cat.name}
-              />
-            )}
-          </td>
-        ))}
-        {/* 単価合計 */}
-        <td style={{ ...tdStyle, textAlign: 'right' }}>
-          {lineType === 'normal' && (
-            <span style={{ fontSize: 12, color: '#475569' }}>¥{unitPrice.toLocaleString()}</span>
-          )}
-        </td>
-        {/* 金額 */}
-        <td style={{ ...tdStyle, textAlign: 'right' }}>
-          {lineType === 'discount' ? (
-            <input type="number" {...register(`lines.${index}.line_total`, { valueAsNumber: true })}
-              style={{ ...cellInputStyle, width: 88, textAlign: 'right' }} disabled={readOnly}
-              onBlur={saveLineToDb} />
-          ) : (
-            <span style={{ fontSize: 13, fontWeight: lineType === 'normal' ? 'normal' : 'bold' }}>
-              ¥{lineTotal.toLocaleString()}
-            </span>
-          )}
-        </td>
-        {/* 課税 */}
-        <td style={tdStyle}>
-          {lineType === 'normal' && (
-            <select {...register(`lines.${index}.tax_category`)} style={{ ...cellInputStyle, width: 68 }} disabled={readOnly}
-              onBlur={saveLineToDb}>
-              <option value="taxable">課税</option>
-              <option value="non_taxable">非課税</option>
-            </select>
-          )}
-        </td>
-        {/* 原価 money型区分 */}
-        {moneyCategories.map((cat, ci) => (
-          <td key={`c-${cat.code}`} style={{ ...tdStyle, borderLeft: ci === 0 ? '2px solid #d1fae5' : undefined }}>
-            {lineType === 'normal' && (
-              <input
-                type="number"
-                value={getCostValue(cat.code)}
-                onChange={e => setCostValue(cat.code, e.target.value)}
-                onBlur={saveLineToDb}
-                style={{ ...cellInputStyle, width: 72 }}
-                disabled={readOnly}
-                placeholder={cat.name}
-              />
-            )}
-          </td>
-        ))}
-        {/* 時間 time型区分 */}
-        {timeCategories.map(cat => (
-          <td key={`t-${cat.code}`} style={tdStyle}>
-            {lineType === 'normal' && (
-              <input
-                type="number"
-                value={getCostValue(cat.code)}
-                onChange={e => setCostValue(cat.code, e.target.value)}
-                onBlur={saveLineToDb}
-                style={{ ...cellInputStyle, width: 52 }}
-                step="0.5"
-                disabled={readOnly}
-                placeholder={cat.name}
-              />
-            )}
-          </td>
-        ))}
-        {/* 労務単価 */}
-        <td style={tdStyle}>
-          {lineType === 'normal' && (
-            <input type="number" {...register(`lines.${index}.cost_labor_rate`, { valueAsNumber: true })}
-              style={{ ...cellInputStyle, width: 64 }} disabled={readOnly}
-              onBlur={saveLineToDb} />
-          )}
-        </td>
-        {/* 労務費 */}
-        <td style={{ ...tdStyle, textAlign: 'right' }}>
-          {lineType === 'normal' && (
-            <span style={{ fontSize: 12, color: '#64748b' }}>¥{Math.round(laborCostTotal).toLocaleString()}</span>
-          )}
-        </td>
-        {/* 材料原価 */}
-        <td style={{ ...tdStyle, textAlign: 'right' }}>
-          {lineType === 'normal' && (
-            <span style={{ fontSize: 12, color: '#64748b' }}>¥{Math.round(materialCostTotal).toLocaleString()}</span>
-          )}
-        </td>
-        {/* 製造原価 */}
-        <td style={{ ...tdStyle, textAlign: 'right' }}>
-          {lineType === 'normal' && (
-            <span style={{ fontSize: 12, color: '#64748b' }}>¥{Math.round(mfgCostTotal).toLocaleString()}</span>
-          )}
-        </td>
-        {/* 利益 */}
-        <td style={{ ...tdStyle, textAlign: 'right' }}>
-          {lineType === 'normal' && (
-            <span style={{ fontSize: 12, color: grossProfit >= 0 ? '#16a34a' : '#dc2626' }}>
-              ¥{Math.round(grossProfit).toLocaleString()}
-            </span>
-          )}
-        </td>
-        {/* 利益率 */}
-        <td style={{ ...tdStyle, textAlign: 'right' }}>
-          {lineType === 'normal' && (
-            <span style={{ fontSize: 12, color: grossProfitRate !== null && grossProfitRate >= 0.3 ? '#16a34a' : grossProfitRate !== null && grossProfitRate >= 0.2 ? '#d97706' : '#dc2626' }}>
-              {grossProfitRate !== null ? `${(grossProfitRate * 100).toFixed(1)}%` : '—'}
-            </span>
-          )}
-        </td>
-        {/* 粗利率 */}
-        <td style={{ ...tdStyle, textAlign: 'right' }}>
-          {lineType === 'normal' && (
-            <span style={{ fontSize: 12, color: '#64748b' }}>
-              {grossMarginRate !== null ? `${(grossMarginRate * 100).toFixed(1)}%` : '—'}
-            </span>
-          )}
-        </td>
-        {/* 日割粗利 */}
-        <td style={{ ...tdStyle, textAlign: 'right' }}>
-          {lineType === 'normal' && (
-            <span style={{ fontSize: 12, color: '#64748b' }}>
-              {dailyGrossProfit !== null ? `¥${Math.round(dailyGrossProfit).toLocaleString()}/日` : '—'}
-            </span>
-          )}
-        </td>
-        {/* 選択ラジオ */}
-        <td style={tdStyle} onClick={e => e.stopPropagation()}>
-          <input type="radio" checked={selected} onChange={() => onSelect?.()}
-            style={{ cursor: 'pointer' }} />
-        </td>
-      </tr>
-      {/* 備考行 */}
-      <tr style={{ background: rowBg }}>
-        <td colSpan={totalCols} style={{ padding: '2px 4px 6px' }}>
-          <input
-            {...register(`lines.${index}.memo`)}
-            placeholder="備考"
-            style={{ ...cellInputStyle, width: '100%', fontSize: 12, color: '#64748b' }}
+    <div
+      data-testid={`line-item-${index}`}
+      onClick={onSelect}
+      style={{
+        display: 'flex',
+        alignItems: 'stretch',
+        width: 'fit-content',
+        minWidth: 1320,
+        padding: '3px 0',
+        borderBottom: '1px solid #d0d7de',
+        background: rowBackground,
+        cursor: 'pointer',
+        fontSize: 12,
+        fontVariantNumeric: 'tabular-nums',
+      }}
+    >
+      <div style={{ width: 42, padding: '2px 4px', boxSizing: 'border-box', textAlign: 'center' }}>
+        <div style={{ color: '#64748b', fontSize: 11 }}>{line?.line_no ?? index + 1}</div>
+        <input
+          aria-label={`${line?.line_no ?? index + 1}行目を選択`}
+          type="radio"
+          checked={selected}
+          onChange={onSelect}
+          onClick={event => event.stopPropagation()}
+        />
+      </div>
+
+      <div style={{ width: 330, paddingRight: 6, boxSizing: 'border-box' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 3 }}>
+          <select
+            aria-label="行種別"
+            {...register(`lines.${index}.line_type`)}
             disabled={readOnly}
             onBlur={saveLineToDb}
+            style={{ ...inputStyle, width: 48 }}
+          >
+            <option value="normal">通常</option>
+            <option value="discount">値引</option>
+            <option value="subtotal">小計</option>
+          </select>
+          <textarea
+            aria-label="取付建具"
+            placeholder="品名"
+            {...register(`lines.${index}.item_name`)}
+            disabled={readOnly}
+            onBlur={saveLineToDb}
+            rows={3}
+            style={{ ...inputStyle, width: 246, height: 45, lineHeight: '15px', resize: 'none' }}
           />
-        </td>
-      </tr>
-    </>
+          {!readOnly && lineType === 'normal' && (
+            <button
+              type="button"
+              title="建具台帳から選択"
+              onClick={event => { event.stopPropagation(); setSelectorOpen(true); }}
+              style={selectorButtonStyle}
+            >📋</button>
+          )}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
+          <div style={joinedGroupStyle}>
+            <input
+              aria-label="取付場所"
+              {...register(`lines.${index}.location_name`)}
+              disabled={readOnly || lineType !== 'normal'}
+              onBlur={saveLineToDb}
+              style={{ ...joinedInputStyle, width: 170 }}
+            />
+            {numericInput('数量', quantity, raw => setValue(`lines.${index}.quantity`, parseNumber(raw)), 56)}
+          </div>
+          <button
+            type="button"
+            onClick={event => { event.stopPropagation(); setMemoOpen(open => !open); }}
+            style={memoButtonStyle}
+          >備考 {memoOpen ? '−' : '＋'}</button>
+        </div>
+        {memoOpen && (
+          <input
+            aria-label="備考"
+            {...register(`lines.${index}.memo`)}
+            disabled={readOnly}
+            onBlur={saveLineToDb}
+            style={{ ...inputStyle, width: 300, marginTop: 2 }}
+          />
+        )}
+        {!readOnly && <TateguSelector isOpen={selectorOpen} onClose={() => setSelectorOpen(false)} onSelect={handleTateguSelect} />}
+      </div>
+
+      <div style={{ width: 842 }}>
+        {lineType === 'normal' ? (
+          <>
+            <div style={{ ...bandStyle, background: '#eef6ee' }}>
+              <span style={{ ...bandLabelStyle, color: '#2f6f3a' }}>売値</span>
+              <div style={joinedGroupStyle}>
+                {moneyCategories.map(category => (
+                  <span key={category.code} style={joinedCellStyle}>
+                    {numericInput(`売値 ${category.name}`, getValue(prices, category.code), raw => setCategoryValue('prices', category, raw), 72, category.name)}
+                  </span>
+                ))}
+              </div>
+              <div style={{ ...joinedGroupStyle, width: 162 }}>
+                <select
+                  aria-label="課税"
+                  {...register(`lines.${index}.tax_category`)}
+                  disabled={readOnly}
+                  onBlur={saveLineToDb}
+                  style={{ ...joinedInputStyle, width: 162 }}
+                >
+                  <option value="taxable">課税</option>
+                  <option value="non_taxable">非課税</option>
+                </select>
+              </div>
+              <div style={resultStyle}>
+                <span style={mutedResultStyle}>単価 ¥{formatNumber(unitPrice)}</span>
+                <strong>金額 ¥{formatNumber(lineTotal)}</strong>
+              </div>
+            </div>
+            <div style={{ ...bandStyle, background: '#fdf3e7' }}>
+              <span style={{ ...bandLabelStyle, color: '#9a5b13' }}>原価・作業</span>
+              <div style={joinedGroupStyle}>
+                {moneyCategories.map(category => (
+                  <span key={category.code} style={joinedCellStyle}>
+                    {numericInput(`原価 ${category.name}`, getValue(costs, category.code), raw => setCategoryValue('costs', category, raw), 72, category.name)}
+                  </span>
+                ))}
+              </div>
+              <div style={joinedGroupStyle}>
+                {timeCategories.map(category => (
+                  <span key={category.code} style={joinedCellStyle}>
+                    {numericInput(category.name, getValue(costs, category.code), raw => setCategoryValue('costs', category, raw), 54)}
+                  </span>
+                ))}
+                <span style={joinedCellStyle}>
+                  {numericInput('労務単価', laborRate, raw => setValue(`lines.${index}.cost_labor_rate`, parseNumber(raw)), 72)}
+                </span>
+              </div>
+              <div style={resultStyle}>
+                <span style={mutedResultStyle}>材料原価 ¥{formatNumber(Math.round(materialCostTotal))}</span>
+                <span style={mutedResultStyle}>労務費 ¥{formatNumber(Math.round(laborCostTotal))}</span>
+                <strong>製造原価 ¥{formatNumber(Math.round(manufactureCostTotal))}</strong>
+              </div>
+            </div>
+          </>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', height: 48, paddingLeft: 8 }}>
+            {lineType === 'discount' ? numericInput('金額', line?.line_total ?? 0, raw => setValue(`lines.${index}.line_total`, parseNumber(raw)), 100) : <strong>小計行</strong>}
+          </div>
+        )}
+      </div>
+
+      <div style={profitStyle}>
+        {lineType === 'normal' && (
+          <>
+            <span style={{ color: '#64748b' }}>利益</span>
+            <strong style={{ color: summary.profit < 0 ? '#cf222e' : '#1f2937' }}>¥{formatNumber(Math.round(summary.profit))}</strong>
+            <span>利益率 {summary.profitRate === null ? '—' : `${(summary.profitRate * 100).toFixed(1)}%`}</span>
+            <span>粗利率 {summary.grossMarginRate === null ? '—' : `${(summary.grossMarginRate * 100).toFixed(1)}%`}</span>
+            <span>日割粗利 {summary.dailyGrossProfit === null ? '—' : `¥${formatNumber(Math.round(summary.dailyGrossProfit))}/日`}</span>
+          </>
+        )}
+      </div>
+    </div>
   );
 }
 
-const tdStyle: React.CSSProperties = {
-  padding: '6px 4px', verticalAlign: 'middle',
+const inputStyle: React.CSSProperties = {
+  height: 20,
+  padding: '0 6px',
+  border: '1px solid #b6bdc6',
+  borderRadius: 5,
+  boxSizing: 'border-box',
+  background: '#fff',
+  fontSize: 12,
 };
-const cellInputStyle: React.CSSProperties = {
-  padding: '5px 6px', border: '1px solid #cbd5e1', borderRadius: 4, fontSize: 13,
+
+const joinedGroupStyle: React.CSSProperties = {
+  display: 'flex',
+  overflow: 'hidden',
+  border: '1px solid #b6bdc6',
+  borderRadius: 5,
+  background: '#fff',
+};
+
+const joinedCellStyle: React.CSSProperties = {
+  display: 'flex',
+  borderLeft: '1px solid #d8dde3',
+  marginLeft: -1,
+};
+
+const joinedInputStyle: React.CSSProperties = {
+  height: 18,
+  padding: '0 6px',
+  border: 0,
+  borderLeft: '1px solid #d8dde3',
+  marginLeft: -1,
+  boxSizing: 'border-box',
+  background: '#fff',
+  fontSize: 12,
+};
+
+const bandStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 5,
+  minHeight: 24,
+  padding: '1px 4px',
   boxSizing: 'border-box',
 };
-const selectBtnStyle: React.CSSProperties = {
-  padding: '4px 6px', background: '#f1f5f9', border: '1px solid #cbd5e1',
-  borderRadius: 4, cursor: 'pointer', fontSize: 14, flexShrink: 0,
+
+const bandLabelStyle: React.CSSProperties = {
+  width: 62,
+  flexShrink: 0,
+  fontWeight: 700,
+};
+
+const resultStyle: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 10,
+  width: 330,
+  paddingLeft: 4,
+  whiteSpace: 'nowrap',
+};
+
+const mutedResultStyle: React.CSSProperties = { color: '#667085', fontSize: 11 };
+
+const profitStyle: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  justifyContent: 'center',
+  width: 118,
+  minHeight: 48,
+  paddingLeft: 8,
+  borderLeft: '1px solid #d0d7de',
+  boxSizing: 'border-box',
+  fontSize: 11,
+  lineHeight: 1.35,
+  whiteSpace: 'nowrap',
+};
+
+const selectorButtonStyle: React.CSSProperties = {
+  width: 24,
+  height: 20,
+  padding: 0,
+  border: '1px solid #b6bdc6',
+  borderRadius: 5,
+  background: '#f8fafc',
+  cursor: 'pointer',
+};
+
+const memoButtonStyle: React.CSSProperties = {
+  height: 20,
+  padding: '0 4px',
+  border: 0,
+  background: 'transparent',
+  color: '#475569',
+  fontSize: 11,
+  cursor: 'pointer',
+  whiteSpace: 'nowrap',
 };
