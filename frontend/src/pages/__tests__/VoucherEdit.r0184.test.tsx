@@ -85,15 +85,20 @@ describe('R-0184 明細入力レイアウト F3 詰め版', () => {
     renderPage();
     const row = await screen.findByTestId('line-item-0');
 
-    expect(within(row).getByRole('textbox', { name: '取付建具' })).toHaveValue('取付建具');
-    expect(within(row).getByRole('textbox', { name: '取付場所' })).toHaveValue('玄関');
-    expect(within(row).getByRole('spinbutton', { name: '数量' })).toHaveValue(3);
+    await waitFor(() => expect((within(row).getByRole('textbox', { name: '取付建具' }) as HTMLTextAreaElement).value).toBe('取付建具'));
+    expect((within(row).getByRole('textbox', { name: '取付場所' }) as HTMLInputElement).value).toBe('玄関');
+    expect((within(row).getByRole('textbox', { name: '数量' }) as HTMLInputElement).value).toBe('3');
     for (const name of ['売値 本体', '売値 金物', '売値 ガラス', '原価 本体', '原価 金物', '原価 ガラス', '工場h', '現場h', '労務単価']) {
-      expect(within(row).getByRole('textbox', { name })).toBeInTheDocument();
+      expect(within(row).getByRole('textbox', { name })).not.toBeNull();
     }
-    for (const label of ['単価', '金額', '労務費', '製造原価', '利益', '利益率', '粗利率', '日割粗利']) {
-      expect(within(row).getByText(new RegExp(`^${label}`))).toBeInTheDocument();
+    for (const label of ['単価', '金額', '材料原価', '労務費', '製造原価', '利益', '利益率', '粗利率', '日割粗利']) {
+      expect(within(row).getByText(new RegExp(`^${label}`))).not.toBeNull();
     }
+    const calculationResults = ['材料原価', '労務費', '製造原価'].map(label =>
+      within(row).getByText(new RegExp(`^${label}`)),
+    );
+    expect(calculationResults[0].compareDocumentPosition(calculationResults[1]) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+    expect(calculationResults[1].compareDocumentPosition(calculationResults[2]) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
   });
 
   it('区分名は見出しだけに1回表示し、2行の明細内には表示しない', async () => {
@@ -103,7 +108,7 @@ describe('R-0184 明細入力レイアウト F3 詰め版', () => {
 
     for (const name of ['本体', '金物', 'ガラス', '工場h', '現場h', '労務単価']) {
       expect(within(heading).getAllByText(name)).toHaveLength(1);
-      for (const row of rows) expect(within(row).queryByText(name)).not.toBeInTheDocument();
+      for (const row of rows) expect(within(row).queryByText(name)).toBeNull();
     }
   });
 
@@ -113,7 +118,7 @@ describe('R-0184 明細入力レイアウト F3 詰め版', () => {
     const row = await screen.findByTestId('line-item-0');
     const price = within(row).getByRole('textbox', { name: '売値 本体' });
 
-    expect(price).toHaveValue('26,000');
+    await waitFor(() => expect((price as HTMLInputElement).value).toBe('26,000'));
     await user.clear(price);
     await user.type(price, '35000');
     await user.tab();
@@ -125,9 +130,12 @@ describe('R-0184 明細入力レイアウト F3 詰め版', () => {
   it('読み取り専用の伝票では明細を入力できない', async () => {
     renderPage(true);
     const row = await screen.findByTestId('line-item-0');
-    const inputs = within(row).getAllByRole(/textbox|spinbutton|combobox/);
+    const inputs = [
+      ...within(row).getAllByRole('textbox'),
+      ...within(row).getAllByRole('combobox'),
+    ];
 
     expect(inputs.length).toBeGreaterThan(0);
-    for (const input of inputs) expect(input).toBeDisabled();
+    for (const input of inputs) expect((input as HTMLInputElement).disabled).toBe(true);
   });
 });
