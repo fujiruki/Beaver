@@ -7,6 +7,7 @@ import {
   calcLaborCostDynamic,
   calcManufactureCostDynamic,
   calcLineTotalDynamic,
+  calcLineProfitSummary,
   calcProfitSummaryDynamic,
   roundToHundred,
 } from '../voucherCalc';
@@ -291,5 +292,73 @@ describe('calcProfitSummaryDynamic', () => {
     ];
     const result = calcProfitSummaryDynamic(lines, 60000);
     expect(result.grossProfit).toBe(15000); // 60000 - 45000
+  });
+});
+
+describe('R-0183 利益率・粗利率・日割粗利', () => {
+  const e02046Costs: LineCategoryValue[] = [
+    { category_code: 'MAIN', category_name: '材料', measure_type: 'money', value: 1200, sort_order: 1 },
+    { category_code: 'FACTORY_TIME', category_name: '作業時間', measure_type: 'time', value: 29, sort_order: 2 },
+  ];
+
+  it('E02046相当を税抜金額で割り、粗利から日割粗利を計算する', () => {
+    const result = calcProfitSummaryDynamic([{
+      costs: e02046Costs,
+      cost_labor_rate: 165300 / 29,
+      quantity: 1,
+      line_type: 'normal',
+      line_total: 107800,
+    }], 107800);
+
+    expect(result.grossProfit).toBeCloseTo(-58700);
+    expect(result.grossProfitRate).toBeCloseTo(-0.545, 3);
+    expect(result.grossMarginRate).toBeCloseTo(0.989, 3);
+    expect(result.grossProfitPerHour! * 8).toBeCloseTo(29407, 0);
+  });
+
+  it('値引後の税抜金額を率の分母にする', () => {
+    const result = calcProfitSummaryDynamic([{
+      costs: [{ category_code: 'MAIN', category_name: '材料', measure_type: 'money', value: 20000, sort_order: 1 }],
+      cost_labor_rate: 0,
+      quantity: 1,
+      line_type: 'normal',
+      line_total: 100000,
+    }], 90000);
+
+    expect(result.grossProfitRate).toBeCloseTo(80000 / 90000);
+    expect(result.grossMarginRate).toBeCloseTo(80000 / 90000);
+  });
+
+  it('内税は税抜換算した金額を率の分母にする', () => {
+    const result = calcProfitSummaryDynamic([{
+      costs: [{ category_code: 'MAIN', category_name: '材料', measure_type: 'money', value: 10000, sort_order: 1 }],
+      cost_labor_rate: 0,
+      quantity: 1,
+      line_type: 'normal',
+      line_total: 110000,
+    }], 100000);
+
+    expect(result.grossProfitRate).toBeCloseTo(1);
+    expect(result.grossMarginRate).toBeCloseTo(1);
+  });
+
+  it('税抜金額0では率、作業時間0では時間当たり粗利を未定義にする', () => {
+    const result = calcProfitSummaryDynamic([{
+      costs: [],
+      cost_labor_rate: 0,
+      quantity: 1,
+      line_type: 'normal',
+      line_total: 0,
+    }], 0);
+
+    expect(result.grossProfitRate).toBeNull();
+    expect(result.grossMarginRate).toBeNull();
+    expect(result.grossProfitPerHour).toBeNull();
+  });
+
+  it('明細行の日割粗利を粗利÷作業日数で計算する', () => {
+    const result = calcLineProfitSummary(100000, 20000, 30000, 4, 8);
+
+    expect(result.dailyGrossProfit).toBe(160000);
   });
 });
