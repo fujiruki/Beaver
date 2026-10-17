@@ -196,3 +196,12 @@ Access ⑥全件再push（00:56〜01:05、sent 5,894・failed 0）の後。未�
 # rc4 合格と、Beaver_betaの保持（2026-10-16）
 
 dodai-backより: rc4はR1〜R9すべて合格（Access記録`a96338a`、AccessTategu `docs/R-086_リハーサル記録.md`）。**いまのBeaver_beta（rc4の⑦まで終えた状態）は、藤田晴樹さんの受入確認（S4）に使うので、入れ替え・書き換えをしない**。コードのデプロイも、S4が終わるまではdodai-backと相談してから行う。
+
+# rc5: Beaver_betaのDBを再び本番の写しに入れ替え（2026-10-17 20:49）
+
+dodai-backの依頼（最終リハーサル、晴樹さん了承済み）。同じ`rc1_copy_prod_db_to_beta.php`で実行。**rc5が終わるまで（dodai-backの「rc5 終了」まで）Beaver_betaへのデプロイは止める。betaのコードはR-0184の2026-10-17 20:03の版で固定**。
+
+- 退避: `Beaver_beta/api/backups/database_beta_20261017_2049_pre_rc1_prod_copy.sqlite`（7,696,384 bytes、0.06秒。S4で使っていた状態）
+- 本番の写し: 0.05秒。本番DBは不変、スキーマ差分なし
+- 入れ替え: 20:49:28
+- 件数: 得意先823、案件61、伝票5,802（見積1,895・売上3,907）、明細25,496。integrity ok
