@@ -13,7 +13,9 @@ type Props = {
 export default function TotalSummary({ lines, taxInputType, taxRate, costLines }: Props) {
   const { subtotal_taxable, tax_amount, total } = useTotalCalc(lines, taxInputType, taxRate);
   const { settings } = useAppSettings();
-  const profit = costLines ? calcProfitSummaryDynamic(costLines, total - tax_amount) : null;
+  const profit = costLines
+    ? calcProfitSummaryDynamic(costLines, total - tax_amount, settings.hoursPerDay)
+    : null;
 
   return (
     <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
@@ -51,9 +53,7 @@ export default function TotalSummary({ lines, taxInputType, taxRate, costLines }
             borderTop: '1px solid #e2e8f0' }}>
             <span style={{ fontSize: 13, color: '#64748b' }}>日割り粗利</span>
             <span style={{ fontSize: 14, color: '#475569' }}>
-              {profit.grossProfitPerHour !== null
-                ? `¥${Math.round(profit.grossProfitPerHour * settings.hoursPerDay).toLocaleString()}/日`
-                : '—'}
+              ¥{Math.round(profit.dailyGrossProfit).toLocaleString()}/日
             </span>
           </div>
         </div>

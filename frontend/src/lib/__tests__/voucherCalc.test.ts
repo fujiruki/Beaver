@@ -8,6 +8,7 @@ import {
   calcManufactureCostDynamic,
   calcLineTotalDynamic,
   calcLineProfitSummary,
+  calcProfitSummary,
   calcProfitSummaryDynamic,
   roundToHundred,
 } from '../voucherCalc';
@@ -353,7 +354,7 @@ describe('R-0183 利益率・粗利率・日割粗利', () => {
 
     expect(result.grossProfitRate).toBeNull();
     expect(result.grossMarginRate).toBeNull();
-    expect(result.grossProfitPerHour! * 8).toBe(10000);
+    expect(result.dailyGrossProfit).toBe(10000);
   });
 
   it.each([
@@ -376,7 +377,28 @@ describe('R-0183 利益率・粗利率・日割粗利', () => {
       line_total: 10000,
     }], 10000);
 
-    expect(result.grossProfitPerHour! * 8).toBe(expected);
+    expect(result.dailyGrossProfit).toBe(expected);
+  });
+
+  it.each([
+    { workHours: 4, expected: 10000 },
+    { workHours: 0, expected: 10000 },
+    { workHours: 8, expected: 10000 },
+    { workHours: 16, expected: 5000 },
+  ])('固定原価形式でも作業時間$workHours時間の日割り粗利を計算する', ({ workHours, expected }) => {
+    const result = calcProfitSummary([{
+      cost_body: 0,
+      cost_hardware: 0,
+      cost_glass: 0,
+      cost_factory_hours: workHours,
+      cost_site_hours: 0,
+      cost_labor_rate: 0,
+      quantity: 1,
+      line_type: 'normal',
+      line_total: 10000,
+    }], 10000);
+
+    expect(result.dailyGrossProfit).toBe(expected);
   });
 
   it.each([
