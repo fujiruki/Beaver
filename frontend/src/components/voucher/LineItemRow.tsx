@@ -8,6 +8,15 @@ import type { LineCategoryValue } from '../../types/voucher';
 import type { VoucherFormValues } from '../../pages/VoucherEdit';
 import type { AggregationCategoryMaster } from '../../api/aggregationCategories';
 import { calcLineProfitSummary } from '../../lib/voucherCalc';
+import {
+  createCategoryGridTemplate,
+  getLineItemRightWidth,
+  getLineItemWidth,
+  LINE_ITEM_LEFT_WIDTH,
+  LINE_ITEM_NO_WIDTH,
+  LINE_ITEM_PROFIT_WIDTH,
+  LINE_TYPE_SELECT_WIDTH,
+} from './lineItemLayout';
 
 type Props = {
   index: number;
@@ -87,6 +96,8 @@ export default function LineItemRow({
   const quantity = line?.quantity ?? 1;
   const moneyCategories = categories.filter(category => category.measure_type === 'money');
   const timeCategories = categories.filter(category => category.measure_type === 'time');
+  const categoryGridTemplate = createCategoryGridTemplate(moneyCategories.length, timeCategories.length);
+  const rightWidth = getLineItemRightWidth(moneyCategories.length, timeCategories.length);
   const { manufactureCost, materialCost, laborCost } = useCostCalcDynamic(costs, laborRate);
 
   useEffect(() => {
@@ -208,7 +219,7 @@ export default function LineItemRow({
         display: 'flex',
         alignItems: 'stretch',
         width: 'fit-content',
-        minWidth: 1320,
+        minWidth: getLineItemWidth(moneyCategories.length, timeCategories.length),
         padding: '3px 0',
         borderBottom: '1px solid #d0d7de',
         background: rowBackground,
@@ -217,7 +228,7 @@ export default function LineItemRow({
         fontVariantNumeric: 'tabular-nums',
       }}
     >
-      <div style={{ width: 42, padding: '2px 4px', boxSizing: 'border-box', textAlign: 'center' }}>
+      <div style={{ width: LINE_ITEM_NO_WIDTH, padding: '2px 4px', boxSizing: 'border-box', textAlign: 'center' }}>
         <div style={{ color: '#64748b', fontSize: 11 }}>{line?.line_no ?? index + 1}</div>
         <input
           aria-label={`${line?.line_no ?? index + 1}行目を選択`}
@@ -228,14 +239,14 @@ export default function LineItemRow({
         />
       </div>
 
-      <div style={{ width: 330, paddingRight: 6, boxSizing: 'border-box' }}>
+      <div data-testid="line-item-left" style={{ width: LINE_ITEM_LEFT_WIDTH, paddingRight: 6, boxSizing: 'border-box' }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 3 }}>
           <select
             aria-label="行種別"
             {...register(`lines.${index}.line_type`)}
             disabled={readOnly}
             onBlur={saveLineToDb}
-            style={{ ...inputStyle, width: 48 }}
+            style={{ ...inputStyle, width: LINE_TYPE_SELECT_WIDTH }}
           >
             <option value="normal">通常</option>
             <option value="discount">値引</option>
@@ -248,7 +259,7 @@ export default function LineItemRow({
             disabled={readOnly}
             onBlur={saveLineToDb}
             rows={3}
-            style={{ ...inputStyle, width: 246, height: 45, lineHeight: '15px', resize: 'none' }}
+            style={{ ...inputStyle, width: 222, height: 45, lineHeight: '15px', resize: 'none' }}
           />
           {!readOnly && lineType === 'normal' && (
             <button
@@ -278,31 +289,22 @@ export default function LineItemRow({
             style={memoButtonStyle}
           >備考 {memoOpen ? '−' : '＋'}</button>
         </div>
-        {memoOpen && (
-          <input
-            aria-label="備考"
-            {...register(`lines.${index}.memo`)}
-            disabled={readOnly}
-            onBlur={saveLineToDb}
-            style={{ ...inputStyle, width: 300, marginTop: 2 }}
-          />
-        )}
         {!readOnly && <TateguSelector isOpen={selectorOpen} onClose={() => setSelectorOpen(false)} onSelect={handleTateguSelect} />}
       </div>
 
-      <div style={{ width: 842 }}>
+      <div data-testid="line-item-right" style={{ width: rightWidth }}>
         {lineType === 'normal' ? (
           <>
-            <div style={{ ...bandStyle, background: '#eef6ee' }}>
+            <div data-testid={`category-grid-row-${index}`} style={{ ...bandStyle, gridTemplateColumns: categoryGridTemplate, background: '#eef6ee' }}>
               <span style={{ ...bandLabelStyle, color: '#2f6f3a' }}>売値</span>
-              <div data-testid="price-group" style={joinedGroupStyle}>
+              <div data-testid="price-group" style={{ ...joinedGroupStyle, gridColumn: `2 / span ${moneyCategories.length}` }}>
                 {moneyCategories.map(category => (
                   <span key={category.code} style={joinedCellStyle}>
                     {numericInput(`売値 ${category.name}`, getValue(prices, category.code), raw => setCategoryValue('prices', category, raw), 72, category.name, true)}
                   </span>
                 ))}
               </div>
-              <div data-testid="tax-group" style={{ ...joinedGroupStyle, width: 162 }}>
+              <div data-testid="tax-group" style={{ ...joinedGroupStyle, gridColumn: `${moneyCategories.length + 2} / span ${timeCategories.length + 1}`, width: 162 }}>
                 <select
                   aria-label="課税"
                   {...register(`lines.${index}.tax_category`)}
@@ -314,21 +316,21 @@ export default function LineItemRow({
                   <option value="non_taxable">非課税</option>
                 </select>
               </div>
-              <div style={resultStyle}>
+              <div style={{ ...resultStyle, gridColumn: moneyCategories.length + timeCategories.length + 3 }}>
                 <span style={mutedResultStyle}>単価 ¥{formatNumber(unitPrice)}</span>
                 <strong>金額 ¥{formatNumber(lineTotal)}</strong>
               </div>
             </div>
-            <div style={{ ...bandStyle, background: '#fdf3e7' }}>
+            <div style={{ ...bandStyle, gridTemplateColumns: categoryGridTemplate, background: '#fdf3e7' }}>
               <span style={{ ...bandLabelStyle, color: '#9a5b13' }}>原価・作業</span>
-              <div data-testid="cost-group" style={joinedGroupStyle}>
+              <div data-testid="cost-group" style={{ ...joinedGroupStyle, gridColumn: `2 / span ${moneyCategories.length}` }}>
                 {moneyCategories.map(category => (
                   <span key={category.code} style={joinedCellStyle}>
                     {numericInput(`原価 ${category.name}`, getValue(costs, category.code), raw => setCategoryValue('costs', category, raw), 72, category.name, true)}
                   </span>
                 ))}
               </div>
-              <div data-testid="work-group" style={joinedGroupStyle}>
+              <div data-testid="work-group" style={{ ...joinedGroupStyle, gridColumn: `${moneyCategories.length + 2} / span ${timeCategories.length + 1}` }}>
                 {timeCategories.map(category => (
                   <span key={category.code} style={joinedCellStyle}>
                     {numericInput(formatWorkCategoryName(category.name), getValue(costs, category.code), raw => setCategoryValue('costs', category, raw), 54, undefined, true)}
@@ -338,7 +340,7 @@ export default function LineItemRow({
                   {numericInput('労務単価', laborRate, raw => setValue(`lines.${index}.cost_labor_rate`, parseNumber(raw)), 72, undefined, true)}
                 </span>
               </div>
-              <div style={resultStyle}>
+              <div style={{ ...resultStyle, gridColumn: moneyCategories.length + timeCategories.length + 3 }}>
                 <span style={mutedResultStyle}>材料原価 ¥{formatNumber(Math.round(materialCostTotal))}</span>
                 <span style={mutedResultStyle}>労務費 ¥{formatNumber(Math.round(laborCostTotal))}</span>
                 <strong>製造原価 ¥{formatNumber(Math.round(manufactureCostTotal))}</strong>
@@ -350,9 +352,18 @@ export default function LineItemRow({
             {lineType === 'discount' ? numericInput('金額', line?.line_total ?? 0, raw => setValue(`lines.${index}.line_total`, parseNumber(raw)), 100) : <strong>小計行</strong>}
           </div>
         )}
+        {memoOpen && (
+          <input
+            aria-label="備考"
+            {...register(`lines.${index}.memo`)}
+            disabled={readOnly}
+            onBlur={saveLineToDb}
+            style={{ ...inputStyle, width: '100%', height: 20, marginTop: 2 }}
+          />
+        )}
       </div>
 
-      <div style={profitStyle}>
+      <div style={{ ...profitStyle, width: LINE_ITEM_PROFIT_WIDTH }}>
         {lineType === 'normal' && (
           <>
             <span style={{ color: '#64748b' }}>利益</span>
@@ -402,17 +413,16 @@ const groupedInputStyle: React.CSSProperties = {
 };
 
 const bandStyle: React.CSSProperties = {
-  display: 'flex',
+  display: 'grid',
   alignItems: 'center',
-  gap: 5,
   minHeight: 24,
-  padding: '1px 4px',
+  padding: '1px 0',
   boxSizing: 'border-box',
 };
 
 const bandLabelStyle: React.CSSProperties = {
-  width: 62,
-  flexShrink: 0,
+  paddingLeft: 4,
+  boxSizing: 'border-box',
   fontWeight: 700,
 };
 

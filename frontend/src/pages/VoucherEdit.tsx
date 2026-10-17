@@ -13,6 +13,12 @@ import { useSalesCategories } from '../api/salesCategories';
 import { useAggregationCategories } from '../api/aggregationCategories';
 import VoucherHeader from '../components/voucher/VoucherHeader';
 import LineItemRow from '../components/voucher/LineItemRow';
+import {
+  createCategoryGridTemplate,
+  getLineItemWidth,
+  LINE_ITEM_LEFT_WIDTH,
+  LINE_ITEM_NO_WIDTH,
+} from '../components/voucher/lineItemLayout';
 import ProfitRateBar from '../components/voucher/ProfitRateBar';
 import VoidVoucherButton from '../components/voucher/VoidVoucherButton';
 import UnvoidVoucherButton from '../components/voucher/UnvoidVoucherButton';
@@ -933,22 +939,20 @@ export default function VoucherEdit() {
               <div role="alert" style={{ padding: 16, color: '#b45309', background: '#fffbeb' }}>
                 集計区分が未同期のため明細を編集できません。設定画面から同期してください
               </div>
-            ) : <div style={{ width: 'fit-content', minWidth: 1320 }}>
+            ) : <div style={{ width: 'fit-content', minWidth: getLineItemWidth(moneyCategories.length, timeCategories.length) }}>
               <div data-testid="line-item-heading" style={lineHeadingStyle}>
-                <span style={{ width: 42 }}>No</span>
-                <span style={{ width: 330 }}>取付建具／取付場所・数量・備考</span>
-                <span style={{ width: 67 }} />
-                <span style={{ display: 'flex' }}>
+                <span style={{ width: LINE_ITEM_NO_WIDTH }}>No</span>
+                <span style={{ width: LINE_ITEM_LEFT_WIDTH }}>取付建具／取付場所・数量・備考</span>
+                <span data-testid="category-grid-heading" style={{ display: 'grid', gridTemplateColumns: createCategoryGridTemplate(moneyCategories.length, timeCategories.length) }}>
+                  <span />
                   {moneyCategories.map(category => (
-                    <span key={category.code} style={{ width: 72, textAlign: 'center' }}>{category.name}</span>
+                    <span key={category.code} style={{ textAlign: 'right' }}>{category.name}</span>
                   ))}
-                </span>
-                <span style={{ width: 167 }} />
-                <span style={{ display: 'flex' }}>
                   {timeCategories.map(category => (
-                    <span key={category.code} style={{ width: 54, textAlign: 'center' }}>{category.name.replace(/時間$/, 'h')}</span>
+                    <span key={category.code} style={{ textAlign: 'right' }}>{category.name.replace(/時間$/, 'h')}</span>
                   ))}
-                  <span style={{ width: 72, textAlign: 'center' }}>労務単価</span>
+                  <span style={{ textAlign: 'right' }}>労務単価</span>
+                  <span />
                 </span>
               </div>
               {fields.map((field, index) => (
@@ -1039,7 +1043,7 @@ const rowOpBtnStyle: React.CSSProperties = {
   borderRadius: 6, cursor: 'pointer', fontSize: 12, color: '#475569',
 };
 const lineHeadingStyle: React.CSSProperties = {
-  display: 'flex', alignItems: 'center', height: 24, padding: '0 4px', boxSizing: 'border-box',
+  display: 'flex', alignItems: 'center', height: 24, padding: 0, boxSizing: 'border-box',
   borderBottom: '1px solid #d0d7de', background: '#f6f8fa', color: '#57606a',
   fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap',
 };
