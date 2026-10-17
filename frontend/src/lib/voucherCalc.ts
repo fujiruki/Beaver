@@ -131,13 +131,40 @@ export type DynamicCostLine = {
 
 export type ProfitSummary = {
   grossProfit: number;
-  grossProfitRate: number;
-  grossMarginRate: number;
+  grossMargin: number;
+  grossProfitRate: number | null;
+  grossMarginRate: number | null;
   totalWorkHours: number;
-  profitPerHour: number | null;
+  grossProfitPerHour: number | null;
 };
 
-export function calcProfitSummary(lines: CostLineForCalc[], voucherTotal: number): ProfitSummary {
+export type LineProfitSummary = {
+  profit: number;
+  grossMargin: number;
+  profitRate: number | null;
+  grossMarginRate: number | null;
+  dailyGrossProfit: number | null;
+};
+
+export function calcLineProfitSummary(
+  lineTotal: number,
+  materialCost: number,
+  laborCost: number,
+  workHours: number,
+  hoursPerDay: number,
+): LineProfitSummary {
+  const profit = lineTotal - materialCost - laborCost;
+  const grossMargin = lineTotal - materialCost;
+  return {
+    profit,
+    grossMargin,
+    profitRate: lineTotal > 0 ? profit / lineTotal : null,
+    grossMarginRate: lineTotal > 0 ? grossMargin / lineTotal : null,
+    dailyGrossProfit: workHours > 0 ? grossMargin / (workHours / hoursPerDay) : null,
+  };
+}
+
+export function calcProfitSummary(lines: CostLineForCalc[], taxExclusiveTotal: number): ProfitSummary {
   const normalLines = lines.filter(l => l.line_type === 'normal');
   let grossProfit = 0;
   let materialCost = 0;
@@ -151,13 +178,14 @@ export function calcProfitSummary(lines: CostLineForCalc[], voucherTotal: number
     totalWorkHours += (l.cost_factory_hours + l.cost_site_hours) * l.quantity;
   }
   const totalSales = normalLines.reduce((s, l) => s + l.line_total, 0);
-  const grossProfitRate = voucherTotal > 0 ? grossProfit / voucherTotal : 0;
-  const grossMarginRate = totalSales > 0 ? (totalSales - materialCost) / totalSales : 0;
-  const profitPerHour = totalWorkHours > 0 ? grossProfit / totalWorkHours : null;
-  return { grossProfit, grossProfitRate, grossMarginRate, totalWorkHours, profitPerHour };
+  const grossMargin = totalSales - materialCost;
+  const grossProfitRate = taxExclusiveTotal > 0 ? grossProfit / taxExclusiveTotal : null;
+  const grossMarginRate = taxExclusiveTotal > 0 ? grossMargin / taxExclusiveTotal : null;
+  const grossProfitPerHour = totalWorkHours > 0 ? grossMargin / totalWorkHours : null;
+  return { grossProfit, grossMargin, grossProfitRate, grossMarginRate, totalWorkHours, grossProfitPerHour };
 }
 
-export function calcProfitSummaryDynamic(lines: DynamicCostLine[], voucherTotal: number): ProfitSummary {
+export function calcProfitSummaryDynamic(lines: DynamicCostLine[], taxExclusiveTotal: number): ProfitSummary {
   const normalLines = lines.filter(l => l.line_type === 'normal');
   let grossProfit = 0;
   let materialCost = 0;
@@ -173,10 +201,11 @@ export function calcProfitSummaryDynamic(lines: DynamicCostLine[], voucherTotal:
       .reduce((s, c) => s + (c.value || 0), 0) * l.quantity;
   }
   const totalSales = normalLines.reduce((s, l) => s + l.line_total, 0);
-  const grossProfitRate = voucherTotal > 0 ? grossProfit / voucherTotal : 0;
-  const grossMarginRate = totalSales > 0 ? (totalSales - materialCost) / totalSales : 0;
-  const profitPerHour = totalWorkHours > 0 ? grossProfit / totalWorkHours : null;
-  return { grossProfit, grossProfitRate, grossMarginRate, totalWorkHours, profitPerHour };
+  const grossMargin = totalSales - materialCost;
+  const grossProfitRate = taxExclusiveTotal > 0 ? grossProfit / taxExclusiveTotal : null;
+  const grossMarginRate = taxExclusiveTotal > 0 ? grossMargin / taxExclusiveTotal : null;
+  const grossProfitPerHour = totalWorkHours > 0 ? grossMargin / totalWorkHours : null;
+  return { grossProfit, grossMargin, grossProfitRate, grossMarginRate, totalWorkHours, grossProfitPerHour };
 }
 
 /**

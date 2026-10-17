@@ -7,6 +7,7 @@ import type { TateguItem } from '../../types/tateguItem';
 import type { LineCategoryValue } from '../../types/voucher';
 import type { VoucherFormValues } from '../../pages/VoucherEdit';
 import type { AggregationCategoryMaster } from '../../api/aggregationCategories';
+import { calcLineProfitSummary } from '../../lib/voucherCalc';
 
 type Props = {
   index: number;
@@ -155,11 +156,19 @@ export default function LineItemRow({
   const mfgCostTotal = manufactureCost * quantity;
   const materialCostTotal = materialCost * quantity;
   const laborCostTotal = laborCost * quantity;
-  const grossProfit = lineTotal - mfgCostTotal;
-  const grossProfitRate = lineTotal > 0 ? grossProfit / lineTotal : 0;
-  const grossMarginRate = lineTotal > 0 ? (lineTotal - materialCostTotal) / lineTotal : 0;
   const totalTimeHours = costs.filter(c => c.measure_type === 'time').reduce((s, c) => s + (c.value || 0), 0) * quantity;
-  const dailyProfit = totalTimeHours > 0 ? grossProfit / totalTimeHours * settings.hoursPerDay : null;
+  const {
+    profit: grossProfit,
+    profitRate: grossProfitRate,
+    grossMarginRate,
+    dailyGrossProfit,
+  } = calcLineProfitSummary(
+    lineTotal,
+    materialCostTotal,
+    laborCostTotal,
+    totalTimeHours,
+    settings.hoursPerDay,
+  );
 
   const rowBg = selected ? '#eff6ff' : 'transparent';
 
@@ -324,8 +333,8 @@ export default function LineItemRow({
         {/* 利益率 */}
         <td style={{ ...tdStyle, textAlign: 'right' }}>
           {lineType === 'normal' && (
-            <span style={{ fontSize: 12, color: grossProfitRate >= 0.3 ? '#16a34a' : grossProfitRate >= 0.2 ? '#d97706' : '#dc2626' }}>
-              {(grossProfitRate * 100).toFixed(1)}%
+            <span style={{ fontSize: 12, color: grossProfitRate !== null && grossProfitRate >= 0.3 ? '#16a34a' : grossProfitRate !== null && grossProfitRate >= 0.2 ? '#d97706' : '#dc2626' }}>
+              {grossProfitRate !== null ? `${(grossProfitRate * 100).toFixed(1)}%` : '—'}
             </span>
           )}
         </td>
@@ -333,15 +342,15 @@ export default function LineItemRow({
         <td style={{ ...tdStyle, textAlign: 'right' }}>
           {lineType === 'normal' && (
             <span style={{ fontSize: 12, color: '#64748b' }}>
-              {(grossMarginRate * 100).toFixed(1)}%
+              {grossMarginRate !== null ? `${(grossMarginRate * 100).toFixed(1)}%` : '—'}
             </span>
           )}
         </td>
         {/* 日割粗利 */}
         <td style={{ ...tdStyle, textAlign: 'right' }}>
-          {lineType === 'normal' && dailyProfit !== null && (
+          {lineType === 'normal' && (
             <span style={{ fontSize: 12, color: '#64748b' }}>
-              ¥{Math.round(dailyProfit).toLocaleString()}/日
+              {dailyGrossProfit !== null ? `¥${Math.round(dailyGrossProfit).toLocaleString()}/日` : '—'}
             </span>
           )}
         </td>

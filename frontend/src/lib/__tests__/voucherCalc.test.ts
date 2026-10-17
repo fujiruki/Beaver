@@ -282,7 +282,7 @@ describe('calcProfitSummaryDynamic', () => {
     expect(result.grossProfitRate).toBeCloseTo(0.2125);
     expect(result.grossMarginRate).toBeCloseTo((80000 - 45000) / 80000);
     expect(result.totalWorkHours).toBe(6);       // 4+2
-    expect(result.profitPerHour).toBeCloseTo(17000 / 6);
+    expect(result.grossProfitPerHour).toBeCloseTo(35000 / 6);
   });
 
   it('subtotal行は無視される', () => {

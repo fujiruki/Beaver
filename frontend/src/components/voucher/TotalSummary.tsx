@@ -13,7 +13,7 @@ type Props = {
 export default function TotalSummary({ lines, taxInputType, taxRate, costLines }: Props) {
   const { subtotal_taxable, tax_amount, total } = useTotalCalc(lines, taxInputType, taxRate);
   const { settings } = useAppSettings();
-  const profit = costLines ? calcProfitSummaryDynamic(costLines, total) : null;
+  const profit = costLines ? calcProfitSummaryDynamic(costLines, total - tax_amount) : null;
 
   return (
     <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
@@ -29,15 +29,15 @@ export default function TotalSummary({ lines, taxInputType, taxRate, costLines }
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0',
             borderTop: '1px solid #e2e8f0' }}>
             <span style={{ fontSize: 13, color: '#64748b' }}>利益率</span>
-            <span style={{ fontSize: 14, color: profit.grossProfitRate >= 0.3 ? '#16a34a' : profit.grossProfitRate >= 0.2 ? '#d97706' : '#dc2626', fontWeight: 'bold' }}>
-              {(profit.grossProfitRate * 100).toFixed(1)}%
+            <span style={{ fontSize: 14, color: profit.grossProfitRate !== null && profit.grossProfitRate >= 0.3 ? '#16a34a' : profit.grossProfitRate !== null && profit.grossProfitRate >= 0.2 ? '#d97706' : '#dc2626', fontWeight: 'bold' }}>
+              {profit.grossProfitRate !== null ? `${(profit.grossProfitRate * 100).toFixed(1)}%` : '—'}
             </span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0',
             borderTop: '1px solid #e2e8f0' }}>
             <span style={{ fontSize: 13, color: '#64748b' }}>粗利率</span>
             <span style={{ fontSize: 14, color: '#475569' }}>
-              {(profit.grossMarginRate * 100).toFixed(1)}%
+              {profit.grossMarginRate !== null ? `${(profit.grossMarginRate * 100).toFixed(1)}%` : '—'}
             </span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0',
@@ -51,8 +51,8 @@ export default function TotalSummary({ lines, taxInputType, taxRate, costLines }
             borderTop: '1px solid #e2e8f0' }}>
             <span style={{ fontSize: 13, color: '#64748b' }}>日割り粗利</span>
             <span style={{ fontSize: 14, color: '#475569' }}>
-              {profit.profitPerHour !== null
-                ? `¥${Math.round(profit.profitPerHour * settings.hoursPerDay).toLocaleString()}/日`
+              {profit.grossProfitPerHour !== null
+                ? `¥${Math.round(profit.grossProfitPerHour * settings.hoursPerDay).toLocaleString()}/日`
                 : '—'}
             </span>
           </div>
