@@ -10,8 +10,8 @@ const categories = [
   { id: 1, code: 'MAIN', name: '本体', measure_type: 'money', sort_order: 1 },
   { id: 2, code: 'HARDWARE', name: '金物', measure_type: 'money', sort_order: 2 },
   { id: 3, code: 'GLASS', name: 'ガラス', measure_type: 'money', sort_order: 3 },
-  { id: 4, code: 'FACTORY_TIME', name: '工場h', measure_type: 'time', sort_order: 4 },
-  { id: 5, code: 'SITE_TIME', name: '現場h', measure_type: 'time', sort_order: 5 },
+  { id: 4, code: 'FACTORY_TIME', name: '工場時間', measure_type: 'time', sort_order: 4 },
+  { id: 5, code: 'SITE_TIME', name: '現場時間', measure_type: 'time', sort_order: 5 },
 ];
 
 const line = {
@@ -109,6 +109,37 @@ describe('R-0184 明細入力レイアウト F3 詰め版', () => {
     for (const name of ['本体', '金物', 'ガラス', '工場h', '現場h', '労務単価']) {
       expect(within(heading).getAllByText(name)).toHaveLength(1);
       for (const row of rows) expect(within(row).queryByText(name)).toBeNull();
+    }
+  });
+
+  it('作業区分の末尾の「時間」は見出しと入力名で「h」にする', async () => {
+    renderPage();
+    const heading = await screen.findByTestId('line-item-heading');
+    const row = await screen.findByTestId('line-item-0');
+
+    expect(within(heading).getByText('工場h')).not.toBeNull();
+    expect(within(heading).getByText('現場h')).not.toBeNull();
+    expect(within(heading).queryByText('工場時間')).toBeNull();
+    expect(within(heading).queryByText('現場時間')).toBeNull();
+    expect(within(row).getByRole('textbox', { name: '工場h' })).not.toBeNull();
+    expect(within(row).getByRole('textbox', { name: '現場h' })).not.toBeNull();
+  });
+
+  it('意味のまとまりごとに外枠を共有し、内側の入力欄に個別の枠線を持たない', async () => {
+    renderPage();
+    const row = await screen.findByTestId('line-item-0');
+
+    for (const testId of ['location-quantity-group', 'price-group', 'cost-group', 'work-group', 'tax-group']) {
+      const group = within(row).getByTestId(testId);
+      expect(group.style.border).toBe('1px solid rgb(182, 189, 198)');
+      expect(group.style.borderRadius).toBe('5px');
+      expect(group.style.overflow).toBe('hidden');
+      expect(group.style.background).toBe('rgb(255, 255, 255)');
+
+      for (const input of within(group).getAllByRole(/textbox|combobox/)) {
+        expect(input.style.border).toBe('0px');
+        expect(input.style.borderRadius).toBe('0px');
+      }
     }
   });
 
