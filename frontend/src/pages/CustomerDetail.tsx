@@ -1,5 +1,5 @@
 import { useContext, useEffect, useRef, useState } from 'react';
-import { UNSAFE_DataRouterContext, useBlocker, useNavigate, useParams } from 'react-router-dom';
+import { Link, UNSAFE_DataRouterContext, useBlocker, useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useCustomer, useCreateCustomer, useUpdateCustomer } from '../api/customers';
 import CustomerFormFields from '../components/CustomerFormFields';
@@ -39,7 +39,7 @@ export default function CustomerDetail() {
   const customerId = id ? Number(id) : 0;
   const isNew = !id;
 
-  const { data: customer, isLoading, refetch } = useCustomer(customerId);
+  const { data: customer, error: customerError, isLoading, refetch } = useCustomer(customerId);
   const createMutation = useCreateCustomer();
   const updateMutation = useUpdateCustomer(customerId);
   const [showHistory, setShowHistory] = useState(false);
@@ -128,6 +128,14 @@ export default function CustomerDetail() {
   }
 
   if (!isNew && isLoading) return <div>読み込み中...</div>;
+  if (!isNew && customerError instanceof ApiError && customerError.status === 404) {
+    return (
+      <div>
+        <p>この得意先は見つかりません</p>
+        <Link to="/customers">得意先一覧へ</Link>
+      </div>
+    );
+  }
 
   const isPending = createMutation.isPending || updateMutation.isPending;
   const mutError  = createMutation.error || updateMutation.error;

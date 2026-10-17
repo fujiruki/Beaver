@@ -1,5 +1,5 @@
 import { useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { UNSAFE_DataRouterContext, useBlocker, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link, UNSAFE_DataRouterContext, useBlocker, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useForm, FormProvider, useFieldArray, useWatch } from 'react-hook-form';
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import {
@@ -236,6 +236,10 @@ function isStaleVoucherError(error: unknown): boolean {
   return (error.body as { error?: unknown } | null)?.error === 'stale_voucher';
 }
 
+function isVoucherNotFoundError(error: unknown): error is ApiError {
+  return error instanceof ApiError && error.status === 404;
+}
+
 function formatSaveError(error: unknown): string {
   if (error instanceof ApiError) {
     const message = (error.body as { error?: unknown } | null)?.error;
@@ -260,7 +264,7 @@ export default function VoucherEdit() {
   const initProjectId  = initProjectIdParam ? Number(initProjectIdParam) : null;
   const initType       = (searchParams.get('type') ?? 'estimate') as VoucherType;
 
-  const { data: voucher, isLoading, isFetchedAfterMount } = useVoucher(voucherId);
+  const { data: voucher, error: voucherError, isLoading, isFetchedAfterMount } = useVoucher(voucherId);
   const customersQuery = useCustomers();
   const projectsQuery = useProjects();
   const salesCategoriesQuery = useSalesCategories();
@@ -308,6 +312,7 @@ export default function VoucherEdit() {
   const voucherUpdatedAtRef = useRef<string | null>(null);
   const writeQueueRef = useRef<Promise<void>>(Promise.resolve());
   const staleRef = useRef(false);
+  const voucherWriteNotFoundRef = useRef<ApiError | null>(null);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [saveError, setSaveError] = useState<unknown>(null);
@@ -402,12 +407,19 @@ export default function VoucherEdit() {
   function enqueueVoucherWrite<T extends VoucherWriteResult>(write: (expectedUpdatedAt: string | null) => Promise<T>): Promise<T> {
     if (!formReady) return Promise.reject(new Error('フォームの初期化が完了していません'));
     const result = writeQueueRef.current.then(async () => {
+      if (voucherWriteNotFoundRef.current) throw voucherWriteNotFoundRef.current;
       if (staleRef.current) throw new Error('stale_voucher');
       try {
         const response = await write(voucherUpdatedAtRef.current);
         voucherUpdatedAtRef.current = response.voucher_updated_at ?? response.updated_at ?? voucherUpdatedAtRef.current;
         return response;
       } catch (error) {
+        if (isVoucherNotFoundError(error)) {
+          voucherWriteNotFoundRef.current = error;
+          queuedHeaderRef.current = null;
+          setSaveError(error);
+          setSaveStatus('error');
+        }
         if (error instanceof ApiError && error.status === 409) {
           const body = error.body as { error?: string; voucher?: Voucher };
           if (body.error === 'stale_voucher' && body.voucher) {
@@ -537,10 +549,11 @@ export default function VoucherEdit() {
 
   const hasUnsavedChanges = isNew
     ? isDirty
-    : saveStatus === 'saving' || saveStatus === 'error' || saveStatus === 'unsaved' || isDirty
-      || addLineMutation.isPending || deleteLineMutation.isPending;
+    : !voucherWriteNotFoundRef.current && (saveStatus === 'saving' || saveStatus === 'error' || saveStatus === 'unsaved' || isDirty
+      || addLineMutation.isPending || deleteLineMutation.isPending);
 
   async function beforeLeave(): Promise<boolean> {
+    if (voucherWriteNotFoundRef.current) return true;
     if (staleRef.current) return false;
     const valid = await trigger(['customer_id', 'voucher_date']);
     if (!valid) return window.confirm(LEAVE_MESSAGE);
@@ -686,6 +699,14 @@ export default function VoucherEdit() {
   }
 
   if (!isNew && isLoading) return <div>読み込み中...</div>;
+  if (!isNew && isVoucherNotFoundError(voucherError)) {
+    return (
+      <div>
+        <p>この伝票は見つかりません（削除されたか、データが入れ替わりました）</p>
+        <Link to="/vouchers">伝票一覧へ</Link>
+      </div>
+    );
+  }
 
   const isPending = createMutation.isPending || updateMutation.isPending || addLineMutation.isPending;
   const mutError = createMutation.error || updateMutation.error || addLineMutation.error;
@@ -719,8 +740,10 @@ export default function VoucherEdit() {
             {saveStatus === 'unsaved' && <span>未保存の変更があります</span>}
             {saveStatus === 'error' && (
               <span>
-                保存に失敗しました: {formatSaveError(saveError)}{' '}
-                <button type="button" onClick={retrySave} style={subBtnStyle}>再試行</button>
+                保存に失敗しました: {isVoucherNotFoundError(saveError) ? 'この伝票は見つかりません' : formatSaveError(saveError)}{' '}
+                {isVoucherNotFoundError(saveError)
+                  ? <Link to="/vouchers">伝票一覧へ</Link>
+                  : <button type="button" onClick={retrySave} style={subBtnStyle}>再試行</button>}
               </span>
             )}
           </div>
