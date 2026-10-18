@@ -238,3 +238,12 @@ Access ⑥全件再push（sent 5,897・failed 0、738秒）の後。読み取り
 | 実行 | 同`--execute` | 21:45:26.20〜26.25 | 0.05秒 | void、record_history id=5 |
 
 照合（voidを除く）: 見積1,953／売上3,944（合計5,897＝Accessのsent 5,897と一致）、明細25,777、access_voucher_idなし6（5805〜5810）、重複0、voucher_noの重複0、売上の合計の再計算の食い違い0（r0151が挙げるのはvoidの5792のみ）、伝票総数5,904（void 1）、integrity ok
+
+## rc6 Beaver_betaを本番の写しに入れ替え（2026-10-18 11:31）
+
+dodai-backの依頼（晴樹さん了承済み）。同じ`rc1_copy_prod_db_to_beta.php`で実行。**rc6が終わるまで（dodai-backの「rc6 終了」まで）Beaver_betaへのデプロイは止める**。
+
+- 退避: `Beaver_beta/api/backups/database_beta_20261018_1131_pre_rc1_prod_copy.sqlite`（7,692,288 bytes、0.06秒。rc5の⑦とR-0184手直しのデプロイまで終えた状態）
+- 本番の写し: 7,168,000 bytes、0.05秒。本番DB不変OK。スキーマ差分なし（migration不要）
+- 入れ替え: 11:32:32（`chmod 666`＋`mv`）
+- 件数: 得意先824（10/18 09:43に本番で誤って作った空の得意先826を含む。code 90023、name空、access_customer_noなし、有効）、案件61、伝票5,802（見積1,895・売上3,907）、明細25,496。integrity ok
