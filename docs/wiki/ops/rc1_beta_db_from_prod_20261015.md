@@ -280,3 +280,5 @@ Access ⑥全件再push（sent 5,897・failed 0、947秒。last_synced_atは13:1
 | 実行 | 同`--execute` | 22:25:14.04〜14.09 | 0.05秒 | void、record_history id=5 |
 
 照合（voidとaccess_voucher_idなしを除く）: 見積1,953／売上3,944（合計5,897＝Accessのsent 5,897と一致）、明細25,777。rc5と同じ。access_voucher_idなし6（5805〜5810）、重複0、voucher_noの重複0、売上の合計の再計算の食い違い0（r0151が挙げるのはvoidの5792のみ）、伝票総数5,904（void 1）、integrity ok
+
+dodai-backより: rc6はR1〜R9すべて合格（見積1,953・売上3,944・明細25,777で一致）。rc6終了につき、Beaver_betaへのデプロイ止めを解除（2026-10-18）。**Beaver_betaのデータはrc6の⑦まで終えた状態のまま残す**（入れ替え・書き換えをしない）。本番切替の日程は晴樹さんとdodai-backで決めて改めて連絡が来る。
