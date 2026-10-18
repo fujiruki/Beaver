@@ -77,6 +77,7 @@ describe('VoucherEdit 戻る (R-0096 Phase2b)', () => {
 
     await screen.findByRole('button', { name: '保存' });
     // 得意先データ読み込みとフォームreset()のタイミング差があるため明示的に選び直す
+    await screen.findByRole('option', { name: '既存得意先' });
     const customerSelect = document.querySelector('select[name="customer_id"]') as HTMLSelectElement;
     await user.selectOptions(customerSelect, '1');
     await user.click(screen.getByRole('button', { name: '保存' }));

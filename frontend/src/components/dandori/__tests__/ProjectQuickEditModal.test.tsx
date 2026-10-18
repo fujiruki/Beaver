@@ -38,7 +38,7 @@ describe('ProjectQuickEditModal (R-0122)', () => {
     const user = userEvent.setup();
     renderModal(vi.fn(), onSaved);
     const name = await screen.findByLabelText('案件名');
-    expect(screen.getByDisplayValue('P00007')).toBeTruthy();
+    expect(await screen.findByDisplayValue('P00007')).toBeTruthy();
     await user.clear(name);
     await user.type(name, '玄関工事 更新');
     await user.click(screen.getByRole('button', { name: '保存' }));

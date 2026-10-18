@@ -101,7 +101,7 @@ describe('R-0164 既存伝票の明細行はフォーカスが外れたときに
     stubFetch();
     renderPage();
     await screen.findByText('Beaver作成');
-    const itemName = document.querySelector('[name="lines.0.item_name"]') as HTMLTextAreaElement;
+    const itemName = await screen.findByDisplayValue('既存明細') as HTMLTextAreaElement;
     await user.type(itemName, '追記');
     await user.tab();
     await waitFor(() => expect(linePuts(51)).toHaveLength(1));
