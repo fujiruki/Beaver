@@ -268,3 +268,15 @@ Access ④ApplyRun（applied 826・failed 0、再取込830）の後。事前の�
 | 退避 | `backups/database_beaver_beta_20261018_2207_pre_rc6_ab10.sqlite` | 22:07 | 1秒未満 | — |
 | dry-run | 4組 | 22:07:54 | 1秒未満 | 案件3件の付け替え予定、伝票・請求・入金0 |
 | 実行 | 4組 | 22:08:16.41〜16.46 | 0.05秒 | 統合4組・案件3件付け替え。得意先830（有効816）、access_customer_noあり826、有効でなし0、統合元への参照0、孤児0、integrity ok（rc5より得意先・有効・ありが各1多いのは826の分） |
+
+## rc6 R7 ⑦ 照合と5792の履歴付きvoid（2026-10-18 22:24〜22:25）
+
+Access ⑥全件再push（sent 5,897・failed 0、947秒。last_synced_atは13:11:10〜13:24:29 UTC）の後。読み取り（22:24〜）で、pushで更新されなかった有効な伝票はrc1〜rc5と同じ5792（S04594、access_voucher_id 4613）の1件だけ（ほかはaccess_voucher_idなしの5805〜5810）。
+
+| # | 内容 | 時刻 | 所要 | 結果 |
+|:--|:--|:--|:--|:--|
+| 退避 | `backups/database_beaver_beta_20261018_2225_pre_rc6_void5792.sqlite` | 22:25 | 1秒未満 | — |
+| dry-run | `~/void_voucher_with_history.php database.sqlite 5792 4613 "<理由>"` | 22:25:13 | 1秒未満 | draft → void予定 |
+| 実行 | 同`--execute` | 22:25:14.04〜14.09 | 0.05秒 | void、record_history id=5 |
+
+照合（voidとaccess_voucher_idなしを除く）: 見積1,953／売上3,944（合計5,897＝Accessのsent 5,897と一致）、明細25,777。rc5と同じ。access_voucher_idなし6（5805〜5810）、重複0、voucher_noの重複0、売上の合計の再計算の食い違い0（r0151が挙げるのはvoidの5792のみ）、伝票総数5,904（void 1）、integrity ok
