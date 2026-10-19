@@ -282,3 +282,13 @@ Access ⑥全件再push（sent 5,897・failed 0、947秒。last_synced_atは13:1
 照合（voidとaccess_voucher_idなしを除く）: 見積1,953／売上3,944（合計5,897＝Accessのsent 5,897と一致）、明細25,777。rc5と同じ。access_voucher_idなし6（5805〜5810）、重複0、voucher_noの重複0、売上の合計の再計算の食い違い0（r0151が挙げるのはvoidの5792のみ）、伝票総数5,904（void 1）、integrity ok
 
 dodai-backより: rc6はR1〜R9すべて合格（見積1,953・売上3,944・明細25,777で一致）。rc6終了につき、Beaver_betaへのデプロイ止めを解除（2026-10-18）。**Beaver_betaのデータはrc6の⑦まで終えた状態のまま残す**（入れ替え・書き換えをしない）。本番切替の日程は晴樹さんとdodai-backで決めて改めて連絡が来る。
+
+# S5 本番切替（やり直し、2026-10-19）
+
+dodai-backの依頼（晴樹さんの判断、Go/No-Go 8項目すべて「はい」）。手順4。
+
+- 本番DBの退避: `Beaver/api/backups/database_20261019_1306_pre_dodaikun_v1_20261019.sqlite`（7,168,000 bytes、13:06:39、VACUUM INTO）。本番DBのmd5は退避の前後で同じ
+- 件数: 得意先824、案件61、伝票5,802（見積1,895・売上3,907）、明細25,496、integrity ok
+- 昨日の退避（`database_20261018_0938_pre_dodaikun_v1.sqlite`）との差は得意先が1件多い（空の得意先826）ことだけ。本番DBの更新時刻は2026-10-18 09:43:46（826を作った時刻）のまま
+- 本番とBeaver_beta（rc6の版）のコード: api/のPHP・SQLはmd5ですべて同じ。本番にだけ、リポジトリに無い古いファイル2つ（`migrations/022_customers_last_synced_at.sql`・`tests/test_lines_merge.php`、07-16）が残っている。フロントのassetsはファイル名の並びが同じ（中身の差はAppIDのbaseの違い）。10/18以降のコミットはR-0186のテストとdocsだけで、本番デプロイは不要
+- 同期トークン: 本番の`config.local.php`には`SYNC_API_TOKEN`も`SYNC_TOKEN_REQUIRED`も無い（config.phpの開発用の値とfalseのまま）。Beaver_betaは独自のトークンとtrue
