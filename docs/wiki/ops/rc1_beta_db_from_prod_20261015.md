@@ -301,3 +301,13 @@ dodai-backの依頼（晴樹さんの判断、Go/No-Go 8項目すべて「はい
 |:--|:--|:--|:--|:--|
 | ① | `rc1_r7_baseline_and_plus10000.php 20261019_1642 Beaver`（退避`Beaver/api/backups/database_beaver_20261019_1642_pre_rc1_r7.sqlite`、7,168,000 bytes、0.054秒） | 16:42:42〜43 | 変換0.001秒 | 基準線はrc6と記録時刻以外すべて同じ。変換: 売上source_estimate_no 6行・見積access_voucher_id 13行。変換後: 見積≤10000 0、重複0、衝突0、孤児0、件数（得意先824・案件61・伝票5,802・明細25,496）不変、integrity ok |
 | ② | 本番`config.local.php`を`config.local.php.bak_20261019_164328`に退避し、新しく作ったSYNC_API_TOKEN（32バイトの乱数）とSYNC_TOKEN_REQUIRED=trueを追記 | 16:43:28 | — | php -l OK。GET /sync/status: トークンなし401・トークンあり200。値はAccess側に入れるため`C:\Users\fjtsu\beaver_prod_sync_token.txt`に置いた（OneDriveのデスクトップは避けた）。サーバー上の一時ファイルは削除 |
+
+## S5 本番 R7 ③シード削除（2026-10-19 16:47〜17:24）
+
+dodai-backの合図の後。削除の前に晴樹さんへ中身（2026-03-17 20:04台にAccessから一括で取り込んだ古い写し。見積1,877・売上3,895、明細25,303、伝票日付2002〜2026、5,772件すべてaccess_voucher_idなし）を説明し、「古い写しですね、いいですよすすめて」で実行。取り込み後にupdated_atが変わった7件（6件は2026-06-16 10:30:28に一括、U00234は06-22）も伝えた。
+
+| # | 内容 | 時刻 | 所要 | 結果 |
+|:--|:--|:--|:--|:--|
+| 退避 | `Beaver/api/backups/database_beaver_20261019_1647_pre_s5_seed_purge.sqlite` | 16:47 | 1秒未満 | — |
+| dry-run | | 16:47:56 | 1秒未満 | 対象5,772、違反0（rc6と同じ） |
+| 実行 | `--execute` | 17:24:29.25〜29.49 | 0.23秒 | 5,772件削除。伝票30（あり24・なし6）、明細193、孤児0、得意先824、案件61、integrity ok（rc6と同じ） |
