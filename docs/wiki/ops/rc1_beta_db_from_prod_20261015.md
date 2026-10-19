@@ -292,3 +292,12 @@ dodai-backの依頼（晴樹さんの判断、Go/No-Go 8項目すべて「はい
 - 昨日の退避（`database_20261018_0938_pre_dodaikun_v1.sqlite`）との差は得意先が1件多い（空の得意先826）ことだけ。本番DBの更新時刻は2026-10-18 09:43:46（826を作った時刻）のまま
 - 本番とBeaver_beta（rc6の版）のコード: api/のPHP・SQLはmd5ですべて同じ。本番にだけ、リポジトリに無い古いファイル2つ（`migrations/022_customers_last_synced_at.sql`・`tests/test_lines_merge.php`、07-16）が残っている。フロントのassetsはファイル名の並びが同じ（中身の差はAppIDのbaseの違い）。10/18以降のコミットはR-0186のテストとdocsだけで、本番デプロイは不要
 - 同期トークン: 本番の`config.local.php`には`SYNC_API_TOKEN`も`SYNC_TOKEN_REQUIRED`も無い（config.phpの開発用の値とfalseのまま）。Beaver_betaは独自のトークンとtrue
+
+## S5 本番 R7 ①基準線＋+10000、②同期トークン（2026-10-19 16:42〜16:43）
+
+本番Access R3〜R6合格（rc6と同じ数）の後、dodai-backの依頼。本番DBへの書き込みは晴樹さんがこのセッションで直接許可（「きょかします」「まとめてきょかしときます」）。
+
+| # | 内容 | 時刻 | 所要 | 結果 |
+|:--|:--|:--|:--|:--|
+| ① | `rc1_r7_baseline_and_plus10000.php 20261019_1642 Beaver`（退避`Beaver/api/backups/database_beaver_20261019_1642_pre_rc1_r7.sqlite`、7,168,000 bytes、0.054秒） | 16:42:42〜43 | 変換0.001秒 | 基準線はrc6と記録時刻以外すべて同じ。変換: 売上source_estimate_no 6行・見積access_voucher_id 13行。変換後: 見積≤10000 0、重複0、衝突0、孤児0、件数（得意先824・案件61・伝票5,802・明細25,496）不変、integrity ok |
+| ② | 本番`config.local.php`を`config.local.php.bak_20261019_164328`に退避し、新しく作ったSYNC_API_TOKEN（32バイトの乱数）とSYNC_TOKEN_REQUIRED=trueを追記 | 16:43:28 | — | php -l OK。GET /sync/status: トークンなし401・トークンあり200。値はAccess側に入れるため`C:\Users\fjtsu\beaver_prod_sync_token.txt`に置いた（OneDriveのデスクトップは避けた）。サーバー上の一時ファイルは削除 |
