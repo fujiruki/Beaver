@@ -224,13 +224,21 @@ try {
         assertEq(['Access明細'], lineNames($pdo, $id), '明細が上書きされる');
     });
 
-    runTest('受入条件4: base_synced_at なし → 上書き200', function () use ($pdo, $sync, $UTC) {
+    runTest('受入条件4\': 既存伝票に base_synced_at なし・force なし → 400、DB不変', function () use ($pdo, $sync, $UTC) {
         $id = seedVoucher($pdo, $sync, 9004, $UTC);
-        $r = request('POST', $sync, payload(9004, 'Access版', 'Access明細'));
-        assertEq(200, $r['status'], 'status');
-        assertEq('synced', $r['body']['status'] ?? null, '応答は従来どおり');
-        assertEq('Access版', snapshot($pdo, $id)['voucher']['memo'], 'memo が上書きされる');
-        assertEq(['Access明細'], lineNames($pdo, $id), '明細が上書きされる');
+        $before = snapshot($pdo, $id);
+        $historyBefore = (int)$pdo->query("SELECT COUNT(*) FROM record_history WHERE entity = 'vouchers' AND entity_id = $id")->fetchColumn();
+        foreach ([
+            'キーなし' => [],
+            'null' => ['base_synced_at' => null],
+            '空文字' => ['base_synced_at' => ''],
+        ] as $label => $extra) {
+            $r = request('POST', $sync, payload(9004, 'Access版', 'Access明細', $extra));
+            assertEq(400, $r['status'], "$label status");
+            assertEq('base_synced_at_required', $r['body']['error'] ?? null, "$label error");
+            assertEq($before, snapshot($pdo, $id), "$label ヘッダー・明細は変わらない");
+            assertEq($historyBefore, (int)$pdo->query("SELECT COUNT(*) FROM record_history WHERE entity = 'vouchers' AND entity_id = $id")->fetchColumn(), "$label 履歴は変わらない");
+        }
     });
 
     runTest('受入条件5: force=true なら updated_at が新しくても置き換え200', function () use ($pdo, $sync, $UTC) {
@@ -383,19 +391,42 @@ try {
         assertEq('Accessからの同期で取消を解除', $beforeJson['related']['reason'] ?? null, '理由');
     });
 
-    runTest('受入条件14: void済みに base_synced_atなし・status=draft → 取消解除、通常同期の unvoid 履歴1件', function () use ($pdo, $sync, $api, $UTC) {
+    runTest('受入条件14\': void済みに base_synced_atなし・forceなし・status=draft → 400、取消と履歴は不変', function () use ($pdo, $sync, $api, $UTC) {
         $id = seedVoucher($pdo, $sync, 9014, $UTC);
         voidWithReason($pdo, $api, $id, '基準時刻なし同期前の取消');
+        $before = snapshot($pdo, $id);
+        $historyBefore = (int)$pdo->query("SELECT COUNT(*) FROM record_history WHERE entity = 'vouchers' AND entity_id = $id")->fetchColumn();
         $r = request('POST', $sync, payload(9014, 'Access版', 'Access明細'));
+        assertEq(400, $r['status'], 'status');
+        assertEq('base_synced_at_required', $r['body']['error'] ?? null, 'error');
+        assertEq($before, snapshot($pdo, $id), '取消のままでヘッダー・明細は変わらない');
+        assertEq($historyBefore, (int)$pdo->query("SELECT COUNT(*) FROM record_history WHERE entity = 'vouchers' AND entity_id = $id")->fetchColumn(), 'unvoid 履歴は残らない');
+    });
+
+    runTest('受入条件15: 新規伝票は base_synced_at なしでも作成200', function () use ($pdo, $sync) {
+        $r = request('POST', $sync, payload(9025, '新規', '新規明細'));
         assertEq(200, $r['status'], 'status');
-        assertEq('draft', snapshot($pdo, $id)['voucher']['status'], 'status が draft に戻る');
-        assertEq(1, historyCount($pdo, $id, 'unvoid'), 'unvoid 履歴が1件');
-        $h = $pdo->query("SELECT * FROM record_history WHERE entity = 'vouchers' AND entity_id = $id AND action = 'unvoid'")->fetch();
-        $beforeJson = json_decode($h['before_json'], true);
-        $afterJson = json_decode((string)$h['after_json'], true);
-        assertEq('void', $beforeJson['row']['status'] ?? null, '解除前の伝票は void');
-        assertEq('draft', $afterJson['row']['status'] ?? null, '解除後の伝票は draft');
-        assertEq('Accessからの同期で取消を解除', $beforeJson['related']['reason'] ?? null, '理由');
+        $id = (int)($r['body']['voucher_id'] ?? 0);
+        assertTrue($id > 0, 'voucher_id');
+        assertEq('新規', snapshot($pdo, $id)['voucher']['memo'], 'memo');
+        assertEq(['新規明細'], lineNames($pdo, $id), '明細');
+    });
+
+    runTest('受入条件16: 既存伝票は base_synced_at なしでも force=true なら置き換え200', function () use ($pdo, $sync, $UTC) {
+        $id = seedVoucher($pdo, $sync, 9026, $UTC);
+        $r = request('POST', $sync, payload(9026, 'Access版', 'Access明細', ['force' => true]));
+        assertEq(200, $r['status'], 'status');
+        assertEq('Access版', snapshot($pdo, $id)['voucher']['memo'], 'memo が置き換わる');
+        assertEq(['Access明細'], lineNames($pdo, $id), '明細が置き換わる');
+    });
+
+    runTest('受入条件17: POST /projects/{id}/vouchers/sync でも既存伝票の base_synced_at なしは400、DB不変', function () use ($pdo, $projSync, $UTC) {
+        $id = seedVoucher($pdo, $projSync, 9027, $UTC);
+        $before = snapshot($pdo, $id);
+        $r = request('POST', $projSync, payload(9027, 'Access版', 'Access明細'));
+        assertEq(400, $r['status'], 'status');
+        assertEq('base_synced_at_required', $r['body']['error'] ?? null, 'error');
+        assertEq($before, snapshot($pdo, $id), 'DBは変わらない');
     });
 
 } finally {
