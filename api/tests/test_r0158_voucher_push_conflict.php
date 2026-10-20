@@ -176,6 +176,16 @@ function assertConflict(PDO $pdo, array $r, int $id, array $before, string $labe
     assertEq($before, snapshot($pdo, $id), "$label ヘッダーも明細も変わらない");
 }
 
+function assertBaseSyncedAtRequiredVoucher(array $r, int $id, array $before, ?string $voidReason, string $label): void {
+    $v = $r['body']['voucher'] ?? [];
+    assertEq($id, (int)($v['id'] ?? 0), "$label voucher.id");
+    assertEq($before['voucher']['voucher_no'], $v['voucher_no'] ?? null, "$label voucher.voucher_no");
+    assertEq(['Beaver明細'], array_column($v['lines'] ?? [], 'item_name'), "$label voucher.lines");
+    assertEq('2026-10-01 12:00:00', $v['updated_at'] ?? null, "$label voucher.updated_at(JST)");
+    assertTrue(array_key_exists('void_reason', $v), "$label void_reason キーがある");
+    assertEq($voidReason, $v['void_reason'], "$label voucher.void_reason");
+}
+
 // UTC 2026-10-01 03:00:00 = JST 2026-10-01 12:00:00
 $UTC = '2026-10-01 03:00:00';
 
@@ -236,6 +246,7 @@ try {
             $r = request('POST', $sync, payload(9004, 'Access版', 'Access明細', $extra));
             assertEq(400, $r['status'], "$label status");
             assertEq('base_synced_at_required', $r['body']['error'] ?? null, "$label error");
+            assertBaseSyncedAtRequiredVoucher($r, $id, $before, null, $label);
             assertEq($before, snapshot($pdo, $id), "$label ヘッダー・明細は変わらない");
             assertEq($historyBefore, (int)$pdo->query("SELECT COUNT(*) FROM record_history WHERE entity = 'vouchers' AND entity_id = $id")->fetchColumn(), "$label 履歴は変わらない");
         }
@@ -399,6 +410,7 @@ try {
         $r = request('POST', $sync, payload(9014, 'Access版', 'Access明細'));
         assertEq(400, $r['status'], 'status');
         assertEq('base_synced_at_required', $r['body']['error'] ?? null, 'error');
+        assertBaseSyncedAtRequiredVoucher($r, $id, $before, '基準時刻なし同期前の取消', 'void済み');
         assertEq($before, snapshot($pdo, $id), '取消のままでヘッダー・明細は変わらない');
         assertEq($historyBefore, (int)$pdo->query("SELECT COUNT(*) FROM record_history WHERE entity = 'vouchers' AND entity_id = $id")->fetchColumn(), 'unvoid 履歴は残らない');
     });
@@ -426,6 +438,7 @@ try {
         $r = request('POST', $projSync, payload(9027, 'Access版', 'Access明細'));
         assertEq(400, $r['status'], 'status');
         assertEq('base_synced_at_required', $r['body']['error'] ?? null, 'error');
+        assertBaseSyncedAtRequiredVoucher($r, $id, $before, null, '案件経路');
         assertEq($before, snapshot($pdo, $id), 'DBは変わらない');
     });
 
