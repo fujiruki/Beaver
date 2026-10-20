@@ -115,7 +115,7 @@ export default function VoucherHeader({
 
         <Field label="売上種別">
           <select
-            {...register('sales_category_id', { setValueAs: v => v === '' ? null : Number(v) })}
+            {...register('sales_category_id', { setValueAs: v => v == null || v === '' ? null : Number(v) })}
             value={salesCategoryId ?? ''}
             style={selStyle}
             disabled={readOnly}

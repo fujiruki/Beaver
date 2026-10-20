@@ -118,7 +118,7 @@ const defaultValues: VoucherFormValues = {
   description: null,
   profit_rate: 0.3,
   memo: null,
-  sales_category_id: null,
+  sales_category_id: 1,
   validity_period: null,
   lines: [{ ...defaultLine }],
 };
