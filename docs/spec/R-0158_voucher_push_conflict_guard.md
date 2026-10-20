@@ -47,6 +47,24 @@ Accessの伝票push（`POST /vouchers/sync`、`POST /projects/{id}/vouchers/sync
 13. void済みの伝票に、forceなし・`base_synced_at`が`updated_at`以上（競合にならない）で`status=draft`のpush → 取消が解除され、`record_history`に`action=unvoid`（理由「Accessからの同期で取消を解除」）が1件残る
 14. void済みの伝票に、`base_synced_at`なしで`status=draft`のpush → 同じく`unvoid`が1件残る
 
+## 追補: `base_synced_at`なしの既存伝票pushを400にする（2026-10-20、dodai-backの合図）
+
+本番の切替（S5）でR8・R9が合格したあとの、運用手順§5の手順8。藤田晴樹さんの判断で進めているS5の一部として、dodai-backが合図した。
+
+- `access_voucher_id`で既存の伝票が見つかり、`base_synced_at`が無い（キーが無い・null・空文字）、かつ`force`がtrueでなければ、何も書かずに400 `{"error": "base_synced_at_required"}`を返す
+- 新規の伝票（`access_voucher_id`が未登録）は対象外。今までどおり`base_synced_at`なしで作成できる
+- `force=true`なら`base_synced_at`が無くても今までどおり置き換える（明示的な置き換えのため）
+- 対象は`syncVoucherUpsert`を通る`POST /vouchers/sync`と`POST /projects/{id}/vouchers/sync`の両方。得意先（R-0157）・案件・出荷フラグなどほかの経路は変えない
+- 設定フラグは作らない。戻すときはコードを戻してデプロイする
+
+受け入れ条件（上の4と14を置き換える）:
+
+4'. 既存伝票に`base_synced_at`なし・forceなし → 400 `base_synced_at_required`、ヘッダーも明細も変わらない（キーなし・null・空文字の3通り）
+14'. void済みの伝票に`base_synced_at`なし・forceなしで`status=draft` → 400、取消のまま、`unvoid`の履歴は残らない
+15. 新規伝票は`base_synced_at`なしでも今までどおり作成（201または今の応答）
+16. 既存伝票に`base_synced_at`なし・`force=true` → 今までどおり置き換え200
+17. `POST /projects/{id}/vouchers/sync`経路でも4'が同じように動く
+
 ## 対象外
 
 - `syncVoucherUpdate`（PUT経路）: Accessは使っていない（dodai-back確認、Access側はPOSTに統一）

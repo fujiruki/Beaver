@@ -649,3 +649,12 @@ R-0083（得意先 + ComboSelect共通化）のPhase1完了後の横展開。案
 
 ### 今後の扱い
 新規のバグ・要望ではなく、既存仕様として保証されている点の確認記録。将来この経路を変更する際の回帰防止の参考にする。
+
+### 2026-10-19 SdDD を v1.0 に更新する（晴樹さん、会話で受付）【中】
+
+> ほかのすべてのプロジェクトのrequests.mdに　それをついかしておいてくれないか
+
+- SdDD v1.0（作業前の判定、AIが止まる条件、UIの2案比較、ADR、セキュリティ検査）をこのプロジェクトに反映する
+- 手順: このプロジェクトで `/sddd-update` を実行する。更新元は `C:\Fujiruki\Projects\SDDD` の `templates`。新設の `docs/quality.md` と `docs/adr/ADR-0000-template.md` も追加する
+- まず LISU で試験運用し、問題がなければほかのプロジェクトへ広げる（2026-10-18 晴樹さん承認）
+- 設計: `C:\Fujiruki\Projects\SDDD\docs\kaigi\2026-10-18-SdDD-v1.0-quality.md`
