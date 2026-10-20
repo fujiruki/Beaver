@@ -376,6 +376,7 @@ runTest('1-2: 1行目quantityを2.5・line_totalを9000にして送ると小数�
     $payload = json_decode(file_get_contents($r0140FixtureDir . '/voucher_estimate_11704_discount.json'), true);
     $payload['lines'][0]['quantity'] = 2.5;
     $payload['lines'][0]['line_total'] = 9000;
+    $payload['base_synced_at'] = '2099-12-31 23:59:59';
     $r = runHelperCase('syncVoucherUpsert', null, $payload);
     assertEq(200, $r['code'], 'http code', ['stderr' => $r['stderr'] ?? '', 'body' => $r['body'] ?? null]);
 
@@ -462,6 +463,7 @@ runTest('test_upsert_preserves_existing_customer_id_on_null_push', function () u
     // 過去伝票モードで再 push (project_id=NULL, customer_access_no='', access_voucher_id=999)
     $r2 = runHelperCase('syncVoucherUpsert', null, [
         'access_voucher_id'  => 999,
+        'base_synced_at'     => '2099-12-31 23:59:59',
         'voucher_type'       => 'sales',
         'customer_access_no' => '',
         'voucher_date'       => '2026-06-06',
@@ -502,6 +504,7 @@ runTest('push（UPDATE/ON CONFLICT）成功後も、vouchers.last_synced_at が�
     // 同じ access_voucher_id で再 push（ON CONFLICT DO UPDATE経路）
     $r = runHelperCase('syncVoucherUpsert', null, [
         'access_voucher_id'  => 9101,
+        'base_synced_at'     => '2099-12-31 23:59:59',
         'voucher_type'       => 'estimate',
         'customer_access_no' => '',
         'voucher_date'       => '2026-07-02',
@@ -1323,6 +1326,7 @@ runTest('R-066-保持-upsert: syncVoucherUpsert の ON CONFLICT 経路で未送�
     // consumption_tax_type 等を送らずに再 upsert（同一 access_voucher_id で CONFLICT）
     $r = runHelperCase('syncVoucherUpsert', null, [
         'access_voucher_id'  => 8802,
+        'base_synced_at'     => '2099-12-31 23:59:59',
         'voucher_type'       => 'estimate',
         'customer_access_no' => '',
         'voucher_date'       => '2026-06-20',
@@ -1357,6 +1361,7 @@ runTest('B2-2-upsert: syncVoucherUpsert は既存明細を DELETE して Access 
 
     $r = runHelperCase('syncVoucherUpsert', null, [
         'access_voucher_id'  => 87621,
+        'base_synced_at'     => '2099-12-31 23:59:59',
         'access_voucher_no'  => 'R076-B2-UP',
         'voucher_type'       => 'estimate',
         'customer_access_no' => '',
@@ -1927,6 +1932,7 @@ runTest('lines_mode未指定でedited_in_beaver=1の行があれば明細は変�
 
     $r = runHelperCase('syncVoucherUpsert', null, [
         'access_voucher_id'  => 161101,
+        'base_synced_at'     => '2099-12-31 23:59:59',
         'voucher_type'       => 'estimate',
         'customer_access_no' => '',
         'voucher_date'       => '2026-09-03',

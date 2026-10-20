@@ -156,6 +156,7 @@ function pushVoucher(int $port, int $accessVoucherId, array $lines, ?string $lin
         'customer_access_no' => '',
         'voucher_date'       => '2026-10-01',
         'total_amount'       => 0,
+        'base_synced_at'     => '2099-12-31 23:59:59',
         'lines'              => $lines,
     ];
     if ($linesMode !== null) $body['lines_mode'] = $linesMode;

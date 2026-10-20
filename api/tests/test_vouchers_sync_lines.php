@@ -207,6 +207,7 @@ try {
         // 2回目push（lines_mode未指定・edited_in_beaver=1の行なし）: 別内容の明細1件
         $post2 = httpJson($port, '/vouchers/sync', 'POST', [
             'access_voucher_id'  => 40002,
+            'base_synced_at'     => '2099-12-31 23:59:59',
             'voucher_type'       => 'estimate',
             'customer_access_no' => '',
             'voucher_date'       => '2026-09-02',
@@ -247,6 +248,7 @@ try {
         // 2回目push（lines_mode未指定）: 別内容の明細で上書きしようとする
         $post2 = httpJson($port, '/vouchers/sync', 'POST', [
             'access_voucher_id'  => 40003,
+            'base_synced_at'     => '2099-12-31 23:59:59',
             'voucher_type'       => 'estimate',
             'customer_access_no' => '',
             'voucher_date'       => '2026-09-02',
@@ -289,6 +291,7 @@ try {
         // lines_mode=replace を明示指定して再push
         $post2 = httpJson($port, '/vouchers/sync', 'POST', [
             'access_voucher_id'  => 40004,
+            'base_synced_at'     => '2099-12-31 23:59:59',
             'voucher_type'       => 'estimate',
             'customer_access_no' => '',
             'voucher_date'       => '2026-09-02',
