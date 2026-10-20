@@ -321,3 +321,15 @@ dodai-backの合図の後。削除の前に晴樹さんへ中身（2026-03-17 20
 | 退避 | `Beaver/api/backups/database_beaver_20261019_1920_pre_s5_ab10.sqlite` | 19:20 | 1秒未満 | — |
 | dry-run | 4組 | 19:20:53 | 1秒未満 | 案件3件の付け替え予定、伝票・請求・入金0（rc6と同じ） |
 | 実行 | 4組（晴樹さん） | 21:58:20 | 1秒未満 | 統合4組・案件3件付け替え。得意先830（有効816）、access_customer_noあり826、有効でなし0、統合元への参照0、孤児0、integrity ok（rc6と同じ） |
+
+## S5 本番 R7 ⑦ 照合と5792の履歴付きvoid（2026-10-20 08:57〜09:10）
+
+本番Access ⑥全件再push（sent 5,897・failed 0、816秒。last_synced_atは2026-10-19 23:49:19〜23:56:59 UTC）の後。読み取り（08:57:49）で、pushで更新されなかった有効な伝票はrc6と同じ5792（S04594、access_voucher_id 4613）の1件だけ（ほかはaccess_voucher_idなしの5805〜5810）。実行は自動の許可判定で止められたため、晴樹さんが`!`で直接実行した。
+
+| # | 内容 | 時刻 | 所要 | 結果 |
+|:--|:--|:--|:--|:--|
+| 退避 | `Beaver/api/backups/database_beaver_20261020_0857_pre_s5_void5792.sqlite` | 08:57 | 1秒未満 | — |
+| dry-run | `~/void_voucher_with_history.php database.sqlite 5792 4613 "<理由>"` | 08:57:59 | 1秒未満 | draft → void予定 |
+| 実行 | 同`--execute`（晴樹さん） | 09:10:26 | 1秒未満 | void、record_history id=5 |
+
+照合（voidとaccess_voucher_idなしを除く）: 見積1,953／売上3,944（合計5,897＝Accessのsent 5,897と一致）、明細25,777。rc6と同じ。access_voucher_idなし6（5805〜5810）、重複0、voucher_noの重複0、売上の合計の再計算の食い違い0（r0151のdry-runを本番DBの写しで実行、挙がるのはvoidの5792のみ）、伝票総数5,904（void 1）、integrity ok
