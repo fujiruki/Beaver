@@ -490,17 +490,13 @@ function syncVoucherUpsert(PDO $pdo, ?int $projectId): void {
         $existsStmt->execute([$accessVoucherId]);
         $existing = $existsStmt->fetch();
 
-        if ($existing && $baseSyncedAtUtc === null && !$force) {
-            $pdo->rollBack();
-            respond(400, ['error' => 'base_synced_at_required']);
-            return;
-        }
-
-        if ($existing && $baseSyncedAtUtc !== null && !$force && $existing['updated_at'] > $baseSyncedAtUtc) {
+        if ($existing && !$force && ($baseSyncedAtUtc === null || $existing['updated_at'] > $baseSyncedAtUtc)) {
             $current = voucherSyncRowById($pdo, (int)$existing['id']);
             $current['void_reason'] = latestVoucherVoidReason($pdo, (int)$existing['id']);
             $pdo->rollBack();
-            respond(409, ['error' => 'voucher_conflict', 'voucher' => $current]);
+            $status = $baseSyncedAtUtc === null ? 400 : 409;
+            $error = $baseSyncedAtUtc === null ? 'base_synced_at_required' : 'voucher_conflict';
+            respond($status, ['error' => $error, 'voucher' => $current]);
             return;
         }
 
