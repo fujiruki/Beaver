@@ -141,10 +141,13 @@ try {
         }
     });
     runTest('9. server_timeはJSTの所定形式', function () use ($port, $since) {
-        $before = new DateTime('now', new DateTimeZone('Asia/Tokyo'));
+        $timezone = new DateTimeZone('Asia/Tokyo');
+        $beforeNow = new DateTime('now', $timezone);
+        $before = DateTime::createFromFormat('!Y-m-d H:i:s', $beforeNow->format('Y-m-d H:i:s'), $timezone);
         $value = httpJson($port, '/sync/changes?since=' . urlencode($since))['body']['server_time'] ?? '';
-        $after = new DateTime('now', new DateTimeZone('Asia/Tokyo'));
-        $actual = DateTime::createFromFormat('!Y-m-d H:i:s', $value, new DateTimeZone('Asia/Tokyo'));
+        $afterNow = new DateTime('now', $timezone);
+        $after = DateTime::createFromFormat('!Y-m-d H:i:s', $afterNow->format('Y-m-d H:i:s'), $timezone);
+        $actual = DateTime::createFromFormat('!Y-m-d H:i:s', $value, $timezone);
         assertTrue($actual !== false && $actual->format('Y-m-d H:i:s') === $value, 'server_time形式');
         assertTrue($actual >= $before && $actual <= $after, 'server_timeが現在のJST');
     });

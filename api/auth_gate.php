@@ -17,6 +17,7 @@ const AUTH_GATE_SYNC_EXEMPT_PATHS = [
     '/payments/sync',
     '/sync/heartbeat',
     '/sync/status',
+    '/sync/changes',
     '/admin/snapshot/save',
     '/admin/snapshot/restore',
     '/admin/snapshot/list',
