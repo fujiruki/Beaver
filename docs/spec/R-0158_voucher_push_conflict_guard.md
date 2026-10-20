@@ -56,10 +56,11 @@ Accessの伝票push（`POST /vouchers/sync`、`POST /projects/{id}/vouchers/sync
 - `force=true`なら`base_synced_at`が無くても今までどおり置き換える（明示的な置き換えのため）
 - 対象は`syncVoucherUpsert`を通る`POST /vouchers/sync`と`POST /projects/{id}/vouchers/sync`の両方。得意先（R-0157）・案件・出荷フラグなどほかの経路は変えない
 - 設定フラグは作らない。戻すときはコードを戻してデプロイする
+- 400の応答にも、409 `voucher_conflict`と同じ形の`voucher`（Beaverの今の伝票。ヘッダー・明細、JST、`void_reason`付き）を入れる: `{"error": "base_synced_at_required", "voucher": {...}}`（2026-10-20 dodai-back依頼。Accessはこの400を競合待ちに回し、「Beaver版を採用」でこの`voucher`を使うため。伝票を1件だけ取るAPIが無い）
 
 受け入れ条件（上の4と14を置き換える）:
 
-4'. 既存伝票に`base_synced_at`なし・forceなし → 400 `base_synced_at_required`、ヘッダーも明細も変わらない（キーなし・null・空文字の3通り）
+4'. 既存伝票に`base_synced_at`なし・forceなし → 400 `base_synced_at_required`、ヘッダーも明細も変わらない（キーなし・null・空文字の3通り）。応答の`voucher`は、同じ伝票で409になるときの`voucher`と同じ内容（void済みなら`void_reason`付き）
 14'. void済みの伝票に`base_synced_at`なし・forceなしで`status=draft` → 400、取消のまま、`unvoid`の履歴は残らない
 15. 新規伝票は`base_synced_at`なしでも今までどおり作成（201または今の応答）
 16. 既存伝票に`base_synced_at`なし・`force=true` → 今までどおり置き換え200
