@@ -49,6 +49,7 @@ $exemptCases = [
     ['POST', '/sync/heartbeat'],
     // R-0144 B-2: 認証ゲート免除漏れの修正（SYNC_API_TOKENで呼べるようにする）
     ['GET', '/sync/status'],
+    ['GET', '/sync/changes'],
     // R-0144 B-1: Beaver_betaスナップショット保存・復元・一覧（SYNC_API_TOKEN必須はルート側で検証）
     ['POST', '/admin/snapshot/save'],
     ['POST', '/admin/snapshot/restore'],
