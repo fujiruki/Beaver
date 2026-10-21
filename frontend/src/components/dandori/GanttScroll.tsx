@@ -122,7 +122,7 @@ export function estimateLabelWidth(text: string): number {
 
 function barClassName(bar: DandoriBar): string {
   const category = bar.category === 'done' ? 'done' : bar.category === 'notstarted' ? 'notstarted' : 'working';
-  return ['bar', category, bar.isShop && bar.category !== 'done' ? 'shop' : '', bar.unknownHours ? 'unknown-hours' : ''].filter(Boolean).join(' ');
+  return ['bar', category, bar.isShop && bar.category !== 'done' ? 'shop' : '', bar.unknownHours ? 'unknown-hours' : '', bar.salesBorderColor ? 'has-sales-border' : '', bar.salesBorderColor === '#ffffff' ? 'sales-border-white' : ''].filter(Boolean).join(' ');
 }
 
 function TodayCol({ leftPx, pxPerDay, label }: { leftPx: number | null; pxPerDay: number; label?: boolean }) {
@@ -320,7 +320,7 @@ function BarRow({ bar, rangeStart, pxPerDay, gridWidth, showBarLabel, todayLeftP
         <TodayCol leftPx={todayLeftPx} pxPerDay={pxPerDay} />
         <div
           className={barClassName(bar)}
-          style={{ left: leftPx, width: widthPx }}
+          style={{ left: leftPx, width: widthPx, ...(bar.salesBorderColor ? { ['--sales-border' as string]: bar.salesBorderColor } : {}) }}
           {...barDrag.handlers}
           onDoubleClick={e => { e.stopPropagation(); onProjectDoubleClick(bar.id); }}
         >

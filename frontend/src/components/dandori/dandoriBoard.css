@@ -92,6 +92,9 @@
 .dandori-board .bar.notstarted { background: var(--work-tint); color: var(--work-dark); border: 2px dashed var(--work); }
 .dandori-board .bar.shop { background: var(--shop); }
 .dandori-board .bar.shop.notstarted { background: #f1e2c8; color: var(--shop); border: 2px dashed var(--shop); }
+.dandori-board .bar.has-sales-border.working { border: 3px solid var(--sales-border); }
+.dandori-board .bar.has-sales-border.notstarted { border: 3px dashed var(--sales-border); }
+.dandori-board .bar.sales-border-white { outline: 1px solid #94a3b8; }
 .dandori-board .bar.done { background: #b7b0a4; color: #fff; border: none; }
 .dandori-board .bar.unknown-hours { opacity: 0.55; }
 .dandori-board .bar .over {
@@ -141,6 +144,9 @@
 .dandori-board .wrap-bar.notstarted { background: var(--work-tint); color: var(--work-dark); border: 2px dashed var(--work); }
 .dandori-board .wrap-bar.shop { background: var(--shop); }
 .dandori-board .wrap-bar.shop.notstarted { background: #f1e2c8; color: var(--shop); border: 2px dashed var(--shop); }
+.dandori-board .wrap-bar.has-sales-border.working { border: 3px solid var(--sales-border); }
+.dandori-board .wrap-bar.has-sales-border.notstarted { border: 3px dashed var(--sales-border); }
+.dandori-board .wrap-bar.sales-border-white { outline: 1px solid #94a3b8; }
 .dandori-board .wrap-bar.done { background: #b7b0a4; color: #fff; border: none; }
 .dandori-board .wrap-bar.cont-l { border-radius: 0 5px 5px 0; }
 .dandori-board .wrap-bar.cont-r { border-radius: 5px 0 0 5px; }

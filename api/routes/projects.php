@@ -418,7 +418,10 @@ switch ($method) {
                     'DESC'
                 );
                 $stmt  = $pdo->prepare("
-                    SELECT p.*, c.name AS customer_name
+                    SELECT p.*, c.name AS customer_name,
+                           (SELECT v.sales_category_id FROM vouchers v
+                            WHERE v.project_id = p.id AND v.status != 'void' AND v.sales_category_id IS NOT NULL
+                            ORDER BY v.voucher_date DESC, v.id DESC LIMIT 1) AS sales_category_id
                     FROM projects p
                     LEFT JOIN customers c ON c.id = p.customer_id
                     LEFT JOIN project_statuses ps ON ps.name = p.status
@@ -438,7 +441,10 @@ switch ($method) {
                 ]);
             } else {
                 $stmt = $pdo->prepare("
-                    SELECT p.*, c.name AS customer_name
+                    SELECT p.*, c.name AS customer_name,
+                           (SELECT v.sales_category_id FROM vouchers v
+                            WHERE v.project_id = p.id AND v.status != 'void' AND v.sales_category_id IS NOT NULL
+                            ORDER BY v.voucher_date DESC, v.id DESC LIMIT 1) AS sales_category_id
                     FROM projects p
                     LEFT JOIN customers c ON c.id = p.customer_id
                     $where ORDER BY p.updated_at DESC

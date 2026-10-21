@@ -43,6 +43,7 @@ export interface Project {
   estimated_site_hours?: number;
   manual_estimated_hours?: number | null;
   effective_estimated_hours?: number | null;
+  sales_category_id?: number | null;
   created_at: string;
   updated_at: string;
 }

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render } from '@testing-library/react';
 import GanttScroll from '../GanttScroll';
 import type { DandoriBar } from '../dandoriBoardUtils';
+import { salesCategoryBorderColor } from '../../../pages/DandoriBoard';
 
 const STORAGE_KEY = 'bv_dandori_label_widths';
 
@@ -152,7 +153,7 @@ describe('R-0189 売上種別による枠線色', () => {
   it.each(Object.entries(SALES_CATEGORY_COLORS))('売上種別%sの枠線色が%sになる', (salesCategoryId, color) => {
     const { container } = render(
       <GanttScroll
-        bars={[{ ...bar, salesCategoryId: Number(salesCategoryId) }]}
+        bars={[{ ...bar, salesBorderColor: salesCategoryBorderColor(Number(salesCategoryId)) }]}
         rangeStart="2026-08-25" rangeEnd="2026-09-15" pxPerDay={24} todayISO="2026-09-01"
         onCommit={vi.fn()} onProjectDoubleClick={vi.fn()}
       />,
@@ -163,7 +164,7 @@ describe('R-0189 売上種別による枠線色', () => {
   it.each([4, null])('売上種別%sは枠線色を指定しない', salesCategoryId => {
     const { container } = render(
       <GanttScroll
-        bars={[{ ...bar, salesCategoryId }]}
+        bars={[{ ...bar, salesBorderColor: salesCategoryBorderColor(salesCategoryId) }]}
         rangeStart="2026-08-25" rangeEnd="2026-09-15" pxPerDay={24} todayISO="2026-09-01"
         onCommit={vi.fn()} onProjectDoubleClick={vi.fn()}
       />,
@@ -174,7 +175,7 @@ describe('R-0189 売上種別による枠線色', () => {
   it('未着手は点線、進行中は実線のクラスを保つ', () => {
     const { container } = render(
       <GanttScroll
-        bars={[{ ...bar, id: 1, category: 'notstarted', salesCategoryId: 1 }, { ...bar, id: 2, category: 'working', salesCategoryId: 2 }]}
+        bars={[{ ...bar, id: 1, category: 'notstarted', salesBorderColor: salesCategoryBorderColor(1) }, { ...bar, id: 2, category: 'working', salesBorderColor: salesCategoryBorderColor(2) }]}
         rangeStart="2026-08-25" rangeEnd="2026-09-15" pxPerDay={24} todayISO="2026-09-01"
         onCommit={vi.fn()} onProjectDoubleClick={vi.fn()}
       />,

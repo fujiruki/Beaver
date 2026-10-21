@@ -6,6 +6,7 @@ function barClassName(bar: DandoriBar, contL: boolean, contR: boolean): string {
   const category = bar.category === 'done' ? 'done' : bar.category === 'notstarted' ? 'notstarted' : 'working';
   return [
     'wrap-bar', category, bar.isShop && bar.category !== 'done' ? 'shop' : '',
+    bar.salesBorderColor ? 'has-sales-border' : '', bar.salesBorderColor === '#ffffff' ? 'sales-border-white' : '',
     contL ? 'cont-l' : '', contR ? 'cont-r' : '',
   ].filter(Boolean).join(' ');
 }
@@ -62,7 +63,7 @@ export default function WrapView({ bars, rangeStart, rangeEnd, todayISO, onProje
                   <div
                     key={bar.id}
                     className={barClassName(bar, contL, contR)}
-                    style={{ marginLeft: `${leftPct}%`, width: `${widthPct}%` }}
+                    style={{ marginLeft: `${leftPct}%`, width: `${widthPct}%`, ...(bar.salesBorderColor ? { ['--sales-border' as string]: bar.salesBorderColor } : {}) }}
                     onDoubleClick={() => onProjectDoubleClick(bar.id)}
                   >
                     {contL && '◀ '}{bar.name}（{bar.customerName}）

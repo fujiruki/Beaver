@@ -26,6 +26,14 @@ import {
 import '../components/dandori/dandoriBoard.css';
 
 const FONT_SCALE_KEY = `${APP_STORAGE_PREFIX}dandori_font_scale`;
+
+export const SALES_CATEGORY_BORDER_COLORS: Readonly<Record<number, string>> = {
+  1: '#2563eb', 2: '#38bdf8', 3: '#8b5cf6', 5: '#ffffff',
+};
+
+export function salesCategoryBorderColor(salesCategoryId: number | null | undefined): string | undefined {
+  return salesCategoryId == null ? undefined : SALES_CATEGORY_BORDER_COLORS[salesCategoryId];
+}
 const FONT_SCALES = [0.85, 1, 1.15];
 const FONT_LABELS = ['A−', 'A', 'A＋'];
 const PRESETS: RangePreset[] = ['8w', '6m', '1y'];
@@ -93,7 +101,10 @@ export default function DandoriBoard() {
 
   const unsetCount = projects.filter(p => !p.start_date).length;
   const allBars = useMemo(
-    () => projects.filter(p => p.start_date).map(p => buildBar(p as Project & { start_date: string }, settings.hoursPerDay)),
+    () => projects.filter(p => p.start_date).map(p => ({
+      ...buildBar(p as Project & { start_date: string }, settings.hoursPerDay),
+      salesBorderColor: salesCategoryBorderColor(p.sales_category_id),
+    })),
     [projects, settings.hoursPerDay],
   );
   const visibleBars = useMemo(() => allBars.filter(b => showDone || b.category !== 'done'), [allBars, showDone]);

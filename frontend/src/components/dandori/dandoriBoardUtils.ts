@@ -130,6 +130,7 @@ export interface DandoriBar {
   delivery: string | null;
   hours: number | null;
   unknownHours: boolean;
+  salesBorderColor?: string;
 }
 
 interface ProjectLike {
