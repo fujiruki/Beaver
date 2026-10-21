@@ -649,6 +649,15 @@ switch ($method) {
                 echo json_encode(['error' => '無効化済みの伝票は引用できません']);
                 exit;
             }
+            $textError = validateVoucherTextLengths($orig);
+            if ($textError !== null) { http_response_code(400); echo json_encode($textError); exit; }
+            $sourceLinesStmt = $pdo->prepare('SELECT * FROM voucher_lines WHERE voucher_id = ? ORDER BY line_no');
+            $sourceLinesStmt->execute([$resourceId]);
+            $sourceLines = $sourceLinesStmt->fetchAll();
+            foreach ($sourceLines as $sourceLine) {
+                $textError = validateVoucherTextLengths($sourceLine, true);
+                if ($textError !== null) { http_response_code(400); echo json_encode($textError); exit; }
+            }
             $today = date('Y-m-d');
             // nextVoucherNo は内部で独自トランザクションを完結させるため、外側 beginTransaction の前に呼ぶ
             $newNo = nextVoucherNo($pdo, 'sales');
@@ -700,9 +709,7 @@ switch ($method) {
             ]);
             $newId = (int)$pdo->lastInsertId();
 
-            $lines = $pdo->prepare('SELECT * FROM voucher_lines WHERE voucher_id = ? ORDER BY line_no');
-            $lines->execute([$resourceId]);
-            foreach ($lines->fetchAll() as $line) {
+            foreach ($sourceLines as $line) {
                 $pdo->prepare('
                     INSERT INTO voucher_lines
                         (voucher_id, line_no, line_type, location_no, location_name,
@@ -813,6 +820,8 @@ switch ($method) {
         // ---- 明細追加 ----
         if ($resourceId && $subAction === 'lines') {
             $data = json_decode(file_get_contents('php://input'), true) ?? [];
+            $textError = validateVoucherTextLengths($data, true);
+            if ($textError !== null) { http_response_code(400); echo json_encode($textError); exit; }
             beginVoucherWrite($pdo, $resourceId, $data);
             assertVoucherEditable($pdo, $resourceId);
             $maxStmt = $pdo->prepare('SELECT COALESCE(MAX(line_no), 0) + 1 FROM voucher_lines WHERE voucher_id = ?');
@@ -884,6 +893,8 @@ switch ($method) {
             echo json_encode(['error' => 'consumption_tax_type は ' . implode('/', allowedConsumptionTaxTypes()) . ' のいずれかで指定してください']);
             exit;
         }
+        $textError = validateVoucherTextLengths($data);
+        if ($textError !== null) { http_response_code(400); echo json_encode($textError); exit; }
         $type = $data['voucher_type'] ?? 'estimate';
         $no = nextVoucherNo($pdo, $type);
         $stmt = $pdo->prepare('
@@ -935,6 +946,8 @@ switch ($method) {
         // ---- 明細更新 ----
         if ($resourceId && $subAction === 'lines' && $subId) {
             $data = json_decode(file_get_contents('php://input'), true) ?? [];
+            $textError = validateVoucherTextLengths($data, true);
+            if ($textError !== null) { http_response_code(400); echo json_encode($textError); exit; }
             beginVoucherWrite($pdo, $resourceId, $data);
             assertVoucherEditable($pdo, $resourceId);
             $fields = ['line_no','line_type','location_no','location_name','tategu_item_id','source_catalog_item_id',
@@ -978,6 +991,8 @@ switch ($method) {
         // ---- 伝票ヘッダー更新 ----
         if (!$resourceId) { http_response_code(400); echo json_encode(['error' => 'ID required']); exit; }
         $data = json_decode(file_get_contents('php://input'), true) ?? [];
+        $textError = validateVoucherTextLengths($data);
+        if ($textError !== null) { http_response_code(400); echo json_encode($textError); exit; }
         beginVoucherWrite($pdo, $resourceId, $data);
         assertVoucherEditable($pdo, $resourceId);
         if (array_key_exists('consumption_tax_type', $data) && !isValidConsumptionTaxType((string)$data['consumption_tax_type'])) {

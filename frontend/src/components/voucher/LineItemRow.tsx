@@ -256,6 +256,7 @@ export default function LineItemRow({
             aria-label="取付建具"
             placeholder="品名"
             {...register(`lines.${index}.item_name`)}
+            maxLength={255}
             disabled={readOnly}
             onBlur={saveLineToDb}
             rows={3}
@@ -275,6 +276,7 @@ export default function LineItemRow({
             <input
               aria-label="取付場所"
               {...register(`lines.${index}.location_name`)}
+              maxLength={255}
               disabled={readOnly || lineType !== 'normal'}
               onBlur={saveLineToDb}
               style={{ ...groupedInputStyle, width: 170 }}
@@ -356,6 +358,7 @@ export default function LineItemRow({
           <input
             aria-label="備考"
             {...register(`lines.${index}.memo`)}
+            maxLength={255}
             disabled={readOnly}
             onBlur={saveLineToDb}
             style={{ ...inputStyle, width: '100%', height: 20, marginTop: 2 }}

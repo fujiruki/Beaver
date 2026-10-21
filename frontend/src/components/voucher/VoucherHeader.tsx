@@ -107,6 +107,7 @@ export default function VoucherHeader({
         <Field label="摘要">
           <input
             {...register('description')}
+            maxLength={255}
             placeholder="案件・工事内容など"
             style={inpStyle}
             disabled={readOnly}

@@ -7,7 +7,7 @@ import { AppSettingsProvider } from '../../../contexts/AppSettingsContext';
 import VoucherHeader from '../VoucherHeader';
 import LineItemRow from '../LineItemRow';
 
-vi.stubGlobal('fetch', vi.fn(async () => new Response('[]')));
+vi.mock('../TateguSelector', () => ({ default: () => null }));
 
 function Harness() {
   const form = useForm<VoucherFormValues>({
@@ -16,7 +16,7 @@ function Harness() {
       tax_input_type: 'exclusive',
       sales_category_id: null,
       lines: [{ item_name: '', location_name: '', memo: '備考', quantity: 1, costs: [], prices: [] }],
-    } as VoucherFormValues,
+    } as unknown as VoucherFormValues,
   });
   return (
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>

@@ -76,6 +76,8 @@ try {
     $syncValid = requestR0190($port, 'POST', '/vouchers/sync', $syncBase + ['description' => $text255, 'lines' => [$validLine]]);
     sameR0190(200, $syncValid['status'], '同期でも全角255文字を保存できる');
     $syncVoucherId = (int)$syncValid['body']['voucher_id'];
+    $syncLine = $pdo->query("SELECT item_name, location_name, memo FROM voucher_lines WHERE voucher_id = $syncVoucherId")->fetch();
+    foreach ($lineFields as $field) sameR0190($text255, $syncLine[$field], '同期済み' . $field . 'の255文字を保持する');
     foreach (['description', ...$lineFields] as $field) {
         $payload = $syncBase + ['access_voucher_id' => 190010 + array_search($field, ['description', ...$lineFields], true)];
         if ($field === 'description') $payload['description'] = $text256;

@@ -25,6 +25,24 @@ if (!function_exists('respond')) {
     }
 }
 
+/** R-0190: 対象文字列が255文字以内かをUTF-8文字数で検証する。 */
+function validateVoucherTextLengths(array $data, bool $linePayload = false): ?array {
+    $fields = $linePayload ? ['item_name', 'location_name', 'memo'] : ['description'];
+    foreach ($fields as $field) {
+        if (array_key_exists($field, $data) && $data[$field] !== null && mb_strlen((string)$data[$field], 'UTF-8') > 255) {
+            return ['error' => 'text_too_long', 'field' => $field, 'max' => 255];
+        }
+    }
+    if (!$linePayload && isset($data['lines']) && is_array($data['lines'])) {
+        foreach ($data['lines'] as $line) {
+            if (!is_array($line)) continue;
+            $error = validateVoucherTextLengths($line, true);
+            if ($error !== null) return $error;
+        }
+    }
+    return null;
+}
+
 /**
  * 内部例外を error_log に記録し、固定文言で 500 を返す。
  * DB スキーマや内部情報がレスポンスに漏れないようにする。
@@ -366,6 +384,12 @@ function nextVoucherNoForSync(PDO $pdo, string $type): string {
  */
 function syncVoucherUpsert(PDO $pdo, ?int $projectId): void {
     $data = readJsonBody();
+
+    $textError = validateVoucherTextLengths($data);
+    if ($textError !== null) {
+        respond(400, $textError);
+        return;
+    }
 
     $baseSyncedAtUtc = null;
     if (isset($data['base_synced_at']) && $data['base_synced_at'] !== '') {
@@ -739,6 +763,9 @@ function upsertSyncedLines(PDO $pdo, int $voucherId, array $lines): ?array {
     foreach ($lines as $line) {
         if (!is_array($line)) { $lineNo++; continue; }
 
+        $textError = validateVoucherTextLengths($line, true);
+        if ($textError !== null) return $textError;
+
         $lineType = $line['line_type'] ?? 'normal';
         if (!in_array($lineType, $allowedLineTypes, true)) {
             return ['error' => 'invalid_line', 'field' => 'line_type', 'value' => $lineType, 'line_no' => $lineNo];
@@ -763,6 +790,7 @@ function upsertSyncedLines(PDO $pdo, int $voucherId, array $lines): ?array {
         $normalized = [
             'line_no'        => isset($line['line_no']) ? (int)$line['line_no'] : $lineNo,
             'line_type'      => $lineType,
+            'location_name'  => $line['location_name'] ?? null,
             'item_name'      => $line['item_name'] ?? null,
             'quantity'       => (float)$quantityRaw,
             'price_body'     => isset($line['price_body'])     ? (float)$line['price_body']     : 0.0,
@@ -801,7 +829,8 @@ function upsertSyncedLines(PDO $pdo, int $voucherId, array $lines): ?array {
     }
     $upd = $pdo->prepare('
         UPDATE voucher_lines SET
-            line_no = :line_no, line_type = :line_type, item_name = :item_name, quantity = :quantity,
+            line_no = :line_no, line_type = :line_type,
+            location_name = COALESCE(:location_name, location_name), item_name = :item_name, quantity = :quantity,
             price_body = :price_body, price_hardware = :price_hardware, price_glass = :price_glass,
             line_total = :line_total, tax_category = :tax_category, memo = :memo,
             edited_in_beaver = 0, updated_at = CURRENT_TIMESTAMP
@@ -811,6 +840,7 @@ function upsertSyncedLines(PDO $pdo, int $voucherId, array $lines): ?array {
         $upd->execute([
             ':line_no'       => $u['line_no'],
             ':line_type'     => $u['line_type'],
+            ':location_name' => $u['location_name'],
             ':item_name'     => $u['item_name'],
             ':quantity'      => $u['quantity'],
             ':price_body'    => $u['price_body'],
@@ -829,12 +859,12 @@ function upsertSyncedLines(PDO $pdo, int $voucherId, array $lines): ?array {
     if (!empty($toInsert)) {
         $ins = $pdo->prepare('
             INSERT INTO voucher_lines
-                (voucher_id, line_no, line_type, item_name, quantity,
+                (voucher_id, line_no, line_type, location_name, item_name, quantity,
                  price_body, price_hardware, price_glass,
                  line_total, tax_category, memo,
                  source, access_line_id, edited_in_beaver, updated_at)
             VALUES
-                (:voucher_id, :line_no, :line_type, :item_name, :quantity,
+                (:voucher_id, :line_no, :line_type, :location_name, :item_name, :quantity,
                  :price_body, :price_hardware, :price_glass,
                  :line_total, :tax_category, :memo,
                  :source, :access_line_id, 0, CURRENT_TIMESTAMP)
@@ -844,6 +874,7 @@ function upsertSyncedLines(PDO $pdo, int $voucherId, array $lines): ?array {
                 ':voucher_id'     => $voucherId,
                 ':line_no'        => $n['line_no'],
                 ':line_type'      => $n['line_type'],
+                ':location_name'  => $n['location_name'],
                 ':item_name'      => $n['item_name'],
                 ':quantity'       => $n['quantity'],
                 ':price_body'     => $n['price_body'],
@@ -950,18 +981,21 @@ function insertSyncedLines(PDO $pdo, int $voucherId, array $lines): ?array {
     // Access側のpayloadに明細単位の更新日時は含まれないため、Beaverが受信した時刻をCURRENT_TIMESTAMPで明示セットする。
     $ins = $pdo->prepare('
         INSERT INTO voucher_lines
-            (voucher_id, line_no, line_type, item_name, quantity,
+            (voucher_id, line_no, line_type, location_name, item_name, quantity,
              price_body, price_hardware, price_glass,
              line_total, tax_category, memo,
              source, access_line_id, edited_in_beaver, updated_at)
         VALUES
-            (:voucher_id, :line_no, :line_type, :item_name, :quantity,
+            (:voucher_id, :line_no, :line_type, :location_name, :item_name, :quantity,
              :price_body, :price_hardware, :price_glass,
              :line_total, :tax_category, :memo,
              :source, :access_line_id, 0, CURRENT_TIMESTAMP)
     ');
     foreach ($lines as $line) {
         if (!is_array($line)) continue;
+
+        $textError = validateVoucherTextLengths($line, true);
+        if ($textError !== null) return $textError;
 
         $lineType = $line['line_type'] ?? 'normal';
         if (!in_array($lineType, $allowedLineTypes, true)) {
@@ -1012,6 +1046,7 @@ function insertSyncedLines(PDO $pdo, int $voucherId, array $lines): ?array {
             ':voucher_id'    => $voucherId,
             ':line_no'       => isset($line['line_no']) ? (int)$line['line_no'] : $lineNo,
             ':line_type'     => $lineType,
+            ':location_name' => $line['location_name'] ?? null,
             ':item_name'     => $line['item_name'] ?? null,
             ':quantity'      => $quantity,
             ':price_body'    => isset($line['price_body'])     ? (float)$line['price_body']     : 0.0,
@@ -1037,6 +1072,12 @@ function insertSyncedLines(PDO $pdo, int $voucherId, array $lines): ?array {
  */
 function syncVoucherUpdate(PDO $pdo, int $projectId, string $accessVoucherNo): void {
     $data = readJsonBody();
+
+    $textError = validateVoucherTextLengths($data);
+    if ($textError !== null) {
+        respond(400, $textError);
+        return;
+    }
 
     if (!projectExists($pdo, $projectId)) {
         respond(404, ['error' => 'project_id が Beaver に存在しません']);
