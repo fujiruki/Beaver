@@ -18,6 +18,13 @@ const bar: DandoriBar = {
   unknownHours: false,
 };
 
+const SALES_CATEGORY_COLORS: Record<number, string> = {
+  1: '#2563eb',
+  2: '#38bdf8',
+  3: '#8b5cf6',
+  5: '#ffffff',
+};
+
 function renderGantt(onNearRightEdge?: () => void) {
   return render(
     <GanttScroll
@@ -138,6 +145,43 @@ describe('GanttScroll 案件名・得意先名の2列表示（R-0138）', () => 
 
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null');
     expect(saved.total).toBe(120);
+  });
+});
+
+describe('R-0189 売上種別による枠線色', () => {
+  it.each(Object.entries(SALES_CATEGORY_COLORS))('売上種別%sの枠線色が%sになる', (salesCategoryId, color) => {
+    const { container } = render(
+      <GanttScroll
+        bars={[{ ...bar, salesCategoryId: Number(salesCategoryId) }]}
+        rangeStart="2026-08-25" rangeEnd="2026-09-15" pxPerDay={24} todayISO="2026-09-01"
+        onCommit={vi.fn()} onProjectDoubleClick={vi.fn()}
+      />,
+    );
+    expect((container.querySelector('.bar') as HTMLElement).style.getPropertyValue('--sales-border')).toBe(color);
+  });
+
+  it.each([4, null])('売上種別%sは枠線色を指定しない', salesCategoryId => {
+    const { container } = render(
+      <GanttScroll
+        bars={[{ ...bar, salesCategoryId }]}
+        rangeStart="2026-08-25" rangeEnd="2026-09-15" pxPerDay={24} todayISO="2026-09-01"
+        onCommit={vi.fn()} onProjectDoubleClick={vi.fn()}
+      />,
+    );
+    expect((container.querySelector('.bar') as HTMLElement).style.getPropertyValue('--sales-border')).toBe('');
+  });
+
+  it('未着手は点線、進行中は実線のクラスを保つ', () => {
+    const { container } = render(
+      <GanttScroll
+        bars={[{ ...bar, id: 1, category: 'notstarted', salesCategoryId: 1 }, { ...bar, id: 2, category: 'working', salesCategoryId: 2 }]}
+        rangeStart="2026-08-25" rangeEnd="2026-09-15" pxPerDay={24} todayISO="2026-09-01"
+        onCommit={vi.fn()} onProjectDoubleClick={vi.fn()}
+      />,
+    );
+    const bars = container.querySelectorAll('.bar');
+    expect(bars[0].classList.contains('notstarted')).toBe(true);
+    expect(bars[1].classList.contains('working')).toBe(true);
   });
 });
 
