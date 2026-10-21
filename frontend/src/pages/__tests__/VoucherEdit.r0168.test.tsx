@@ -60,7 +60,7 @@ function renderPage(client = new QueryClient({ defaultOptions: { queries: { retr
 
 async function changeDescriptionAndClose(value = '入力中の摘要') {
   const user = userEvent.setup();
-  await screen.findByText('Beaver作成');
+  await screen.findByDisplayValue('2026-10-10');
   const description = document.querySelector('input[name="description"]') as HTMLInputElement;
   await user.clear(description);
   await user.type(description, value);
@@ -112,7 +112,7 @@ describe('R-0168 離脱前に保存結果を待つ', () => {
     stubFetch('success');
     const router = renderPage();
     const user = userEvent.setup();
-    await screen.findByText('得意先A');
+    await screen.findByDisplayValue('2026-10-10');
     await user.selectOptions(document.querySelector('select[name="customer_id"]') as HTMLSelectElement, '0');
     await user.click(screen.getByRole('button', { name: '閉じる' }));
     await waitFor(() => expect(router.state.location.pathname).toBe(expectedPath));
@@ -123,7 +123,7 @@ describe('R-0168 離脱前に保存結果を待つ', () => {
     stubFetch('stale');
     renderPage();
     const user = userEvent.setup();
-    await screen.findByText('Beaver作成');
+    await screen.findByDisplayValue('2026-10-10');
     const description = document.querySelector('input[name="description"]') as HTMLInputElement;
     await user.clear(description);
     await user.type(description, '競合する摘要');

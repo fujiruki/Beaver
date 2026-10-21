@@ -49,7 +49,7 @@ describe('離脱ガード後の再遷移でbasenameを二重にしない', () =>
       </QueryClientProvider>,
     );
     const user = userEvent.setup();
-    await screen.findByText('Beaver作成');
+    await screen.findByDisplayValue('変更前');
     const description = document.querySelector('input[name="description"]') as HTMLInputElement;
     await user.clear(description);
     await user.type(description, '入力中の摘要');

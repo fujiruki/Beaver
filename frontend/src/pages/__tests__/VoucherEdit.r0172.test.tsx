@@ -50,7 +50,7 @@ function expectFixedBottomRight(el: HTMLElement) {
 
 async function editDescription() {
   const user = userEvent.setup();
-  await screen.findByText('Beaver作成');
+  await screen.findByDisplayValue('2026-10-10');
   await user.type(document.querySelector('input[name="description"]') as HTMLInputElement, '山田様邸');
   await user.tab();
 }

@@ -113,7 +113,7 @@ describe('R-0154 追加仕様2: 未保存の入力があれば保存してから
     const user = userEvent.setup();
     stubFetch();
     renderVoucher();
-    await screen.findByText('Beaver作成');
+    await screen.findByDisplayValue('2026-09-01');
     await user.type(document.querySelector('input[name="description"]') as HTMLInputElement, '山田様邸');
     await user.click(screen.getByRole('button', { name: '取消' }));
 
@@ -133,7 +133,7 @@ describe('R-0154 追加仕様2: 未保存の入力があれば保存してから
     const user = userEvent.setup();
     stubFetch({ putFails: true });
     renderVoucher();
-    await screen.findByText('Beaver作成');
+    await screen.findByDisplayValue('2026-09-01');
     await user.type(document.querySelector('input[name="description"]') as HTMLInputElement, '山田様邸');
     const getsBefore = requests.filter(r => r.method === 'GET' && r.url.endsWith('/vouchers/5')).length;
     await user.click(screen.getByRole('button', { name: '取消' }));
@@ -149,7 +149,7 @@ describe('R-0154 追加仕様2: 未保存の入力があれば保存してから
     const user = userEvent.setup();
     stubFetch();
     renderVoucher();
-    await screen.findByText('Beaver作成');
+    await screen.findByDisplayValue('2026-09-01');
     await user.click(screen.getByRole('button', { name: '取消' }));
 
     await screen.findByText('伝票一覧');
@@ -163,7 +163,7 @@ describe('R-0154: 空の伝票を物理削除したら詳細を再取得しな�
     const user = userEvent.setup();
     stubFetch({ deleteResult: 'deleted' });
     renderVoucher();
-    await screen.findByText('Beaver作成');
+    await screen.findByDisplayValue('2026-09-01');
     await user.click(screen.getByRole('button', { name: '取消' }));
 
     await screen.findByText('伝票一覧');

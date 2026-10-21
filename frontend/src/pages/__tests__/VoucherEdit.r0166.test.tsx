@@ -75,7 +75,7 @@ describe('R-0166 伝票画面の楽観的ロック', () => {
     }));
     const user = userEvent.setup();
     renderPage();
-    await screen.findByText('Beaver作成');
+    await screen.findByDisplayValue('2026-10-10');
     const description = document.querySelector('input[name="description"]') as HTMLInputElement;
     await user.clear(description);
     await user.type(description, '1回目');
@@ -111,7 +111,7 @@ describe('R-0166 伝票画面の楽観的ロック', () => {
     }));
     const user = userEvent.setup();
     renderPage();
-    await screen.findByText('Beaver作成');
+    await screen.findByDisplayValue('2026-10-10');
     const description = document.querySelector('input[name="description"]') as HTMLInputElement;
     await user.type(description, '変更');
     await user.tab();
@@ -146,7 +146,7 @@ describe('R-0166 伝票画面の楽観的ロック', () => {
     }));
     const user = userEvent.setup();
     renderPage();
-    await screen.findByText('Beaver作成');
+    await screen.findByDisplayValue('2026-10-10');
     const description = document.querySelector('input[name="description"]') as HTMLInputElement;
     await user.clear(description);
     await user.type(description, '入力中の値');
@@ -191,7 +191,7 @@ describe('R-0166 伝票画面の楽観的ロック', () => {
     }));
     const user = userEvent.setup();
     renderPage();
-    await screen.findByText('Beaver作成');
+    await screen.findByDisplayValue('2026-10-10');
     const description = document.querySelector('input[name="description"]') as HTMLInputElement;
     await user.clear(description);
     await user.type(description, '競合する入力');

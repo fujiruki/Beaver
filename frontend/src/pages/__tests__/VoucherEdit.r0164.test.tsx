@@ -70,7 +70,7 @@ describe('R-0164 伝票ヘッダーの自動保存と離脱警告', () => {
     const user = userEvent.setup();
     stubFetch();
     renderPage();
-    await screen.findByText('Beaver作成');
+    await screen.findByDisplayValue('2026-10-10');
     const description = document.querySelector('input[name="description"]') as HTMLInputElement;
     await user.type(description, '山田様邸');
     await user.tab();
@@ -93,7 +93,7 @@ describe('R-0164 伝票ヘッダーの自動保存と離脱警告', () => {
     const user = userEvent.setup();
     stubFetch();
     renderPage();
-    await screen.findByText('Beaver作成');
+    await screen.findByDisplayValue('2026-10-10');
     const date = document.querySelector('input[name="voucher_date"]') as HTMLInputElement;
     await user.clear(date);
     await waitFor(() => expect(screen.getByText('未保存の変更があります')).toBeTruthy());
@@ -105,7 +105,7 @@ describe('R-0164 伝票ヘッダーの自動保存と離脱警告', () => {
     const user = userEvent.setup();
     stubFetch({ failFirstPut: true });
     renderPage();
-    await screen.findByText('Beaver作成');
+    await screen.findByDisplayValue('2026-10-10');
     const description = document.querySelector('input[name="description"]') as HTMLInputElement;
     await user.type(description, '再試行対象');
     await user.tab();
@@ -119,7 +119,7 @@ describe('R-0164 伝票ヘッダーの自動保存と離脱警告', () => {
     const user = userEvent.setup();
     const { releasePut } = stubFetch({ holdPut: true });
     renderPage();
-    await screen.findByText('Beaver作成');
+    await screen.findByDisplayValue('2026-10-10');
     const description = document.querySelector('input[name="description"]') as HTMLInputElement;
     await user.type(description, '保存中');
     await user.tab();
@@ -135,7 +135,7 @@ describe('R-0164 伝票ヘッダーの自動保存と離脱警告', () => {
     const user = userEvent.setup();
     stubFetch();
     renderPage();
-    await screen.findByText('Beaver作成');
+    await screen.findByDisplayValue('2026-10-10');
     await user.click(screen.getByRole('button', { name: '閉じる' }));
     expect(await screen.findByText('伝票一覧')).toBeTruthy();
     expect(confirm).not.toHaveBeenCalled();
@@ -144,7 +144,7 @@ describe('R-0164 伝票ヘッダーの自動保存と離脱警告', () => {
   it('編集できない伝票では変更操作ができず保存も送られない', async () => {
     stubFetch({ voucher: { ...baseVoucher, status: 'billed' } });
     renderPage();
-    await screen.findByText('Beaver作成');
+    await screen.findByDisplayValue('2026-10-10');
     expect((document.querySelector('input[name="description"]') as HTMLInputElement).disabled).toBe(true);
     expect(putRequests()).toHaveLength(0);
   });
@@ -165,7 +165,7 @@ describe('R-0164 伝票ヘッダーの自動保存と離脱警告', () => {
   it('既存伝票では保存・キャンセルボタンを表示しない', async () => {
     stubFetch();
     renderPage();
-    await screen.findByText('Beaver作成');
+    await screen.findByDisplayValue('2026-10-10');
     expect(screen.queryByRole('button', { name: '保存' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'キャンセル' })).toBeNull();
   });

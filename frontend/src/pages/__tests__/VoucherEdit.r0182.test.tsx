@@ -64,7 +64,7 @@ function renderVoucher(client = createClient()) {
 
 async function editDescription() {
   const user = userEvent.setup();
-  await screen.findByText('Beaver作成');
+  await screen.findByDisplayValue('2026-10-10');
   const description = document.querySelector('input[name="description"]') as HTMLInputElement;
   await user.clear(description);
   await user.type(description, '編集後');

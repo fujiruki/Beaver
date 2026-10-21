@@ -79,7 +79,7 @@ describe('R-0164 既存伝票の明細行はフォーカスが外れたときに
     const user = userEvent.setup();
     stubFetch();
     renderPage();
-    await screen.findByText('Beaver作成');
+    await screen.findByDisplayValue('2026-10-10');
     await user.click(screen.getByRole('button', { name: '+ 行を追加' }));
     await waitFor(() => expect(linePosts()).toHaveLength(1));
     const itemName = await waitFor(() => {
