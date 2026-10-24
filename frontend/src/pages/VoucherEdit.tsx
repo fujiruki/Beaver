@@ -378,6 +378,8 @@ export default function VoucherEdit() {
 
   const editBlockReason = getVoucherEditBlockReason(voucher);
   const canEdit = ['draft', 'submitted', 'approved'].includes(voucher?.status ?? '') && editBlockReason === null;
+  const canEditLockedProject = !isNew && !isReadOnly
+    && (voucher?.status === 'billed' || voucher?.access_billed_flag === 1);
 
   const linesForCalc = (watchedLines ?? []).map(l => ({
     line_type: (l?.line_type ?? 'normal') as 'normal' | 'discount' | 'subtotal',
@@ -490,6 +492,25 @@ export default function VoucherEdit() {
     void processHeaderQueue();
   }
 
+  async function saveLockedProject() {
+    if (!formReady || !canEditLockedProject) return;
+    setSaveStatus('saving');
+    setSaveError(null);
+    try {
+      const projectId = getValues('project_id');
+      await enqueueVoucherWrite(expectedUpdatedAt => updateMutation.mutateAsync({
+        project_id: projectId ? Number(projectId) : null,
+        expected_updated_at: expectedUpdatedAt ?? undefined,
+      }));
+      reset(getValues(), { keepValues: true });
+      setSavedAt(new Date());
+      setSaveStatus('saved');
+    } catch (error) {
+      setSaveError(error);
+      setSaveStatus(staleRef.current ? 'unsaved' : 'error');
+    }
+  }
+
   function handleHeaderBlur(event: React.FocusEvent<HTMLFormElement>) {
     const target = event.target as unknown as HTMLInputElement;
     if (target.tagName !== 'INPUT' || target.type === 'date' || !HEADER_FIELDS.has(target.name as keyof VoucherFormValues)) return;
@@ -499,6 +520,10 @@ export default function VoucherEdit() {
   function handleHeaderChange(event: React.ChangeEvent<HTMLFormElement>) {
     const target = event.target as unknown as HTMLInputElement | HTMLSelectElement;
     if (!HEADER_FIELDS.has(target.name as keyof VoucherFormValues)) return;
+    if (target.name === 'project_id' && canEditLockedProject) {
+      queueMicrotask(() => void saveLockedProject());
+      return;
+    }
     if (target.tagName === 'SELECT' || (target as HTMLInputElement).type === 'date') {
       queueMicrotask(() => void queueHeaderSave());
     }
@@ -917,6 +942,7 @@ export default function VoucherEdit() {
             currentProjectId={voucher?.project_id ?? null}
             currentSalesCategoryId={voucher?.sales_category_id ?? null}
             readOnly={!formReady || isReadOnly || (!isNew && !canEdit)}
+            projectEditable={formReady && canEditLockedProject}
             onTaxInputTypeChange={() => queueMicrotask(() => void queueHeaderSave())}
           />
 

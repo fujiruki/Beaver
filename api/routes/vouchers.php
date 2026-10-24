@@ -1001,7 +1001,21 @@ switch ($method) {
         $textError = validateVoucherTextLengths($data);
         if ($textError !== null) { http_response_code(400); echo json_encode($textError); exit; }
         beginVoucherWrite($pdo, $resourceId, $data);
-        assertVoucherEditable($pdo, $resourceId);
+        // R-0196: 案件だけの変更は請求済み・引用済みロックを越えて許可する。
+        // 楽観ロック用の expected_updated_at は更新項目に数えない。
+        $updateKeys = array_values(array_diff(array_keys($data), ['expected_updated_at']));
+        $isProjectOnlyUpdate = $updateKeys === ['project_id'];
+        if ($isProjectOnlyUpdate) {
+            $statusStmt = $pdo->prepare('SELECT status FROM vouchers WHERE id = ?');
+            $statusStmt->execute([$resourceId]);
+            if ($statusStmt->fetchColumn() === 'void') {
+                http_response_code(409);
+                echo json_encode(['error' => '無効化済みの伝票は編集できません']);
+                exit;
+            }
+        } else {
+            assertVoucherEditable($pdo, $resourceId);
+        }
         if (array_key_exists('consumption_tax_type', $data) && !isValidConsumptionTaxType((string)$data['consumption_tax_type'])) {
             http_response_code(400);
             echo json_encode(['error' => 'consumption_tax_type は ' . implode('/', allowedConsumptionTaxTypes()) . ' のいずれかで指定してください']);

@@ -12,6 +12,7 @@ interface Props {
   currentProjectId?: number | null;
   currentSalesCategoryId?: number | null;
   readOnly?: boolean;
+  projectEditable?: boolean;
   onTaxInputTypeChange?: () => void;
 }
 
@@ -25,7 +26,7 @@ const STATUS_OPTIONS = [
 
 export default function VoucherHeader({
   customers, projects, salesCategories, currentCustomerId, currentProjectId, currentSalesCategoryId,
-  readOnly = false, onTaxInputTypeChange,
+  readOnly = false, projectEditable = false, onTaxInputTypeChange,
 }: Props) {
   const { register, watch, setValue, formState: { errors } } = useFormContext<VoucherFormValues>();
   const taxInputType = watch('tax_input_type');
@@ -62,7 +63,7 @@ export default function VoucherHeader({
           <select
             {...register('project_id')}
             style={selStyle}
-            disabled={readOnly}
+            disabled={readOnly && !projectEditable}
           >
             <option value="">-- 案件なし --</option>
             {currentProjectId != null && !projects.some(p => p.id === currentProjectId) && (
