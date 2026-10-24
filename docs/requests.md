@@ -658,3 +658,10 @@ R-0083（得意先 + ComboSelect共通化）のPhase1完了後の横展開。案
 - 手順: このプロジェクトで `/sddd-update` を実行する。更新元は `C:\Fujiruki\Projects\SDDD` の `templates`。新設の `docs/quality.md` と `docs/adr/ADR-0000-template.md` も追加する
 - まず LISU で試験運用し、問題がなければほかのプロジェクトへ広げる（2026-10-18 晴樹さん承認）
 - 設計: `C:\Fujiruki\Projects\SDDD\docs\kaigi\2026-10-18-SdDD-v1.0-quality.md`
+
+### 2026-10-25 R-0197: 割り当てモードの右の伝票をダブルクリックで詳細をモーダル表示（晴樹さん、dodai-back経由で転送）【中】
+
+> （案件一覧の割り当てモード https://door-fujita.com/contents/Beaver/projects?assign=1 のスクリーンショットを見せて）この画面で右の伝票をダブルクリックしたらその伝票の詳細がモーダルで開いてほしいな
+> あ、画面のUI配置などについてカンガルーのデザイン手順書をみて
+
+- 指揮役: カンガルーの「一流デザイン手順書2026」（00ルーター・UX版）を読んだ。UI/UX案件（C）。2026-10-24の決定で、デザインの案・判断はChatGPT/Codex、最終承認は晴樹さん、Claude Codeは実装と検証のみ。Codexに設計案（Primary Job・表示する情報の優先順位・配置・ドラッグとの両立・閉じ方）と実寸HTMLモックを作らせ、晴樹さんに選んでもらってから仕様を確定する
