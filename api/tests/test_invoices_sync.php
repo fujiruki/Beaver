@@ -276,6 +276,56 @@ try {
         assertEq([$voucherId1], array_map('intval', $rows2), '再送で1件に絞り込まれる');
     });
 
+    echo "=== R-0192 請求書の発行日 ===\n";
+
+    runTest('invoice_date付きの新規同期は指定日を保存する', function () use ($port) {
+        $r = httpJson($port, 'POST', '/invoices/sync', [
+            'access_receivable_id' => 90191,
+            'customer_access_no' => '100',
+            'invoice_date' => '2026-10-01',
+        ]);
+        assertTrue(str_contains($r['status'], '200'), 'HTTP 200: ' . $r['status']);
+        assertEq('2026-10-01', $r['body']['invoice_date'], '指定した発行日');
+    });
+
+    runTest('invoice_dateなしの新規同期は受信日を保存する', function () use ($port) {
+        $r = httpJson($port, 'POST', '/invoices/sync', [
+            'access_receivable_id' => 90192,
+            'customer_access_no' => '100',
+        ]);
+        assertTrue(str_contains($r['status'], '200'), 'HTTP 200: ' . $r['status']);
+        assertEq(date('Y-m-d'), $r['body']['invoice_date'], '受信日');
+    });
+
+    runTest('既存同期はinvoice_date付きなら更新し、省略時は保持する', function () use ($port) {
+        $updated = httpJson($port, 'POST', '/invoices/sync', [
+            'access_receivable_id' => 90191,
+            'customer_access_no' => '100',
+            'invoice_date' => '2026-10-02',
+        ]);
+        assertEq('2026-10-02', $updated['body']['invoice_date'], '指定日へ更新');
+
+        $preserved = httpJson($port, 'POST', '/invoices/sync', [
+            'access_receivable_id' => 90191,
+            'customer_access_no' => '100',
+        ]);
+        assertEq('2026-10-02', $preserved['body']['invoice_date'], '省略時は保持');
+    });
+
+    runTest('不正なinvoice_dateは400でDBを変更しない', function () use ($port, $testDbPath) {
+        $before = dbConn($testDbPath)->query('SELECT * FROM invoices WHERE access_receivable_id = 90191')->fetch();
+        $r = httpJson($port, 'POST', '/invoices/sync', [
+            'access_receivable_id' => 90191,
+            'customer_access_no' => '100',
+            'invoice_date' => '2026-02-30',
+            'invoice_total' => 999999,
+        ]);
+        assertTrue(str_contains($r['status'], '400'), 'HTTP 400: ' . $r['status']);
+        assertEq('Invalid invoice_date format', $r['body']['error'] ?? null, 'エラー文言');
+        $after = dbConn($testDbPath)->query('SELECT * FROM invoices WHERE access_receivable_id = 90191')->fetch();
+        assertEq($before, $after, 'DBは不変');
+    });
+
 } finally {
     if (is_resource($serverProc)) {
         foreach ($serverPipes as $p) { if (is_resource($p)) fclose($p); }
