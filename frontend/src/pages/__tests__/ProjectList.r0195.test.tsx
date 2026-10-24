@@ -99,10 +99,10 @@ describe('R-0195 案件一覧の伝票割り当てモード', () => {
     fireEvent.dragOver(project, { dataTransfer: transfer });
     fireEvent.drop(project, { dataTransfer: transfer });
 
-    await waitFor(() => expect(requests.some(r => r.method === 'PUT' && r.url.endsWith('/vouchers/11') && r.body?.project_id === 1)).toBe(true));
+    await waitFor(() => expect(requests.some(r => r.method === 'PUT' && r.url.endsWith('/vouchers/11') && JSON.stringify(r.body) === JSON.stringify({ project_id: 1 }))).toBe(true));
     await waitFor(() => expect(screen.queryByTestId('unlinked-voucher-11')).toBeNull());
     fireEvent.click(screen.getByRole('button', { name: '元に戻す' }));
-    await waitFor(() => expect(requests.some(r => r.method === 'PUT' && r.url.endsWith('/vouchers/11') && r.body?.project_id === null)).toBe(true));
+    await waitFor(() => expect(requests.some(r => r.method === 'PUT' && r.url.endsWith('/vouchers/11') && JSON.stringify(r.body) === JSON.stringify({ project_id: null }))).toBe(true));
   });
 
   it('得意先が違う場合は確認し、キャンセルならPUTしない', async () => {
