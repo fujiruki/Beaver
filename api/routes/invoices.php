@@ -45,6 +45,17 @@ function syncInvoiceUpsert(PDO $pdo): void {
         return;
     }
 
+    $invoiceDate = null;
+    if (array_key_exists('invoice_date', $data)) {
+        $candidate = is_string($data['invoice_date']) ? $data['invoice_date'] : '';
+        $date = DateTime::createFromFormat('Y-m-d', $candidate);
+        if ($date === false || $date->format('Y-m-d') !== $candidate) {
+            respond(400, ['error' => 'Invalid invoice_date format']);
+            return;
+        }
+        $invoiceDate = $candidate;
+    }
+
     $accessCustomerNo = isset($data['customer_access_no']) ? (string)$data['customer_access_no'] : '';
     $customerId = resolveCustomerId($pdo, $accessCustomerNo);
     if ($customerId === null) {
@@ -82,6 +93,7 @@ function syncInvoiceUpsert(PDO $pdo): void {
             $pdo->prepare('
                 UPDATE invoices SET
                     customer_id = :customer_id,
+                    invoice_date = COALESCE(:invoice_date, invoice_date),
                     cutoff_date = :cutoff_date,
                     billing_date = :billing_date,
                     carry_forward = :carry_forward,
@@ -96,6 +108,7 @@ function syncInvoiceUpsert(PDO $pdo): void {
                 WHERE id = :id
             ')->execute([
                 ':customer_id'         => $customerId,
+                ':invoice_date'        => $invoiceDate,
                 ':cutoff_date'         => $cutoffDate,
                 ':billing_date'        => $billingDate,
                 ':carry_forward'       => $carryForward,
@@ -124,7 +137,7 @@ function syncInvoiceUpsert(PDO $pdo): void {
             ')->execute([
                 ':invoice_no'          => $invoiceNo,
                 ':customer_id'         => $customerId,
-                ':invoice_date'        => date('Y-m-d'),
+                ':invoice_date'        => $invoiceDate ?? date('Y-m-d'),
                 ':cutoff_date'         => $cutoffDate,
                 ':billing_date'        => $billingDate,
                 ':carry_forward'       => $carryForward,
