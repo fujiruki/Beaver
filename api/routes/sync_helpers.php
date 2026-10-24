@@ -549,7 +549,7 @@ function syncVoucherUpsert(PDO $pdo, ?int $projectId): void {
                  :trade_type,
                  -- NOT NULL 列: fresh INSERT で未送信(null)ならスキーマ既定値を補完する。
                  COALESCE(:consumption_tax_type, ' . "'外税/伝票計'" . '),
-                 COALESCE(:print_date_flag, 1), COALESCE(:print_tax_excl_flag, 0), COALESCE(:print_company_seal, 0),
+                 COALESCE(:print_date_flag, 0), COALESCE(:print_tax_excl_flag, 0), COALESCE(:print_company_seal, 0),
                  :sales_category_id, :delivery_date, :billing_date, :source_estimate_no,
                  :validity_period, CURRENT_TIMESTAMP,
                  COALESCE(:access_billed_flag, 0), :access_billing_date, :access_receivable_id)
@@ -1246,7 +1246,7 @@ function syncVoucherUpdate(PDO $pdo, int $projectId, string $accessVoucherNo): v
                      :trade_type,
                      -- NOT NULL 列: fresh INSERT で未送信(null)ならスキーマ既定値を補完する。
                      COALESCE(:consumption_tax_type, ' . "'外税/伝票計'" . '),
-                     COALESCE(:print_date_flag, 1), COALESCE(:print_tax_excl_flag, 0), COALESCE(:print_company_seal, 0),
+                     COALESCE(:print_date_flag, 0), COALESCE(:print_tax_excl_flag, 0), COALESCE(:print_company_seal, 0),
                      :sales_category_id, :delivery_date, :billing_date, :source_estimate_no,
                      :validity_period)
             ')->execute([

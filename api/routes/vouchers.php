@@ -930,7 +930,7 @@ switch ($method) {
             ':profit_rate'          => $data['profit_rate'] ?? 0.30,
             ':memo'                 => $data['memo'] ?? null,
             ':description'          => $data['description'] ?? null,
-            ':print_date_flag'      => $data['print_date_flag'] ?? 1,
+            ':print_date_flag'      => $data['print_date_flag'] ?? 0,
             ':print_tax_excl_flag'  => $data['print_tax_excl_flag'] ?? 0,
             ':print_company_seal'   => $data['print_company_seal'] ?? 0,
             ':validity_period'      => $data['validity_period'] ?? null,
