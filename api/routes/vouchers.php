@@ -900,14 +900,14 @@ switch ($method) {
         $stmt = $pdo->prepare('
             INSERT INTO vouchers
                 (voucher_no, voucher_type, status, project_id, customer_id,
-                 voucher_date, delivery_date, tax_input_type, consumption_tax_type,
+                 voucher_date, due_date, delivery_date, tax_input_type, consumption_tax_type,
                  cutoff_date, billing_date, override_billing_date,
                  trade_type, profit_rate, memo, description,
                  print_date_flag, print_tax_excl_flag, print_company_seal,
                  validity_period, sales_category_id)
             VALUES
                 (:voucher_no, :voucher_type, "draft", :project_id, :customer_id,
-                 :voucher_date, :delivery_date, :tax_input_type, :consumption_tax_type,
+                 :voucher_date, :due_date, :delivery_date, :tax_input_type, :consumption_tax_type,
                  :cutoff_date, :billing_date, :override_billing_date,
                  :trade_type, :profit_rate, :memo, :description,
                  :print_date_flag, :print_tax_excl_flag, :print_company_seal,
@@ -919,6 +919,7 @@ switch ($method) {
             ':project_id'           => $data['project_id'] ?? null,
             ':customer_id'          => $data['customer_id'] ?? null,
             ':voucher_date'         => $data['voucher_date'] ?? date('Y-m-d'),
+            ':due_date'             => $data['due_date'] ?? null,
             ':delivery_date'        => $data['delivery_date'] ?? null,
             ':tax_input_type'       => $data['tax_input_type'] ?? 'exclusive',
             ':consumption_tax_type' => $data['consumption_tax_type'] ?? '外税/伝票計',
@@ -1000,7 +1001,7 @@ switch ($method) {
             echo json_encode(['error' => 'consumption_tax_type は ' . implode('/', allowedConsumptionTaxTypes()) . ' のいずれかで指定してください']);
             exit;
         }
-        $fields = ['status','project_id','customer_id','voucher_date','delivery_date',
+        $fields = ['status','project_id','customer_id','voucher_date','due_date','delivery_date',
                    'tax_input_type','consumption_tax_type','cutoff_date','billing_date','override_billing_date',
                    'trade_type','profit_rate','memo','description',
                    'print_date_flag','print_tax_excl_flag','print_company_seal',

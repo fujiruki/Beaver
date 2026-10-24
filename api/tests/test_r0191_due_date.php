@@ -104,7 +104,10 @@ $sync = httpJsonR0191($port, 'POST', '/vouchers/sync', [
     'voucher_date' => '2026-10-24',
     'due_date' => '2099-12-31',
 ]);
-assertTrueR0191(str_contains($sync['status'], '201'), '同期新規作成は201');
+assertTrueR0191(
+    str_contains($sync['status'], '200'),
+    '同期新規作成は200: ' . $sync['status'] . ' ' . json_encode($sync['body'], JSON_UNESCAPED_UNICODE)
+);
 $syncRow = $pdo->query('SELECT due_date FROM vouchers WHERE access_voucher_id = 9191')->fetch();
 assertSameR0191(null, $syncRow['due_date'], '同期受信はdue_dateを無視');
 

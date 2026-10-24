@@ -35,6 +35,7 @@ export type VoucherFormValues = {
   customer_id: string;
   project_id: string;
   voucher_date: string;
+  due_date: string | null;
   delivery_date: string | null;
   tax_input_type: TaxInputType;
   consumption_tax_type: string;
@@ -110,6 +111,7 @@ const defaultValues: VoucherFormValues = {
   customer_id: '0',
   project_id: '',
   voucher_date: new Date().toISOString().split('T')[0],
+  due_date: null,
   delivery_date: null,
   tax_input_type: 'exclusive',
   consumption_tax_type: '外税/伝票計',
@@ -125,7 +127,7 @@ const defaultValues: VoucherFormValues = {
 
 const LEAVE_MESSAGE = '保存されていない変更があります。破棄して移動しますか？';
 const HEADER_FIELDS = new Set<keyof VoucherFormValues>([
-  'voucher_type', 'status', 'customer_id', 'project_id', 'voucher_date', 'delivery_date',
+  'voucher_type', 'status', 'customer_id', 'project_id', 'voucher_date', 'due_date', 'delivery_date',
   'tax_input_type', 'consumption_tax_type', 'override_billing_date', 'trade_type', 'description',
   'profit_rate', 'memo', 'sales_category_id', 'validity_period',
 ]);
@@ -140,6 +142,7 @@ function toFormValues(voucher: Voucher): VoucherFormValues {
     customer_id: String(voucher.customer_id),
     project_id: voucher.project_id != null ? String(voucher.project_id) : '',
     voucher_date: voucher.voucher_date,
+    due_date: voucher.due_date,
     delivery_date: voucher.delivery_date,
     tax_input_type: voucher.tax_input_type,
     consumption_tax_type: voucher.consumption_tax_type,
@@ -397,6 +400,7 @@ export default function VoucherEdit() {
       customer_id: Number(data.customer_id),
       project_id: data.project_id ? Number(data.project_id) : null,
       voucher_date: data.voucher_date,
+      due_date: data.due_date,
       delivery_date: data.delivery_date,
       tax_input_type: data.tax_input_type,
       consumption_tax_type: data.consumption_tax_type,

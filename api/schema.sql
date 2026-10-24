@@ -147,6 +147,7 @@ CREATE TABLE IF NOT EXISTS vouchers (
     customer_id           INTEGER NOT NULL REFERENCES customers(id),
     -- 日付
     voucher_date          DATE NOT NULL,
+    due_date              DATE,
     delivery_date         DATE,
     -- 税設定（伝票単位）
     tax_input_type        TEXT NOT NULL DEFAULT 'exclusive',

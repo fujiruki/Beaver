@@ -99,9 +99,9 @@ export default function VoucherHeader({
         </Field>
       </div>
 
-      {/* 行2: 摘要 / 売上種別 / 納期 / 有効期限(見積のみ) / 税入力切替 */}
+      {/* 行2: 摘要 / 売上種別 / 納期 / 納品日 / 有効期限(見積のみ) / 税入力切替 */}
       <div style={{
-        display: 'grid', gridTemplateColumns: voucherType === 'estimate' ? '3fr 1fr 1fr 1fr auto' : '3fr 1fr 1fr auto',
+        display: 'grid', gridTemplateColumns: voucherType === 'estimate' ? '3fr 1fr 1fr 1fr 1fr auto' : '3fr 1fr 1fr 1fr auto',
         gap: 12, padding: '12px 16px', alignItems: 'end',
       }}>
         <Field label="摘要">
@@ -132,6 +132,15 @@ export default function VoucherHeader({
         </Field>
 
         <Field label="納期">
+          <input
+            type="date"
+            {...register('due_date')}
+            style={inpStyle}
+            disabled={readOnly}
+          />
+        </Field>
+
+        <Field label="納品日">
           <input
             type="date"
             {...register('delivery_date')}

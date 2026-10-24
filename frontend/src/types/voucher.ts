@@ -29,6 +29,7 @@ export interface Voucher {
   project_id: number | null;
   customer_id: number;
   voucher_date: string;
+  due_date: string | null;
   delivery_date: string | null;
   tax_input_type: TaxInputType;
   consumption_tax_type: string;
