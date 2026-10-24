@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useProjectsPaged, useDeleteProject } from '../api/projects';
 import { useCustomers } from '../api/customers';
@@ -10,6 +10,9 @@ import type { DataTableColumn, SortState } from '../components/DataTable';
 import YoukanLinkButton from '../components/YoukanLinkButton';
 import type { Project, ProjectStatus } from '../types/project';
 import { deadlineTierClassName, deadlineTierIcon, getDeadlineTier } from '../lib/dateHighlight';
+import { useAssignVoucher, useUnlinkedVouchers } from '../api/vouchers';
+import UndoToast from '../components/history/UndoToast';
+import type { Voucher, VoucherType } from '../types/voucher';
 
 // R-0091: sort=a,b&order=asc,desc 形式のURLクエリを複合ソートキー配列に変換する
 // R-0116: URL・localStorageに未設定の新規ブラウザでは、ステータス（工程順）→納期の複合ソートを既定にする
@@ -50,6 +53,10 @@ export default function ProjectList() {
   const [searchParams, setSearchParams] = useSearchParams();
   const customerFilter = searchParams.get('customer_id') ? Number(searchParams.get('customer_id')) : undefined;
   const statusFilter = searchParams.get('status') || undefined;
+  const assignMode = searchParams.get('assign') === '1';
+  const [undoVoucher, setUndoVoucher] = useState<Voucher | null>(null);
+  const [assignedIds, setAssignedIds] = useState<Set<number>>(() => new Set());
+  const assignMutation = useAssignVoucher();
 
   const [page, setPage] = useState(() => {
     const p = Number(searchParams.get('page'));
@@ -86,7 +93,37 @@ export default function ProjectList() {
       next.set('sort', nextSortKeys.map(s => s.key).join(','));
       next.set('order', nextSortKeys.map(s => s.dir).join(','));
     }
+    if (assignMode) next.set('assign', '1');
     setSearchParams(next, { replace: true });
+  }
+
+  function toggleAssignMode() {
+    const next = new URLSearchParams(searchParams);
+    if (assignMode) next.delete('assign');
+    else next.set('assign', '1');
+    setSearchParams(next);
+  }
+
+  async function assignVoucher(voucher: Voucher, project: Project) {
+    if (voucher.customer_id && voucher.customer_id !== project.customer_id) {
+      const ok = confirm(`得意先が違います（伝票: ${voucher.customer_name ?? '未設定'} ／ 案件: ${project.customer_name ?? '未設定'}）。この案件に入れますか`);
+      if (!ok) return;
+    }
+    await assignMutation.mutateAsync({ voucherId: voucher.id, projectId: project.id });
+    setAssignedIds(prev => new Set(prev).add(voucher.id));
+    setUndoVoucher(voucher);
+  }
+
+  async function undoAssignment() {
+    if (!undoVoucher) return;
+    const voucher = undoVoucher;
+    await assignMutation.mutateAsync({ voucherId: voucher.id, projectId: null });
+    setAssignedIds(prev => {
+      const next = new Set(prev);
+      next.delete(voucher.id);
+      return next;
+    });
+    setUndoVoucher(null);
   }
 
   function commitSearch(q: string) {
@@ -213,12 +250,23 @@ export default function ProjectList() {
           onClick={() => {
             const params = new URLSearchParams();
             if (customerFilter) params.set('customer_id', String(customerFilter));
+            if (assignMode) params.set('assign', '1');
             const qs = params.toString();
             navigate(`/projects/new${qs ? `?${qs}` : ''}`);
           }}
           className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700"
         >
           ＋ 新規登録
+        </button>
+      </div>
+
+      <div className="mb-3 flex justify-end">
+        <button
+          type="button"
+          onClick={toggleAssignMode}
+          className={`px-3 py-1.5 rounded-md text-sm border ${assignMode ? 'bg-slate-700 text-white border-slate-700' : 'bg-white text-slate-700 border-slate-300'}`}
+        >
+          {assignMode ? '割り当てを終了' : '伝票の割り当て'}
         </button>
       </div>
 
@@ -257,13 +305,21 @@ export default function ProjectList() {
         </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+      <div className={assignMode ? 'grid gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(360px,2fr)]' : ''}>
+      <div className="bg-white rounded-lg shadow-sm overflow-hidden min-w-0">
         <div className="md:hidden" data-testid="project-mobile-list">
           {projects.map(p => {
             const tier = getDeadlineTier(p.delivery_date, new Date());
             return (
               <div
                 key={p.id}
+                onDragOver={assignMode ? e => e.preventDefault() : undefined}
+                onDrop={assignMode ? e => {
+                  e.preventDefault();
+                  const voucherId = Number(e.dataTransfer.getData('text/plain'));
+                  const voucher = JSON.parse(e.dataTransfer.getData('application/x-beaver-voucher') || 'null') as Voucher | null;
+                  if (voucher && voucher.id === voucherId) void assignVoucher(voucher, p);
+                } : undefined}
                 onClick={() => navigate(`/projects/${p.id}`)}
                 className="p-3 border-b border-slate-100 last:border-0 cursor-pointer"
                 style={{ minHeight: 44 }}
@@ -302,6 +358,16 @@ export default function ProjectList() {
             multiSort
             sortKeys={sortKeys}
             onMultiSortChange={handleMultiSortChange}
+            getRowProps={assignMode ? p => ({
+              'data-testid': `assign-project-${p.id}`,
+              onDragOver: e => e.preventDefault(),
+              onDrop: e => {
+                e.preventDefault();
+                const voucherId = Number(e.dataTransfer.getData('text/plain'));
+                const voucher = JSON.parse(e.dataTransfer.getData('application/x-beaver-voucher') || 'null') as Voucher | null;
+                if (voucher && voucher.id === voucherId) void assignVoucher(voucher, p);
+              },
+            }) : undefined}
           />
         </div>
         {meta && (
@@ -314,6 +380,87 @@ export default function ProjectList() {
           />
         )}
       </div>
+      {assignMode && <UnlinkedVouchersPanel assignedIds={assignedIds} />}
+      </div>
+      {undoVoucher && (
+        <UndoToast
+          message={`${undoVoucher.voucher_no} を案件に割り当てました`}
+          onUndo={() => void undoAssignment()}
+          onDismiss={() => setUndoVoucher(null)}
+          pending={assignMutation.isPending}
+        />
+      )}
     </div>
+  );
+}
+
+function UnlinkedVouchersPanel({ assignedIds }: { assignedIds: Set<number> }) {
+  const [type, setType] = useState<'all' | VoucherType>('all');
+  const [search, setSearch] = useState('');
+  const { data, isLoading, error, hasNextPage, fetchNextPage, isFetchingNextPage } = useUnlinkedVouchers({
+    ...(type !== 'all' ? { voucher_type: type } : {}),
+    ...(search.trim() ? { q: search.trim() } : {}),
+  });
+  const vouchers = useMemo(() => (data?.pages.flatMap(page => page.data) ?? []).filter(voucher => {
+    if (assignedIds.has(voucher.id)) return false;
+    if (type !== 'all' && voucher.voucher_type !== type) return false;
+    const needle = search.trim().toLocaleLowerCase();
+    if (!needle) return true;
+    return [voucher.customer_name, voucher.description, voucher.voucher_no]
+      .some(value => (value ?? '').toLocaleLowerCase().includes(needle));
+  }), [assignedIds, data, search, type]);
+
+  return (
+    <aside className="bg-white rounded-lg shadow-sm p-4 min-w-0" data-testid="unlinked-vouchers-panel">
+      <h2 className="font-bold mb-3">未割り当て伝票</h2>
+      <div className="flex gap-1 mb-2">
+        {([['all', '両方'], ['estimate', '見積'], ['sales', '売上']] as const).map(([value, label]) => (
+          <button key={value} type="button" onClick={() => setType(value)}
+            className={`px-3 py-1 rounded-full text-xs border ${type === value ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-600 border-slate-300'}`}>
+            {label}
+          </button>
+        ))}
+      </div>
+      <input
+        type="search"
+        value={search}
+        onChange={e => setSearch(e.target.value)}
+        placeholder="得意先・摘要・伝票番号で検索"
+        className="w-full px-3 py-1.5 mb-3 border border-slate-300 rounded-md text-sm"
+      />
+      {isLoading && <p className="text-sm text-slate-500">読み込み中...</p>}
+      {error && <p className="text-sm text-red-600">伝票を読み込めませんでした</p>}
+      <div className="space-y-2">
+        {vouchers.map(voucher => (
+          <div
+            key={voucher.id}
+            draggable
+            data-testid={`unlinked-voucher-${voucher.id}`}
+            onDragStart={e => {
+              e.dataTransfer.effectAllowed = 'move';
+              e.dataTransfer.setData('text/plain', String(voucher.id));
+              e.dataTransfer.setData('application/x-beaver-voucher', JSON.stringify(voucher));
+            }}
+            className="border border-slate-200 rounded-md p-3 cursor-grab active:cursor-grabbing hover:border-blue-400"
+          >
+            <div className="flex justify-between gap-2 text-sm font-semibold">
+              <span>{voucher.voucher_date}</span>
+              <span>{voucher.voucher_no}</span>
+              <span className="text-xs text-slate-500">{voucher.voucher_type === 'estimate' ? '見積' : '売上'}</span>
+            </div>
+            <div className="text-sm mt-1">{voucher.customer_name ?? '得意先未設定'}</div>
+            <div className="text-xs text-slate-500 truncate">{voucher.description ?? '摘要なし'}</div>
+            <div className="text-sm text-right mt-1">¥{Number(voucher.total_amount ?? 0).toLocaleString()}</div>
+          </div>
+        ))}
+        {!isLoading && vouchers.length === 0 && <p className="text-sm text-slate-500 py-4 text-center">該当する伝票はありません</p>}
+      </div>
+      {hasNextPage && (
+        <button type="button" onClick={() => void fetchNextPage()} disabled={isFetchingNextPage}
+          className="mt-3 w-full px-3 py-2 border border-slate-300 rounded-md text-sm">
+          {isFetchingNextPage ? '読み込み中...' : 'もっと見る'}
+        </button>
+      )}
+    </aside>
   );
 }

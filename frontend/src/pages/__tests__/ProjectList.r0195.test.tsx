@@ -125,16 +125,16 @@ describe('R-0195 案件一覧の伝票割り当てモード', () => {
     await within(panel).findByText('E00011');
 
     fireEvent.click(within(panel).getByRole('button', { name: '売上' }));
+    expect(await within(panel).findByText('S00012')).toBeTruthy();
     expect(within(panel).queryByText('E00011')).toBeNull();
-    expect(within(panel).getByText('S00012')).toBeTruthy();
 
     fireEvent.click(within(panel).getByRole('button', { name: '両方' }));
     const search = within(panel).getByPlaceholderText('得意先・摘要・伝票番号で検索');
     fireEvent.change(search, { target: { value: '玄関' } });
-    expect(within(panel).getByText('E00011')).toBeTruthy();
+    expect(await within(panel).findByText('E00011')).toBeTruthy();
     expect(within(panel).queryByText('S00012')).toBeNull();
     fireEvent.change(search, { target: { value: 'S00012' } });
+    expect(await within(panel).findByText('S00012')).toBeTruthy();
     expect(within(panel).queryByText('E00011')).toBeNull();
-    expect(within(panel).getByText('S00012')).toBeTruthy();
   });
 });

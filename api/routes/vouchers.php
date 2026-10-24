@@ -569,6 +569,10 @@ switch ($method) {
             if (!empty($_GET['customer_id'])) { $where .= ' AND v.customer_id = ?'; $params[] = (int)$_GET['customer_id']; }
             if (!empty($_GET['project_id']))  { $where .= ' AND v.project_id = ?';  $params[] = (int)$_GET['project_id']; }
             if (!empty($_GET['status']))      { $where .= ' AND v.status = ?';      $params[] = $_GET['status']; }
+            // R-0195: 案件未割り当て一覧。取消済みは割り当て対象にしない。
+            if (($_GET['no_project'] ?? '') === '1') {
+                $where .= " AND v.project_id IS NULL AND v.status <> 'void'";
+            }
             if (($_GET['exclude_void'] ?? '') === '1' && ($_GET['status'] ?? '') !== 'void') {
                 $where .= " AND v.status <> 'void'";
             }
@@ -593,21 +597,23 @@ switch ($method) {
                 $cntStmt->execute($params);
                 $total = (int)$cntStmt->fetchColumn();
                 // R-076 Part A Phase 1: サーバソート（ホワイトリストは全てハードコード文字列・実カラム/JOIN別名のみ）
-                $sortClause = resolveSortClause(
-                    [
-                        'voucher_no'    => 'v.voucher_no',
-                        'voucher_type'  => 'v.voucher_type',
-                        'status'        => 'v.status',
-                        'customer_name' => 'c.name',
-                        'description'   => 'v.description',
-                        'project_name'  => 'p.name',
-                        'voucher_date'  => 'v.voucher_date',
-                        'total_amount'  => 'v.total_amount',
-                    ],
-                    'v.voucher_date',
-                    'v.id',
-                    'DESC'
-                );
+                $sortClause = (($_GET['no_project'] ?? '') === '1' && empty($_GET['sort']))
+                    ? 'ORDER BY v.voucher_date DESC, v.id DESC'
+                    : resolveSortClause(
+                        [
+                            'voucher_no'    => 'v.voucher_no',
+                            'voucher_type'  => 'v.voucher_type',
+                            'status'        => 'v.status',
+                            'customer_name' => 'c.name',
+                            'description'   => 'v.description',
+                            'project_name'  => 'p.name',
+                            'voucher_date'  => 'v.voucher_date',
+                            'total_amount'  => 'v.total_amount',
+                        ],
+                        'v.voucher_date',
+                        'v.id',
+                        'DESC'
+                    );
                 $stmt  = $pdo->prepare("
                     SELECT v.*, c.name AS customer_name, p.name AS project_name, $quotedBySalesCol
                     FROM vouchers v
@@ -626,7 +632,7 @@ switch ($method) {
                     FROM vouchers v
                     LEFT JOIN customers c ON c.id = v.customer_id
                     LEFT JOIN projects  p ON p.id = v.project_id
-                    $where ORDER BY v.voucher_date DESC
+                    $where ORDER BY v.voucher_date DESC, v.id DESC
                 ");
                 $stmt->execute($params);
                 echo json_encode($stmt->fetchAll());

@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery, type QueryClient } from '@tanstack/react-query';
 import { api } from './client';
 import type { Voucher, VoucherInput, VoucherLine } from '../types/voucher';
 import type { PaginatedResponse, SortParam } from '../types/pagination';
@@ -17,7 +17,36 @@ type VoucherFilters = {
   customer_id?: number;
   project_id?: number;
   exclude_void?: boolean;
+  no_project?: boolean;
 };
+
+/** R-0195: 案件未割り当て伝票を50件ずつ取得する */
+export function useUnlinkedVouchers(filters?: Pick<VoucherFilters, 'q' | 'voucher_type'>) {
+  return useInfiniteQuery({
+    queryKey: [KEY, 'unlinked', filters],
+    initialPageParam: 1,
+    queryFn: ({ pageParam }) => {
+      const params = new URLSearchParams({ no_project: '1', page: String(pageParam), per_page: '50' });
+      if (filters?.q) params.set('q', filters.q);
+      if (filters?.voucher_type) params.set('voucher_type', filters.voucher_type);
+      return api.get<PaginatedResponse<Voucher>>(`/vouchers?${params}`);
+    },
+    getNextPageParam: lastPage => lastPage.meta.page < lastPage.meta.last_page ? lastPage.meta.page + 1 : undefined,
+  });
+}
+
+/** R-0195: 既存PUTで案件を割り当て、または解除する */
+export function useAssignVoucher() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ voucherId, projectId }: { voucherId: number; projectId: number | null }) =>
+      api.put<Voucher>(`/vouchers/${voucherId}`, { project_id: projectId }),
+    onSuccess: () => {
+      invalidateProjects(queryClient);
+      queryClient.invalidateQueries({ queryKey: [KEY] });
+    },
+  });
+}
 
 /** 伝票一覧取得（全件・KPI等用） */
 export function useVouchers(filters?: VoucherFilters) {

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import type { CSSProperties, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, ReactNode } from 'react';
+import type { CSSProperties, HTMLAttributes, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent, ReactNode } from 'react';
 import { APP_STORAGE_PREFIX } from '../lib/appId';
 
 export type SortDir = 'asc' | 'desc';
@@ -32,6 +32,7 @@ interface DataTableProps<T> {
   onMultiSortChange?: (keys: SortState[]) => void;
   emptyMessage?: string;
   density?: 'compact';
+  getRowProps?: (row: T) => HTMLAttributes<HTMLTableRowElement>;
 }
 
 export interface SortState {
@@ -246,6 +247,7 @@ export default function DataTable<T>({
   onMultiSortChange,
   emptyMessage = '登録なし',
   density = 'compact',
+  getRowProps,
 }: DataTableProps<T>) {
   const { widths, setWidth, persist } = useColumnWidths(tableId, columns);
   const { order, reorder } = useColumnOrder(tableId, columns);
@@ -440,9 +442,11 @@ export default function DataTable<T>({
             </td>
           </tr>
         )}
-        {rows.map(row => (
-          <tr
+        {rows.map(row => {
+          const extraRowProps = getRowProps?.(row);
+          return <tr
             key={rowKey(row)}
+            {...extraRowProps}
             className="bv-datatable-row"
             style={{ borderBottom: '1px solid #f1f5f9', cursor: onRowClick ? 'pointer' : undefined }}
             onClick={() => onRowClick?.(row)}
@@ -456,8 +460,8 @@ export default function DataTable<T>({
                 {col.render(row)}
               </td>
             ))}
-          </tr>
-        ))}
+          </tr>;
+        })}
       </tbody>
       </table>
     </div>
