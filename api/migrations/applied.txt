@@ -78,3 +78,4 @@
 035_sync_state_heartbeat  2026-09-27  prod (緊急インシデント対応。vouchers.sync_pending・sync_heartbeatsテーブル存在確認済み)
 036_invoices_payments_updated_at  2026-09-27  prod (緊急インシデント対応。invoices.updated_at/payments.updated_at存在確認済み)
 038_vouchers_due_date  2026-10-24  beaver_beta (R-0191。vouchers.due_dateを追加、SSH+PHP PDO経由で適用。backup: database_beta_20261024_1043_pre_038_due_date.sqlite)
+038_vouchers_due_date  2026-10-24  prod (R-0191。vouchers.due_dateを追加、SSH+PHP PDO経由で適用。晴樹さんOK。backup: database_beaver_20261024_1046_pre_038_r0193_e02046.sqlite)
