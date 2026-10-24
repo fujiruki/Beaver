@@ -23,6 +23,15 @@
 - 割り当ては既存の`PUT /vouchers/{id}`の`project_id`で行う（楽観ロックなど既存の扱いに従う）。新しい書き込みAPIは作らない
 - 同期: `project_id`の変更で`updated_at`が進むので、Accessは次のプルで受け取る（今の仕組みのまま）
 
+## 追補: 請求済みの売上に印を付ける（2026-10-24）
+
+dodai-backより、Accessでは請求済みの売上はBeaver版の採用が止まる（AccessTategu R-0177・F-14）ため、Beaverで案件に入れてもAccessには入らない。晴樹さんの選択「印を付けて残す」。
+
+- 右の一覧の売上で、`status`が`billed`または`access_billed_flag`が1のものに「請求済み（Accessには入らない）」の印を付ける。一覧には残し、ドラッグもできる
+- 応答に`access_billed_flag`が無ければ足す
+
+7. 請求済みの売上の行に印が付き、未請求の売上と見積には付かない
+
 ## 受け入れ条件（テスト）
 
 1. `GET /vouchers?no_project=1`は、案件なし・voidでない伝票だけを、伝票日付の新しい順で返し、得意先名と摘要を含む
