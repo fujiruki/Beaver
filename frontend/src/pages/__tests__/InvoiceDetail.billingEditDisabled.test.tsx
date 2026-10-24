@@ -19,7 +19,9 @@ const baseInvoice = {
   payment_received: 0,
   invoice_total: 1100,
   next_carry_forward: 1100,
-  vouchers: [],
+  vouchers: [
+    { id: 30, voucher_no: 'S-30', voucher_date: '2026-01-01', total_amount: 1100, description: null },
+  ],
   payments: [
     { id: 10, payment_no: 'P-10', customer_id: 1, invoice_id: 3, payment_date: '2026-01-05',
       amount: 500, payment_type: '振込', memo: null, created_at: '', updated_at: '' },
@@ -83,5 +85,13 @@ describe('InvoiceDetail R-0143 A-B-05 請求・入金編集の封印', () => {
     expect(screen.getByRole('button', { name: '削除' })).toBeTruthy();
     expect(screen.getByRole('button', { name: '+ 入金登録' })).toBeTruthy();
     expect(screen.getByRole('button', { name: '取消' })).toBeTruthy();
+  });
+
+  it('請求明細の日付列を売上日と表示する', async () => {
+    stubFetch(false);
+    renderPage('/invoices/3');
+
+    await screen.findByText('I-3', { exact: false });
+    expect(screen.getByRole('columnheader', { name: '売上日' })).toBeTruthy();
   });
 });
