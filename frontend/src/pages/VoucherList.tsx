@@ -184,7 +184,7 @@ function VoucherListBody() {
     { key: 'project_name', label: '案件', sortable: true, render: v => v.project_name ?? '-' },
     {
       key: 'voucher_date',
-      label: '伝票日付',
+      label: typeFilter === 'estimate' ? '見積日' : typeFilter === 'sales' ? '売上日' : '伝票日付',
       sortable: true,
       render: v => (
         <span className={isRecentVoucherDate(v.voucher_date, new Date()) ? 'text-blue-600 font-medium' : ''}>

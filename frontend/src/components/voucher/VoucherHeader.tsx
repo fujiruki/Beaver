@@ -74,7 +74,7 @@ export default function VoucherHeader({
           </select>
         </Field>
 
-        <Field label="伝票日付 *" error={errors.voucher_date?.message}>
+        <Field label={`${voucherType === 'estimate' ? '見積日' : '売上日'} *`} error={errors.voucher_date?.message}>
           <input
             type="date"
             {...register('voucher_date', { required: '必須です' })}

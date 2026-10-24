@@ -233,7 +233,7 @@ export default function InvoiceDetail() {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ background: '#f8fafc' }}>
-                    <Th>伝票番号</Th><Th>伝票日付</Th><Th right>金額</Th><Th>備考</Th>
+                    <Th>伝票番号</Th><Th>売上日</Th><Th right>金額</Th><Th>備考</Th>
                   </tr>
                 </thead>
                 <tbody>
