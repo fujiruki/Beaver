@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>R-0197 伝票詳細モーダル 実寸モック</title>
+<style>
+  :root { --ink:#172033; --muted:#64748b; --line:#cfd6df; --soft:#f4f6f8; --blue:#2563eb; --paper:#fff; }
+  * { box-sizing:border-box; }
+  body { margin:0; color:var(--ink); background:#e9edf2; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif; font-size:14px; }
+  button,input { font:inherit; }
+  .page-title { width:1440px; margin:24px auto 10px; }
+  .page-title h1 { margin:0 0 5px; font-size:20px; }
+  .page-title p { margin:0; color:var(--muted); font-size:13px; }
+  .stage { position:relative; width:1440px; height:900px; margin:0 auto 36px; overflow:hidden; background:#f7f8fa; border:1px solid #b8c0ca; box-shadow:0 8px 30px rgba(15,23,42,.12); }
+  .appbar { height:54px; display:flex; align-items:center; justify-content:space-between; padding:0 28px; background:#26364d; color:#fff; }
+  .brand { font-size:17px; font-weight:700; letter-spacing:.03em; }
+  .nav { display:flex; gap:22px; font-size:13px; color:#dbe4f0; }
+  .workspace { padding:22px 28px; }
+  .topline { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+  .topline h2 { margin:0; font-size:20px; }
+  .btn { height:34px; padding:0 13px; border:1px solid #aeb8c5; border-radius:6px; background:#fff; color:#334155; cursor:pointer; }
+  .btn.primary { border-color:var(--blue); background:var(--blue); color:#fff; }
+  .toolbar { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+  .search { width:260px; height:34px; padding:0 10px; border:1px solid #b9c2ce; border-radius:6px; background:white; }
+  .split { display:grid; grid-template-columns:minmax(0,3fr) minmax(380px,2fr); gap:16px; }
+  .panel { background:#fff; border:1px solid #dde2e8; border-radius:8px; box-shadow:0 1px 3px rgba(15,23,42,.06); overflow:hidden; }
+  .project-head,.project-row { display:grid; grid-template-columns:92px 1.35fr 1fr 92px 96px; align-items:center; min-height:49px; padding:0 14px; border-bottom:1px solid #e5e9ee; }
+  .project-head { min-height:38px; background:#f5f7f9; color:#596579; font-size:12px; font-weight:650; }
+  .project-row strong { font-weight:650; }
+  .project-row small { color:var(--muted); }
+  .status { display:inline-flex; align-items:center; width:max-content; min-height:22px; padding:2px 8px; border:1px solid #9da8b5; border-radius:999px; background:#fff; color:#3f4b5c; font-size:11px; }
+  .voucher-panel { padding:15px; }
+  .voucher-panel h3 { margin:0 0 11px; font-size:15px; }
+  .tabs { display:flex; gap:5px; margin-bottom:8px; }
+  .tab { height:27px; padding:0 11px; border:1px solid #bdc6d0; border-radius:99px; background:#fff; color:#536174; font-size:12px; }
+  .tab.active { border-color:#334155; background:#334155; color:#fff; }
+  .voucher-search { width:100%; height:33px; padding:0 10px; margin-bottom:10px; border:1px solid #bbc4cf; border-radius:6px; }
+  .voucher-card { margin-top:8px; padding:11px 12px; border:1px solid #bdc6d0; border-radius:6px; background:#fff; cursor:grab; }
+  .voucher-card.focused { outline:2px solid #2563eb; outline-offset:1px; }
+  .voucher-card .line1 { display:flex; justify-content:space-between; gap:10px; font-size:13px; font-weight:650; }
+  .voucher-card .customer { margin-top:6px; }
+  .voucher-card .desc { margin-top:2px; overflow:hidden; color:var(--muted); font-size:12px; white-space:nowrap; text-overflow:ellipsis; }
+  .voucher-card .amount { margin-top:4px; text-align:right; font-variant-numeric:tabular-nums; }
+  .scrim { position:absolute; inset:54px 0 0; display:flex; align-items:center; justify-content:center; background:rgba(15,23,42,.24); }
+  .modal { width:960px; max-height:836px; display:flex; flex-direction:column; overflow:hidden; border:1px solid #8792a1; border-radius:9px; background:#fff; box-shadow:0 20px 55px rgba(15,23,42,.3); }
+  .modal-head { min-height:66px; display:flex; align-items:center; justify-content:space-between; padding:12px 18px; border-bottom:1px solid var(--line); }
+  .title-group { display:flex; align-items:center; gap:9px; }
+  .doc-title { font-size:19px; font-weight:700; letter-spacing:.02em; }
+  .kind { padding:2px 7px; border:1px solid #64748b; border-radius:4px; font-size:12px; font-weight:650; }
+  .state { padding:2px 7px; border:1px solid #aab3bf; border-radius:99px; color:#445164; font-size:11px; }
+  .close { width:36px; height:36px; border:0; border-radius:5px; background:transparent; color:#3f4b5b; font-size:25px; line-height:1; }
+  .close:hover { background:#eef1f4; }
+  .modal-body { overflow:auto; padding:18px; }
+  .facts { display:grid; grid-template-columns:160px 240px 1fr 150px; border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
+  .fact { min-height:66px; padding:9px 12px; border-right:1px solid #e0e4e9; }
+  .fact:last-child { border-right:0; }
+  .label { display:block; margin-bottom:4px; color:var(--muted); font-size:11px; font-weight:500; }
+  .value { font-size:15px; }
+  .description { margin:14px 0 16px; padding:0 2px; }
+  .description .value { line-height:1.55; }
+  .section-title { display:flex; align-items:baseline; justify-content:space-between; margin:0 0 7px; }
+  .section-title h4 { margin:0; font-size:14px; }
+  .section-title span { color:var(--muted); font-size:12px; }
+  .table-wrap { max-height:320px; overflow:auto; border:1px solid #bfc7d1; }
+  table { width:100%; border-collapse:collapse; table-layout:fixed; font-size:12px; }
+  th { position:sticky; top:0; z-index:1; height:34px; padding:0 8px; border-bottom:1px solid #aeb7c2; background:#eef1f4; color:#475569; text-align:left; font-weight:650; }
+  td { min-height:43px; padding:8px; border-bottom:1px solid #dde2e7; vertical-align:top; line-height:1.4; }
+  tbody tr:last-child td { border-bottom:0; }
+  .num { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .no { width:38px; text-align:center; color:#667085; }
+  .item { width:210px; }
+  .place { width:120px; }
+  .qty { width:58px; }
+  .unit { width:92px; }
+  .sum { width:100px; }
+  .memo-col { width:190px; color:#5c6879; }
+  .note-total { display:grid; grid-template-columns:1fr 290px; gap:22px; margin-top:15px; }
+  .note { min-height:76px; padding:10px 12px; border:1px solid #d4dae2; background:#fafbfc; line-height:1.55; }
+  .totals { width:100%; border-collapse:collapse; font-size:13px; }
+  .totals th,.totals td { position:static; height:auto; padding:5px 3px; border:0; background:transparent; }
+  .totals th { color:#5d6979; font-weight:500; text-align:left; }
+  .totals .grand th,.totals .grand td { padding-top:8px; border-top:1px solid #8793a1; color:#111827; font-size:17px; font-weight:700; }
+  .modal-foot { min-height:58px; display:flex; align-items:center; justify-content:space-between; padding:10px 18px; border-top:1px solid var(--line); background:#fafbfc; }
+  .link { border:0; background:transparent; color:#315a99; text-decoration:underline; text-underline-offset:3px; }
+  .hint { color:#6b7788; font-size:12px; }
+  .annotation { position:absolute; z-index:5; padding:6px 9px; border:1px solid #172033; border-radius:4px; background:#fff; box-shadow:0 2px 8px rgba(15,23,42,.15); font-size:11px; font-weight:650; }
+  .a-entry { top:72px; left:258px; }
+  .a-reading { top:292px; right:180px; }
+  .a-return { bottom:72px; right:252px; }
+  .compare { display:grid; grid-template-columns:1fr 1fr; width:1440px; margin:0 auto 40px; gap:18px; }
+  .compare-card { min-height:540px; overflow:hidden; border:1px solid #b8c0ca; background:#f6f7f9; box-shadow:0 5px 18px rgba(15,23,42,.09); }
+  .compare-head { padding:14px 16px; border-bottom:1px solid #cbd2db; background:#fff; }
+  .compare-head strong { display:block; font-size:16px; }
+  .compare-head span { color:var(--muted); font-size:12px; }
+  .mini-app { position:relative; height:480px; padding:18px; }
+  .mini-list { width:58%; height:100%; border:1px solid #ccd3dc; background:#fff; }
+  .mini-row { height:45px; padding:12px; border-bottom:1px solid #e1e5ea; font-size:12px; }
+  .drawer { position:absolute; top:0; right:0; width:54%; height:100%; padding:16px; border-left:1px solid #909aa7; background:white; box-shadow:-12px 0 30px rgba(15,23,42,.15); }
+  .drawer h3 { margin:0 0 14px; }
+  .drawer .facts { grid-template-columns:1fr 1fr; }
+  .drawer .fact { min-height:58px; }
+  .narrow-lines { margin-top:14px; border:1px solid #c8cfd8; }
+  .narrow-row { display:grid; grid-template-columns:1fr 74px; gap:8px; padding:9px; border-bottom:1px solid #e1e5ea; font-size:12px; }
+  .narrow-row:last-child { border-bottom:0; }
+  .state-board { padding:16px; background:#fff; }
+  .states { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .state-box { min-height:67px; padding:10px; border:1px solid #cbd2da; }
+  .state-box strong { display:block; margin-bottom:5px; font-size:12px; }
+  .state-box span { color:#627084; font-size:12px; }
+  .skeleton { height:8px; margin:6px 0; background:#dce1e7; border-radius:9px; }
+  .error { color:#a11d2b !important; }
+  @media (max-width:1450px) { .page-title,.stage,.compare { width:calc(100vw - 24px); } }
+</style>
+</head>
+<body>
+  <header class="page-title">
+    <h1>案A（推奨）— 軽量モーダル / 1440 × 900</h1>
+    <p>売上 S08468を表示。背景に案件一覧と未割り当て伝票を残し、閉じると元カードへ戻る。</p>
+  </header>
+
+  <main class="stage" aria-label="案件一覧上の伝票詳細モーダル">
+    <div class="appbar"><div class="brand">Beaver</div><div class="nav"><span>案件</span><span>伝票</span><span>請求</span><span>入金</span><span>設定</span></div></div>
+    <div class="workspace">
+      <div class="topline"><h2>案件一覧</h2><div><button class="btn">割り当てを終了</button> <button class="btn primary">＋ 新規登録</button></div></div>
+      <div class="toolbar"><input class="search" value="" placeholder="案件名・得意先名で検索"><span style="color:#64748b;font-size:12px">すべて　進行中　完了</span></div>
+      <div class="split">
+        <section class="panel">
+          <div class="project-head"><span>案件番号</span><span>案件名</span><span>得意先</span><span>状態</span><span>納期</span></div>
+          <div class="project-row"><small>P-02451</small><strong>只様邸 建具工事</strong><span>徳山建設</span><span class="status">進行中</span><span>2026-11-08</span></div>
+          <div class="project-row"><small>P-02448</small><strong>高尾店舗 改修</strong><span>住吉産業</span><span class="status">見積中</span><span>2026-11-18</span></div>
+          <div class="project-row"><small>P-02439</small><strong>西町集合住宅</strong><span>徳山建設</span><span class="status">進行中</span><span>2026-12-02</span></div>
+          <div class="project-row"><small>P-02427</small><strong>市民会館 木製扉</strong><span>山口工務店</span><span class="status">保留</span><span>—</span></div>
+          <div class="project-row"><small>P-02420</small><strong>住吉倉庫 修繕</strong><span>住吉産業</span><span class="status">完了</span><span>2026-10-20</span></div>
+        </section>
+        <aside class="panel voucher-panel">
+          <h3>未割り当て伝票</h3><div class="tabs"><button class="tab active">両方</button><button class="tab">見積</button><button class="tab">売上</button></div>
+          <input class="voucher-search" placeholder="得意先・摘要・伝票番号で検索">
+          <div class="voucher-card focused"><div class="line1"><span>2026-10-24</span><span>S08468</span><span>売上</span></div><div class="customer">徳山建設</div><div class="desc">只様邸 マグネットラッチ部材</div><div class="amount">¥1,100</div></div>
+          <div class="voucher-card"><div class="line1"><span>2026-10-23</span><span>E03988</span><span>見積</span></div><div class="customer">住吉産業</div><div class="desc">事務所棟 木製建具修繕工事</div><div class="amount">¥286,000</div></div>
+        </aside>
+      </div>
+    </div>
+
+    <div class="scrim">
+      <section class="modal" role="dialog" aria-modal="true" aria-labelledby="dialog-title">
+        <header class="modal-head">
+          <div class="title-group"><span class="doc-title" id="dialog-title">S08468</span><span class="kind">売上</span><span class="state">請求済み</span></div>
+          <button class="close" aria-label="閉じる">×</button>
+        </header>
+        <div class="modal-body">
+          <div class="facts">
+            <div class="fact"><span class="label">伝票日付</span><span class="value">2026年10月24日</span></div>
+            <div class="fact"><span class="label">得意先</span><span class="value">徳山建設</span></div>
+            <div class="fact"><span class="label">摘要</span><span class="value">只様邸 マグネットラッチ部材</span></div>
+            <div class="fact"><span class="label">合計金額</span><span class="value num">¥1,100</span></div>
+          </div>
+          <div class="description"><span class="label">摘要</span><span class="value">只様邸 マグネットラッチ部材</span></div>
+          <div class="section-title"><h4>明細</h4><span>全1件</span></div>
+          <div class="table-wrap">
+            <table><thead><tr><th class="no">No</th><th class="item">品名</th><th class="place">取付場所</th><th class="qty num">数量</th><th class="unit num">単価</th><th class="sum num">金額</th><th class="memo-col">備考</th></tr></thead>
+            <tbody><tr><td class="no">1</td><td>マグネットラッチ部材</td><td>只様邸</td><td class="num">1</td><td class="num">¥1,000</td><td class="num">¥1,000</td><td class="memo-col">交換用部材</td></tr></tbody></table>
+          </div>
+          <div class="note-total">
+            <div><span class="label">備考</span><div class="note">—</div></div>
+            <table class="totals"><tr><th>税抜金額</th><td class="num">¥1,000</td></tr><tr><th>消費税</th><td class="num">¥100</td></tr><tr class="grand"><th>合計</th><td class="num">¥1,100</td></tr></table>
+          </div>
+        </div>
+        <footer class="modal-foot"><button class="link">伝票画面で開く ↗</button><div><span class="hint">Escでも閉じる</span>　<button class="btn">閉じる</button></div></footer>
+      </section>
+      <span class="annotation a-entry">Entry：番号・種別・状態</span><span class="annotation a-reading">Reading：明細を横に読む</span><span class="annotation a-return">Return：閉じて元カードへ</span>
+    </div>
+  </main>
+
+  <section class="compare" aria-label="比較案と状態例">
+    <article class="compare-card">
+      <div class="compare-head"><strong>案B — 右ドロワー</strong><span>案件一覧は読めるが、明細の横幅が不足するため非推奨</span></div>
+      <div class="mini-app">
+        <div class="mini-list"><div class="mini-row"><b>P-02451</b>　只様邸 建具工事</div><div class="mini-row"><b>P-02448</b>　高尾店舗 改修</div><div class="mini-row"><b>P-02439</b>　西町集合住宅</div><div class="mini-row"><b>P-02427</b>　市民会館 木製扉</div></div>
+        <aside class="drawer">
+          <div style="display:flex;justify-content:space-between"><h3>E03988　<span class="kind">見積</span></h3><button class="close">×</button></div>
+          <div class="facts"><div class="fact"><span class="label">得意先</span>住吉産業</div><div class="fact"><span class="label">日付</span>2026年10月23日</div></div>
+          <p><span class="label">摘要</span>事務所棟 木製建具修繕工事</p>
+          <div class="section-title"><h4>明細</h4><span>全4件</span></div>
+          <div class="narrow-lines"><div class="narrow-row"><span>木製片開き戸<br><small>1階 事務室 / 1式</small></span><b class="num">¥80,000</b></div><div class="narrow-row"><span>木製引違い戸<br><small>2階 会議室 / 2枚</small></span><b class="num">¥120,000</b></div><div class="narrow-row"><span>ドアクローザー交換<br><small>玄関 / 1台</small></span><b class="num">¥35,000</b></div><div class="narrow-row"><span>現場調整費<br><small>各所 / 1式</small></span><b class="num">¥25,000</b></div></div>
+          <p style="font-size:12px;color:#5e6a7a;line-height:1.55"><span class="label">備考（65文字）</span>既存建具の寸法を現地で再確認のうえ製作。金物は既存同等品とし、搬入経路と作業時間は管理会社と事前調整してください。</p>
+          <div style="text-align:right;font-size:17px;font-weight:700;border-top:1px solid #8994a2;padding-top:8px">合計　¥286,000</div>
+        </aside>
+      </div>
+    </article>
+
+    <article class="compare-card">
+      <div class="compare-head"><strong>状態一覧</strong><span>白黒でも罫線・文言・配置で識別。色だけに依存しない。</span></div>
+      <div class="state-board">
+        <div class="states">
+          <div class="state-box"><strong>読込中</strong><div class="skeleton" style="width:82%"></div><div class="skeleton" style="width:63%"></div><div class="skeleton" style="width:74%"></div></div>
+          <div class="state-box"><strong>明細0件</strong><span>明細はありません</span></div>
+          <div class="state-box"><strong>明細が多い</strong><span>全12件　・　8行高で内部スクロール<br>列見出しは上部に固定</span></div>
+          <div class="state-box"><strong><span class="state">取消</span> void</strong><span>取消済みの伝票です。内容は参照できます。</span></div>
+          <div class="state-box"><strong><span class="state">請求済み</span></strong><span>情報として見出し横に表示。案件変更可能なので警告色にしない。</span></div>
+          <div class="state-box"><strong>読込失敗</strong><span class="error">伝票の詳細を読み込めませんでした。</span><br><button class="btn" style="height:28px;margin-top:6px">再試行</button></div>
+        </div>
+        <div style="margin-top:18px;padding:13px;border-top:1px solid #cbd2da;color:#4d5a6c;font-size:12px;line-height:1.7">
+          <b>操作:</b> ダブルクリック / Enter で開く　·　Esc / 外側クリック / × で閉じる<br>
+          <b>誤操作防止:</b> ポインターが4pxを超えて移動した操作系列では、ダブルクリックを発火しない。
+        </div>
+      </div>
+    </article>
+  </section>
+</body>
+</html>
