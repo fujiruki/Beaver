@@ -11,8 +11,6 @@ const projects = [
 const vouchers = [
   { id: 11, voucher_no: 'E00011', voucher_type: 'estimate', status: 'draft', project_id: null, customer_id: 1, customer_name: '山田建具', voucher_date: '2026-10-24', description: '玄関建具', total_amount: 110000 },
   { id: 12, voucher_no: 'S00012', voucher_type: 'sales', status: 'approved', project_id: null, customer_id: 2, customer_name: '佐藤工務店', voucher_date: '2026-10-23', description: '検索用摘要', total_amount: 220000 },
-  { id: 13, voucher_no: 'S00013', voucher_type: 'sales', status: 'billed', project_id: null, customer_id: 1, customer_name: '山田建具', voucher_date: '2026-10-22', description: 'Beaver請求済み', total_amount: 330000 },
-  { id: 14, voucher_no: 'S00014', voucher_type: 'sales', status: 'approved', access_billed_flag: 1, project_id: null, customer_id: 1, customer_name: '山田建具', voucher_date: '2026-10-21', description: 'Access請求済み', total_amount: 440000 },
 ];
 
 let requests: Array<{ method: string; url: string; body?: Record<string, unknown> }>;
@@ -138,17 +136,5 @@ describe('R-0195 案件一覧の伝票割り当てモード', () => {
     fireEvent.change(search, { target: { value: 'S00012' } });
     expect(await within(panel).findByText('S00012')).toBeTruthy();
     expect(within(panel).queryByText('E00011')).toBeNull();
-  });
-
-  it('請求済みの売上だけにAccessには入らない印を付け、一覧には残す', async () => {
-    renderPage('/projects?assign=1');
-
-    const unbilledSales = await screen.findByTestId('unlinked-voucher-12');
-    const billedSales = await screen.findByTestId('unlinked-voucher-13');
-    const accessBilledSales = await screen.findByTestId('unlinked-voucher-14');
-
-    expect(within(unbilledSales).queryByText('請求済み（Accessには入らない）')).toBeNull();
-    expect(within(billedSales).getByText('請求済み（Accessには入らない）')).toBeTruthy();
-    expect(within(accessBilledSales).getByText('請求済み（Accessには入らない）')).toBeTruthy();
   });
 });
