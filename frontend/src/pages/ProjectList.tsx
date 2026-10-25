@@ -1,5 +1,5 @@
-import { useMemo, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useProjectsPaged, useDeleteProject } from '../api/projects';
 import { useCustomers } from '../api/customers';
 import { useAppSettings } from '../contexts/AppSettingsContext';
@@ -10,7 +10,7 @@ import type { DataTableColumn, SortState } from '../components/DataTable';
 import YoukanLinkButton from '../components/YoukanLinkButton';
 import type { Project, ProjectStatus } from '../types/project';
 import { deadlineTierClassName, deadlineTierIcon, getDeadlineTier } from '../lib/dateHighlight';
-import { useAssignVoucher, useUnlinkedVouchers } from '../api/vouchers';
+import { useAssignVoucher, useUnlinkedVouchers, useVoucher } from '../api/vouchers';
 import UndoToast from '../components/history/UndoToast';
 import type { Voucher, VoucherType } from '../types/voucher';
 
@@ -397,6 +397,10 @@ export default function ProjectList() {
 function UnlinkedVouchersPanel({ assignedIds }: { assignedIds: Set<number> }) {
   const [type, setType] = useState<'all' | VoucherType>('all');
   const [search, setSearch] = useState('');
+  const [detailVoucher, setDetailVoucher] = useState<Voucher | null>(null);
+  const openedCardRef = useRef<HTMLElement | null>(null);
+  const pointerStartRef = useRef<{ x: number; y: number } | null>(null);
+  const suppressDoubleClickRef = useRef(false);
   const { data, isLoading, error, hasNextPage, fetchNextPage, isFetchingNextPage } = useUnlinkedVouchers({
     ...(type !== 'all' ? { voucher_type: type } : {}),
     ...(search.trim() ? { q: search.trim() } : {}),
@@ -410,8 +414,28 @@ function UnlinkedVouchersPanel({ assignedIds }: { assignedIds: Set<number> }) {
       .some(value => (value ?? '').toLocaleLowerCase().includes(needle));
   }), [assignedIds, data, search, type]);
 
+  function openDetail(voucher: Voucher, card: HTMLElement) {
+    if (detailVoucher) return;
+    openedCardRef.current = card;
+    setDetailVoucher(voucher);
+  }
+
+  function closeDetail() {
+    setDetailVoucher(null);
+    requestAnimationFrame(() => openedCardRef.current?.focus());
+  }
+
+  useEffect(() => {
+    if (!detailVoucher) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') closeDetail();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [detailVoucher]);
+
   return (
-    <aside className="bg-white rounded-lg shadow-sm p-4 min-w-0" data-testid="unlinked-vouchers-panel">
+    <aside className="relative bg-white rounded-lg shadow-sm p-4 min-w-0 overflow-hidden" data-testid="unlinked-vouchers-panel">
       <h2 className="font-bold mb-3">未割り当て伝票</h2>
       <div className="flex gap-1 mb-2">
         {([['all', '両方'], ['estimate', '見積'], ['sales', '売上']] as const).map(([value, label]) => (
@@ -435,8 +459,32 @@ function UnlinkedVouchersPanel({ assignedIds }: { assignedIds: Set<number> }) {
           <div
             key={voucher.id}
             draggable
+            tabIndex={0}
             data-testid={`unlinked-voucher-${voucher.id}`}
+            onPointerDown={e => {
+              pointerStartRef.current = { x: e.clientX, y: e.clientY };
+            }}
+            onPointerMove={e => {
+              const start = pointerStartRef.current;
+              if (start && Math.hypot(e.clientX - start.x, e.clientY - start.y) > 4) {
+                suppressDoubleClickRef.current = true;
+              }
+            }}
+            onPointerUp={() => {
+              pointerStartRef.current = null;
+            }}
+            onDoubleClick={e => {
+              if (suppressDoubleClickRef.current) {
+                suppressDoubleClickRef.current = false;
+                return;
+              }
+              openDetail(voucher, e.currentTarget);
+            }}
+            onKeyDown={e => {
+              if (e.key === 'Enter') openDetail(voucher, e.currentTarget);
+            }}
             onDragStart={e => {
+              suppressDoubleClickRef.current = true;
               e.dataTransfer.effectAllowed = 'move';
               e.dataTransfer.setData('text/plain', String(voucher.id));
               e.dataTransfer.setData('application/x-beaver-voucher', JSON.stringify(voucher));
@@ -461,6 +509,119 @@ function UnlinkedVouchersPanel({ assignedIds }: { assignedIds: Set<number> }) {
           {isFetchingNextPage ? '読み込み中...' : 'もっと見る'}
         </button>
       )}
+      {detailVoucher && (
+        <>
+          <button
+            type="button"
+            aria-label="詳細を閉じる"
+            data-testid="voucher-drawer-backdrop"
+            onClick={closeDetail}
+            className="absolute inset-0 z-10 h-full w-full cursor-default bg-slate-900/20"
+          />
+          <VoucherDetailDrawer voucherSummary={detailVoucher} onClose={closeDetail} />
+        </>
+      )}
     </aside>
+  );
+}
+
+function VoucherDetailDrawer({ voucherSummary, onClose }: { voucherSummary: Voucher; onClose: () => void }) {
+  const { data: voucher, isLoading, error, refetch, isFetching } = useVoucher(voucherSummary.id);
+  const shownVoucher = voucher ?? voucherSummary;
+  const status = shownVoucher.status;
+
+  return (
+    <section
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="voucher-detail-title"
+      className="absolute inset-y-0 right-0 z-20 flex h-full w-full min-w-0 flex-col border-l border-slate-300 bg-white shadow-2xl"
+    >
+      <header className="flex items-start justify-between gap-3 border-b border-slate-200 px-5 py-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <h2 id="voucher-detail-title" className="text-lg font-bold text-slate-900">{shownVoucher.voucher_no}</h2>
+          <span className="rounded border border-slate-300 px-2 py-0.5 text-xs font-semibold text-slate-700">
+            {shownVoucher.voucher_type === 'estimate' ? '見積' : '売上'}
+          </span>
+          {status === 'void' && <span className="rounded border border-slate-500 px-2 py-0.5 text-xs font-semibold">取消</span>}
+          {(status === 'billed' || shownVoucher.access_billed_flag === 1) && (
+            <span className="rounded border border-slate-400 px-2 py-0.5 text-xs font-semibold">請求済み</span>
+          )}
+        </div>
+        <button type="button" onClick={onClose} aria-label="閉じる" className="rounded p-1 text-xl leading-none text-slate-500 hover:bg-slate-100">×</button>
+      </header>
+
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-5 py-4">
+        {isLoading && (
+          <div aria-label="伝票詳細を読み込み中" className="space-y-4">
+            <div className="h-16 animate-pulse rounded bg-slate-100" />
+            <div className="h-10 w-4/5 animate-pulse rounded bg-slate-100" />
+            <div className="h-40 animate-pulse rounded bg-slate-100" />
+          </div>
+        )}
+
+        {error && !voucher && (
+          <div className="rounded border border-slate-300 p-4 text-sm">
+            <p className="mb-3 text-red-700">伝票の詳細を読み込めませんでした</p>
+            <button type="button" onClick={() => void refetch()} disabled={isFetching} className="rounded border border-slate-300 px-3 py-1.5 hover:bg-slate-50">
+              {isFetching ? '再試行中...' : '再試行'}
+            </button>
+          </div>
+        )}
+
+        {voucher && (
+          <>
+            {status === 'void' && <p className="mb-4 border border-slate-300 bg-slate-50 px-3 py-2 text-sm font-semibold">取消済みの伝票です</p>}
+            <dl className="grid grid-cols-2 border border-slate-200 text-sm">
+              <div className="min-h-16 border-r border-slate-200 p-3">
+                <dt className="mb-1 text-xs text-slate-500">得意先</dt>
+                <dd className="font-semibold text-slate-900">{voucher.customer_name ?? '得意先未設定'}</dd>
+              </div>
+              <div className="min-h-16 p-3">
+                <dt className="mb-1 text-xs text-slate-500">日付</dt>
+                <dd className="font-semibold text-slate-900">{voucher.voucher_date}</dd>
+              </div>
+            </dl>
+
+            <div className="border-x border-b border-slate-200 p-3 text-sm">
+              <div className="mb-1 text-xs text-slate-500">摘要</div>
+              <div className="font-medium text-slate-900">{voucher.description ?? '—'}</div>
+            </div>
+
+            <div className="mt-5 flex items-center justify-between border-b border-slate-300 pb-2">
+              <h3 className="font-bold">明細</h3>
+              <span className="text-xs text-slate-500">全{voucher.lines.length}件</span>
+            </div>
+            <div className="max-h-80 overflow-y-auto border-x border-b border-slate-300">
+              {voucher.lines.length === 0 ? (
+                <p className="p-6 text-center text-sm text-slate-500">明細はありません</p>
+              ) : voucher.lines.map(line => (
+                <div key={line.id} className="grid grid-cols-[minmax(0,1fr)_auto] gap-3 border-b border-slate-200 p-3 last:border-b-0">
+                  <div className="min-w-0">
+                    <div className="break-words text-sm font-semibold text-slate-900">{line.item_name ?? '品名未設定'}</div>
+                    <div className="mt-1 text-xs text-slate-500">{line.location_name ?? '取付場所なし'} / {Number(line.quantity).toLocaleString()}</div>
+                  </div>
+                  <div className="self-center whitespace-nowrap text-right text-sm font-semibold">¥{Number(line.line_total ?? 0).toLocaleString()}</div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-4 text-sm">
+              <div className="mb-1 text-xs text-slate-500">備考</div>
+              <p className="whitespace-pre-wrap text-slate-700">{voucher.memo ?? '—'}</p>
+            </div>
+
+            <div className="mt-5 border-t border-slate-500 pt-3 text-right text-lg font-bold">
+              合計　¥{Number(voucher.total_amount ?? 0).toLocaleString()}
+            </div>
+          </>
+        )}
+      </div>
+
+      <footer className="flex items-center justify-between border-t border-slate-200 px-5 py-3">
+        <Link to={`/vouchers/${voucherSummary.id}`} className="text-sm text-blue-700 underline underline-offset-2">伝票画面で開く</Link>
+        <span className="text-xs text-slate-400">Escでも閉じる</span>
+      </footer>
+    </section>
   );
 }

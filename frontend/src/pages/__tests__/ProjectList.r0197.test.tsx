@@ -118,12 +118,12 @@ describe('R-0197 未割り当て伝票の詳細ドロワー', () => {
 
     expect(within(drawer).getByText('E00011')).toBeTruthy();
     expect(within(drawer).getByText('見積')).toBeTruthy();
-    expect(within(drawer).getByText('山田建具')).toBeTruthy();
+    expect(await within(drawer).findByText('山田建具')).toBeTruthy();
     expect(within(drawer).getByText('玄関建具')).toBeTruthy();
     expect(within(drawer).getByText('全1件')).toBeTruthy();
     expect(within(drawer).getByText('木製片開き戸')).toBeTruthy();
     expect(within(drawer).getByText('¥110,000')).toBeTruthy();
-    expect(screen.getByText('山田邸改修')).toBeTruthy();
+    expect(screen.getAllByText('山田邸改修').length).toBeGreaterThan(0);
     expect(drawer.parentElement).toBe(screen.getByTestId('unlinked-vouchers-panel'));
   });
 
@@ -150,7 +150,7 @@ describe('R-0197 未割り当て伝票の詳細ドロワー', () => {
   it('中のクリックでは閉じず、Esc・×・外側クリックで閉じてカードにフォーカスを戻す', async () => {
     renderPage();
     const first = await openVoucher(11);
-    fireEvent.click(within(first.drawer).getByText('玄関建具'));
+    fireEvent.click(await within(first.drawer).findByText('玄関建具'));
     expect(screen.getByRole('dialog')).toBeTruthy();
     fireEvent.keyDown(document, { key: 'Escape' });
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
@@ -171,15 +171,15 @@ describe('R-0197 未割り当て伝票の詳細ドロワー', () => {
     renderPage();
     let opened = await openVoucher(12);
     expect(within(opened.drawer).getByText('取消')).toBeTruthy();
-    expect(within(opened.drawer).getByText('取消済みの伝票です')).toBeTruthy();
+    expect(await within(opened.drawer).findByText('取消済みの伝票です')).toBeTruthy();
     fireEvent.click(within(opened.drawer).getByRole('button', { name: '閉じる' }));
 
     opened = await openVoucher(13);
-    expect(within(opened.drawer).getByText('請求済み')).toBeTruthy();
+    expect(await within(opened.drawer).findByText('請求済み')).toBeTruthy();
     fireEvent.click(within(opened.drawer).getByRole('button', { name: '閉じる' }));
 
     opened = await openVoucher(14);
-    expect(within(opened.drawer).getByText('明細はありません')).toBeTruthy();
+    expect(await within(opened.drawer).findByText('明細はありません')).toBeTruthy();
     fireEvent.click(within(opened.drawer).getByRole('button', { name: '閉じる' }));
 
     detailFailures.add(15);
