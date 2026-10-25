@@ -56,6 +56,7 @@ export default function ProjectList() {
   const assignMode = searchParams.get('assign') === '1';
   const [undoVoucher, setUndoVoucher] = useState<Voucher | null>(null);
   const [assignedIds, setAssignedIds] = useState<Set<number>>(() => new Set());
+  const [selectedVoucherId, setSelectedVoucherId] = useState<number | null>(null);
   const assignMutation = useAssignVoucher();
 
   const [page, setPage] = useState(() => {
@@ -104,6 +105,26 @@ export default function ProjectList() {
     setSearchParams(next);
   }
 
+  function selectVoucher(voucher: Voucher) {
+    const isSelected = selectedVoucherId === voucher.id;
+    setSelectedVoucherId(isSelected ? null : voucher.id);
+    setPage(1);
+    const next = new URLSearchParams(searchParams);
+    next.delete('page');
+    if (!isSelected && voucher.customer_id) next.set('customer_id', String(voucher.customer_id));
+    else next.delete('customer_id');
+    setSearchParams(next);
+  }
+
+  function clearCustomerFilter() {
+    setSelectedVoucherId(null);
+    setPage(1);
+    const next = new URLSearchParams(searchParams);
+    next.delete('customer_id');
+    next.delete('page');
+    setSearchParams(next);
+  }
+
   async function assignVoucher(voucher: Voucher, project: Project) {
     if (voucher.customer_id && voucher.customer_id !== project.customer_id) {
       const ok = confirm(`得意先が違います（伝票: ${voucher.customer_name ?? '未設定'} ／ 案件: ${project.customer_name ?? '未設定'}）。この案件に入れますか`);
@@ -112,6 +133,7 @@ export default function ProjectList() {
     await assignMutation.mutateAsync({ voucherId: voucher.id, projectId: project.id });
     setAssignedIds(prev => new Set(prev).add(voucher.id));
     setUndoVoucher(voucher);
+    if (selectedVoucherId === voucher.id) clearCustomerFilter();
   }
 
   async function undoAssignment() {
@@ -241,9 +263,15 @@ export default function ProjectList() {
         <div className="flex items-center gap-3">
           <h1 className="text-xl font-bold">案件一覧</h1>
           {filterCustomer && (
-            <span className="text-sm text-slate-500 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
+            <button
+              type="button"
+              onClick={clearCustomerFilter}
+              aria-label="得意先の絞り込みを解除"
+              className="text-sm text-slate-500 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200"
+            >
               {filterCustomer.name} の案件
-            </span>
+              <span aria-hidden="true" className="ml-1">×</span>
+            </button>
           )}
         </div>
         <button
@@ -380,7 +408,13 @@ export default function ProjectList() {
           />
         )}
       </div>
-      {assignMode && <UnlinkedVouchersPanel assignedIds={assignedIds} />}
+      {assignMode && (
+        <UnlinkedVouchersPanel
+          assignedIds={assignedIds}
+          selectedVoucherId={selectedVoucherId}
+          onSelectVoucher={selectVoucher}
+        />
+      )}
       </div>
       {undoVoucher && (
         <UndoToast
@@ -394,7 +428,15 @@ export default function ProjectList() {
   );
 }
 
-function UnlinkedVouchersPanel({ assignedIds }: { assignedIds: Set<number> }) {
+function UnlinkedVouchersPanel({
+  assignedIds,
+  selectedVoucherId,
+  onSelectVoucher,
+}: {
+  assignedIds: Set<number>;
+  selectedVoucherId: number | null;
+  onSelectVoucher: (voucher: Voucher) => void;
+}) {
   const [type, setType] = useState<'all' | VoucherType>('all');
   const [search, setSearch] = useState('');
   const [detailVoucher, setDetailVoucher] = useState<Voucher | null>(null);
@@ -460,7 +502,9 @@ function UnlinkedVouchersPanel({ assignedIds }: { assignedIds: Set<number> }) {
             key={voucher.id}
             draggable
             tabIndex={0}
+            aria-pressed={selectedVoucherId === voucher.id}
             data-testid={`unlinked-voucher-${voucher.id}`}
+            onClick={() => onSelectVoucher(voucher)}
             onPointerDown={e => {
               pointerStartRef.current = { x: e.clientX, y: e.clientY };
             }}
@@ -489,7 +533,9 @@ function UnlinkedVouchersPanel({ assignedIds }: { assignedIds: Set<number> }) {
               e.dataTransfer.setData('text/plain', String(voucher.id));
               e.dataTransfer.setData('application/x-beaver-voucher', JSON.stringify(voucher));
             }}
-            className="border border-slate-200 rounded-md p-3 cursor-grab active:cursor-grabbing hover:border-blue-400"
+            className={`border rounded-md p-3 cursor-grab active:cursor-grabbing hover:border-blue-400 ${
+              selectedVoucherId === voucher.id ? 'border-blue-500 bg-blue-50' : 'border-slate-200'
+            }`}
           >
             <div className="flex justify-between gap-2 text-sm font-semibold">
               <span>{voucher.voucher_date}</span>
