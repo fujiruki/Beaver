@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { useProjectsPaged, useDeleteProject } from '../api/projects';
+import { useProjectsPaged, useDeleteProject, useCreateProject, useHardDeleteProject } from '../api/projects';
 import { useCustomers } from '../api/customers';
 import { useAppSettings } from '../contexts/AppSettingsContext';
 import Pagination from '../components/Pagination';
@@ -13,6 +13,7 @@ import { deadlineTierClassName, deadlineTierIcon, getDeadlineTier } from '../lib
 import { useAssignVoucher, useUnlinkedVouchers, useVoucher } from '../api/vouchers';
 import UndoToast from '../components/history/UndoToast';
 import type { Voucher, VoucherType } from '../types/voucher';
+import { ApiError } from '../api/client';
 
 // R-0091: sort=a,b&order=asc,desc 形式のURLクエリを複合ソートキー配列に変換する
 // R-0116: URL・localStorageに未設定の新規ブラウザでは、ステータス（工程順）→納期の複合ソートを既定にする
@@ -54,10 +55,13 @@ export default function ProjectList() {
   const customerFilter = searchParams.get('customer_id') ? Number(searchParams.get('customer_id')) : undefined;
   const statusFilter = searchParams.get('status') || undefined;
   const assignMode = searchParams.get('assign') === '1';
-  const [undoVoucher, setUndoVoucher] = useState<Voucher | null>(null);
+  const [undoAssignmentInfo, setUndoAssignmentInfo] = useState<{ voucher: Voucher; createdProjectId?: number } | null>(null);
   const [assignedIds, setAssignedIds] = useState<Set<number>>(() => new Set());
   const [selectedVoucherId, setSelectedVoucherId] = useState<number | null>(null);
+  const [assignmentError, setAssignmentError] = useState<string | null>(null);
   const assignMutation = useAssignVoucher();
+  const createMutation = useCreateProject();
+  const hardDeleteMutation = useHardDeleteProject();
 
   const [page, setPage] = useState(() => {
     const p = Number(searchParams.get('page'));
@@ -132,20 +136,59 @@ export default function ProjectList() {
     }
     await assignMutation.mutateAsync({ voucherId: voucher.id, projectId: project.id });
     setAssignedIds(prev => new Set(prev).add(voucher.id));
-    setUndoVoucher(voucher);
+    setUndoAssignmentInfo({ voucher });
+    if (selectedVoucherId === voucher.id) clearCustomerFilter();
+  }
+
+  function errorMessage(error: unknown) {
+    if (error instanceof ApiError && error.body && typeof error.body === 'object' && 'message' in error.body) {
+      return String(error.body.message);
+    }
+    return error instanceof Error ? error.message : '処理に失敗しました';
+  }
+
+  async function createProjectFromVoucher(voucher: Voucher) {
+    if (!voucher.customer_id) return;
+    setAssignmentError(null);
+    let project: Project;
+    try {
+      project = await createMutation.mutateAsync({
+        customer_id: voucher.customer_id,
+        name: voucher.description?.trim() || `${voucher.voucher_no}の案件`,
+        status: voucher.voucher_type === 'sales' ? '完了' : '見積済',
+      });
+    } catch (error) {
+      setAssignmentError(errorMessage(error));
+      return;
+    }
+
+    try {
+      await assignMutation.mutateAsync({ voucherId: voucher.id, projectId: project.id });
+    } catch (error) {
+      try {
+        await hardDeleteMutation.mutateAsync(project.id);
+      } finally {
+        setAssignmentError(errorMessage(error));
+      }
+      return;
+    }
+
+    setAssignedIds(prev => new Set(prev).add(voucher.id));
+    setUndoAssignmentInfo({ voucher, createdProjectId: project.id });
     if (selectedVoucherId === voucher.id) clearCustomerFilter();
   }
 
   async function undoAssignment() {
-    if (!undoVoucher) return;
-    const voucher = undoVoucher;
+    if (!undoAssignmentInfo) return;
+    const { voucher, createdProjectId } = undoAssignmentInfo;
     await assignMutation.mutateAsync({ voucherId: voucher.id, projectId: null });
+    if (createdProjectId) await hardDeleteMutation.mutateAsync(createdProjectId);
     setAssignedIds(prev => {
       const next = new Set(prev);
       next.delete(voucher.id);
       return next;
     });
-    setUndoVoucher(null);
+    setUndoAssignmentInfo(null);
   }
 
   function commitSearch(q: string) {
@@ -335,6 +378,19 @@ export default function ProjectList() {
 
       <div className={assignMode ? 'grid gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(360px,2fr)]' : ''}>
       <div className="bg-white rounded-lg shadow-sm overflow-hidden min-w-0">
+        {assignMode && (
+          <div
+            onDragOver={event => event.preventDefault()}
+            onDrop={event => {
+              event.preventDefault();
+              const voucher = JSON.parse(event.dataTransfer.getData('application/x-beaver-voucher') || 'null') as Voucher | null;
+              if (voucher?.customer_id) void createProjectFromVoucher(voucher);
+            }}
+            className="m-3 rounded-md border-2 border-dashed border-blue-300 bg-blue-50 px-4 py-3 text-center text-sm font-semibold text-blue-700"
+          >
+            新しい案件にする（ここへ落とす）
+          </div>
+        )}
         <div className="md:hidden" data-testid="project-mobile-list">
           {projects.map(p => {
             const tier = getDeadlineTier(p.delivery_date, new Date());
@@ -413,15 +469,18 @@ export default function ProjectList() {
           assignedIds={assignedIds}
           selectedVoucherId={selectedVoucherId}
           onSelectVoucher={selectVoucher}
+          onCreateProject={createProjectFromVoucher}
+          creating={createMutation.isPending || assignMutation.isPending || hardDeleteMutation.isPending}
         />
       )}
       </div>
-      {undoVoucher && (
+      {assignmentError && <p role="alert" className="mt-3 text-sm text-red-600">{assignmentError}</p>}
+      {undoAssignmentInfo && (
         <UndoToast
-          message={`${undoVoucher.voucher_no} を案件に割り当てました`}
+          message={`${undoAssignmentInfo.voucher.voucher_no} を案件に割り当てました`}
           onUndo={() => void undoAssignment()}
-          onDismiss={() => setUndoVoucher(null)}
-          pending={assignMutation.isPending}
+          onDismiss={() => setUndoAssignmentInfo(null)}
+          pending={assignMutation.isPending || hardDeleteMutation.isPending}
         />
       )}
     </div>
@@ -432,10 +491,14 @@ function UnlinkedVouchersPanel({
   assignedIds,
   selectedVoucherId,
   onSelectVoucher,
+  onCreateProject,
+  creating,
 }: {
   assignedIds: Set<number>;
   selectedVoucherId: number | null;
   onSelectVoucher: (voucher: Voucher) => void;
+  onCreateProject: (voucher: Voucher) => Promise<void>;
+  creating: boolean;
 }) {
   const [type, setType] = useState<'all' | VoucherType>('all');
   const [search, setSearch] = useState('');
@@ -564,14 +627,32 @@ function UnlinkedVouchersPanel({
             onClick={closeDetail}
             className="absolute inset-0 z-10 h-full w-full cursor-default bg-slate-900/20"
           />
-          <VoucherDetailDrawer voucherSummary={detailVoucher} onClose={closeDetail} />
+          <VoucherDetailDrawer
+            voucherSummary={detailVoucher}
+            onClose={closeDetail}
+            onCreateProject={async voucher => {
+              await onCreateProject(voucher);
+              closeDetail();
+            }}
+            creating={creating}
+          />
         </>
       )}
     </aside>
   );
 }
 
-function VoucherDetailDrawer({ voucherSummary, onClose }: { voucherSummary: Voucher; onClose: () => void }) {
+function VoucherDetailDrawer({
+  voucherSummary,
+  onClose,
+  onCreateProject,
+  creating,
+}: {
+  voucherSummary: Voucher;
+  onClose: () => void;
+  onCreateProject: (voucher: Voucher) => Promise<void>;
+  creating: boolean;
+}) {
   const { data: voucher, isLoading, error, refetch, isFetching } = useVoucher(voucherSummary.id);
   const shownVoucher = voucher ?? voucherSummary;
   const status = shownVoucher.status;
@@ -666,7 +747,14 @@ function VoucherDetailDrawer({ voucherSummary, onClose }: { voucherSummary: Vouc
 
       <footer className="flex items-center justify-between border-t border-slate-200 px-5 py-3">
         <Link to={`/vouchers/${voucherSummary.id}`} className="text-sm text-blue-700 underline underline-offset-2">伝票画面で開く</Link>
-        <span className="text-xs text-slate-400">Escでも閉じる</span>
+        <button
+          type="button"
+          onClick={() => void onCreateProject(shownVoucher)}
+          disabled={!shownVoucher.customer_id || creating}
+          className="rounded bg-blue-600 px-3 py-1.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-300"
+        >
+          この伝票で案件を作る
+        </button>
       </footer>
     </section>
   );

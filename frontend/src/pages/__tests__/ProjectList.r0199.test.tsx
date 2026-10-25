@@ -147,7 +147,7 @@ describe('R-0199 割り当てモードで伝票から案件を作る', () => {
     const card = await screen.findByTestId('unlinked-voucher-14');
     fireEvent.doubleClick(card);
     const button = await within(await screen.findByRole('dialog')).findByRole('button', { name: 'この伝票で案件を作る' });
-    expect(button).toBeDisabled();
+    expect(button).toHaveProperty('disabled', true);
     fireEvent.click(button);
     fireEvent.drop(await screen.findByText('新しい案件にする（ここへ落とす）'), { dataTransfer: dataTransfer(vouchers[3]) });
 
