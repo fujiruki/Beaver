@@ -34,7 +34,7 @@
 |:--|:--|:--|
 | `code` | 建具№ | 上のとおり |
 | `name` | 建具名 | 同期 |
-| `description` | 説明 または 備考 | **未決**（下の1） |
+| `description` | 備考 | 同期（3/17の取り込みと同じ。晴樹さんの言う「説明」は画面に出ている備考。Accessの説明の列は全件空なので同期しない） |
 | `status` | 使用不可 | `archived`⇔使用不可 |
 | `building_image_path` | 建具図 | 画像そのものを同期（下の「製品図」） |
 | `tategu_item_cost_lines` | 本体・金物・硝子 | `category_code` MAIN/HARDWARE/GLASS。台帳ごとに全件入れ替え。`sort_order`はAccessのID順 |
@@ -42,7 +42,7 @@
 | `cost_*`・`cost_breakdown` | 合計 | 同期しない。各側で明細から計算する |
 | `base_catalog_item_id`ほか | なし | Beaverだけ。Accessから来たときは触らない |
 
-Accessだけに置くもの: 金物1・金物2・硝子・仕上・KeyWord・木材設定・木材明細。
+Accessだけに置くもの: 説明・金物1・金物2・硝子・仕上・KeyWord・木材設定・木材明細。
 
 ### Beaverの画面で変えること
 
@@ -73,9 +73,9 @@ Beaver側の案。dodai-backに渡し、Access側をこれに合わせてもら�
 
 - 1台帳に1枚。置き場は`api/uploads/tategu/{id}/`。直接は開けない（`.htaccess`で`Require all denied`）、`GET /tategu-items/{id}/drawing`でだけ渡す（ログインか同期トークンが要る）
 - `building_image_path`には`uploads/tategu/{id}/`からのファイル名を入れる。新しく`drawing_sha256`（TEXT）を足す（migration）
-- `POST /tategu-items/{id}/drawing`: multipart、項目名`file`（PHPはPUTのmultipartを受けないためPOST）。受けるのはJPEG・PNG・GIF・BMP・PDF（拡張子でなく中身で判定）、10MBまで。置き換えたら古いファイルは消す。`updated_at`と`drawing_sha256`を変える
+- `POST /tategu-items/{id}/drawing`: multipart、項目名`file`（PHPはPUTのmultipartを受けないためPOST）。受けるのはJPEG・PNGだけ（拡張子でなく中身で判定）、10MBまで。Accessの建具図はほとんどWMF（1,237件中1,186件）で、ブラウザで出せないため、AccessがPNGに変えてから送る。置き換えたら古いファイルは消す。`updated_at`と`drawing_sha256`を変える
 - `DELETE /tategu-items/{id}/drawing`: 製品図を外す。`updated_at`を変え、`drawing_sha256`をNULLにする
-- 同期: 台帳の`drawing_sha256`が手元と違うときだけ、Accessは画像を取りに来る（または送る）。製品図だけ変えたときも台帳1件の変更として扱う（競合の単位も台帳1件）
+- 同期: `drawing_sha256`はBeaverに置いたファイルのハッシュ。Accessは送った・受け取ったときのハッシュを覚えておき、違うときだけ画像を取りに来る（Beaverから来たPNG・JPEGはAccessの建具図フォルダに置く）。製品図だけ変えたときも台帳1件の変更として扱う（競合の単位も台帳1件）
 - 初回: 台帳の全件を入れたあと、Accessが製品図を1件ずつ`POST`する
 
 ### 初回
@@ -86,5 +86,4 @@ Beaver側の案。dodai-backに渡し、Access側をこれに合わせてもら�
 
 ### 決まっていないこと
 
-1. **`description`に当てるのは「説明」か「備考」か**。3/17の取り込みでは`備考`を`description`に入れた（`docs/from_access/20260316_Beaver_04_Accessデータ移行マッピング.md`）。晴樹さんの答えは「説明だけ同期」。備考も同期するなら、Beaverに列を1つ足す
-2. 製品図: Access側の建具図の形式（拡張子）と大きさの分布。10MBを超えるものがあれば上限を見直す
+1. 製品図の大きさの分布（dodai-backがfrontPCで測る）。10MBを超えるものがあれば上限を見直す
