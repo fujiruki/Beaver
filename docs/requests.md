@@ -671,3 +671,4 @@ R-0083（得意先 + ComboSelect共通化）のPhase1完了後の横展開。案
 - 指揮役の整理: (A) 名前を「製品台帳」にする（Accessと用語をそろえる）、(B) 伝票の明細から台帳をその場で作る・直し、保存したらその明細の原価に反映（ほかの伝票の明細は変えない）、(C) 製品台帳をAccessと同期する（Access側の建具台帳設定とBeaverのtategu_itemsの構造を突き合わせる。dodai-backと相談）。既存: 明細から「建具台帳から選択」（TateguSelector）、建具台帳の画面（/tategu）、「原価から売値を設定」ボタン（ProfitRateBar）
 - (B)の画面はカンガルー手順書に沿ってCodexにデザイン案を作らせ、晴樹さんに選んでもらう
 - 2026-10-27 晴樹さんの決定（このセッションで選択）: 同期の向きは「両方向（承認なし）」、名前は「両方『製品台帳』に」（Beaver・Accessの画面名と用語集。表や列の名前は変えない）。dodai-backの構造資料: AccessTategu docs/R-0211_建具台帳の構造とBeaver対応.md（234a33e）。Access側はR-0211
+- 2026-10-27 R-0211 の9点に晴樹さんの答え（dodai-back経由、AccessTategu 6259017）。Beaverの仕様は `docs/spec/R-0200_product_ledger.md`。(A)の範囲は「画面に出る『建具』をすべて『製品』に」（帳票名・建具複製も）で確定。(C)は description に当てる項目（説明／備考）と製品図の形式・大きさが未決
