@@ -149,6 +149,21 @@ try {
         assertTrue(str_contains($res['status'], '200'), 'expected 200 got: ' . $res['status'] . ' body=' . $res['body']);
     });
 
+    runTest('SYNC_TOKEN_REQUIRED=true でも正しいX-Admin-Tokenの GET /admin/feedback は200（R-0214）', function () use ($port) {
+        $res = httpGet($port, '/admin/feedback', ['X-Admin-Token: dev-local-token-change-me']);
+        assertTrue(str_contains($res['status'], '200'), 'expected 200 got: ' . $res['status'] . ' body=' . $res['body']);
+    });
+
+    runTest('X-Admin-Token無しの GET /admin/feedback は401（R-0214）', function () use ($port) {
+        $res = httpGet($port, '/admin/feedback');
+        assertTrue(str_contains($res['status'], '401'), 'expected 401 got: ' . $res['status'] . ' body=' . $res['body']);
+    });
+
+    runTest('不一致X-Admin-Tokenの GET /admin/feedback は401（R-0214）', function () use ($port) {
+        $res = httpGet($port, '/admin/feedback', ['X-Admin-Token: wrong-token']);
+        assertTrue(str_contains($res['status'], '401'), 'expected 401 got: ' . $res['status'] . ' body=' . $res['body']);
+    });
+
     runTest('トークン無しの POST /customers は401', function () use ($port) {
         $body = json_encode(['name' => 'テスト同期太郎', 'access_customer_no' => 'unittest-ab13-1']);
         $res = httpPost($port, '/customers', ['Content-Type: application/json'], $body);
