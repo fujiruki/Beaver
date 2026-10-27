@@ -178,6 +178,22 @@ function putJson(int $port, string $path, array $body): array {
     ];
 }
 
+function postJson(int $port, string $path, array $body): array {
+    $ctx = stream_context_create(['http' => [
+        'method'  => 'POST',
+        'header'  => "Content-Type: application/json\r\nConnection: close\r\n",
+        'content' => json_encode($body, JSON_UNESCAPED_UNICODE),
+        'ignore_errors' => true,
+        'timeout' => 5,
+    ]]);
+    $rawBody = @file_get_contents("http://127.0.0.1:$port/contents/Beaver/api$path", false, $ctx);
+    return [
+        'status' => $http_response_header[0] ?? '',
+        'body'   => json_decode((string)$rawBody, true),
+        'raw'    => (string)$rawBody,
+    ];
+}
+
 function getJson(int $port, string $path): array {
     $ctx = stream_context_create(['http' => ['ignore_errors' => true, 'timeout' => 5]]);
     $rawBody = @file_get_contents("http://127.0.0.1:$port/contents/Beaver/api$path", false, $ctx);
@@ -210,6 +226,43 @@ try {
     if (!$ready) throw new RuntimeException('サーバーが応答しません');
 
     echo "=== ADR-003 建具台帳 原価行明細API ===\n";
+
+    runTest('R-0200: POST /tategu-items は code を採番せず NULL で作る', function () use ($port) {
+        $r = postJson($port, '/tategu-items', ['name' => '採番待ち製品']);
+        assertTrue(str_contains($r['status'], '201'), 'HTTP 201: ' . $r['status'] . ' body=' . $r['raw']);
+        assertEq(null, $r['body']['code'] ?? null, 'code');
+    });
+
+    runTest('R-0200: 材料単価の円未満は400で拒否し、既存行を変えない', function () use (&$pdo, $port) {
+        $id = createTateguItem($pdo, 'R0200-DECIMAL');
+        putJson($port, "/tategu-items/$id/cost-lines", ['lines' => [[
+            'category_code' => 'MAIN', 'name' => '既存材', 'quantity' => 1,
+            'unit_cost' => 1000, 'amount' => 1000, 'source' => 'manual', 'sort_order' => 0,
+        ]]]);
+        $r = putJson($port, "/tategu-items/$id/cost-lines", ['lines' => [[
+            'category_code' => 'MAIN', 'name' => '小数材', 'quantity' => 1,
+            'unit_cost' => 1000.5, 'amount' => 1000.5, 'source' => 'manual', 'sort_order' => 0,
+        ]]]);
+        assertTrue(str_contains($r['status'], '400'), 'HTTP 400: ' . $r['status'] . ' body=' . $r['raw']);
+        assertEq('unit_cost_fraction', $r['body']['error'] ?? null, 'error');
+        assertEq('既存材', $pdo->query("SELECT name FROM tategu_item_cost_lines WHERE tategu_item_id = $id")->fetchColumn(), '既存行');
+    });
+
+    runTest('R-0200: 通常更新で wood_calc 行を削除・変更できない', function () use (&$pdo, $port) {
+        $id = createTateguItem($pdo, 'R0200-WOOD');
+        $pdo->prepare("INSERT INTO tategu_item_cost_lines
+            (tategu_item_id, category_code, name, quantity, unit_cost, amount, source, sort_order)
+            VALUES (?, 'MAIN', '木材計算', 2, 800, 1600, 'wood_calc', 0)")->execute([$id]);
+        $r = putJson($port, "/tategu-items/$id/cost-lines", ['lines' => [[
+            'category_code' => 'HARDWARE', 'name' => '手入力', 'quantity' => 1,
+            'unit_cost' => 300, 'amount' => 300, 'source' => 'manual', 'sort_order' => 1,
+        ]]]);
+        assertTrue(str_contains($r['status'], '200'), 'HTTP 200: ' . $r['status'] . ' body=' . $r['raw']);
+        $wood = $pdo->query("SELECT name, quantity, unit_cost FROM tategu_item_cost_lines WHERE tategu_item_id = $id AND source = 'wood_calc'")->fetch();
+        assertEq('木材計算', $wood['name'] ?? null, 'name');
+        assertNear(2.0, (float)($wood['quantity'] ?? 0), 'quantity');
+        assertNear(800.0, (float)($wood['unit_cost'] ?? 0), 'unit_cost');
+    });
 
     runTest('PUT /tategu-items/{id}/cost-lines は本体/金物/ガラス行を全件入れ替えし固定集計列を再計算する', function () use (&$pdo, $port) {
         $id = createTateguItem($pdo, 'ADR003-COST');

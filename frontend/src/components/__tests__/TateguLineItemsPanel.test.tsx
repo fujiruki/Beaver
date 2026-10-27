@@ -54,6 +54,21 @@ describe('TateguCostLinesPanel', () => {
       sort_order: 0,
     }]);
   });
+
+  it('単価は整数刻みで、wood_calc 行は読み取り専用かつ削除できない', () => {
+    const onChange = vi.fn();
+    const lines: CostLineDraft[] = [{
+      category_code: 'MAIN', name: '木材計算', quantity: 2, unit_cost: 800,
+      amount: 1600, source: 'wood_calc', sort_order: 0,
+    }];
+
+    render(<TateguCostLinesPanel lines={lines} onChange={onChange} categories={categories} />);
+
+    expect(screen.getByLabelText('材料単価').getAttribute('step')).toBe('1');
+    expect((screen.getByLabelText('材料単価') as HTMLInputElement).disabled).toBe(true);
+    expect((screen.getByLabelText('数量') as HTMLInputElement).disabled).toBe(true);
+    expect(screen.queryByRole('button', { name: '削除' })).toBeNull();
+  });
 });
 
 describe('TateguLaborLinesPanel', () => {
