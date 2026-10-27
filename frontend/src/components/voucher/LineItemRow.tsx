@@ -253,7 +253,7 @@ export default function LineItemRow({
             <option value="subtotal">小計</option>
           </select>
           <textarea
-            aria-label="取付建具"
+            aria-label="取付製品"
             placeholder="品名"
             {...register(`lines.${index}.item_name`)}
             maxLength={255}
@@ -265,7 +265,7 @@ export default function LineItemRow({
           {!readOnly && lineType === 'normal' && (
             <button
               type="button"
-              title="建具台帳から選択"
+              title="製品台帳から選択"
               onClick={event => { event.stopPropagation(); setSelectorOpen(true); }}
               style={selectorButtonStyle}
             >📋</button>

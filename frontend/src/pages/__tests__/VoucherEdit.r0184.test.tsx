@@ -85,7 +85,7 @@ describe('R-0184 明細入力レイアウト F3 詰め版', () => {
     renderPage();
     const row = await screen.findByTestId('line-item-0');
 
-    await waitFor(() => expect((within(row).getByRole('textbox', { name: '取付建具' }) as HTMLTextAreaElement).value).toBe('取付建具'));
+    await waitFor(() => expect((within(row).getByRole('textbox', { name: '取付製品' }) as HTMLTextAreaElement).value).toBe('取付建具'));
     expect((within(row).getByRole('textbox', { name: '取付場所' }) as HTMLInputElement).value).toBe('玄関');
     expect((within(row).getByRole('textbox', { name: '数量' }) as HTMLInputElement).value).toBe('3');
     for (const name of ['売値 本体', '売値 金物', '売値 ガラス', '原価 本体', '原価 金物', '原価 ガラス', '工場h', '現場h', '労務単価']) {

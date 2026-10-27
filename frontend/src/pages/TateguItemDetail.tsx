@@ -141,7 +141,7 @@ export default function TateguItemDetail() {
         <button onClick={goBack} className="px-3 py-1 border border-slate-300 rounded text-sm text-slate-600 hover:bg-slate-50">
           ← 戻る
         </button>
-        <h1 className="text-xl font-bold">{isNew ? '建具台帳 新規登録' : '建具台帳 編集'}</h1>
+        <h1 className="text-xl font-bold">{isNew ? '製品台帳 新規登録' : '製品台帳 編集'}</h1>
       </div>
 
       {mutError && (

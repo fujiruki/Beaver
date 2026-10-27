@@ -72,7 +72,7 @@ export default function SalesCategorySettings() {
             value={newName}
             onChange={e => setNewName(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleCreate()}
-            placeholder="種別名（例：建具製作、リフォーム）"
+            placeholder="種別名（例：製品製作、リフォーム）"
             style={{ flex: 1, padding: '6px 10px', border: '1px solid #cbd5e1', borderRadius: 6, fontSize: 13 }}
           />
           <button

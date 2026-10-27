@@ -41,7 +41,7 @@ const navItems = [
   { to: '/dandori',    icon: '📅', label: '段取り' },
   { to: '/vouchers?voucher_type=estimate', icon: '📝', label: '見積' },
   { to: '/vouchers?voucher_type=sales',    icon: '🧾', label: '売上' },
-  { to: '/tategu',     icon: '🚪', label: '建具台帳' },
+  { to: '/tategu',     icon: '🚪', label: '製品台帳' },
   { to: '/invoices',   icon: '💰', label: '請求' },
   { to: '/settings/app', icon: '⚙️', label: 'アプリ設定' },
   { to: '/help',       icon: '❓', label: 'ヘルプ' },

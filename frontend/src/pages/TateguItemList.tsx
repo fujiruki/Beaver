@@ -117,7 +117,7 @@ export default function TateguItemList() {
   return (
     <div>
       <div className="flex justify-between items-center mb-4">
-        <h1 className="text-xl font-bold">建具台帳</h1>
+        <h1 className="text-xl font-bold">製品台帳</h1>
         <button
           onClick={() => navigate('/tategu/new')}
           className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700"

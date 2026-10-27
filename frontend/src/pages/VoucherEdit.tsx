@@ -952,7 +952,7 @@ export default function VoucherEdit() {
           {!isReadOnly && (
             <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
               <button type="button" onClick={handleDuplicateLine}
-                disabled={selectedIdx === null} style={rowOpBtnStyle}>建具複製</button>
+                disabled={selectedIdx === null} style={rowOpBtnStyle}>製品複製</button>
               <button type="button" onClick={handleInsertLine} style={rowOpBtnStyle}>行を挿入</button>
               <button type="button" onClick={() => selectedIdx !== null && handleRemoveLine(selectedIdx)}
                 disabled={selectedIdx === null} style={{ ...rowOpBtnStyle, color: '#ef4444', borderColor: '#fca5a5' }}>行を削除</button>
@@ -972,7 +972,7 @@ export default function VoucherEdit() {
             ) : <div style={{ width: 'fit-content', minWidth: getLineItemWidth(moneyCategories.length, timeCategories.length) }}>
               <div data-testid="line-item-heading" style={lineHeadingStyle}>
                 <span style={{ width: LINE_ITEM_NO_WIDTH }}>No</span>
-                <span style={{ width: LINE_ITEM_LEFT_WIDTH }}>取付建具／取付場所・数量・備考</span>
+                <span style={{ width: LINE_ITEM_LEFT_WIDTH }}>取付製品／取付場所・数量・備考</span>
                 <span data-testid="category-grid-heading" style={{ display: 'grid', gridTemplateColumns: createCategoryGridTemplate(moneyCategories.length, timeCategories.length) }}>
                   <span />
                   {moneyCategories.map(category => (
