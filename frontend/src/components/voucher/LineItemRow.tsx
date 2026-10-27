@@ -163,7 +163,13 @@ export default function LineItemRow({
           if (category.code === 'GLASS' || category.code === 'glass') value = item.cost_glass;
           if (category.code === 'FACTORY_TIME') value = item.cost_factory_hours;
           if (category.code === 'SITE_TIME') value = item.cost_site_hours;
-          return { category_code: category.code, category_name: category.name, measure_type: category.measure_type, value, sort_order: category.sort_order };
+          return {
+            category_code: category.code,
+            category_name: category.name,
+            measure_type: category.measure_type,
+            value,
+            sort_order: category.sort_order,
+          };
         }).filter(value => value.value !== 0);
     setValue(`lines.${index}.tategu_item_id`, item.id);
     setValue(`lines.${index}.item_name`, item.name);
@@ -201,7 +207,10 @@ export default function LineItemRow({
   function unlinkLedger() {
     setValue(`lines.${index}.tategu_item_id`, null);
     setLedgerMenuOpen(false);
-    if (!isNew) { const current = getValues(`lines.${index}`); if (current?.id) void onSaveLine(current.id, { tategu_item_id: null }); }
+    if (!isNew) {
+      const current = getValues(`lines.${index}`);
+      if (current?.id) void onSaveLine(current.id, { tategu_item_id: null });
+    }
   }
 
   const lineType = line?.line_type ?? 'normal';
@@ -294,9 +303,59 @@ export default function LineItemRow({
             style={{ ...inputStyle, width: 222, height: 45, lineHeight: '15px', resize: 'none' }}
           />
           {!readOnly && lineType === 'normal' && <div style={{ position: 'relative', display: 'flex' }}>
-            <button type="button" onClick={event => { event.stopPropagation(); if (line?.tategu_item_id) setLedgerMode('edit'); else setLedgerMenuOpen(open => !open); }} style={ledgerButtonStyle}>{line?.tategu_item_id ? '台帳を直す' : '製品台帳'}</button>
-            {line?.tategu_item_id && <button type="button" aria-label="製品台帳メニュー" onClick={event => { event.stopPropagation(); setLedgerMenuOpen(open => !open); }} style={ledgerArrowStyle}>▼</button>}
-            {ledgerMenuOpen && <div style={ledgerMenuStyle}>{!line?.tategu_item_id && <button type="button" onClick={() => { setLedgerMode('create'); setLedgerMenuOpen(false); }}>新しく作る</button>}<button type="button" onClick={() => { setSelectorOpen(true); setLedgerMenuOpen(false); }}>{line?.tategu_item_id ? '別の台帳を選ぶ' : '台帳から選ぶ'}</button>{line?.tategu_item_id && <button type="button" onClick={unlinkLedger}>紐付けを外す</button>}</div>}
+            <button
+              type="button"
+              onClick={event => {
+                event.stopPropagation();
+                if (line?.tategu_item_id) setLedgerMode('edit');
+                else setLedgerMenuOpen(open => !open);
+              }}
+              style={ledgerButtonStyle}
+            >
+              {line?.tategu_item_id ? '台帳を直す' : '製品台帳'}
+            </button>
+            {line?.tategu_item_id && (
+              <button
+                type="button"
+                aria-label="製品台帳メニュー"
+                onClick={event => {
+                  event.stopPropagation();
+                  setLedgerMenuOpen(open => !open);
+                }}
+                style={ledgerArrowStyle}
+              >
+                ▼
+              </button>
+            )}
+            {ledgerMenuOpen && (
+              <div style={ledgerMenuStyle}>
+                {!line?.tategu_item_id && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLedgerMode('create');
+                      setLedgerMenuOpen(false);
+                    }}
+                  >
+                    新しく作る
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectorOpen(true);
+                    setLedgerMenuOpen(false);
+                  }}
+                >
+                  {line?.tategu_item_id ? '別の台帳を選ぶ' : '台帳から選ぶ'}
+                </button>
+                {line?.tategu_item_id && (
+                  <button type="button" onClick={unlinkLedger}>
+                    紐付けを外す
+                  </button>
+                )}
+              </div>
+            )}
           </div>}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
@@ -320,7 +379,19 @@ export default function LineItemRow({
           >備考 {memoOpen ? '−' : '＋'}</button>
         </div>
         {!readOnly && <TateguSelector isOpen={selectorOpen} onClose={() => setSelectorOpen(false)} onSelect={handleTateguSelect} />}
-        {!readOnly && ledgerMode && <ProductLedgerModal isOpen mode={ledgerMode} itemId={line?.tategu_item_id} voucherLabel={voucherLabel} lineNo={line?.line_no ?? index + 1} initialName={line?.item_name ?? ''} categories={categories} onClose={() => setLedgerMode(null)} onApplied={applyLedger} />}
+        {!readOnly && ledgerMode && (
+          <ProductLedgerModal
+            isOpen
+            mode={ledgerMode}
+            itemId={line?.tategu_item_id}
+            voucherLabel={voucherLabel}
+            lineNo={line?.line_no ?? index + 1}
+            initialName={line?.item_name ?? ''}
+            categories={categories}
+            onClose={() => setLedgerMode(null)}
+            onApplied={applyLedger}
+          />
+        )}
       </div>
 
       <div data-testid="line-item-right" style={{ width: rightWidth }}>
@@ -493,9 +564,35 @@ const selectorButtonStyle: React.CSSProperties = {
   cursor: 'pointer',
 };
 
-const ledgerButtonStyle: React.CSSProperties = { ...selectorButtonStyle, width: 'auto', padding: '0 6px', whiteSpace: 'nowrap', borderRadius: '5px 0 0 5px' };
-const ledgerArrowStyle: React.CSSProperties = { ...selectorButtonStyle, width: 20, borderLeft: 0, borderRadius: '0 5px 5px 0', fontSize: 9 };
-const ledgerMenuStyle: React.CSSProperties = { position: 'absolute', top: 23, right: 0, zIndex: 20, display: 'flex', flexDirection: 'column', gap: 1, minWidth: 130, padding: 4, background: '#fff', border: '1px solid #cbd5e1', borderRadius: 6, boxShadow: '0 5px 15px rgba(0,0,0,.15)' };
+const ledgerButtonStyle: React.CSSProperties = {
+  ...selectorButtonStyle,
+  width: 'auto',
+  padding: '0 6px',
+  whiteSpace: 'nowrap',
+  borderRadius: '5px 0 0 5px',
+};
+const ledgerArrowStyle: React.CSSProperties = {
+  ...selectorButtonStyle,
+  width: 20,
+  borderLeft: 0,
+  borderRadius: '0 5px 5px 0',
+  fontSize: 9,
+};
+const ledgerMenuStyle: React.CSSProperties = {
+  position: 'absolute',
+  top: 23,
+  right: 0,
+  zIndex: 20,
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 1,
+  minWidth: 130,
+  padding: 4,
+  background: '#fff',
+  border: '1px solid #cbd5e1',
+  borderRadius: 6,
+  boxShadow: '0 5px 15px rgba(0,0,0,.15)',
+};
 
 const memoButtonStyle: React.CSSProperties = {
   height: 20,
