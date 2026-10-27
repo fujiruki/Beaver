@@ -1,67 +1,55 @@
 # 引き継ぎ資料 — Beaver（最新）
 
-**最終更新**: 2026-10-12 朝（2026-10-11〜12にR-0169〜R-0174と不具合修正4件をBeaver_betaへデプロイ。本番は未デプロイ）
+**最終更新**: 2026-10-27（10/18〜10/27。Dodaikun v1 本番切替（S5）完了、その後の改善 R-0186〜R-0199 を本番まで反映。R-0200 製品台帳は進行中）
 
-前回分は `docs/handover/Hikitsugi_2026-10-10.md`（A-X-01完了、R-0154〜R-0168）。それ以前は同ディレクトリの日付付きファイル。
+前回分は `docs/handover/Hikitsugi_2026-10-12.md`。それ以前は同ディレクトリの日付付きファイル。作業の細かい記録は `docs/requests_log.md` の末尾と `docs/wiki/ops/rc1_beta_db_from_prod_20261015.md`（rc1〜rc6・S5）。
 
-## 最初に
+## 最初に（運用ルール）
 
-- **実装はCodexへ（2026-10-12 晴樹さん指示、番頭経由）**: 実装・TDD修正はできるだけCodex（`codex:codex-rescue` か直接呼び出し）に任せる。顧客情報・個人情報・口座情報など機密を含む作業はClaude側で行う。前セッションはClaudeのAgentに任せ続けていたので切り替えること
-- **Codexの呼び出し方**: `codex --cd C:/Fujiruki/Projects --sandbox workspace-write --ask-for-approval on-request exec "$(cat プロンプト.md)" </dev/null`。`codex-onrequest.cmd`に標準入力で渡すと何もせず終わる。`--cd`をBeaverにすると`.git`が読み取り専用になる
-- **Beaver_betaへのデプロイ前後はdodai-backに一言連絡**（共同確認中のため）。DBを書き換える変更はデプロイ前に`api/backups/`へコピー
-- テスト用の伝票はE03981（id 11709）・E03982・5809（E02046）。**5810（E02047）は実務の伝票なのでテストに使わない**
+- **本番Beaverは稼働中**（2026-10-19 S5でAccess→Beaverの本番切替済み。本番も `SYNC_TOKEN_REQUIRED=true`、専用トークン）。本番のDBには書き込み系の確認リクエストを送らない（GETとgrepで確認）
+- **デプロイ**: 晴樹さん「今後テストをとおったものはデプロイ許可しとく」（10/21）。指揮役が回帰ゲート🔵青を自分で流し直したら、beta・本番ともデプロイしてよい。ただし (1) dodai-backと時期を決めた変更はその取り決めに従う、(2) **本番DBのデータ書き換え・migrationはデプロイに含めない**（その都度晴樹さんに確認。自動の許可判定が止めることも多い→止まったら1行のコマンドを渡して晴樹さんに`!`で流してもらう）。`upload.ps1`に`-KeepLocalDB`は絶対に付けない。デプロイ直前にdodai-backへ一言
+- **晴樹さん待ちの連絡**: 質問はこのセッションに置き、番頭（BantoAI）には「何の返事待ちか1行＋見る場所」だけ送る（10/25 晴樹さん決定）
+- **デザイン**: 画面の配置・見た目はカンガルー「一流デザイン手順書2026」（Googleドライブ `AI共有庫 カンガルー`、00ルーターとUX版）に従う。**デザインの案と判断はCodex、最終の選択は晴樹さん、Claude Codeは実装と検証だけ**。Codexに設計メモ＋実寸HTMLモック（`docs/design/`）を作らせ、ブラウザで開いて晴樹さんに選んでもらう
+- **実装はCodex**: `codex --cd C:/Fujiruki/Projects --sandbox workspace-write --ask-for-approval on-request exec "$(cat プロンプト.md)" </dev/null`。指揮役はコードを直接編集しない。完了報告を受けたら回帰ゲートを自分で流し直す（CodexはPHPを実行できないことがある）
+- 方針が変わってCodexを止めるときは、TaskStopだけでは子プロセスが残る。`Get-CimInstance Win32_Process`でコマンドラインにR番号を含む`codex.exe`を探して`taskkill /T /F`
+- 回帰ゲートがたまに⚫黒になるときは、`/tmp/bv_vitest.log`に落ちたテスト名が残っている（R-0186で「データが入る前に操作するテスト」は直した）
 
-## 現在地
+## 現在地（2026-10-27）
 
-### 1. 2026-10-11〜12 にBeaver_betaへ入れたもの（本番は未デプロイ）
-| 件 | 内容 | コミット | beta確認 |
-|:--|:--|:--|:--|
-| 不具合 | 新規伝票保存後の遷移でベースパスが二重→404（R-0168離脱ガードの再遷移でbasename込みのパスを渡していた） | `f58ddb1` | 合格（E03981） |
-| 不具合 | 既存伝票で追加した明細行がフォームに入らず、blurで保存されない／明細保存で保存状態が変わらない | `f325668` | 未確認 |
-| 不具合 | 「原価から売値を設定」（ProfitRateBar）が売値・金額をフォームに入れるだけで保存しない | `87d1796` | R-0173の往復で合格 |
-| R-0171 | 売値の内訳（voucher_line_prices MAIN/HARDWARE/GLASS）を/vouchers/syncで返し、Accessのreplaceを内訳にも反映。画面保存で旧列も揃える | `b79dab6` | 合格 |
-| R-0173 | 明細の取付場所・原価5項目・労務単価を双方向同期（キーが無いときは変えない。労務単価は列のみ）。Access側はR-0174 | `4b51e74` | 合格（E03981） |
-| 改訂 | 内訳を全部消して保存したら旧列も0（R-0171/R-0173、晴樹さん判断） | `0df3655` | — |
-| R-0170 | 取消した伝票に「下書きに戻す」（POST /vouchers/{id}/unvoid、履歴unvoid） | `abed2c9` | 合格（E03982、Access往復も） |
-| R-0169 | 上部メニューの「伝票」を「見積」「売上」に分ける | `ee95307` | 未確認 |
-| R-0172 | 伝票画面の保存状態を右下に固定表示 | `bedc730` | 未確認 |
-| 不具合 | 下書きに戻した後、案件画面で無効のまま（伝票の変更時にprojectsクエリも無効化） | `320704e` | 確認依頼中 |
-| R-0174 | 新しい行の労務単価の初期値を会社設定`company_settings.default_labor_rate`（betaは5000）から取る。設定画面もこの値を編集 | `8039c1e` | 確認依頼中 |
+### 進行中: R-0200 製品台帳（晴樹さん、10/27）
+要望の原文は `docs/requests.md` の末尾。3つに分けている。
+- **(A) 名前を「製品台帳」に**: 晴樹さん決定「両方『製品台帳』に」（Beaver・Accessの画面名と用語集。表・列名は変えない）。まだ実装していない
+- **(B) 伝票の明細から製品台帳をその場で作る・直す**: 保存したらその伝票のその明細だけ原価に自動反映（ほかの伝票は変えない）。Codexのデザイン案 `docs/design/R-0200_product_ledger_from_voucher.md`・`_mock.html`（A: 大きなモーダル＝推し／B: 右の引き出し）。**晴樹さんのA/Bの選択待ち**（番頭に連絡済み）。Access側の画面の書き起こし: `docs/design/R-0200_access_tategu_settings_screen.md`
+- **(C) Accessと同期**: 晴樹さん決定「両方向（承認なし）」。Access側の構造資料と仕様案は AccessTategu `docs/R-0211_建具台帳の構造とBeaver対応.md`・`docs/R-0211_製品台帳同期_仕様案.md`（d30a33c）。Beaver側で了解済みの5点: 採番はAccessだけ（Beaverはcodeを空で作り、access-linkで受け取る。今の `tategu_items.php` の MAX+1 採番をやめる）／明細の同期に `tategu_code` を足す／使用不可⇔`status=archived`、同期済みは物理削除しない／労務はAccessの1行をFACTORY_TIME・SITE_TIMEの2行に、合計は同期しない、`wood_calc`行はBeaverで直せない／同期順は得意先→案件→製品台帳→伝票。**dodai-backが晴樹さんに9点を質問中**（両方で直したとき、建具図・金物の置き場、単価の端数、番号の見え方、追加工程、初回の違い、名前の範囲、削除）。答えが来たらBeaverの仕様（R-0200 C）を書く
+- 本番Beaverの台帳の事実: 5,607件（code 00001〜05615）はすべて2026-03-17の一括取り込みの古い写しで、子の表は0件、明細の`tategu_item_id`も0件。Accessは5,693件。初回はAccessを正としてcode＝建具№で上書き・追加でよい
 
-- バックアップ: `database_beta_20261011_pre_r0171.sqlite`・`_pre_r0173`・`_pre_r0170`
-- 仕様書はすべて`docs/spec/R-01xx_*.md`、台帳は`docs/requests_log.md`
-- R-0174は**Beaverの番号**。Access側のR-0174（原価同期）とは別物
-- `AppSettingsContext`の`defaultLaborRate`（localStorage）は未使用のまま残してある（消すと既存テストも消すことになるため）
+### 待ち
+- 晴樹さん: R-0200(B)のデザインA/B
+- dodai-back: R-0211の9点の答え
+- **git push**: 10/20から自動の許可判定で止まっていて、手元に70件以上のコミットがたまっている（`git log origin/master..HEAD`）。晴樹さんに「pushして」と言ってもらうか `! git -C C:/Fujiruki/Projects/Beaver push`
 
-### 2. 晴樹さんの判断待ち
-- **R-0167**（得意先画面の楽観的ロック。開きっぱなしの画面で保存すると、同期で入った新しい内容を黙って上書きする）: 2026-10-11に平易に説明済み。指揮役のおすすめは「本番切替前に入れる」。「入れて」と言われたらR-0166と同じ作りで実装
-- R-0154の確認待ち: 引用先の売上をすべて取り消した見積から再び売上を作れてよいか／引用先一覧の取消済み売上に目印を付けるか
+## この期間にやったこと（要点）
 
-### 3. A-X-02（本番Beaverの切替）の手順メモ（Beaver側）
-- **本番に入れるもの**: R-0154（追加仕様含む）・R-0157・R-0158・R-0159・R-0161・R-0163〜R-0166・R-0168〜R-0174と上の不具合修正すべて。R-0158の「`base_synced_at`なしの既存伝票は400」への切り替えはA-X-02後にdodai-backの合図で行う
-- 本番データの修復（r0150・r0151・r0152の`--execute`）はdodai-backが実行時期を指定する。r0151はシード伝票の削除後に実行すると対象が約21件に絞れる
-- 試用伝票は本番の手順7（同期）の前、手順4.5（シード削除）の近くで本番Beaverから消す。本番にR-0154をデプロイしてから行う
-- 5792相当の「Accessで削除済みの伝票」は`~/void_voucher_with_history.php <db> <id> <期待access_voucher_id> "<理由>" [--execute]`で履歴付きvoidにする（サーバーのホームに配置済み）
-- A-X-02の直前に本番で`access_voucher_id`がNULLの伝票を一覧にし、晴樹さんに残すか消すかを1件ずつ確認する。E02046（5809）・E02047（5810）は残す。5809の得意先は仮の「とりあえず登録用」なので付け替えを確認
-- 本番の試用データ22件（U0xxxx）の扱いはdodai-backが判断
-- 本番切替前に、本番AccessにBeaver由来で売値0の行が無いことを確かめる（R-0171以前の取り込みで起きていた。本番AccessにはまだBeaver由来の伝票が無い見込み）
-- **本番の会社設定`default_labor_rate`の値を確認**してから切り替える（R-0174で新しい行の初期値になる）
+- **S5 本番切替（10/19〜20）**: rc6リハーサル合格後、本番でR7 ①〜⑦（基準線＋見積+10000、②同期トークン、③3/17の古い写し5,772件の削除、⑤重複得意先4組の統合、⑦5792のvoid）。件数は見積1,953・売上3,944・明細25,777でAccessと一致。記録は `docs/wiki/ops/rc1_beta_db_from_prod_20261015.md`
+- 本番の誤作成した空の得意先826は、10/21に晴樹さんの許可で物理削除
+- R-0150のデータ修正を本番で流し忘れていた（伝票の消費税区分「課税」6件）→10/20に修正、S04600はvoid
+- **本番反映済みの改善**（すべて `docs/spec/` に仕様）:
+  - R-0158追補（base_synced_atなしの既存伝票pushは400、voucher付き）、R-0187（`GET /sync/changes`）
+  - R-0188（売上種別の既定値「1地元建具」、種別5「5障子張替え」をid指定で追加）、R-0189（段取りのバーの枠線を売上種別で色分け）、R-0190（摘要・備考・品名・取付場所は255文字まで）
+  - R-0191（伝票に納期 `due_date` を新設、`delivery_date`は「納品日」。migration 038 本番適用済み）、R-0192（請求書の発行日をAccessの売掛発行日に）、R-0193（日付印字の既定を「印字する」=0。Beaverで作った6件を0に修正）、R-0194（見出し「見積日」「売上日」）
+  - R-0195〜R-0199（案件一覧の「伝票の割り当て」モード: 案件なしの伝票をドラッグで割り当て／請求済みでも案件だけは変えられる／ダブルクリックで右の引き出しに詳細／クリックで得意先に絞り込み／「この伝票で案件を作る」＝得意先＋摘要で案件を作って入れる、売上は完了・見積は見積済）
+  - R-0186（テストがときどき落ちる件）
+- Access側の関連: R-0208（案件だけの付け替えは承認なしで取り込む。請求済みも対象）は本番反映済み
 
-### 4. dodai-backと進行中
-- R-0155（同期を得意先→案件→伝票の順に）・R-0156（Access画面でBeaverの伝票番号を見せる）: Access側の作業
-- Access側の受入シナリオU-3で得意先の双方向同期を確認予定
+## 注意点
 
-### 5. 未着手
-- R-0153（伝票編集画面の合計プレビューをR-0152の計算規則に揃える。`docs/requests.md` §38）。Dodaikunへ乗り換える前に必ず直す
+- 本番の得意先・伝票の書き換えは、退避（`VACUUM INTO backups/...`）→dry-run→実行→件数とintegrityの確認、の順。記録は `docs/requests_log.md`
+- Accessは`beaver_newer`（Beaverだけで変わった伝票）を、案件だけの違いなら自動で、それ以外は承認画面に回す。Beaverで伝票の中身を直すとAccessの承認画面に積まれる
+- 伝票の`updated_at`を変えずにデータを直すと、Accessには届かない（Access側も同じ修正が要る。dodai-backに頼む）
 
-## 知っておくと早いこと
-- Accessの`lines_mode=replace`は`access_line_id`キーのupsert。payloadに無い既存行は消える（`access_line_id`がまだ無いBeaver追加行も）。price_*はキーが無いと0、原価系（R-0173）はキーが無いと変えない
-- 明細の内訳は`voucher_line_prices`／`voucher_line_costs`が正、旧列`price_*`/`cost_*`は内訳0件の行の表示用（`fallbackPrices`/`fallbackCosts`）。労務単価は列`cost_labor_rate`のみ
-- 伝票画面のフォームは開いたときに1回だけ値を入れる（R-0166）。フォームだけ`setValue`して保存しない経路があると、画面と DB がずれる（ProfitRateBarがそうだった）
-- `blocker.location.pathname`はbasename込み（`/contents/Beaver_beta/...`）
+## プロジェクト概要（静的）
 
-## 運用メモ
-- auto modeは、Beaver_betaのDB書き換え・`upload.ps1`の実行を止めることがある。止められたら、コマンドを1行にまとめて晴樹さんに`! `で実行してもらう
-- サーバーの`sqlite3` CLIは使えない。DBの確認は`php -r`でPDOを使う
-- dodai-back（AccessTategu側backpc指揮役）とはSendMessageでやり取りする
-- `upload.ps1 -Beta`に`-KeepLocalDB`は絶対に付けない
+- 建具店向けの見積・売上・請求・案件管理Web。フロント React19+TS+Vite（`frontend/`）、API PHP+SQLite（`api/`）
+- 本番 `https://door-fujita.com/contents/Beaver/`、ベータ `.../Beaver_beta/`。サーバー `c6924945@www1045.conoha.ne.jp:8022`（鍵 `C:/Fujiruki/Projects/AI_DEVELOP_RULES/UPLOAD/key-2025-11-29-07-10.pem`）、sqlite3 CLIは無いのでPHP PDOで操作
+- 回帰ゲート `bash .claude/hooks/regression-gate.sh`（vitest＋PHPテスト）
+- 要望の正本は `SDDD.md` の手順（`docs/requests.md`→仕様→`docs/requests_log.md`）
