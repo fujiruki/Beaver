@@ -28,7 +28,7 @@ describe('TateguCostLinesPanel', () => {
     render(<TateguCostLinesPanel lines={lines} onChange={onChange} categories={categories} />);
 
     expect(screen.getAllByText('¥2,000').length).toBeGreaterThan(0);
-    fireEvent.change(screen.getByLabelText('材料単価'), { target: { value: '1500' } });
+    fireEvent.change(screen.getAllByLabelText('材料単価')[0], { target: { value: '1500' } });
 
     expect(onChange).toHaveBeenCalledWith([{
       ...lines[0],
@@ -62,11 +62,11 @@ describe('TateguCostLinesPanel', () => {
       amount: 15840000, source: 'manual', sort_order: 0,
     }]} onChange={vi.fn()} categories={categories} />);
 
-    expect((screen.getByLabelText('数量') as HTMLInputElement).value).toBe('1,200');
-    expect((screen.getByLabelText('材料単価') as HTMLInputElement).value).toBe('¥13,200');
-    expect((screen.getByLabelText('数量') as HTMLInputElement).style.textAlign).toBe('right');
-    fireEvent.focus(screen.getByLabelText('材料単価'));
-    expect((screen.getByLabelText('材料単価') as HTMLInputElement).value).toBe('13200');
+    expect((screen.getAllByLabelText('数量')[0] as HTMLInputElement).value).toBe('1,200');
+    expect((screen.getAllByLabelText('材料単価')[0] as HTMLInputElement).value).toBe('¥13,200');
+    expect((screen.getAllByLabelText('数量')[0] as HTMLInputElement).style.textAlign).toBe('right');
+    fireEvent.focus(screen.getAllByLabelText('材料単価')[0]);
+    expect((screen.getAllByLabelText('材料単価')[0] as HTMLInputElement).value).toBe('13200');
   });
 
   it('単価は整数刻みで、wood_calc 行は読み取り専用かつ削除できない', () => {
@@ -78,9 +78,9 @@ describe('TateguCostLinesPanel', () => {
 
     render(<TateguCostLinesPanel lines={lines} onChange={onChange} categories={categories} />);
 
-    expect(screen.getByLabelText('材料単価').getAttribute('step')).toBe('1');
-    expect((screen.getByLabelText('材料単価') as HTMLInputElement).disabled).toBe(true);
-    expect((screen.getByLabelText('数量') as HTMLInputElement).disabled).toBe(true);
+    expect(screen.getAllByLabelText('材料単価')[0].getAttribute('step')).toBe('1');
+    expect((screen.getAllByLabelText('材料単価')[0] as HTMLInputElement).disabled).toBe(true);
+    expect((screen.getAllByLabelText('数量')[0] as HTMLInputElement).disabled).toBe(true);
     expect(screen.queryByRole('button', { name: '削除' })).toBeNull();
   });
 });
@@ -100,7 +100,7 @@ describe('TateguLaborLinesPanel', () => {
     render(<TateguLaborLinesPanel lines={lines} onChange={onChange} categories={categories} />);
 
     expect(screen.getAllByText('¥6,000').length).toBeGreaterThan(0);
-    fireEvent.change(screen.getByLabelText('工数'), { target: { value: '2' } });
+    fireEvent.change(screen.getAllByLabelText('工数')[0], { target: { value: '2' } });
 
     expect(onChange).toHaveBeenCalledWith([{
       ...lines[0],
@@ -123,7 +123,7 @@ describe('TateguLaborLinesPanel', () => {
 
     render(<TateguLaborLinesPanel lines={lines} onChange={onChange} categories={categories} />);
 
-    const options = Array.from(screen.getByLabelText('労務区分').querySelectorAll('option')).map(option => option.value);
+    const options = Array.from(screen.getAllByLabelText('労務区分')[0].querySelectorAll('option')).map(option => option.value);
     expect(options).toEqual(['FACTORY_TIME', 'SITE_TIME']);
   });
 

@@ -995,6 +995,7 @@ export default function VoucherEdit() {
                   categories={categories}
                   isNew={isNew}
                   onSaveLine={saveLine}
+                  voucherLabel={`${voucherTypeLabel} ${voucher?.voucher_no ?? '新規'}`}
                 />
               ))}
             </div>}

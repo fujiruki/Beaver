@@ -3,6 +3,7 @@ import { useFormContext, useWatch } from 'react-hook-form';
 import { useCostCalcDynamic } from '../../hooks/useCostCalc';
 import { useAppSettings } from '../../contexts/AppSettingsContext';
 import TateguSelector from './TateguSelector';
+import ProductLedgerModal from './ProductLedgerModal';
 import type { TateguItem } from '../../types/tateguItem';
 import type { LineCategoryValue } from '../../types/voucher';
 import type { VoucherFormValues } from '../../pages/VoucherEdit';
@@ -26,6 +27,7 @@ type Props = {
   categories: AggregationCategoryMaster[];
   isNew: boolean;
   onSaveLine: (lineId: number, data: Record<string, unknown>) => Promise<void>;
+  voucherLabel?: string;
 };
 
 const formatNumber = (value: number | null | undefined) =>
@@ -84,8 +86,11 @@ export default function LineItemRow({
   categories,
   isNew,
   onSaveLine,
+  voucherLabel = '伝票',
 }: Props) {
   const [selectorOpen, setSelectorOpen] = useState(false);
+  const [ledgerMode, setLedgerMode] = useState<'create' | 'edit' | null>(null);
+  const [ledgerMenuOpen, setLedgerMenuOpen] = useState(false);
   const [memoOpen, setMemoOpen] = useState(false);
   const { register, setValue, getValues, control } = useFormContext<VoucherFormValues>();
   const { settings } = useAppSettings();
@@ -149,6 +154,17 @@ export default function LineItemRow({
   }, [isNew, getValues, index, onSaveLine]);
 
   function handleTateguSelect(item: TateguItem) {
+    const snapshotCosts: LineCategoryValue[] = item.cost_breakdown?.length
+      ? item.cost_breakdown.map(value => ({ ...value }))
+      : categories.map(category => {
+          let value = 0;
+          if (category.code === 'MAIN' || category.code === 'body') value = item.cost_body;
+          if (category.code === 'HARDWARE' || category.code === 'hardware') value = item.cost_hardware;
+          if (category.code === 'GLASS' || category.code === 'glass') value = item.cost_glass;
+          if (category.code === 'FACTORY_TIME') value = item.cost_factory_hours;
+          if (category.code === 'SITE_TIME') value = item.cost_site_hours;
+          return { category_code: category.code, category_name: category.name, measure_type: category.measure_type, value, sort_order: category.sort_order };
+        }).filter(value => value.value !== 0);
     setValue(`lines.${index}.tategu_item_id`, item.id);
     setValue(`lines.${index}.item_name`, item.name);
     setValue(`lines.${index}.cost_body`, item.cost_body);
@@ -158,19 +174,34 @@ export default function LineItemRow({
     setValue(`lines.${index}.cost_site_hours`, item.cost_site_hours);
     setValue(`lines.${index}.cost_labor_rate`, item.cost_labor_rate);
     setValue(`lines.${index}.snapshot_loaded_at`, new Date().toISOString());
-    if (item.cost_breakdown?.length) {
-      setValue(`lines.${index}.costs`, item.cost_breakdown.map(value => ({ ...value })));
-    }
+    setValue(`lines.${index}.costs`, snapshotCosts);
     if (!isNew) {
       const current = getValues(`lines.${index}`);
       if (current?.id) {
         void onSaveLine(current.id, {
           tategu_item_id: item.id,
           item_name: item.name,
+          cost_body: item.cost_body,
+          cost_hardware: item.cost_hardware,
+          cost_glass: item.cost_glass,
+          cost_factory_hours: item.cost_factory_hours,
+          cost_site_hours: item.cost_site_hours,
           cost_labor_rate: item.cost_labor_rate,
+          costs: snapshotCosts,
+          snapshot_loaded_at: new Date().toISOString(),
         });
       }
     }
+  }
+
+  function applyLedger(item: TateguItem) {
+    handleTateguSelect(item);
+  }
+
+  function unlinkLedger() {
+    setValue(`lines.${index}.tategu_item_id`, null);
+    setLedgerMenuOpen(false);
+    if (!isNew) { const current = getValues(`lines.${index}`); if (current?.id) void onSaveLine(current.id, { tategu_item_id: null }); }
   }
 
   const lineType = line?.line_type ?? 'normal';
@@ -262,14 +293,11 @@ export default function LineItemRow({
             rows={3}
             style={{ ...inputStyle, width: 222, height: 45, lineHeight: '15px', resize: 'none' }}
           />
-          {!readOnly && lineType === 'normal' && (
-            <button
-              type="button"
-              title="製品台帳から選択"
-              onClick={event => { event.stopPropagation(); setSelectorOpen(true); }}
-              style={selectorButtonStyle}
-            >📋</button>
-          )}
+          {!readOnly && lineType === 'normal' && <div style={{ position: 'relative', display: 'flex' }}>
+            <button type="button" onClick={event => { event.stopPropagation(); if (line?.tategu_item_id) setLedgerMode('edit'); else setLedgerMenuOpen(open => !open); }} style={ledgerButtonStyle}>{line?.tategu_item_id ? '台帳を直す' : '製品台帳'}</button>
+            {line?.tategu_item_id && <button type="button" aria-label="製品台帳メニュー" onClick={event => { event.stopPropagation(); setLedgerMenuOpen(open => !open); }} style={ledgerArrowStyle}>▼</button>}
+            {ledgerMenuOpen && <div style={ledgerMenuStyle}>{!line?.tategu_item_id && <button type="button" onClick={() => { setLedgerMode('create'); setLedgerMenuOpen(false); }}>新しく作る</button>}<button type="button" onClick={() => { setSelectorOpen(true); setLedgerMenuOpen(false); }}>{line?.tategu_item_id ? '別の台帳を選ぶ' : '台帳から選ぶ'}</button>{line?.tategu_item_id && <button type="button" onClick={unlinkLedger}>紐付けを外す</button>}</div>}
+          </div>}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
           <div data-testid="location-quantity-group" style={joinedGroupStyle}>
@@ -292,6 +320,7 @@ export default function LineItemRow({
           >備考 {memoOpen ? '−' : '＋'}</button>
         </div>
         {!readOnly && <TateguSelector isOpen={selectorOpen} onClose={() => setSelectorOpen(false)} onSelect={handleTateguSelect} />}
+        {!readOnly && ledgerMode && <ProductLedgerModal isOpen mode={ledgerMode} itemId={line?.tategu_item_id} voucherLabel={voucherLabel} lineNo={line?.line_no ?? index + 1} initialName={line?.item_name ?? ''} categories={categories} onClose={() => setLedgerMode(null)} onApplied={applyLedger} />}
       </div>
 
       <div data-testid="line-item-right" style={{ width: rightWidth }}>
@@ -463,6 +492,10 @@ const selectorButtonStyle: React.CSSProperties = {
   background: '#f8fafc',
   cursor: 'pointer',
 };
+
+const ledgerButtonStyle: React.CSSProperties = { ...selectorButtonStyle, width: 'auto', padding: '0 6px', whiteSpace: 'nowrap', borderRadius: '5px 0 0 5px' };
+const ledgerArrowStyle: React.CSSProperties = { ...selectorButtonStyle, width: 20, borderLeft: 0, borderRadius: '0 5px 5px 0', fontSize: 9 };
+const ledgerMenuStyle: React.CSSProperties = { position: 'absolute', top: 23, right: 0, zIndex: 20, display: 'flex', flexDirection: 'column', gap: 1, minWidth: 130, padding: 4, background: '#fff', border: '1px solid #cbd5e1', borderRadius: 6, boxShadow: '0 5px 15px rgba(0,0,0,.15)' };
 
 const memoButtonStyle: React.CSSProperties = {
   height: 20,

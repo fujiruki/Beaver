@@ -1,10 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import ProductLedgerModal from '../ProductLedgerModal';
 
 describe('ProductLedgerModal', () => {
   it('伝票と明細番号、他伝票を変えない案内、保存して反映する操作を表示する', () => {
-    render(
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={client}>
       <ProductLedgerModal
         isOpen
         mode="create"
@@ -15,7 +17,7 @@ describe('ProductLedgerModal', () => {
         onClose={vi.fn()}
         onApplied={vi.fn()}
       />,
-    );
+    </QueryClientProvider>);
 
     expect(screen.getByText('見積 E03988・明細5')).toBeTruthy();
     expect(screen.getByText(/他の伝票は変わりません/)).toBeTruthy();
