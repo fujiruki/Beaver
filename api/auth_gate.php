@@ -18,6 +18,8 @@ const AUTH_GATE_SYNC_EXEMPT_PATHS = [
     '/sync/heartbeat',
     '/sync/status',
     '/sync/changes',
+    '/tategu-items/sync',
+    '/tategu-items/sync/bulk',
     '/admin/snapshot/save',
     '/admin/snapshot/restore',
     '/admin/snapshot/list',
@@ -30,6 +32,7 @@ const AUTH_GATE_SYNC_EXEMPT_PATTERNS = [
     '#^/projects/\d+/vouchers/sync$#',
     '#^/projects/\d+/vouchers/[^/]+/shipped$#',
     '#^/projects/\d+/customer$#',
+    '#^/tategu-items/\d+/(?:sync|access-link|drawing)$#',
 ];
 
 /**
@@ -53,6 +56,7 @@ function authGateIsExempt(string $path, string $method): bool
 /** 同期トークンがない場合に、画面のログイン認証へ切り替える書き込みかを判定する。 */
 function authGateAllowsUserAuthentication(string $path, string $method): bool
 {
+    if (preg_match('#^/tategu-items/\d+/drawing$#', $path)) return true;
     return $method === 'POST' && ($path === '/customers' || $path === '/feedback');
 }
 

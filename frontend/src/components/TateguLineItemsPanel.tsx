@@ -146,6 +146,7 @@ export function TateguCostLinesPanel({ lines, onChange, categories }: CostLinesP
                     value={line.category_code}
                     onChange={e => updateLine(index, { category_code: e.target.value })}
                     className={inputCls}
+                    disabled={line.source === 'wood_calc'}
                   >
                     {options.map(option => (
                       <option key={option.code} value={option.code}>{option.name}</option>
@@ -159,6 +160,7 @@ export function TateguCostLinesPanel({ lines, onChange, categories }: CostLinesP
                     onChange={e => updateLine(index, { name: e.target.value })}
                     className={inputCls}
                     placeholder="材料名"
+                    disabled={line.source === 'wood_calc'}
                   />
                 </td>
                 <td className="py-1 pr-2">
@@ -170,6 +172,7 @@ export function TateguCostLinesPanel({ lines, onChange, categories }: CostLinesP
                     className={inputCls}
                     min="0"
                     step="0.01"
+                    disabled={line.source === 'wood_calc'}
                   />
                 </td>
                 <td className="py-1 pr-2">
@@ -180,17 +183,19 @@ export function TateguCostLinesPanel({ lines, onChange, categories }: CostLinesP
                     onChange={e => updateLine(index, { unit_cost: Number(e.target.value) })}
                     className={inputCls}
                     min="0"
+                    step="1"
+                    disabled={line.source === 'wood_calc'}
                   />
                 </td>
                 <td className="py-1 pr-2 text-right font-semibold text-slate-700">{moneyText(costAmount(line))}</td>
                 <td className="py-1 text-center">
-                  <button
+                  {line.source !== 'wood_calc' && <button
                     type="button"
                     onClick={() => removeLine(index)}
                     className="text-xs text-red-500 hover:text-red-700 px-1"
                   >
                     削除
-                  </button>
+                  </button>}
                 </td>
               </tr>
             ))}

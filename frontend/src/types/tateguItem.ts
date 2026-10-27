@@ -33,9 +33,9 @@ export interface LaborLine {
 
 export interface TateguItem {
   id: number;
-  item_code: string;
+  code: string | null;
   name: string;
-  spec: string | null;
+  description: string | null;
   base_catalog_item_name: string | null;
   cost_body: number;
   cost_hardware: number;

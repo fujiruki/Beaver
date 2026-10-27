@@ -155,14 +155,11 @@ export default function TateguItemDetail() {
         <section className="bg-white rounded-lg shadow-sm p-5">
           <h2 className="text-sm font-bold text-slate-500 mb-4">基本情報</h2>
           <div className="grid grid-cols-2 gap-4">
-            <Field label="品番コード *" error={errors.item_code?.message}>
-              <input {...register('item_code', { required: '必須です' })} className={inputCls} />
+            <Field label="製品№">
+              <input {...register('code')} className={readOnlyInputCls} readOnly placeholder="採番待ち" />
             </Field>
             <Field label="品名 *" error={errors.name?.message}>
               <input {...register('name', { required: '必須です' })} className={inputCls} />
-            </Field>
-            <Field label="仕様">
-              <input {...register('spec')} className={inputCls} />
             </Field>
             <Field label="単位">
               <input {...register('unit')} className={inputCls} placeholder="本・枚・組" />
@@ -259,7 +256,7 @@ export default function TateguItemDetail() {
         </section>
 
         <Field label="備考">
-          <textarea {...register('memo')} rows={2} className={`${inputCls} w-full resize-none`} />
+          <textarea {...register('description')} rows={2} className={`${inputCls} w-full resize-none`} />
         </Field>
 
         <div className="flex justify-end gap-2">

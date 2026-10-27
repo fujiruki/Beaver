@@ -55,10 +55,15 @@ if ($method === 'GET' && $subAction === 'changes') {
     $stmt->execute([':since' => $since]);
     $counts['projects'] = (int)$stmt->fetchColumn();
 
+    $stmt = $pdo->prepare('SELECT COUNT(*) FROM tategu_items WHERE updated_at > :since');
+    $stmt->execute([':since' => $since]);
+    $counts['tategu_items'] = (int)$stmt->fetchColumn();
+
     respond(200, [
         'customers'  => $counts['customers'],
         'vouchers'   => $counts['vouchers'],
         'projects'   => $counts['projects'],
+        'tategu_items' => $counts['tategu_items'],
         'server_time' => utcToJst(gmdate('Y-m-d H:i:s')),
     ]);
     exit;

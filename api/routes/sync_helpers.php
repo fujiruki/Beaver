@@ -131,7 +131,7 @@ function voucherSyncRowsToJst(PDO $pdo, array $rows): array {
                    CASE WHEN lp.voucher_line_id IS NULL THEN l.price_hardware ELSE lp.hardware END AS price_hardware,
                    CASE WHEN lp.voucher_line_id IS NULL THEN l.price_glass ELSE lp.glass END AS price_glass,
                    l.line_total, l.tax_category, l.memo, l.updated_at, l.edited_in_beaver,
-                   l.location_name,
+                   l.location_name, l.tategu_item_id, ti.code AS tategu_code,
                    CASE WHEN lc.voucher_line_id IS NULL THEN l.cost_body ELSE lc.main END AS cost_body,
                    CASE WHEN lc.voucher_line_id IS NULL THEN l.cost_hardware ELSE lc.hardware END AS cost_hardware,
                    CASE WHEN lc.voucher_line_id IS NULL THEN l.cost_glass ELSE lc.glass END AS cost_glass,
@@ -139,6 +139,7 @@ function voucherSyncRowsToJst(PDO $pdo, array $rows): array {
                    CASE WHEN lc.voucher_line_id IS NULL THEN l.cost_site_hours ELSE lc.site_time END AS cost_site_hours,
                    l.cost_labor_rate
             FROM voucher_lines l
+            LEFT JOIN tategu_items ti ON ti.id = l.tategu_item_id
             LEFT JOIN (
                 SELECT voucher_line_id,
                        TOTAL(CASE WHEN category_code = 'MAIN' THEN value END) AS main,
@@ -384,6 +385,9 @@ function nextVoucherNoForSync(PDO $pdo, string $type): string {
  */
 function syncVoucherUpsert(PDO $pdo, ?int $projectId): void {
     $data = readJsonBody();
+
+    $productError = resolveSyncedTateguItems($pdo, $data);
+    if ($productError !== null) { respond(409, $productError); return; }
 
     $textError = validateVoucherTextLengths($data);
     if ($textError !== null) {
@@ -695,8 +699,18 @@ function syncLinesAutoMode(PDO $pdo, int $voucherId, array $data): ?array {
     if (hasEditedInBeaverLines($pdo, $voucherId)) {
         return null;
     }
+    $keep = $pdo->prepare('SELECT access_line_id, tategu_item_id FROM voucher_lines WHERE voucher_id = ? AND access_line_id IS NOT NULL AND tategu_item_id IS NOT NULL');
+    $keep->execute([$voucherId]);
+    $productByLine = $keep->fetchAll(PDO::FETCH_KEY_PAIR);
+    $lines = $data['lines'];
+    foreach ($lines as &$line) {
+        if (is_array($line) && !array_key_exists('tategu_item_id', $line) && isset($line['access_line_id'], $productByLine[$line['access_line_id']])) {
+            $line['tategu_item_id'] = (int)$productByLine[$line['access_line_id']];
+        }
+    }
+    unset($line);
     $pdo->prepare('DELETE FROM voucher_lines WHERE voucher_id = ?')->execute([$voucherId]);
-    return insertSyncedLines($pdo, $voucherId, $data['lines']);
+    return insertSyncedLines($pdo, $voucherId, $lines);
 }
 
 /**
@@ -800,6 +814,7 @@ function upsertSyncedLines(PDO $pdo, int $voucherId, array $lines): ?array {
             'tax_category'   => $taxCategory === '課税' ? 'taxable' : 'non_taxable',
             'memo'           => $line['memo'] ?? null,
             'access_line_id' => $accessLineId,
+            'tategu_item_id' => array_key_exists('tategu_item_id', $line) ? $line['tategu_item_id'] : null,
             'cost_fields'    => syncedLineCostFields($line),
         ];
 
@@ -833,7 +848,7 @@ function upsertSyncedLines(PDO $pdo, int $voucherId, array $lines): ?array {
             location_name = COALESCE(:location_name, location_name), item_name = :item_name, quantity = :quantity,
             price_body = :price_body, price_hardware = :price_hardware, price_glass = :price_glass,
             line_total = :line_total, tax_category = :tax_category, memo = :memo,
-            edited_in_beaver = 0, updated_at = CURRENT_TIMESTAMP
+            tategu_item_id = COALESCE(:tategu_item_id, tategu_item_id), edited_in_beaver = 0, updated_at = CURRENT_TIMESTAMP
         WHERE id = :id
     ');
     foreach ($toUpdate as $u) {
@@ -849,6 +864,7 @@ function upsertSyncedLines(PDO $pdo, int $voucherId, array $lines): ?array {
             ':line_total'    => $u['line_total'],
             ':tax_category'  => $u['tax_category'],
             ':memo'          => $u['memo'],
+            ':tategu_item_id'=> $u['tategu_item_id'],
             ':id'            => $u['id'],
         ]);
         syncLinePriceBreakdown($pdo, $u['id'], $u);
@@ -862,12 +878,12 @@ function upsertSyncedLines(PDO $pdo, int $voucherId, array $lines): ?array {
                 (voucher_id, line_no, line_type, location_name, item_name, quantity,
                  price_body, price_hardware, price_glass,
                  line_total, tax_category, memo,
-                 source, access_line_id, edited_in_beaver, updated_at)
+                 source, access_line_id, tategu_item_id, edited_in_beaver, updated_at)
             VALUES
                 (:voucher_id, :line_no, :line_type, :location_name, :item_name, :quantity,
                  :price_body, :price_hardware, :price_glass,
                  :line_total, :tax_category, :memo,
-                 :source, :access_line_id, 0, CURRENT_TIMESTAMP)
+                 :source, :access_line_id, :tategu_item_id, 0, CURRENT_TIMESTAMP)
         ');
         foreach ($toInsert as $n) {
             $ins->execute([
@@ -885,6 +901,7 @@ function upsertSyncedLines(PDO $pdo, int $voucherId, array $lines): ?array {
                 ':memo'           => $n['memo'],
                 ':source'         => 'access',
                 ':access_line_id' => $n['access_line_id'],
+                ':tategu_item_id' => $n['tategu_item_id'],
             ]);
             applySyncedLineCostFields($pdo, (int)$pdo->lastInsertId(), $n['cost_fields']);
         }
@@ -984,12 +1001,12 @@ function insertSyncedLines(PDO $pdo, int $voucherId, array $lines): ?array {
             (voucher_id, line_no, line_type, location_name, item_name, quantity,
              price_body, price_hardware, price_glass,
              line_total, tax_category, memo,
-             source, access_line_id, edited_in_beaver, updated_at)
+             source, access_line_id, tategu_item_id, edited_in_beaver, updated_at)
         VALUES
             (:voucher_id, :line_no, :line_type, :location_name, :item_name, :quantity,
              :price_body, :price_hardware, :price_glass,
              :line_total, :tax_category, :memo,
-             :source, :access_line_id, 0, CURRENT_TIMESTAMP)
+             :source, :access_line_id, :tategu_item_id, 0, CURRENT_TIMESTAMP)
     ');
     foreach ($lines as $line) {
         if (!is_array($line)) continue;
@@ -1057,9 +1074,26 @@ function insertSyncedLines(PDO $pdo, int $voucherId, array $lines): ?array {
             ':memo'          => $line['memo'] ?? null,
             ':source'        => 'access',
             ':access_line_id' => isset($line['access_line_id']) ? (int)$line['access_line_id'] : null,
+            ':tategu_item_id' => $line['tategu_item_id'] ?? null,
         ]);
         $lineNo++;
     }
+    return null;
+}
+
+/** R-0200: 明細の tategu_code を製品台帳IDへ解決する。キーなしは既存挙動を保つ。 */
+function resolveSyncedTateguItems(PDO $pdo, array &$data): ?array {
+    if (!isset($data['lines']) || !is_array($data['lines'])) return null;
+    $find = $pdo->prepare('SELECT id FROM tategu_items WHERE CAST(code AS INTEGER) = ?');
+    foreach ($data['lines'] as $index => &$line) {
+        if (!is_array($line) || !array_key_exists('tategu_code', $line)) continue;
+        if ($line['tategu_code'] === null || $line['tategu_code'] === '') { $line['tategu_item_id'] = null; continue; }
+        if (!is_numeric($line['tategu_code'])) return ['error' => 'product_missing', 'tategu_code' => $line['tategu_code'], 'line_no' => $index + 1];
+        $find->execute([(int)$line['tategu_code']]); $id = $find->fetchColumn();
+        if (!$id) return ['error' => 'product_missing', 'tategu_code' => $line['tategu_code'], 'line_no' => $index + 1];
+        $line['tategu_item_id'] = (int)$id;
+    }
+    unset($line);
     return null;
 }
 
@@ -1072,6 +1106,9 @@ function insertSyncedLines(PDO $pdo, int $voucherId, array $lines): ?array {
  */
 function syncVoucherUpdate(PDO $pdo, int $projectId, string $accessVoucherNo): void {
     $data = readJsonBody();
+
+    $productError = resolveSyncedTateguItems($pdo, $data);
+    if ($productError !== null) { respond(409, $productError); return; }
 
     $textError = validateVoucherTextLengths($data);
     if ($textError !== null) {

@@ -84,9 +84,9 @@ export default function TateguItemList() {
   }
 
   const columns: DataTableColumn<TateguItem>[] = [
-    { key: 'code', label: 'コード', sortable: true, render: item => item.item_code },
+    { key: 'code', label: '製品№', sortable: true, render: item => item.code || '採番待ち' },
     { key: 'name', label: '品名', sortable: true, render: item => item.name },
-    { key: 'spec', label: '仕様', render: item => item.spec ?? '—' },
+    { key: 'description', label: '備考', render: item => item.description ?? '—' },
     {
       key: 'total_cost',
       label: '製造原価',

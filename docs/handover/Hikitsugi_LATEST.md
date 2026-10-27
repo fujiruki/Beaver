@@ -18,9 +18,9 @@
 
 ### 進行中: R-0200 製品台帳（晴樹さん、10/27）
 要望の原文は `docs/requests.md` の末尾。3つに分けている。
-- **(A) 名前を「製品台帳」に**: 晴樹さん決定「両方『製品台帳』に」（Beaver・Accessの画面名と用語集。表・列名は変えない）。まだ実装していない
+- **(A) 名前を「製品台帳」に**: Beaver側は R-0200 の画面固定文言と用語集を変更済み。識別子・API・表名・データ中の「建具」は変更していない
 - **(B) 伝票の明細から製品台帳をその場で作る・直す**: 保存したらその伝票のその明細だけ原価に自動反映（ほかの伝票は変えない）。Codexのデザイン案 `docs/design/R-0200_product_ledger_from_voucher.md`・`_mock.html`（A: 大きなモーダル＝推し／B: 右の引き出し）。**晴樹さんのA/Bの選択待ち**（番頭に連絡済み）。Access側の画面の書き起こし: `docs/design/R-0200_access_tategu_settings_screen.md`
-- **(C) Accessと同期**: 晴樹さん決定「両方向（承認なし）」。Access側の構造資料と仕様案は AccessTategu `docs/R-0211_建具台帳の構造とBeaver対応.md`・`docs/R-0211_製品台帳同期_仕様案.md`（d30a33c）。Beaver側で了解済みの5点: 採番はAccessだけ（Beaverはcodeを空で作り、access-linkで受け取る。今の `tategu_items.php` の MAX+1 採番をやめる）／明細の同期に `tategu_code` を足す／使用不可⇔`status=archived`、同期済みは物理削除しない／労務はAccessの1行をFACTORY_TIME・SITE_TIMEの2行に、合計は同期しない、`wood_calc`行はBeaverで直せない／同期順は得意先→案件→製品台帳→伝票。**dodai-backが晴樹さんに9点を質問中**（両方で直したとき、建具図・金物の置き場、単価の端数、番号の見え方、追加工程、初回の違い、名前の範囲、削除）。答えが来たらBeaverの仕様（R-0200 C）を書く
+- **(C) Accessと同期**: Beaver側を実装済み。台帳同期5窓口、access-link、製品図、039 migration、変更件数、伝票明細の`tategu_code`解決、採番待ち・整数単価・wood_calc保護を追加。PHP実行は環境のアクセス拒否で未実行、Vitest 590件とfrontend buildは通過。`039_tategu_drawing_sha256.sql`は作成のみで未適用
 - 本番Beaverの台帳の事実: 5,607件（code 00001〜05615）はすべて2026-03-17の一括取り込みの古い写しで、子の表は0件、明細の`tategu_item_id`も0件。Accessは5,693件。初回はAccessを正としてcode＝建具№で上書き・追加でよい
 
 ### 待ち

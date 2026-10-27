@@ -15,7 +15,7 @@ export default function TateguSelector({ isOpen, onClose, onSelect }: Props) {
   if (!isOpen) return null;
 
   const filtered = items.filter(item =>
-    item.name.includes(search) || item.item_code.includes(search) || (item.spec ?? '').includes(search)
+    item.name.includes(search) || (item.code ?? '').includes(search) || (item.description ?? '').includes(search)
   );
 
   return (
@@ -57,9 +57,9 @@ export default function TateguSelector({ isOpen, onClose, onSelect }: Props) {
                       style={{ cursor: 'pointer' }}
                       onMouseEnter={e => (e.currentTarget.style.background = '#f0f9ff')}
                       onMouseLeave={e => (e.currentTarget.style.background = '')}>
-                      <td style={tdStyle}>{item.item_code}</td>
+                      <td style={tdStyle}>{item.code || '採番待ち'}</td>
                       <td style={tdStyle}>{item.name}</td>
-                      <td style={tdStyle}>{item.spec ?? ''}</td>
+                      <td style={tdStyle}>{item.description ?? ''}</td>
                       <td style={tdStyle}>{item.unit ?? ''}</td>
                     </tr>
                   ))}
