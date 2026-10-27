@@ -70,7 +70,7 @@ try {
         }
     } elseif (authGateIsExempt($path, $method)) {
         // --- 認証ゲート (R-0143 A-B-08 / R-0181) ---
-        if (SYNC_TOKEN_REQUIRED && !authGateHasValidSyncToken()) {
+        if (SYNC_TOKEN_REQUIRED && $path !== '/admin/feedback' && !authGateHasValidSyncToken()) {
             if (authGateAllowsUserAuthentication($path, $method) && AUTH_DRIVER !== 'none') {
                 if (!authGateHasValidBantoToken()) {
                     auth_require_user(json: true);
