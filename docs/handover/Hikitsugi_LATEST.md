@@ -18,15 +18,15 @@
 
 ### 進行中: R-0200 製品台帳（晴樹さん、10/27）
 要望の原文は `docs/requests.md` の末尾。3つに分けている。
-- **(A) 名前を「製品台帳」に**: Beaver側は R-0200 の画面固定文言と用語集を変更済み。識別子・API・表名・データ中の「建具」は変更していない
+- **(A) 名前を「製品台帳」に**: 実装済み（feb57c3、未デプロイ）。画面に出る「建具」をすべて「製品」に（R-0211 Q8）。識別子・API・表名・データ中の「建具」は変更していない
 - **(B) 伝票の明細から製品台帳をその場で作る・直す**: 保存したらその伝票のその明細だけ原価に自動反映（ほかの伝票は変えない）。Codexのデザイン案 `docs/design/R-0200_product_ledger_from_voucher.md`・`_mock.html`（A: 大きなモーダル＝推し／B: 右の引き出し）。**晴樹さんのA/Bの選択待ち**（番頭に連絡済み）。Access側の画面の書き起こし: `docs/design/R-0200_access_tategu_settings_screen.md`
-- **(C) Accessと同期**: Beaver側を実装済み。台帳同期5窓口、access-link、製品図、039 migration、変更件数、伝票明細の`tategu_code`解決、採番待ち・整数単価・wood_calc保護を追加。PHP実行は環境のアクセス拒否で未実行、Vitest 590件とfrontend buildは通過。`039_tategu_drawing_sha256.sql`は作成のみで未適用
+- **(C) Accessと同期**: Beaver側を実装済み（17a8dc3・ae28004、回帰スイート🔵青、`api/tests/test_r0200_tategu_sync.php` 18本）。仕様 `docs/spec/R-0200_product_ledger.md`（R-0211の9点の答えを反映済み。descriptionは備考、製品図はJPEG・PNGで10MBまで、古い建具図は送らない）。**dodai-backの依頼で本番・betaに入れない**。Access側の準備ができたら同じ日にそろえて入れる（段取りはdodai-backから。migration 039の晴樹さん確認もそのとき）。窓口の仕様を変えたらdodai-backに知らせる。本番のPHPの`upload_max_filesize`が2MBなら製品図10MBに足りないので、デプロイ前に確かめる
 - 本番Beaverの台帳の事実: 5,607件（code 00001〜05615）はすべて2026-03-17の一括取り込みの古い写しで、子の表は0件、明細の`tategu_item_id`も0件。Accessは5,693件。初回はAccessを正としてcode＝建具№で上書き・追加でよい
 
 ### 待ち
 - 晴樹さん: R-0200(B)のデザインA/B
-- dodai-back: R-0211の9点の答え
-- **git push**: 10/20から自動の許可判定で止まっていて、手元に70件以上のコミットがたまっている（`git log origin/master..HEAD`）。晴樹さんに「pushして」と言ってもらうか `! git -C C:/Fujiruki/Projects/Beaver push`
+- dodai-back: Access側の製品台帳同期の実装（そろったら(A)(C)をまとめて本番へ）
+- **git push**: 10/20から自動の許可判定で止まっていて、手元に80件以上のコミットがたまっている（`git log origin/master..HEAD`）。晴樹さんに「pushして」と言ってもらうか `! git -C C:/Fujiruki/Projects/Beaver push`
 
 ## この期間にやったこと（要点）
 
