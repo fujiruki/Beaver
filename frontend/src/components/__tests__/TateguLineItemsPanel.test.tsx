@@ -38,21 +38,35 @@ describe('TateguCostLinesPanel', () => {
     }]);
   });
 
-  it('材料明細の行追加はmoney区分の先頭カテゴリを使う', () => {
+  it('末尾の空行へ入力すると材料行が追加され、行追加ボタンは出さない', () => {
     const onChange = vi.fn();
 
     render(<TateguCostLinesPanel lines={[]} onChange={onChange} categories={categories} />);
-    fireEvent.click(screen.getByText('+ 行追加'));
+    expect(screen.queryByText('+ 行追加')).toBeNull();
+    fireEvent.change(screen.getByLabelText('材料名'), { target: { value: '框材' } });
 
     expect(onChange).toHaveBeenCalledWith([{
       category_code: 'MAIN',
-      name: '',
+      name: '框材',
       quantity: 1,
       unit_cost: 0,
       amount: 0,
       source: 'manual',
       sort_order: 0,
     }]);
+  });
+
+  it('数値入力は右寄せで、非フォーカス時に数量はコンマ、単価は円記号を表示する', () => {
+    render(<TateguCostLinesPanel lines={[{
+      category_code: 'MAIN', name: '框材', quantity: 1200, unit_cost: 13200,
+      amount: 15840000, source: 'manual', sort_order: 0,
+    }]} onChange={vi.fn()} categories={categories} />);
+
+    expect((screen.getByLabelText('数量') as HTMLInputElement).value).toBe('1,200');
+    expect((screen.getByLabelText('材料単価') as HTMLInputElement).value).toBe('¥13,200');
+    expect((screen.getByLabelText('数量') as HTMLInputElement).style.textAlign).toBe('right');
+    fireEvent.focus(screen.getByLabelText('材料単価'));
+    expect((screen.getByLabelText('材料単価') as HTMLInputElement).value).toBe('13200');
   });
 
   it('単価は整数刻みで、wood_calc 行は読み取り専用かつ削除できない', () => {
@@ -111,5 +125,18 @@ describe('TateguLaborLinesPanel', () => {
 
     const options = Array.from(screen.getByLabelText('労務区分').querySelectorAll('option')).map(option => option.value);
     expect(options).toEqual(['FACTORY_TIME', 'SITE_TIME']);
+  });
+
+  it('末尾の空行へ入力すると工程が追加され、下に新しい空行が残る', () => {
+    const onChange = vi.fn();
+    const { rerender } = render(<TateguLaborLinesPanel lines={[]} onChange={onChange} categories={categories} />);
+
+    fireEvent.change(screen.getByLabelText('工程名'), { target: { value: '組立' } });
+    expect(onChange).toHaveBeenCalledWith([expect.objectContaining({ process_name: '組立' })]);
+    expect(screen.queryByText('+ 行追加')).toBeNull();
+
+    const added = onChange.mock.calls[0][0] as LaborLineDraft[];
+    rerender(<TateguLaborLinesPanel lines={added} onChange={onChange} categories={categories} />);
+    expect(screen.getAllByLabelText('工程名')).toHaveLength(2);
   });
 });
