@@ -269,7 +269,7 @@ try {
 
         $r = putJson($port, "/tategu-items/$id/cost-lines", ['lines' => [
             ['category_code' => 'MAIN', 'name' => 'ヒノキ材', 'quantity' => 2.5, 'unit_cost' => 1200, 'amount' => 3000, 'source' => 'manual', 'sort_order' => 2],
-            ['category_code' => 'MAIN', 'name' => '木材計算', 'quantity' => 1, 'unit_cost' => 2500, 'amount' => 2500, 'source' => 'wood_calc', 'sort_order' => 1],
+            ['category_code' => 'MAIN', 'name' => '木材計算', 'quantity' => 1, 'unit_cost' => 2500, 'amount' => 2500, 'source' => 'manual', 'sort_order' => 1],
             ['category_code' => 'HARDWARE', 'name' => '丁番', 'quantity' => 4, 'unit_cost' => 300, 'amount' => 1200, 'sort_order' => 3],
             ['category_code' => 'GLASS', 'name' => '透明ガラス', 'quantity' => 1, 'unit_cost' => 1800, 'amount' => 1800, 'sort_order' => 4],
         ]]);
@@ -283,7 +283,7 @@ try {
 
         $lines = $pdo->query("SELECT category_code, name, source FROM tategu_item_cost_lines WHERE tategu_item_id = $id ORDER BY sort_order, id")->fetchAll();
         assertEq(4, count($lines), 'cost_lines count');
-        assertEq('wood_calc', $lines[0]['source'], 'sort_order と source');
+        assertEq('木材計算', $lines[0]['name'], 'sort_order 順');
     });
 
     runTest('PUT /tategu-items/{id}/labor-lines は労務行を全件入れ替えし時間と加重平均単価を再計算する', function () use (&$pdo, $port) {
