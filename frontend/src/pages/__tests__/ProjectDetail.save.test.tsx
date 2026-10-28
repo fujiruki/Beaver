@@ -26,10 +26,12 @@ const baseProject = {
 };
 
 let putBodies: any[] = [];
+let postBodies: any[] = [];
 let currentProject: typeof baseProject;
 
 beforeEach(() => {
   putBodies = [];
+  postBodies = [];
   currentProject = { ...baseProject };
   vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
     const u = new URL(url, 'http://localhost');
@@ -45,6 +47,11 @@ beforeEach(() => {
       putBodies.push(body);
       return new Response(JSON.stringify({ ...currentProject, ...body }), { status: 200 });
     }
+    if (method === 'POST' && u.pathname.endsWith('/projects')) {
+      const body = JSON.parse(String(init?.body ?? '{}'));
+      postBodies.push(body);
+      return new Response(JSON.stringify({ ...currentProject, ...body, id: 42 }), { status: 201 });
+    }
     return new Response(JSON.stringify(currentProject), { status: 200 });
   }));
 });
@@ -56,6 +63,21 @@ function renderPage() {
       <MemoryRouter initialEntries={['/projects/5']}>
         <Routes>
           <Route path="/projects/:id" element={<ProjectDetail />} />
+          <Route path="/projects" element={<div>一覧画面</div>} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
+
+function renderNewPage() {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+  return render(
+    <QueryClientProvider client={qc}>
+      <MemoryRouter initialEntries={['/projects/new']}>
+        <Routes>
+          <Route path="/projects/new" element={<ProjectDetail />} />
+          <Route path="/projects/:id" element={<div>作成案件画面</div>} />
           <Route path="/projects" element={<div>一覧画面</div>} />
         </Routes>
       </MemoryRouter>
@@ -88,5 +110,23 @@ describe('ProjectDetail 保存 (R-071)', () => {
     await user.click(screen.getByRole('button', { name: '保存' }));
     await waitFor(() => expect(putBodies.length).toBeGreaterThan(0));
     expect(putBodies[0].name).toBe('新しい案件名');
+  });
+});
+
+describe('ProjectDetail 新規保存後の遷移 (R-0217)', () => {
+  it('作成された案件IDの編集画面を開く', async () => {
+    const user = userEvent.setup();
+    const { container } = renderNewPage();
+
+    const name = container.querySelector('input[name="name"]') as HTMLInputElement;
+    await user.type(name, '新規案件');
+    const customer = screen.getByPlaceholderText('得意先を検索...');
+    await user.click(customer);
+    await user.keyboard('{Enter}');
+    await user.click(screen.getByRole('button', { name: '保存' }));
+
+    await waitFor(() => expect(postBodies).toHaveLength(1));
+    expect(await screen.findByText('作成案件画面')).toBeTruthy();
+    expect(screen.queryByText('一覧画面')).toBeNull();
   });
 });

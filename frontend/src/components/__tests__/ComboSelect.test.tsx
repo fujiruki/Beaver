@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+import { vi } from 'vitest';
 import ComboSelect, { type ComboOption } from '../ComboSelect';
 
 const OPTIONS: ComboOption[] = [
@@ -72,6 +73,35 @@ describe('ComboSelect Enter選択 (R-0114)', () => {
     fireEvent.keyDown(input, { key: 'Enter', keyCode: 229 });
 
     expect(selected).toBe(null);
+  });
+});
+
+describe('ComboSelect IME確定後のEnter選択 (R-0216)', () => {
+  it('漢字変換確定のEnterではフォーム送信せず、次のEnterで絞り込んだ候補を確定する', () => {
+    let selected: number | null = null;
+    const onSubmit = vi.fn((event: React.FormEvent) => event.preventDefault());
+    render(
+      <form onSubmit={onSubmit}>
+        <ComboSelect
+          options={OPTIONS}
+          value={null}
+          onChange={id => { selected = id; }}
+          placeholder="選択"
+        />
+      </form>,
+    );
+    const input = screen.getByPlaceholderText('選択');
+
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: '鈴木' } });
+    const wasNotCancelled = fireEvent.keyDown(input, { key: 'Enter', isComposing: true });
+
+    expect(wasNotCancelled).toBe(false);
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(selected).toBeNull();
+
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(selected).toBe(3);
   });
 });
 

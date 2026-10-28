@@ -43,3 +43,10 @@ describe('R-0190 テキスト入力の最大長', () => {
     expect(input.maxLength).toBe(255);
   });
 });
+
+describe('R-0215 取付場所のplaceholder', () => {
+  it('取付場所が空欄のとき「取付場所」を薄く表示する', () => {
+    const { getByRole } = render(<Harness />);
+    expect(getByRole('textbox', { name: '取付場所' }).getAttribute('placeholder')).toBe('取付場所');
+  });
+});
