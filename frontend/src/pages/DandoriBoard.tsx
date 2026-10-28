@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useProjects } from '../api/projects';
+import { useProjectStatuses } from '../api/projectStatuses';
 import { useAppSettings } from '../contexts/AppSettingsContext';
 import { APP_STORAGE_PREFIX } from '../lib/appId';
 import { api } from '../api/client';
@@ -48,6 +49,7 @@ function loadFontScale(): number {
 
 export default function DandoriBoard() {
   const { data: projects = [], isLoading, error } = useProjects();
+  const { data: projectStatuses = [] } = useProjectStatuses();
   const { settings } = useAppSettings();
   const queryClient = useQueryClient();
 
@@ -59,13 +61,21 @@ export default function DandoriBoard() {
   const [dragError, setDragError] = useState<string | null>(null);
   const [editingProjectId, setEditingProjectId] = useState<number | null>(null);
   const [extraDays, setExtraDays] = useState(0);
+  const [extraBeforeDays, setExtraBeforeDays] = useState(0);
 
   const todayISO = todayISOLocal();
-  const { start: rangeStart, end: presetRangeEnd } = useMemo(() => rangeForPreset(todayISO, preset), [todayISO, preset]);
+  const { start: presetRangeStart, end: presetRangeEnd } = useMemo(
+    () => rangeForPreset(todayISO, preset),
+    [todayISO, preset],
+  );
+  const rangeStart = useMemo(
+    () => addDaysISO(presetRangeStart, -extraBeforeDays),
+    [presetRangeStart, extraBeforeDays],
+  );
   const rangeEnd = useMemo(() => addDaysISO(presetRangeEnd, extraDays), [presetRangeEnd, extraDays]);
 
   const commitMutation = useMutation({
-    mutationFn: ({ id, patch }: { id: number; patch: { start_date?: string; delivery_date?: string } }) =>
+    mutationFn: ({ id, patch }: { id: number; patch: Partial<Project> }) =>
       api.put<Project>(`/projects/${id}`, patch),
     onMutate: async ({ id, patch }) => {
       await queryClient.cancelQueries({ queryKey: PROJECTS_QUERY_KEY });
@@ -88,10 +98,15 @@ export default function DandoriBoard() {
     setPreset(next);
     setPxPerDay(PRESET_DEFAULT_PX_PER_DAY[next]);
     setExtraDays(0);
+    setExtraBeforeDays(0);
   }
 
   function handleNearRightEdge() {
     setExtraDays(prev => nextExtraDays(prev, EXTRA_STEP_DAYS, EXTRA_MAX_DAYS));
+  }
+
+  function handleNearLeftEdge() {
+    setExtraBeforeDays(prev => nextExtraDays(prev, EXTRA_STEP_DAYS, EXTRA_MAX_DAYS));
   }
 
   function handleCommit(id: number, patch: { start_date?: string; delivery_date?: string }) {
@@ -223,6 +238,12 @@ export default function DandoriBoard() {
           onCommit={handleCommit}
           onProjectDoubleClick={setEditingProjectId}
           onNearRightEdge={handleNearRightEdge}
+          onNearLeftEdge={handleNearLeftEdge}
+          statusOptions={[...projectStatuses]
+            .filter(status => status.is_active)
+            .sort((a, b) => a.sort_order - b.sort_order)
+            .map(status => status.name)}
+          onStatusChange={(id, status) => commitMutation.mutate({ id, patch: { status } })}
         />
       ) : (
         <WrapView bars={visibleBars} rangeStart={rangeStart} rangeEnd={rangeEnd} todayISO={todayISO} onProjectDoubleClick={setEditingProjectId} />

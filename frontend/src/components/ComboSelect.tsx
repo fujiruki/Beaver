@@ -104,7 +104,10 @@ export default function ComboSelect({ options, value, onChange, placeholder, dis
       setHighlighted(h => Math.max(h - 1, 0));
     } else if (e.key === 'Enter') {
       // R-0114: 漢字変換確定のEnterでは候補確定しない
-      if (e.nativeEvent.isComposing || e.keyCode === 229) return;
+      if (e.nativeEvent.isComposing || e.keyCode === 229) {
+        e.preventDefault();
+        return;
+      }
       e.preventDefault();
       // R-0114: ハイライトがなければ、表示中候補の一番上で確定する
       const target = highlighted >= 0 ? filtered[highlighted] : filtered[0];

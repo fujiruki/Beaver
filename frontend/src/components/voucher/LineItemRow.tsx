@@ -275,6 +275,7 @@ export default function LineItemRow({
           <div data-testid="location-quantity-group" style={joinedGroupStyle}>
             <input
               aria-label="取付場所"
+              placeholder="取付場所"
               {...register(`lines.${index}.location_name`)}
               maxLength={255}
               disabled={readOnly || lineType !== 'normal'}

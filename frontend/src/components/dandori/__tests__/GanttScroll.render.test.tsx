@@ -44,7 +44,7 @@ function renderGantt(onNearRightEdge?: () => void) {
 function mockScrollMetrics(el: HTMLElement, metrics: { scrollWidth: number; clientWidth: number; scrollLeft: number }) {
   Object.defineProperty(el, 'scrollWidth', { value: metrics.scrollWidth, configurable: true });
   Object.defineProperty(el, 'clientWidth', { value: metrics.clientWidth, configurable: true });
-  Object.defineProperty(el, 'scrollLeft', { value: metrics.scrollLeft, configurable: true });
+  Object.defineProperty(el, 'scrollLeft', { value: metrics.scrollLeft, configurable: true, writable: true });
 }
 
 describe('GanttScroll 案件名・得意先名の2列表示（R-0138）', () => {

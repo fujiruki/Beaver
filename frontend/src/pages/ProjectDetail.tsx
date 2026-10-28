@@ -107,11 +107,12 @@ export default function ProjectDetail() {
 
   async function onSubmit(data: ProjectInput) {
     if (isNew) {
-      await createMutation.mutateAsync(data);
+      const created = await createMutation.mutateAsync(data);
+      navigate(`/projects/${created.id}`);
     } else {
       await updateMutation.mutateAsync(data);
+      goBack();
     }
-    goBack();
   }
 
   async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
