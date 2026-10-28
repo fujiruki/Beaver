@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import GanttScroll from '../GanttScroll';
 import type { DandoriBar } from '../dandoriBoardUtils';
 import { salesCategoryBorderColor } from '../../../pages/DandoriBoard';
@@ -215,5 +215,71 @@ describe('GanttScroll シームレススクロール（R-0146: onNearRightEdge�
     mockScrollMetrics(scrollEl, { scrollWidth: 2000, clientWidth: 800, scrollLeft: 1900 });
 
     expect(() => fireEvent.scroll(scrollEl)).not.toThrow();
+  });
+});
+
+describe('R-0218 案件ステータスの右クリック変更', () => {
+  it('バーの右クリックでマスタ順の一覧と現在値の印を表示し、選択値を通知する', () => {
+    const onStatusChange = vi.fn();
+    const { container } = render(
+      <GanttScroll
+        bars={[{ ...bar, status: '進行中' }]}
+        rangeStart="2026-08-25"
+        rangeEnd="2026-09-15"
+        pxPerDay={24}
+        todayISO="2026-09-01"
+        onCommit={vi.fn()}
+        onProjectDoubleClick={vi.fn()}
+        statusOptions={['問い合わせ', '進行中', '完了']}
+        onStatusChange={onStatusChange}
+      />,
+    );
+
+    fireEvent.contextMenu(container.querySelector('.bar') as HTMLElement, { clientX: 30, clientY: 40 });
+
+    const items = screen.getAllByRole('menuitem');
+    expect(items.map(item => item.textContent)).toEqual(['問い合わせ', '✓ 進行中', '完了']);
+    fireEvent.click(items[2]);
+    expect(onStatusChange).toHaveBeenCalledWith(1, '完了');
+  });
+
+  it('外側クリックまたはEscで閉じる', () => {
+    const { container } = render(
+      <GanttScroll
+        bars={[{ ...bar, status: '進行中' }]}
+        rangeStart="2026-08-25" rangeEnd="2026-09-15" pxPerDay={24} todayISO="2026-09-01"
+        onCommit={vi.fn()} onProjectDoubleClick={vi.fn()}
+        statusOptions={['進行中', '完了']} onStatusChange={vi.fn()}
+      />,
+    );
+    const projectBar = container.querySelector('.bar') as HTMLElement;
+
+    fireEvent.contextMenu(projectBar);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('menu')).toBeNull();
+
+    fireEvent.contextMenu(projectBar);
+    fireEvent.mouseDown(document.body);
+    expect(screen.queryByRole('menu')).toBeNull();
+  });
+});
+
+describe('R-0219 前期間へのシームレススクロール', () => {
+  it('左端近くで前期間を要求し、追加後も見ていた位置を保つ', () => {
+    const onNearLeftEdge = vi.fn();
+    const props = {
+      bars: [bar], rangeEnd: '2026-09-15', pxPerDay: 24, todayISO: '2026-09-01',
+      onCommit: vi.fn(), onProjectDoubleClick: vi.fn(), onNearLeftEdge,
+    };
+    const { container, rerender } = render(<GanttScroll {...props} rangeStart="2026-08-25" />);
+    const scrollEl = container.querySelector('.gantt-scroll') as HTMLElement;
+    mockScrollMetrics(scrollEl, { scrollWidth: 2000, clientWidth: 800, scrollLeft: 100 });
+
+    fireEvent.scroll(scrollEl);
+    expect(onNearLeftEdge).toHaveBeenCalledTimes(1);
+
+    Object.defineProperty(scrollEl, 'scrollWidth', { value: 2672, configurable: true });
+    rerender(<GanttScroll {...props} rangeStart="2026-07-28" />);
+    expect(scrollEl.scrollLeft).toBe(772);
   });
 });
