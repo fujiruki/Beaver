@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { dailyLoad } from '../../lib/dandoriCalc';
 import { APP_STORAGE_PREFIX } from '../../lib/appId';
 import {
@@ -164,6 +164,7 @@ function useDayDrag(pxPerDay: number, onCommit: (deltaDays: number) => void) {
 }
 
 const NEAR_RIGHT_EDGE_THRESHOLD_PX = 400; // R-0146: 残りがこの幅未満でonNearRightEdgeを呼ぶ
+const NEAR_LEFT_EDGE_THRESHOLD_PX = 400;
 
 interface GanttScrollProps {
   bars: DandoriBar[];
@@ -174,9 +175,18 @@ interface GanttScrollProps {
   onCommit: (id: number, patch: { start_date?: string; delivery_date?: string }) => void;
   onProjectDoubleClick: (id: number) => void;
   onNearRightEdge?: () => void;
+  onNearLeftEdge?: () => void;
+  statusOptions?: string[];
+  onStatusChange?: (id: number, status: string) => void;
 }
 
-export default function GanttScroll({ bars, rangeStart, rangeEnd, pxPerDay, todayISO, onCommit, onProjectDoubleClick, onNearRightEdge }: GanttScrollProps) {
+export default function GanttScroll({
+  bars, rangeStart, rangeEnd, pxPerDay, todayISO, onCommit, onProjectDoubleClick,
+  onNearRightEdge, onNearLeftEdge, statusOptions = [], onStatusChange,
+}: GanttScrollProps) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const widthBeforePrependRef = useRef<number | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ id: number; status?: string; x: number; y: number } | null>(null);
   const totalDays = daysBetween(rangeStart, rangeEnd) + 1;
   const gridWidth = totalDays * pxPerDay;
   const showDayNumbers = pxPerDay >= DETAIL_THRESHOLD_PX;
@@ -190,15 +200,40 @@ export default function GanttScroll({ bars, rangeStart, rangeEnd, pxPerDay, toda
   const markers = freeMarkerLabels(load, todayISO);
   const loadDays = enumerateDays(rangeStart, rangeEnd);
 
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    const previousWidth = widthBeforePrependRef.current;
+    if (!el || previousWidth === null) return;
+    el.scrollLeft += el.scrollWidth - previousWidth;
+    widthBeforePrependRef.current = null;
+  }, [rangeStart]);
+
+  useEffect(() => {
+    if (!contextMenu) return;
+    const close = () => setContextMenu(null);
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') close();
+    };
+    document.addEventListener('mousedown', close);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [contextMenu]);
+
   function handleScroll(e: React.UIEvent<HTMLDivElement>) {
-    if (!onNearRightEdge) return;
     const el = e.currentTarget;
     const remainingPx = el.scrollWidth - (el.scrollLeft + el.clientWidth);
-    if (remainingPx < NEAR_RIGHT_EDGE_THRESHOLD_PX) onNearRightEdge();
+    if (onNearRightEdge && remainingPx < NEAR_RIGHT_EDGE_THRESHOLD_PX) onNearRightEdge();
+    if (onNearLeftEdge && el.scrollLeft < NEAR_LEFT_EDGE_THRESHOLD_PX && widthBeforePrependRef.current === null) {
+      widthBeforePrependRef.current = el.scrollWidth;
+      onNearLeftEdge();
+    }
   }
 
   return (
-    <div className="gantt-scroll" onScroll={handleScroll}>
+    <div ref={scrollRef} className="gantt-scroll" onScroll={handleScroll}>
       <div className="gantt" style={{ width: labelTotalWidth + gridWidth }}>
         <div className="axis">
           <div className="label-col" style={{ width: labelTotalWidth }}>
@@ -252,6 +287,10 @@ export default function GanttScroll({ bars, rangeStart, rangeEnd, pxPerDay, toda
             labelTotalWidth={labelTotalWidth}
             onCommit={onCommit}
             onProjectDoubleClick={onProjectDoubleClick}
+            onContextMenu={(event, status) => {
+              event.preventDefault();
+              setContextMenu({ id: bar.id, status, x: event.clientX, y: event.clientY });
+            }}
           />
         ))}
 
@@ -277,11 +316,42 @@ export default function GanttScroll({ bars, rangeStart, rangeEnd, pxPerDay, toda
           </div>
         </div>
       </div>
+      {contextMenu && (
+        <div
+          role="menu"
+          onMouseDown={event => event.stopPropagation()}
+          style={{
+            position: 'fixed', left: contextMenu.x, top: contextMenu.y, zIndex: 1000,
+            minWidth: 150, padding: 4, border: '1px solid #cbd5e1', borderRadius: 6,
+            background: '#fff', boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+          }}
+        >
+          {statusOptions.map(status => (
+            <button
+              key={status}
+              role="menuitem"
+              type="button"
+              onClick={() => {
+                onStatusChange?.(contextMenu.id, status);
+                setContextMenu(null);
+              }}
+              style={{
+                display: 'block', width: '100%', padding: '6px 10px', textAlign: 'left', background: 'none',
+              }}
+            >
+              {status === contextMenu.status ? `✓ ${status}` : status}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
-function BarRow({ bar, rangeStart, pxPerDay, gridWidth, showBarLabel, todayLeftPx, nameColWidth, custColWidth, labelTotalWidth, onCommit, onProjectDoubleClick }: {
+function BarRow({
+  bar, rangeStart, pxPerDay, gridWidth, showBarLabel, todayLeftPx, nameColWidth, custColWidth,
+  labelTotalWidth, onCommit, onProjectDoubleClick, onContextMenu,
+}: {
   bar: DandoriBar;
   rangeStart: string;
   pxPerDay: number;
@@ -293,6 +363,7 @@ function BarRow({ bar, rangeStart, pxPerDay, gridWidth, showBarLabel, todayLeftP
   labelTotalWidth: number;
   onCommit: (id: number, patch: { start_date?: string; delivery_date?: string }) => void;
   onProjectDoubleClick: (id: number) => void;
+  onContextMenu: (event: React.MouseEvent, status?: string) => void;
 }) {
   const barDrag = useDayDrag(pxPerDay, deltaDays => onCommit(bar.id, { start_date: addDaysISO(bar.start, deltaDays) }));
   const deadlineDrag = useDayDrag(pxPerDay, deltaDays => bar.delivery && onCommit(bar.id, { delivery_date: addDaysISO(bar.delivery, deltaDays) }));
@@ -323,6 +394,7 @@ function BarRow({ bar, rangeStart, pxPerDay, gridWidth, showBarLabel, todayLeftP
           style={{ left: leftPx, width: widthPx, ...(bar.salesBorderColor ? { ['--sales-border' as string]: bar.salesBorderColor } : {}) }}
           {...barDrag.handlers}
           onDoubleClick={e => { e.stopPropagation(); onProjectDoubleClick(bar.id); }}
+          onContextMenu={event => onContextMenu(event, bar.status)}
         >
           {showBarLabel && labelFitsInside && labelText}
           {overDays > 0 && <div className="over" style={{ width: overDays * pxPerDay }} />}

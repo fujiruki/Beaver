@@ -125,6 +125,7 @@ export interface DandoriBar {
   customerName: string;
   isShop: boolean;
   category: StatusCategory;
+  status?: string;
   start: string;
   end: string;
   delivery: string | null;
@@ -160,6 +161,7 @@ export function buildBar(project: ProjectLike, hoursPerDay: number): DandoriBar 
     customerName: project.customer_name ?? '',
     isShop: (project.customer_name ?? '').includes('社内'),
     category: statusCategory(project.status),
+    status: project.status,
     start: project.start_date,
     end: barEndDate(project.start_date, workdays),
     delivery: project.delivery_date,
