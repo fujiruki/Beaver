@@ -3,6 +3,7 @@
  * 案件単位の工数→バー期間計算は lib/dandoriCalc.ts に集約済みのためそちらを使う。
  * ここに置くのは画面のレイアウト・表示切替に関わる小さなロジックのみ。
  */
+import type { ProjectSchedule } from '../../types/projectSchedule';
 import { freeDayMarkers, workdaysFromHours, barEndDate, dailyLoad } from '../../lib/dandoriCalc';
 
 export type RangePreset = '8w' | '6m' | '1y';
@@ -145,11 +146,35 @@ interface ProjectLike {
 }
 
 /** 開始日未設定の案件のうち、表示対象のもの（完了・キャンセル系はshowDoneに従う） */
-export function unstartedProjects<T extends { start_date: string | null; status: string }>(
+export function unstartedProjects<T extends { id: number; start_date: string | null; status: string }>(
   projects: T[],
   showDone: boolean,
+  excludeIds: Set<number> = new Set(),
 ): T[] {
-  return projects.filter(p => !p.start_date && (showDone || statusCategory(p.status) !== 'done'));
+  return projects.filter(
+    p => !p.start_date && !excludeIds.has(p.id) && (showDone || statusCategory(p.status) !== 'done'),
+  );
+}
+
+/** R-0220: 開始日が無くても、済でない予定があれば段取りに行を出す案件 */
+export function scheduleOnlyProjects<T extends { id: number; start_date: string | null; status: string }>(
+  projects: T[],
+  schedules: { project_id: number; done: number }[],
+  showDone: boolean,
+): T[] {
+  const withPending = new Set(schedules.filter(s => !s.done).map(s => s.project_id));
+  return unstartedProjects(projects, showDone).filter(p => withPending.has(p.id));
+}
+
+/** R-0220: 稼働数に数える区間。製作のバーと、済でない取付の予定 */
+export function loadIntervals(
+  bars: { id: number; start: string; end: string }[],
+  schedules: ProjectSchedule[],
+): { id: number; start: string; end: string }[] {
+  const installs = schedules
+    .filter(s => s.kind === '取付' && !s.done)
+    .map(s => ({ id: s.project_id, start: s.start_date ?? s.end_date, end: s.end_date }));
+  return [...bars.map(b => ({ id: b.id, start: b.start, end: b.end })), ...installs];
 }
 
 export function buildBar(project: ProjectLike, hoursPerDay: number): DandoriBar {
