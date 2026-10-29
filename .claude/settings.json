@@ -13,14 +13,5 @@
         ]
       }
     ]
-  },
-  "permissions": {
-    "allow": [
-      "Bash(powershell -ExecutionPolicy Bypass -File upload.ps1*)"
-    ]
-  } ,
-  "enabledPlugins": {
-    "fast-jev-compaction@fast-jev-compaction": true
   }
 }
-
