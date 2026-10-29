@@ -81,3 +81,4 @@
 038_vouchers_due_date  2026-10-24  prod (R-0191。vouchers.due_dateを追加、SSH+PHP PDO経由で適用。晴樹さんOK。backup: database_beaver_20261024_1046_pre_038_r0193_e02046.sqlite)
 039_tategu_drawing_sha256  2026-10-29  beaver_beta (R-0200(C)。tategu_items.drawing_sha256・last_synced_at、SSH+PHP PDO経由。dodai-back依頼・晴樹さん「betaで進めてよい」。backup: database_beta_20261029_1311_pre_039_040.sqlite)
 040_project_schedules  2026-10-29  beaver_beta (R-0220。project_schedules、同上のbackup)
+040_project_schedules  2026-10-29  prod (R-0220。project_schedules、SSH+PHP PDO経由。晴樹さん「はい」。039はまだ本番に無い（R-0200と一緒に手で当てる）。backup: database_beaver_20261029_1402_pre_040_project_schedules.sqlite)
