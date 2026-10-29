@@ -19,5 +19,5 @@
 
 ## タスク
 
-- [ ] T1 `api/tests/test_search_multi_property_phase2.php` に案件の検索のテストを足す（失敗を確かめる）
-- [ ] T2 `api/routes/projects.php` の検索対象に `c.name_kana` を足す
+- [x] T1 `api/tests/test_search_multi_property_phase2.php` に案件の検索のテストを足す（失敗を確かめる）
+- [x] T2 `api/routes/projects.php` の検索対象に `c.name_kana` を足す
