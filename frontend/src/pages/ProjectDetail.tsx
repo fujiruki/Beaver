@@ -72,7 +72,6 @@ export default function ProjectDetail() {
         name: project.name,
         description: project.description,
         status: project.status,
-        start_date: project.start_date,
         end_date: project.end_date,
         delivery_date: project.delivery_date,
         address: project.address,
@@ -272,9 +271,6 @@ export default function ProjectDetail() {
               <input {...register('order_date')} type="date" className={dateInputCls} />
             </Field>
 
-            <Field label="開始日">
-              <input {...register('start_date')} type="date" className={dateInputCls} />
-            </Field>
             <Field label="納品日">
               <input {...register('end_date')} type="date" className={dateInputCls} />
             </Field>

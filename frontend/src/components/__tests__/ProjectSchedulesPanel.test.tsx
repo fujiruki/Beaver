@@ -108,7 +108,7 @@ describe('ProjectSchedulesPanel（R-0222）', () => {
     current = [schedule({ id: 3, kind: '見積', hours: 1.5 })];
     stubFetch();
     renderPanel();
-    const hours = (await screen.findByLabelText('予定の時間')) as HTMLInputElement;
+    const hours = (await screen.findByDisplayValue('1.5')) as HTMLInputElement;
     expect(hours.value).toBe('1.5');
     expect(hours.className).toMatch(/text-right/);
     fireEvent.change(hours, { target: { value: '2' } });

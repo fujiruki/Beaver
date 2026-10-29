@@ -33,7 +33,6 @@ export default function ProjectQuickEditModal({ projectId, onClose, onSaved }: P
       name: project.name,
       status: project.status,
       order_date: project.order_date,
-      start_date: project.start_date,
       delivery_date: project.delivery_date,
       manual_estimated_hours: project.manual_estimated_hours,
       memo: project.memo,
@@ -69,7 +68,6 @@ export default function ProjectQuickEditModal({ projectId, onClose, onSaved }: P
               <label className="text-sm">得意先<select aria-label="得意先" {...register('customer_id', { required: true })} className={inputClass}>{customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
               <label className="text-sm">ステータス<select aria-label="ステータス" {...register('status')} className={inputClass}>{statuses.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}</select></label>
               <label className="text-sm">受注日<input aria-label="受注日" type="date" {...register('order_date')} className={inputClass} /></label>
-              <label className="text-sm">開始日<input aria-label="開始日" type="date" {...register('start_date')} className={inputClass} /></label>
               <label className="text-sm">納期<input aria-label="納期" type="date" {...register('delivery_date')} className={inputClass} /></label>
               <label className="text-sm">工数目安（h）<input aria-label="工数目安（h）" type="number" step="0.1" {...register('manual_estimated_hours', { valueAsNumber: true })} className={inputClass} /></label>
             </div>
