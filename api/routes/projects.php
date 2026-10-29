@@ -18,6 +18,11 @@ $resourceId  = isset($segments[1]) && is_numeric($segments[1]) ? (int)$segments[
 $subResource = $segments[2] ?? null;
 $subId       = isset($segments[3]) && is_numeric($segments[3]) ? (int)$segments[3] : null;
 
+if ($resourceId && $subResource === 'schedules') {
+    require __DIR__ . '/project_schedules.php';
+    exit;
+}
+
 function nextProjectCode(PDO $pdo): string {
     $pdo->prepare('UPDATE sequences SET last_no = last_no + 1 WHERE key = "project"')->execute();
     $row = $pdo->query('SELECT last_no FROM sequences WHERE key = "project"')->fetch();
