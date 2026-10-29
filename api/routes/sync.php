@@ -41,7 +41,7 @@ if ($method === 'GET' && $subAction === 'changes') {
     }
 
     $counts = [];
-    foreach (['customers', 'vouchers'] as $table) {
+    foreach (['customers', 'vouchers', 'tategu_items'] as $table) {
         $stmt = $pdo->prepare(
             "SELECT COUNT(*) FROM $table
              WHERE updated_at > :since
@@ -54,10 +54,6 @@ if ($method === 'GET' && $subAction === 'changes') {
     $stmt = $pdo->prepare('SELECT COUNT(*) FROM projects WHERE updated_at > :since');
     $stmt->execute([':since' => $since]);
     $counts['projects'] = (int)$stmt->fetchColumn();
-
-    $stmt = $pdo->prepare('SELECT COUNT(*) FROM tategu_items WHERE updated_at > :since');
-    $stmt->execute([':since' => $since]);
-    $counts['tategu_items'] = (int)$stmt->fetchColumn();
 
     respond(200, [
         'customers'  => $counts['customers'],

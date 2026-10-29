@@ -96,6 +96,7 @@ function writeTateguSync(PDO $pdo, array $data, ?int $id = null): int {
             $data['status'] ?? 'active', $data['building_image_path'] ?? null, $id]);
     }
     replaceTateguSyncLines($pdo, $id, $data);
+    $pdo->prepare('UPDATE tategu_items SET last_synced_at = updated_at WHERE id = ?')->execute([$id]);
     return $id;
 }
 
@@ -160,7 +161,7 @@ if ($resourceId && $subAction === 'access-link' && $method === 'PATCH') {
     if ($stmt->fetchColumn()) { respond(409, ['error' => 'code_conflict']); exit; }
     $stmt = $pdo->prepare('SELECT code FROM tategu_items WHERE id = ?'); $stmt->execute([$resourceId]); $current = $stmt->fetchColumn();
     if ($current !== false && $current !== null && normalizeTateguCode($current) !== $code) { respond(409, ['error' => 'code_conflict']); exit; }
-    $pdo->prepare('UPDATE tategu_items SET code = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')->execute([$code, $resourceId]);
+    $pdo->prepare('UPDATE tategu_items SET code = ?, updated_at = CURRENT_TIMESTAMP, last_synced_at = CURRENT_TIMESTAMP WHERE id = ?')->execute([$code, $resourceId]);
     respond(200, tateguSyncRow($pdo, $resourceId)); exit;
 }
 if ($resourceId && $subAction === 'drawing') {

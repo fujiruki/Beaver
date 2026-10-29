@@ -315,7 +315,7 @@ try {
     runTest('GET /sync/changes の tategu_items は Access から届いた変更を数えず、画面の更新は数える', function () use ($port, $pdo) {
         $since = rawurlencode('2020-01-01 00:00:00');
         $count = fn() => jsonReq($port, 'GET', '/sync/changes?since=' . $since)['body']['tategu_items'] ?? null;
-        $reset = fn() => $pdo->exec("UPDATE tategu_items SET updated_at = '2000-01-01 00:00:00'");
+        $reset = fn() => $pdo->exec("UPDATE tategu_items SET updated_at = '2000-01-01 00:00:00', last_synced_at = '2000-01-01 00:00:00'");
 
         $reset();
         $r = jsonReq($port, 'POST', '/tategu-items/sync', ['code' => 1501, 'name' => 'A新規']);
