@@ -1,6 +1,6 @@
 # R-0220: 案件の予定（見積・見積依頼など）を段取りの画面に出す
 
-- 状態: 仕様化済み（2026-10-29）
+- 状態: 実装済み・ブラウザ確認待ち・未デプロイ（2026-10-29。回帰スイート🔵青を指揮役が確認）
 - 要望の原文: `docs/requests_log.md` の R-0220
 - デザイン: `docs/design/R-0220_dandori_multi_schedule_mock.html` の**案A（1行のまま重ねる）**（晴樹さん選択）
 - 関係する仕様: R-0111（段取りボード）、R-0146（シームレススクロール）、R-0218（右クリックメニュー）、R-0219（左スクロール）
@@ -111,12 +111,12 @@
 
 ## タスク
 
-- [ ] T1 migration 040 と `api/routes/project_schedules.php`、PHPテスト（422・論理削除の案件・updated_at を進めないこと）
-- [ ] T2 型・APIフック（`types/projectSchedule.ts`、`api/projectSchedules.ts`）
-- [ ] T3 稼働数の計算に取付を足す（`dandoriCalc`／`dandoriBoardUtils` の純粋関数、vitest）
-- [ ] T4 案件の画面の「予定」の表
-- [ ] T5 段取りの画面の描画・ドラッグ・右クリック「予定を追加」・開始日なし案件の行
-- [ ] T6 「やること」の一覧
+- [x] T1 migration 040 と `api/routes/project_schedules.php`、PHPテスト（422・論理削除の案件・updated_at を進めないこと）
+- [x] T2 型・APIフック（`types/projectSchedule.ts`、`api/projectSchedules.ts`）
+- [x] T3 稼働数の計算に取付を足す（`dandoriCalc`／`dandoriBoardUtils` の純粋関数、vitest）
+- [x] T4 案件の画面の「予定」の表
+- [x] T5 段取りの画面の描画・ドラッグ・右クリック「予定を追加」・開始日なし案件の行
+- [x] T6 「やること」の一覧
 - [ ] T7 回帰スイート、ブラウザでの確認
 
 ## デプロイ
