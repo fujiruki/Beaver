@@ -67,7 +67,7 @@ Accessだけに置くもの: 説明・金物1・金物2・硝子・仕上・KeyW
 | `GET/POST/DELETE /tategu-items/{id}/drawing` | 製品図（下） |
 
 - 応答には、書いたあとのBeaverの`updated_at`を入れる（Accessはこれを`last_synced_at`にする）
-- `GET /sync/changes`に台帳の件数を足す
+- `GET /sync/changes`に台帳の件数を足す。得意先・伝票と同じく、Accessから届いた変更は数えない（`tategu_items`に`last_synced_at`を足し、Accessからの`POST`・`PUT /sync`・`bulk`・`access-link`で書いたときは`updated_at`と同じ値にする。数えるのは`updated_at > since`かつ`last_synced_at`が空か`updated_at`より古いもの）。dodai-backの指摘（10/29）
 - 伝票の同期: 明細に`tategu_item_id`と`tategu_code`を足す。Accessから`tategu_code`が来たら`code`で引いて`tategu_item_id`に入れる。引けなければその伝票は書かず409 `product_missing`（Accessは台帳を先に送ってから再送する）。キーが無ければ今の値を残す
 - 同期の順はAccessが決める（得意先→案件→製品台帳→伝票）
 
@@ -76,7 +76,7 @@ Accessだけに置くもの: 説明・金物1・金物2・硝子・仕上・KeyW
 Beaver側の案。dodai-backに渡し、Access側をこれに合わせてもらう。
 
 - 1台帳に1枚。置き場は`api/uploads/tategu/{id}/`。直接は開けない（`.htaccess`で`Require all denied`）、`GET /tategu-items/{id}/drawing`でだけ渡す（ログインか同期トークンが要る）
-- `building_image_path`には`uploads/tategu/{id}/`からのファイル名を入れる。新しく`drawing_sha256`（TEXT）を足す（migration）
+- `building_image_path`には`uploads/tategu/{id}/`からのファイル名を入れる。新しく`drawing_sha256`（TEXT）を足す（migration 039。`last_synced_at`も同じmigrationで足す）
 - `POST /tategu-items/{id}/drawing`: multipart、項目名`file`（PHPはPUTのmultipartを受けないためPOST）。受けるのはJPEG・PNGだけ（拡張子でなく中身で判定）、10MBまで。Accessの建具図はほとんどWMF（1,237件中1,186件）で、ブラウザで出せないため、AccessがPNGに変えてから送る。置き換えたら古いファイルは消す。`updated_at`と`drawing_sha256`を変える
 - `DELETE /tategu-items/{id}/drawing`: 製品図を外す。`updated_at`を変え、`drawing_sha256`をNULLにする
 - 同期: `drawing_sha256`はBeaverに置いたファイルのハッシュ。Accessは送った・受け取ったときのハッシュを覚えておき、違うときだけ画像を取りに来る（Beaverから来たPNG・JPEGはAccessの建具図フォルダに置く）。製品図だけ変えたときも台帳1件の変更として扱う（競合の単位も台帳1件）
