@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>R-0220 段取りの予定 デザイン案</title>
+<style>
+:root{--g:#2f7d6d;--a:#b07a2e;--r:#c2453a;--m:#4a5fa8;--line:#d9d6cf;--bg:#faf8f3;--ink:#2b2a27;--sub:#7a766d;--day:22px}
+body{margin:0;padding:16px 20px 60px;background:var(--bg);color:var(--ink);font:13px/1.5 "Yu Gothic UI","Meiryo",sans-serif}
+h1{font-size:18px;margin:0 0 4px}h2{font-size:15px;margin:28px 0 6px;border-left:4px solid var(--ink);padding-left:8px}
+p.note{margin:2px 0 8px;color:var(--sub)}
+.legend{display:flex;gap:16px;flex-wrap:wrap;margin:6px 0 10px;color:var(--sub)}
+.legend i{display:inline-block;width:22px;height:10px;vertical-align:middle;margin-right:4px;border-radius:2px}
+.board{background:#fff;border:1px solid var(--line);display:inline-block;max-width:100%;overflow-x:auto}
+.r{display:flex;border-bottom:1px solid #eee;position:relative}
+.lab{width:230px;box-sizing:border-box;flex:none;padding:0 6px;display:flex;align-items:center;gap:6px;border-right:1px solid var(--line);white-space:nowrap;overflow:hidden}
+.lab .c{color:var(--sub);font-size:12px}
+.lab .tg{cursor:pointer;color:var(--sub);width:12px}
+.lab.sub{padding-left:26px;color:var(--sub);font-size:12px}
+.grid{position:relative;flex:none}
+.ax .grid span{position:absolute;top:0;font-size:11px;color:var(--sub);text-align:center;width:var(--day)}
+.we{position:absolute;top:0;bottom:0;background:#f3f1ec}
+.today{position:absolute;top:0;bottom:0;background:#fff6c9}
+.bar{position:absolute;border-radius:3px;font-size:11px;color:#fff;padding:0 4px;white-space:nowrap;overflow:visible;box-sizing:border-box;line-height:16px}
+.mfg{top:9px;height:16px;background:var(--g)}
+.mfg.plan{background:#e6f1ee;border:1px dashed var(--g);color:var(--g)}
+.mfg.inh{background:var(--a)}
+.est{top:2px;height:8px;background:var(--m);font-size:0}
+.est.done{background:#b9c0d8}
+.estlab{position:absolute;top:-2px;font-size:10.5px;color:var(--m);white-space:nowrap}
+.dia{position:absolute;top:1px;width:10px;height:10px;background:var(--m);transform:rotate(45deg)}
+.dia.done{background:#b9c0d8}
+.dl{position:absolute;top:0;bottom:0;width:3px;background:var(--r)}
+.full .bar{top:6px;height:16px}.full .dia{top:9px}.full .estlab{top:6px}
+.tasks{display:inline-block;vertical-align:top;margin-left:16px;width:300px;background:#fff;border:1px solid var(--line)}
+.tasks h3{font-size:13px;margin:0;padding:6px 8px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between}
+.tasks li{list-style:none;padding:4px 8px;border-bottom:1px solid #f0eee8;display:flex;gap:6px;align-items:baseline}
+.tasks ul{margin:0;padding:0}.tasks .d{width:44px;color:var(--sub);flex:none}.tasks .late{color:var(--r);font-weight:bold}
+.tasks .p{color:var(--sub);font-size:11.5px;margin-left:auto;white-space:nowrap}
+.wrap{white-space:nowrap}
+table.f{border-collapse:collapse;background:#fff;margin-top:4px}
+table.f td,table.f th{border:1px solid var(--line);padding:0 6px;height:22px;font-size:12.5px}
+table.f th{background:#f3f1ec;font-weight:normal;color:var(--sub)}
+table.f tr.blank td{color:#bbb}
+.q{background:#fff;border:1px solid var(--line);padding:8px 14px;margin-top:6px}
+.q li{margin:3px 0}
+</style>
+</head>
+<body>
+<h1>R-0220 段取りの画面に「予定」を複数出す（デザイン案）</h1>
+<p class="note">表示期間 10/26〜11/29。今日は 10/29。案件・日付は説明用の架空のものです。</p>
+
+<h2>考え方</h2>
+<div class="q"><ul>
+<li><b>案件に「予定」を何本でも付けられる</b>ようにします。予定は「種類・期間（または期限だけ）・済」の3つだけを持ちます。種類は 見積／見積依頼／現調／打合せ／製作／取付／その他。</li>
+<li><b>今の段取りのバー（開始日＋工数）は「製作」の予定</b>として、そのまま残します。ドラッグ・納期線・納期超過の赤斜線も今のままです。</li>
+<li>見積などの<b>段取り外の仕事は、細い紺のバー／◆（期限だけのとき）</b>で描き、製作の太いバーと見分けます。紺は今の色の言葉（緑＝お客様の仕事、琥珀＝社内、赤＝納期）と重ならない色です。</li>
+<li><b>開始日が無い案件でも、予定があれば段取りに出します</b>（○○様 キッチン扉）。「納期未定、まず見積」の案件が見えるようになります。</li>
+<li>右側の<b>「やること」</b>に、済になっていない見積・見積依頼などを日付順に並べます。チェックで済にします。Youkan を開かなくても、段取りの画面で見積の予定を確かめられます。</li>
+<li>Youkan のような作業の細かい分解はしません（R-0111 の「案件単位の粗い粒度」は守ります）。</li>
+</ul></div>
+
+<div class="legend">
+<span><i style="background:var(--g)"></i>製作（着手中）</span>
+<span><i style="background:#e6f1ee;border:1px dashed var(--g)"></i>製作（未着手）</span>
+<span><i style="background:var(--a)"></i>社内の仕事</span>
+<span><i style="background:var(--m);height:6px"></i>見積など（期間）</span>
+<span><i style="background:var(--m);width:9px;height:9px;transform:rotate(45deg)"></i>見積など（期限だけ）</span>
+<span><i style="background:#b9c0d8;height:6px"></i>済</span>
+<span><i style="background:var(--r);width:3px"></i>納期</span>
+</div>
+
+<h2>案A　1行のまま重ねる</h2>
+<p class="note">行の高さは今のまま。行の上の帯に見積などを細く、真ん中に製作を太く描きます。会議で全体を一目で見るのに向きます。重なると細い帯の文字が読みにくくなります。</p>
+<div class="wrap"><div class="board" id="A"></div><div class="tasks" id="TA"></div></div>
+
+<h2>案B　案件の下に段を開く</h2>
+<p class="note">ふだんは1行で、予定の印だけ出します。▸ を押すと、予定ごとに1段ずつ開きます。文字が重ならず読みやすい一方、開くと縦に長くなります。</p>
+<div class="wrap"><div class="board" id="B"></div><div class="tasks" id="TB"></div></div>
+
+<h2>予定を入れる場所（案A・案B 共通）</h2>
+<p class="note">案件の画面に「予定」の表を置きます。製品台帳と同じく、いつも最後に空の行が出ていて、入力すると行が加わります。段取りの画面では、バーの右クリックの「予定を追加」と、行の空いている所をドラッグして期間を作る、の2つで入れられます。</p>
+<table class="f">
+<tr><th>種類</th><th>開始</th><th>終了・期限</th><th>メモ</th><th>済</th></tr>
+<tr><td>見積</td><td>10/28</td><td>10/30</td><td>建具12本、金物確認</td><td>☐</td></tr>
+<tr><td>見積依頼</td><td></td><td>11/2</td><td>硝子屋へ</td><td>☐</td></tr>
+<tr><td>製作</td><td>11/16</td><td>（工数から）</td><td>開始日・工数は今の欄のまま</td><td></td></tr>
+<tr class="blank"><td>（種類）</td><td></td><td></td><td></td><td></td></tr>
+</table>
+
+<h2>決めてほしいこと</h2>
+<div class="q"><ol>
+<li><b>案A と 案B のどちらにしますか。</b>（両方を切り替えられるようにもできますが、手間が増えます）</li>
+<li><b>下の「1日の稼働案件数」に見積を数えますか。</b>おすすめは「数えない」です。稼働数は工房の手のふさがり具合なので、製作と取付だけを数えます。</li>
+<li><b>種類の一覧</b>は 見積／見積依頼／現調／打合せ／製作／取付／その他 で足りますか。</li>
+</ol></div>
+
+<script>
+const S='2026-10-26',N=35,D=22,T='2026-10-29';
+const d=s=>Math.round((new Date(s)-new Date(S))/864e5);
+const P=[
+ {n:'○○邸 建具一式',c:'○○様',del:null,it:[
+  {k:'見積',s:'2026-10-28',e:'2026-10-30'},{k:'見積依頼',e:'2026-11-02',m:'硝子屋へ'},{k:'製作',s:'2026-11-16',e:'2026-11-27',cls:'plan'}]},
+ {n:'△△店 改装',c:'△△工務店',del:'2026-11-12',it:[
+  {k:'製作',s:'2026-10-26',e:'2026-11-06'},{k:'取付',s:'2026-11-10',e:'2026-11-10'},{k:'見積',e:'2026-10-27',done:1,m:'追加分'}]},
+ {n:'○○様 キッチン扉',c:'○○様',del:null,nostart:1,it:[
+  {k:'現調',e:'2026-10-30'},{k:'見積',s:'2026-11-02',e:'2026-11-04'}]},
+ {n:'展示会 見本',c:'社内',del:null,it:[
+  {k:'製作',s:'2026-11-17',e:'2026-11-21',cls:'inh'},{k:'打合せ',e:'2026-11-09',m:'出展内容'}]},
+];
+const mfg=k=>k==='製作'||k==='取付';
+function bg(h){let s='';for(let i=0;i<N;i++){const w=new Date(S);w.setDate(w.getDate()+i);const x=w.getDay();
+ if(x===0||x===6)s+=`<div class="we" style="left:${i*D}px;width:${D}px"></div>`;}
+ return s+`<div class="today" style="left:${d(T)*D}px;width:${D}px"></div>`;}
+function axis(){let s='';for(let i=0;i<N;i++){const w=new Date(S);w.setDate(w.getDate()+i);
+ s+=`<span style="left:${i*D}px">${w.getDate()===1?(w.getMonth()+1)+'/':''}${w.getDate()}</span>`;}
+ return `<div class="r ax" style="height:20px"><div class="lab"><b>案件</b><span class="c">得意先</span></div><div class="grid" style="width:${N*D}px">${s}</div></div>`;}
+function item(t){const e=d(t.e);
+ if(mfg(t.k)){const s=d(t.s);return `<div class="bar mfg ${t.cls||''}" style="left:${s*D}px;width:${(e-s+1)*D}px">${t.k}</div>`;}
+ if(!t.s)return `<div class="dia ${t.done?'done':''}" style="left:${e*D+6}px"></div><span class="estlab" style="left:${e*D+18}px">${t.k}</span>`;
+ const s=d(t.s);return `<div class="bar est ${t.done?'done':''}" style="left:${s*D}px;width:${(e-s+1)*D}px"></div><span class="estlab" style="left:${(e+1)*D+3}px">${t.k}</span>`;}
+function dl(p){return p.del?`<div class="dl" style="left:${(d(p.del)+1)*D-2}px"></div>`:'';}
+function lab(p,tg){return `<div class="lab">${tg||''}<span>${p.n}</span><span class="c">${p.c}${p.nostart?'・開始日なし':''}</span></div>`;}
+function A(){let h=axis();for(const p of P)h+=`<div class="r" style="height:30px">${lab(p)}<div class="grid" style="width:${N*D}px">${bg()}${p.it.map(item).join('')}${dl(p)}</div></div>`;return h;}
+function B(){let h=axis();P.forEach((p,i)=>{const open=i<2;
+ h+=`<div class="r" style="height:30px">${lab(p,`<span class="tg">${open?'▾':'▸'}</span>`)}<div class="grid" style="width:${N*D}px">${bg()}${p.it.map(item).join('')}${dl(p)}</div></div>`;
+ if(open)for(const t of p.it)h+=`<div class="r full" style="height:28px"><div class="lab sub">${t.k}${t.m?'　'+t.m:''}</div><div class="grid" style="width:${N*D}px">${bg()}${item(t)}${t.k==='製作'?dl(p):''}</div></div>`;});
+ return h;}
+function tasks(){const L=[];for(const p of P)for(const t of p.it)if(!mfg(t.k)&&!t.done)L.push({...t,p:p.n});
+ L.sort((a,b)=>a.e<b.e?-1:1);
+ return `<h3><span>やること（済でないもの）</span><label style="font-weight:normal;color:var(--sub)"><input type="checkbox">済も表示</label></h3><ul>`+
+ L.map(t=>{const m=t.e.slice(5).replace('-','/').replace(/^0/,'');return `<li><input type="checkbox"><span class="d ${t.e<T?'late':''}">${m}</span><span>${t.k}${t.m?'（'+t.m+'）':''}</span><span class="p">${t.p}</span></li>`}).join('')+'</ul>';}
+document.getElementById('A').innerHTML=A();document.getElementById('B').innerHTML=B();
+document.getElementById('TA').innerHTML=tasks();document.getElementById('TB').innerHTML=tasks();
+</script>
+</body>
+</html>
