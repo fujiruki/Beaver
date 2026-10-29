@@ -48,6 +48,17 @@ describe('ProjectQuickEditModal (R-0122)', () => {
     expect(screen.getByRole('link', { name: '案件詳細を開く' }).getAttribute('href')).toBe('/projects/7');
   });
 
+  it('R-0222: 開始日の欄は無く、保存しても start_date を送らない', async () => {
+    const user = userEvent.setup();
+    renderModal();
+    await screen.findByDisplayValue('玄関工事');
+    expect(screen.queryByLabelText('開始日')).toBeNull();
+    await user.click(screen.getByRole('button', { name: '保存' }));
+    await waitFor(() => expect((fetch as ReturnType<typeof vi.fn>).mock.calls.some(([, init]) => init?.method === 'PUT')).toBe(true));
+    const put = (fetch as ReturnType<typeof vi.fn>).mock.calls.find(([, init]) => init?.method === 'PUT');
+    expect(JSON.parse(String(put?.[1]?.body))).not.toHaveProperty('start_date');
+  });
+
   it('キャンセルでは保存せず閉じる', async () => {
     const onClose = vi.fn();
     const user = userEvent.setup();

@@ -110,13 +110,13 @@ describe('ProjectDetail レイアウト改善 (R-0101)', () => {
     expect(display.className).not.toMatch(/\bw-full\b/);
   });
 
-  it('受注日・開始日・納品日・納期の日付入力欄がw-fullではなく固定幅クラスを持つ', async () => {
+  it('受注日・納品日・納期の日付入力欄がw-fullではなく固定幅クラスを持つ', async () => {
     currentProject = { ...baseProject, estimated_factory_hours: 0, estimated_site_hours: 0, manual_estimated_hours: null, effective_estimated_hours: null };
     stubFetch();
     const { container } = renderPage();
     await screen.findByDisplayValue('既存案件');
 
-    const dateLabels = ['受注日', '開始日', '納品日', '納期'];
+    const dateLabels = ['受注日', '納品日', '納期'];
     for (const label of dateLabels) {
       const labelEl = Array.from(container.querySelectorAll('label')).find(el => el.textContent === label);
       expect(labelEl).toBeTruthy();
@@ -126,5 +126,14 @@ describe('ProjectDetail レイアウト改善 (R-0101)', () => {
       expect(input.className).not.toMatch(/\bw-full\b/);
       expect(input.className).toMatch(/\bw-\d+\b/);
     }
+  });
+
+  it('R-0222: 案件の画面に開始日の欄は無い（製作の予定がそのかわり）', async () => {
+    currentProject = { ...baseProject, estimated_factory_hours: 0, estimated_site_hours: 0, manual_estimated_hours: null, effective_estimated_hours: null };
+    stubFetch();
+    const { container } = renderPage();
+    await screen.findByDisplayValue('既存案件');
+
+    expect(Array.from(container.querySelectorAll('label')).some(el => el.textContent === '開始日')).toBe(false);
   });
 });
