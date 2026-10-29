@@ -207,3 +207,5 @@
 > beaverで案件を立てたときさ、　この案件のための見積をいつまでにやりたい、みたいなのが同時にあることがあるんだよね、　見積をやりたい、　見積もり依頼を送りたい、納期はまだ未定。　まあ見積をしたい　制作もここからここくらいでやりたいとか、　　今は段取りの画面では１案件に１時期しかでませんよね　　これを複数表示したい気持ちになる時があるんだ、ただそれがどういうデザイン、何を表示したいのか整理できてない
 >
 > でもそれをわざわざyoukanを起動するのめんどくさい。　　それと段取りの画面でその見積とかのタスクも確認したいってことがある　さあUI・UXデザインを設計してくれないか
+
+| 2026-10-29 | R-0200(C)・R-0220: Beaver_betaへ反映 | beta済み・本番未 | dodai-back依頼（晴樹さんがdodai-backで「betaで進めてよい」）。13:11 betaのDBを退避（`backups/database_beta_20261029_1311_pre_039_040.sqlite`）してmigration 039（tategu_items.drawing_sha256・last_synced_at）と040（project_schedules）を適用、integrity ok。続けて`upload.ps1 -Beta`（-KeepLocalDBなし、版f607e3d＝master。R-0200(A)(B)(C)・a4affbc・R-0220を含む）、health・アプリ200。本番には入れない |
