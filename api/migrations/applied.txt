@@ -84,3 +84,4 @@
 040_project_schedules  2026-10-29  prod (R-0220。project_schedules、SSH+PHP PDO経由。晴樹さん「はい」。039はまだ本番に無い（R-0200と一緒に手で当てる）。backup: database_beaver_20261029_1402_pre_040_project_schedules.sqlite)
 039_tategu_drawing_sha256  2026-10-29  prod (R-0200(C)。tategu_items.drawing_sha256・last_synced_at、SSH+PHP PDO経由。晴樹さん「入れてよい」。1回目はスクリプトのcommit漏れでロールバック→当て直し。backup: database_beaver_20261029_1521_pre_039_r0200.sqlite)
 041_project_schedules_hours_and_production  2026-10-30  beaver_beta (R-0222。project_schedulesを作り直しend_dateをNULL可・hours追加、開始日を製作の予定へ移す（35件）。backup: database_beta_20261030_0443_pre_041.sqlite)
+041_project_schedules_hours_and_production  2026-10-30  prod (R-0222。晴樹さん「よい」、晴樹さんが!で実行。製作の予定38行・既存の予定4件を保持・integrity ok。backup: database_beaver_20261030_0648_pre_041_r0222.sqlite)
