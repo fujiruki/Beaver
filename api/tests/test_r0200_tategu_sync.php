@@ -312,6 +312,35 @@ try {
         assertEq(0, $r['body']['tategu_items'] ?? null, '未来は0');
     });
 
+    runTest('GET /sync/changes の tategu_items は Access から届いた変更を数えず、画面の更新は数える', function () use ($port, $pdo) {
+        $since = rawurlencode('2020-01-01 00:00:00');
+        $count = fn() => jsonReq($port, 'GET', '/sync/changes?since=' . $since)['body']['tategu_items'] ?? null;
+        $reset = fn() => $pdo->exec("UPDATE tategu_items SET updated_at = '2000-01-01 00:00:00'");
+
+        $reset();
+        $r = jsonReq($port, 'POST', '/tategu-items/sync', ['code' => 1501, 'name' => 'A新規']);
+        assertStatus(201, $r);
+        $id = (int)$r['body']['id'];
+        assertEq(0, $count(), 'POST sync');
+
+        $reset();
+        $r = jsonReq($port, 'PUT', "/tategu-items/$id/sync", ['name' => 'A更新', 'base_synced_at' => '2099-01-01 00:00:00']);
+        assertStatus(200, $r);
+        assertEq(0, $count(), 'PUT sync');
+
+        $reset();
+        assertStatus(200, jsonReq($port, 'POST', '/tategu-items/sync/bulk', ['items' => [['code' => 1501, 'name' => 'A一括']]]));
+        assertEq(0, $count(), 'POST sync/bulk');
+
+        $reset();
+        assertStatus(200, jsonReq($port, 'PATCH', "/tategu-items/$id/access-link", ['code' => 1501]));
+        assertEq(0, $count(), 'PATCH access-link');
+
+        $reset();
+        assertStatus(200, jsonReq($port, 'PUT', "/tategu-items/$id", ['name' => '画面更新']));
+        assertEq(1, $count(), '画面からの更新');
+    });
+
     echo "\n=== 伝票の同期 ===\n";
 
     $voucher = fn(int $no, array $lines) => [
