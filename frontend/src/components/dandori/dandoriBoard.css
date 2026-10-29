@@ -162,6 +162,12 @@
 }
 .dandori-board .dt-actions button:hover { background: var(--work); color: #fff; }
 
+/* R-0222: 予定全体（製作のバー・済も含む）を囲む薄い枠。バーより下に描き、ドラッグの邪魔をしない */
+.dandori-board .sched-frame {
+  position: absolute; top: 0; bottom: 0; box-sizing: border-box; pointer-events: none; z-index: 0;
+  border: 1px dotted rgba(176, 122, 46, 0.6); border-radius: 4px; background: rgba(176, 122, 46, 0.06);
+}
+
 /* R-0220: 案件の予定。細い帯は行の上端、取付は製作のバーと同じ高さ */
 .dandori-board .sched-thin {
   position: absolute; top: 0; height: 8px; border-radius: 3px;
@@ -195,4 +201,5 @@
 .dandori-board .todo-date.overdue { color: var(--danger); }
 .dandori-board .todo-what { flex: 0 1 auto; }
 .dandori-board .todo-project { margin-left: auto; background: none; border: 0; color: var(--muted); text-decoration: underline; cursor: pointer; text-align: right; }
+.dandori-board .todo-undated-head { display: block; font-weight: 700; color: var(--muted); border-bottom: 1px solid var(--line); padding-top: 8px; }
 .dandori-board .todo-empty { color: var(--muted); padding: 8px 0; }

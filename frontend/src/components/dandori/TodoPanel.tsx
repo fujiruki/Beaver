@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import type { ProjectSchedule } from '../../types/projectSchedule';
-import { formatMD, isScheduleOverdue, todoSchedules } from './dandoriBoardUtils';
+import { formatMD, isScheduleOverdue, scheduleLabel, todoSchedules } from './dandoriBoardUtils';
 
 interface TodoPanelProps {
   schedules: ProjectSchedule[];
@@ -13,6 +13,7 @@ interface TodoPanelProps {
 export default function TodoPanel({ schedules, projectNames, todayISO, onToggleDone, onOpenProject }: TodoPanelProps) {
   const [showDone, setShowDone] = useState(false);
   const rows = todoSchedules(schedules.filter(s => projectNames.has(s.project_id)), showDone);
+  const firstUndatedId = rows.find(s => !s.end_date && !s.start_date)?.id;
 
   return (
     <aside className="todo-panel" aria-label="やること">
@@ -25,21 +26,29 @@ export default function TodoPanel({ schedules, projectNames, todayISO, onToggleD
       </div>
       {rows.length === 0 && <div className="todo-empty">やることはありません</div>}
       <ul>
-        {rows.map(s => (
-          <li key={s.id} className={s.done ? 'done' : ''}>
-            <input
-              type="checkbox"
-              aria-label={`${s.kind}を済にする`}
-              checked={!!s.done}
-              onChange={e => onToggleDone(s.id, e.target.checked)}
-            />
-            <span className={isScheduleOverdue(s, todayISO) ? 'todo-date overdue' : 'todo-date'}>{formatMD(s.end_date)}</span>
-            <span className="todo-what">{s.kind}{s.memo && `（${s.memo}）`}</span>
-            <button type="button" className="todo-project" onClick={() => onOpenProject(s.project_id)}>
-              {projectNames.get(s.project_id)}
-            </button>
-          </li>
-        ))}
+        {rows.map(s => {
+          const date = s.end_date ?? s.start_date;
+          return (
+            <Fragment key={s.id}>
+              {s.id === firstUndatedId && <li className="todo-undated-head">日付未定</li>}
+              <li className={s.done ? 'done' : ''}>
+                <input
+                  type="checkbox"
+                  aria-label={`${s.kind}を済にする`}
+                  checked={!!s.done}
+                  onChange={e => onToggleDone(s.id, e.target.checked)}
+                />
+                {date && (
+                  <span className={isScheduleOverdue(s, todayISO) ? 'todo-date overdue' : 'todo-date'}>{formatMD(date)}</span>
+                )}
+                <span className="todo-what">{scheduleLabel(s)}{s.memo && `（${s.memo}）`}</span>
+                <button type="button" className="todo-project" onClick={() => onOpenProject(s.project_id)}>
+                  {projectNames.get(s.project_id)}
+                </button>
+              </li>
+            </Fragment>
+          );
+        })}
       </ul>
     </aside>
   );

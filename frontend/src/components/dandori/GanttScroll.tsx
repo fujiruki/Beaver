@@ -10,8 +10,11 @@ import {
   monthBoundaries,
   freeMarkerLabels,
   loadIntervals,
+  scheduleLabel,
   shiftScheduleDates,
+  formatHours,
   type DandoriBar,
+  type ProductionSegment,
 } from './dandoriBoardUtils';
 import type { ProjectSchedule } from '../../types/projectSchedule';
 
@@ -123,9 +126,10 @@ export function estimateLabelWidth(text: string): number {
   return text.length * CHAR_WIDTH_PX + LABEL_PADDING_PX;
 }
 
-function barClassName(bar: DandoriBar): string {
-  const category = bar.category === 'done' ? 'done' : bar.category === 'notstarted' ? 'notstarted' : 'working';
-  return ['bar', category, bar.isShop && bar.category !== 'done' ? 'shop' : '', bar.unknownHours ? 'unknown-hours' : '', bar.salesBorderColor ? 'has-sales-border' : '', bar.salesBorderColor === '#ffffff' ? 'sales-border-white' : ''].filter(Boolean).join(' ');
+function barClassName(bar: DandoriBar, segment: ProductionSegment): string {
+  const done = bar.category === 'done' || segment.done;
+  const category = done ? 'done' : bar.category === 'notstarted' ? 'notstarted' : 'working';
+  return ['bar', category, bar.isShop && !done ? 'shop' : '', segment.unknownHours ? 'unknown-hours' : '', bar.salesBorderColor ? 'has-sales-border' : '', bar.salesBorderColor === '#ffffff' ? 'sales-border-white' : ''].filter(Boolean).join(' ');
 }
 
 function TodayCol({ leftPx, pxPerDay, label }: { leftPx: number | null; pxPerDay: number; label?: boolean }) {
@@ -175,14 +179,14 @@ interface GanttScrollProps {
   rangeEnd: string;
   pxPerDay: number;
   todayISO: string;
-  onCommit: (id: number, patch: { start_date?: string; delivery_date?: string }) => void;
+  onCommit: (id: number, patch: { delivery_date?: string }) => void;
   onProjectDoubleClick: (id: number) => void;
   onNearRightEdge?: () => void;
   onNearLeftEdge?: () => void;
   statusOptions?: string[];
   onStatusChange?: (id: number, status: string) => void;
   schedules?: ProjectSchedule[];
-  onScheduleMove?: (id: number, patch: { start_date?: string; end_date: string }) => void;
+  onScheduleMove?: (id: number, patch: { start_date?: string; end_date?: string }) => void;
   onAddSchedule?: (projectId: number) => void;
 }
 
@@ -206,7 +210,7 @@ export default function GanttScroll({
   const visibleProjectIds = new Set(bars.map(b => b.id));
   const visibleSchedules = schedules.filter(s => visibleProjectIds.has(s.project_id));
   const load = dailyLoad(
-    loadIntervals(sortedBars.filter(b => !b.noBar), visibleSchedules),
+    loadIntervals(sortedBars, visibleSchedules),
     rangeStart,
     rangeEnd,
   );
@@ -390,24 +394,16 @@ function BarRow({
   showBarLabel: boolean;
   todayLeftPx: number | null;
   schedules: ProjectSchedule[];
-  onScheduleMove?: (id: number, patch: { start_date?: string; end_date: string }) => void;
+  onScheduleMove?: (id: number, patch: { start_date?: string; end_date?: string }) => void;
   nameColWidth: number;
   custColWidth: number;
   labelTotalWidth: number;
-  onCommit: (id: number, patch: { start_date?: string; delivery_date?: string }) => void;
+  onCommit: (id: number, patch: { delivery_date?: string }) => void;
   onProjectDoubleClick: (id: number) => void;
   onContextMenu: (event: React.MouseEvent, status?: string) => void;
 }) {
-  const barDrag = useDayDrag(pxPerDay, deltaDays => onCommit(bar.id, { start_date: addDaysISO(bar.start, deltaDays) }));
   const deadlineDrag = useDayDrag(pxPerDay, deltaDays => bar.delivery && onCommit(bar.id, { delivery_date: addDaysISO(bar.delivery, deltaDays) }));
-
-  const leftPx = daysBetween(rangeStart, bar.start) * pxPerDay + barDrag.dragOffsetPx;
-  const widthPx = (daysBetween(bar.start, bar.end) + 1) * pxPerDay;
-  const overDays = bar.delivery && bar.end > bar.delivery ? daysBetween(bar.delivery, bar.end) : 0;
   const deadlineLeftPx = bar.delivery ? daysBetween(rangeStart, bar.delivery) * pxPerDay + deadlineDrag.dragOffsetPx : null;
-
-  const labelText = `${bar.name}（${bar.hours ?? '?'}h）`;
-  const labelFitsInside = estimateLabelWidth(labelText) <= widthPx;
 
   return (
     <div className="row" onContextMenu={event => onContextMenu(event, bar.status)}>
@@ -422,18 +418,28 @@ function BarRow({
       <div className="grid-col" style={{ width: gridWidth }}>
         <div className="grid-bg" style={gridBgStyle(pxPerDay)} />
         <TodayCol leftPx={todayLeftPx} pxPerDay={pxPerDay} />
-        {!bar.noBar && (
-        <div
-          className={barClassName(bar)}
-          style={{ left: leftPx, width: widthPx, ...(bar.salesBorderColor ? { ['--sales-border' as string]: bar.salesBorderColor } : {}) }}
-          {...barDrag.handlers}
-          onDoubleClick={e => { e.stopPropagation(); onProjectDoubleClick(bar.id); }}
-        >
-          {showBarLabel && labelFitsInside && labelText}
-          {overDays > 0 && <div className="over" style={{ width: overDays * pxPerDay }} />}
-        </div>
+        {bar.frame && (
+          <div
+            className="sched-frame"
+            style={{
+              left: daysBetween(rangeStart, bar.frame.start) * pxPerDay,
+              width: (daysBetween(bar.frame.start, bar.frame.end) + 1) * pxPerDay,
+            }}
+          />
         )}
-        {schedules.map(s => (
+        {bar.segments.map(segment => (
+          <ProductionBar
+            key={segment.scheduleId}
+            bar={bar}
+            segment={segment}
+            rangeStart={rangeStart}
+            pxPerDay={pxPerDay}
+            showBarLabel={showBarLabel}
+            onMove={onScheduleMove}
+            onProjectDoubleClick={onProjectDoubleClick}
+          />
+        ))}
+        {schedules.filter(s => !isProductionSegment(s)).map(s => (
           <ScheduleMark
             key={s.id}
             schedule={s}
@@ -442,9 +448,6 @@ function BarRow({
             onMove={onScheduleMove}
           />
         ))}
-        {!bar.noBar && showBarLabel && !labelFitsInside && (
-          <span className="bar-label-outside" style={{ left: leftPx + widthPx + 6 }}>{labelText}</span>
-        )}
         {deadlineLeftPx !== null && (
           <div className="deadline" style={{ left: deadlineLeftPx }} {...deadlineDrag.handlers} />
         )}
@@ -453,9 +456,55 @@ function BarRow({
   );
 }
 
+function isProductionSegment(s: ProjectSchedule): boolean {
+  return s.kind === '製作' && !!s.start_date;
+}
+
+/** R-0222: 製作の予定1行ぶんのバー。ドラッグでその予定の開始日（終了があれば同じ日数だけ終了も）を動かす */
+function ProductionBar({
+  bar, segment, rangeStart, pxPerDay, showBarLabel, onMove, onProjectDoubleClick,
+}: {
+  bar: DandoriBar;
+  segment: ProductionSegment;
+  rangeStart: string;
+  pxPerDay: number;
+  showBarLabel: boolean;
+  onMove?: (id: number, patch: { start_date?: string; end_date?: string }) => void;
+  onProjectDoubleClick: (id: number) => void;
+}) {
+  const drag = useDayDrag(pxPerDay, deltaDays => onMove?.(
+    segment.scheduleId,
+    shiftScheduleDates({ start_date: segment.start, end_date: segment.fixedEnd }, deltaDays),
+  ));
+  const leftPx = daysBetween(rangeStart, segment.start) * pxPerDay + drag.dragOffsetPx;
+  const widthPx = (daysBetween(segment.start, segment.end) + 1) * pxPerDay;
+  const overDays = bar.delivery && segment.end > bar.delivery ? daysBetween(bar.delivery, segment.end) : 0;
+  const labelText = `${bar.name}（${segment.hours === null ? '?' : formatHours(segment.hours)}h）`;
+  const labelFitsInside = estimateLabelWidth(labelText) <= widthPx;
+
+  return (
+    <>
+      <div
+        className={barClassName(bar, segment)}
+        style={{ left: leftPx, width: widthPx, ...(bar.salesBorderColor ? { ['--sales-border' as string]: bar.salesBorderColor } : {}) }}
+        {...drag.handlers}
+        onDoubleClick={e => { e.stopPropagation(); onProjectDoubleClick(bar.id); }}
+      >
+        {showBarLabel && labelFitsInside && labelText}
+        {overDays > 0 && <div className="over" style={{ width: overDays * pxPerDay }} />}
+      </div>
+      {showBarLabel && !labelFitsInside && (
+        <span className="bar-label-outside" style={{ left: leftPx + widthPx + 6 }}>{labelText}</span>
+      )}
+    </>
+  );
+}
+
 function scheduleTitle(s: ProjectSchedule): string {
-  const period = s.start_date ? `${formatMD(s.start_date)}〜${formatMD(s.end_date)}` : `${formatMD(s.end_date)}まで`;
-  return [s.kind, period, s.memo].filter(Boolean).join(' ');
+  const period = s.start_date && s.end_date
+    ? `${formatMD(s.start_date)}〜${formatMD(s.end_date)}`
+    : s.start_date ? `${formatMD(s.start_date)}から` : s.end_date ? `${formatMD(s.end_date)}まで` : '';
+  return [s.kind, period, s.hours ? `${formatHours(s.hours)}h` : '', s.memo].filter(Boolean).join(' ');
 }
 
 /** R-0220: 案件の予定。取付は太いバー、それ以外は行の上の細い帯、期限だけは◆で描く */
@@ -465,14 +514,17 @@ function ScheduleMark({
   schedule: ProjectSchedule;
   rangeStart: string;
   pxPerDay: number;
-  onMove?: (id: number, patch: { start_date?: string; end_date: string }) => void;
+  onMove?: (id: number, patch: { start_date?: string; end_date?: string }) => void;
 }) {
   const drag = useDayDrag(pxPerDay, deltaDays => onMove?.(schedule.id, shiftScheduleDates(schedule, deltaDays)));
   const isInstall = schedule.kind === '取付';
   const startISO = schedule.start_date ?? schedule.end_date;
+  const endISO = schedule.end_date ?? schedule.start_date;
+  if (!startISO || !endISO) return null;
   const leftPx = daysBetween(rangeStart, startISO) * pxPerDay + drag.dragOffsetPx;
-  const widthPx = (daysBetween(startISO, schedule.end_date) + 1) * pxPerDay;
+  const widthPx = (daysBetween(startISO, endISO) + 1) * pxPerDay;
   const doneClass = schedule.done ? ' done' : '';
+  const label = scheduleLabel(schedule);
 
   if (!schedule.start_date && !isInstall) {
     return (
@@ -483,7 +535,7 @@ function ScheduleMark({
           title={scheduleTitle(schedule)}
           {...drag.handlers}
         />
-        <span className="sched-label" style={{ left: leftPx + pxPerDay / 2 + 8 }}>{schedule.kind}</span>
+        <span className="sched-label" style={{ left: leftPx + pxPerDay / 2 + 8 }}>{label}</span>
       </>
     );
   }
@@ -496,9 +548,9 @@ function ScheduleMark({
         title={scheduleTitle(schedule)}
         {...drag.handlers}
       >
-        {isInstall && widthPx >= 40 && schedule.kind}
+        {isInstall && widthPx >= 40 && label}
       </div>
-      {!isInstall && <span className="sched-label" style={{ left: leftPx + widthPx + 4 }}>{schedule.kind}</span>}
+      {!isInstall && <span className="sched-label" style={{ left: leftPx + widthPx + 4 }}>{label}</span>}
     </>
   );
 }

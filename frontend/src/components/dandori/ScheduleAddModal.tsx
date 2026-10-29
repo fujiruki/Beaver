@@ -17,17 +17,19 @@ export default function ScheduleAddModal({ projectId, projectName, defaultDate, 
   const [kind, setKind] = useState<ScheduleKind>('見積');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState(defaultDate);
+  const [hours, setHours] = useState('');
   const [memo, setMemo] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
-    if (!endDate) {
-      setError('終了/期限を入れてください');
+    const hoursValue = hours === '' ? null : Number(hours);
+    if (!startDate && !endDate && hoursValue === null) {
+      setError('日付か時間のどれかを入れてください');
       return;
     }
     createMutation.mutate(
-      { kind, start_date: startDate || null, end_date: endDate, memo },
+      { kind, start_date: startDate || null, end_date: endDate || null, hours: hoursValue, memo },
       { onSuccess: onClose, onError: () => setError('保存に失敗しました') },
     );
   }
@@ -58,6 +60,17 @@ export default function ScheduleAddModal({ projectId, projectName, defaultDate, 
         <label>
           終了/期限
           <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} style={fieldStyle} />
+        </label>
+        <label>
+          時間
+          <input
+            type="number"
+            min={0}
+            step={0.5}
+            value={hours}
+            onChange={e => setHours(e.target.value)}
+            style={{ ...fieldStyle, textAlign: 'right' }}
+          />
         </label>
         <label>
           メモ

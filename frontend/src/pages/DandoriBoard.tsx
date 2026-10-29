@@ -2,11 +2,12 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useProjects } from '../api/projects';
 import { useProjectStatuses } from '../api/projectStatuses';
-import { useAllProjectSchedules, useUpdateProjectSchedule } from '../api/projectSchedules';
+import { useAllProjectSchedules, useCreateProjectScheduleFor, useUpdateProjectSchedule } from '../api/projectSchedules';
 import { useAppSettings } from '../contexts/AppSettingsContext';
 import { APP_STORAGE_PREFIX } from '../lib/appId';
 import { api } from '../api/client';
 import type { Project } from '../types/project';
+import type { ProjectSchedule } from '../types/projectSchedule';
 import GanttScroll from '../components/dandori/GanttScroll';
 import WrapView from '../components/dandori/WrapView';
 import ProjectQuickEditModal from '../components/dandori/ProjectQuickEditModal';
@@ -19,7 +20,10 @@ import {
   rangeForPreset,
   todayISOLocal,
   unstartedProjects,
-  scheduleOnlyProjects,
+  scheduledProjects,
+  datedProjectIds,
+  productionPlacement,
+  expandSegments,
   loadIntervals,
   statusCategory,
   nextFreeDay,
@@ -66,6 +70,7 @@ export default function DandoriBoard() {
   const { data: projectStatuses = [] } = useProjectStatuses();
   const { data: schedules = [] } = useAllProjectSchedules();
   const scheduleMutation = useUpdateProjectSchedule();
+  const createScheduleMutation = useCreateProjectScheduleFor();
   const { settings } = useAppSettings();
   const queryClient = useQueryClient();
 
@@ -127,54 +132,40 @@ export default function DandoriBoard() {
     setExtraBeforeDays(prev => nextExtraDays(prev, EXTRA_STEP_DAYS));
   }
 
-  function handleCommit(id: number, patch: { start_date?: string; delivery_date?: string }) {
+  function handleCommit(id: number, patch: { delivery_date?: string }) {
     setDragError(null);
     commitMutation.mutate({ id, patch });
   }
 
-  const allBars = useMemo(
-    () => projects.filter(p => p.start_date).map(p => ({
-      ...buildBar(p as Project & { start_date: string }, settings.hoursPerDay),
+  function placeProduction(projectId: number, date: string) {
+    setDragError(null);
+    const action = productionPlacement(schedules, projectId, date);
+    if (action.type === 'update') {
+      scheduleMutation.mutate({ id: action.id, ...action.patch });
+    } else {
+      createScheduleMutation.mutate({ projectId, ...action.input });
+    }
+  }
+
+  const schedulesByProject = useMemo(() => {
+    const map = new Map<number, ProjectSchedule[]>();
+    for (const schedule of schedules) map.set(schedule.project_id, [...(map.get(schedule.project_id) ?? []), schedule]);
+    return map;
+  }, [schedules]);
+  const visibleBars = useMemo(
+    () => scheduledProjects(projects, schedules, showDone).map(p => ({
+      ...buildBar(p, schedulesByProject.get(p.id) ?? [], settings.hoursPerDay),
       salesBorderColor: salesCategoryBorderColor(p.sales_category_id),
     })),
-    [projects, settings.hoursPerDay],
+    [projects, schedules, schedulesByProject, showDone, settings.hoursPerDay],
   );
-  const visibleBars = useMemo(() => allBars.filter(b => showDone || b.category !== 'done'), [allBars, showDone]);
   const overCount = visibleBars.filter(b => b.delivery && b.end > b.delivery).length;
-  const scheduleOnly = useMemo(
-    () => scheduleOnlyProjects(projects, schedules, showDone),
-    [projects, schedules, showDone],
-  );
-  const scheduleOnlyBars = useMemo(
-    () => scheduleOnly.map(p => {
-      const first = schedules
-        .filter(s => s.project_id === p.id && !s.done)
-        .map(s => s.start_date ?? s.end_date)
-        .sort()[0];
-      return {
-        id: p.id,
-        name: p.name,
-        customerName: p.customer_name ?? '',
-        isShop: false,
-        category: statusCategory(p.status),
-        status: p.status,
-        start: first,
-        end: first,
-        delivery: p.delivery_date,
-        hours: null,
-        unknownHours: false,
-        noBar: true,
-      };
-    }),
-    [scheduleOnly, schedules],
-  );
-  const scheduleOnlyIds = useMemo(() => new Set(scheduleOnly.map(p => p.id)), [scheduleOnly]);
-  const unsetCount = projects.filter(p => !p.start_date && !scheduleOnlyIds.has(p.id)).length;
+  const datedIds = useMemo(() => datedProjectIds(schedules), [schedules]);
+  const unsetCount = projects.filter(p => !datedIds.has(p.id)).length;
   const unsetProjects = useMemo(
-    () => unstartedProjects(projects, showDone, scheduleOnlyIds),
-    [projects, showDone, scheduleOnlyIds],
+    () => unstartedProjects(projects, showDone, datedIds),
+    [projects, showDone, datedIds],
   );
-  const boardBars = useMemo(() => [...visibleBars, ...scheduleOnlyBars], [visibleBars, scheduleOnlyBars]);
   const projectNames = useMemo(
     () => new Map(projects.filter(p => showDone || statusCategory(p.status) !== 'done').map(p => [p.id, p.name])),
     [projects, showDone],
@@ -218,8 +209,8 @@ export default function DandoriBoard() {
       key: 'actions', label: '', width: 190, stopRowClick: true,
       render: p => (
         <span className="dt-actions">
-          <button onClick={() => handleCommit(p.id, { start_date: todayISO })}>今日に置く</button>
-          <button onClick={() => handleCommit(p.id, { start_date: nextFree })}>次の空きに置く</button>
+          <button onClick={() => placeProduction(p.id, todayISO)}>今日に置く</button>
+          <button onClick={() => placeProduction(p.id, nextFree)}>次の空きに置く</button>
         </span>
       ),
     },
@@ -233,7 +224,7 @@ export default function DandoriBoard() {
       <div className="db-header">
         <h1>段取りボード</h1>
         <span className="sub">{rangeStart} 〜 {rangeEnd}（{PRESET_LABELS[preset]}）</span>
-        {unsetCount > 0 && <span className="unset-note">開始日未設定 {unsetCount}件</span>}
+        {unsetCount > 0 && <span className="unset-note">予定なし {unsetCount}件</span>}
         {overCount > 0 && <span className="alert-badge">⚠ 納期注意 {overCount}件</span>}
       </div>
 
@@ -304,7 +295,7 @@ export default function DandoriBoard() {
       <div className="board-body">
       {mode === 'scroll' ? (
         <GanttScroll
-          bars={boardBars}
+          bars={visibleBars}
           schedules={schedules}
           onScheduleMove={(id, patch) => scheduleMutation.mutate({ id, ...patch })}
           onAddSchedule={setAddingScheduleProjectId}
@@ -323,7 +314,7 @@ export default function DandoriBoard() {
           onStatusChange={(id, status) => commitMutation.mutate({ id, patch: { status } })}
         />
       ) : (
-        <WrapView bars={visibleBars} rangeStart={rangeStart} rangeEnd={rangeEnd} todayISO={todayISO} onProjectDoubleClick={setEditingProjectId} />
+        <WrapView bars={expandSegments(visibleBars)} rangeStart={rangeStart} rangeEnd={rangeEnd} todayISO={todayISO} onProjectDoubleClick={setEditingProjectId} />
       )}
       {todoOpen && (
         <TodoPanel
@@ -338,7 +329,7 @@ export default function DandoriBoard() {
 
       {unsetProjects.length > 0 && (
         <>
-          <h2 className="section-title">開始日未設定の案件（{unsetProjects.length}件）</h2>
+          <h2 className="section-title">予定のない案件（{unsetProjects.length}件）</h2>
           <DataTable
             tableId="dandori-unset"
             columns={unsetColumns}

@@ -50,7 +50,7 @@ export default function WrapView({ bars, rangeStart, rangeEnd, todayISO, onProje
               )}
               {weekBars.map(bar => {
                 if (!bar.delivery || bar.delivery < week.start || bar.delivery > week.end) return null;
-                return <div key={`dl-${bar.id}`} className="w-deadline" style={{ left: `${(daysBetween(week.start, bar.delivery) / 7) * 100}%` }} />;
+                return <div key={`dl-${bar.id}-${bar.start}`} className="w-deadline" style={{ left: `${(daysBetween(week.start, bar.delivery) / 7) * 100}%` }} />;
               })}
               {weekBars.map(bar => {
                 const segStart = bar.start < week.start ? week.start : bar.start;
@@ -61,7 +61,7 @@ export default function WrapView({ bars, rangeStart, rangeEnd, todayISO, onProje
                 const widthPct = ((daysBetween(segStart, segEnd) + 1) / 7) * 100;
                 return (
                   <div
-                    key={bar.id}
+                    key={`${bar.id}-${bar.start}`}
                     className={barClassName(bar, contL, contR)}
                     style={{ marginLeft: `${leftPct}%`, width: `${widthPct}%`, ...(bar.salesBorderColor ? { ['--sales-border' as string]: bar.salesBorderColor } : {}) }}
                     onDoubleClick={() => onProjectDoubleClick(bar.id)}
