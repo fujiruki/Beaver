@@ -391,9 +391,9 @@ switch ($method) {
                 $params[] = (int)$_GET['customer_id'];
             }
             if (!empty($_GET['q'])) {
-                // R-0091: 検索対象を案件コード・案件名・得意先名に拡張
+                // R-0091・R-0221: 検索対象を案件コード・案件名・得意先名・得意先のよみがなに拡張
                 [$searchClause, $searchParams] = buildMultiColumnSearchClause(
-                    ['p.project_code', 'p.name', 'c.name'],
+                    ['p.project_code', 'p.name', 'c.name', 'c.name_kana'],
                     $_GET['q']
                 );
                 $where .= ' AND ' . $searchClause;
