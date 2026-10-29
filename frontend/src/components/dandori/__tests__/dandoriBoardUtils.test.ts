@@ -13,6 +13,8 @@ import {
   unstartedProjects,
   nextFreeDay,
   nextExtraDays,
+  loadIntervals,
+  scheduleOnlyProjects,
 } from '../dandoriBoardUtils';
 
 describe('statusCategory', () => {
@@ -174,5 +176,70 @@ describe('freeMarkerLabels', () => {
       { date: '2024-01-04', label: '1/4 空き' },
       { date: '2024-01-08', label: '1/8 から空き' },
     ]);
+  });
+});
+
+describe('loadIntervals（R-0220: 稼働数には製作と取付だけを数える）', () => {
+  const bars = [{ id: 1, start: '2024-01-01', end: '2024-01-02' }];
+  const sch = (over: object) => ({
+    id: 1, project_id: 1, kind: '取付', start_date: null, end_date: '2024-01-03',
+    memo: '', done: 0, created_at: '', updated_at: '', ...over,
+  });
+
+  it('見積などは数えない', () => {
+    const r = loadIntervals(bars, [sch({ kind: '見積' }), sch({ kind: '材料発注' })] as never);
+    expect(r).toHaveLength(1);
+  });
+
+  it('済でない取付を足す。期限だけの取付はその1日', () => {
+    const r = loadIntervals(bars, [sch({ project_id: 2 })] as never);
+    expect(r).toContainEqual({ id: 2, start: '2024-01-03', end: '2024-01-03' });
+  });
+
+  it('済の取付は数えない', () => {
+    expect(loadIntervals(bars, [sch({ done: 1 })] as never)).toHaveLength(1);
+  });
+
+  it('同じ案件の製作と取付が重なる日は1件と数える', () => {
+    const intervals = loadIntervals(bars, [sch({ project_id: 1, start_date: '2024-01-02', end_date: '2024-01-04' })] as never);
+    const load = dailyLoad(intervals, '2024-01-01', '2024-01-04');
+    expect(load.get('2024-01-01')).toBe(1);
+    expect(load.get('2024-01-02')).toBe(1);
+    expect(load.get('2024-01-03')).toBe(1);
+  });
+
+  it('製作のバーが無い案件の取付も数える', () => {
+    const intervals = loadIntervals([], [sch({ project_id: 9 })] as never);
+    expect(dailyLoad(intervals, '2024-01-03', '2024-01-03').get('2024-01-03')).toBe(1);
+  });
+});
+
+describe('scheduleOnlyProjects（R-0220: 開始日が無くても済でない予定があれば行を出す）', () => {
+  const projects = [
+    { id: 1, status: '問い合わせ', start_date: null },
+    { id: 2, status: '問い合わせ', start_date: null },
+    { id: 3, status: '完了', start_date: null },
+    { id: 4, status: '進行中', start_date: '2024-01-01' },
+  ];
+  const s = (project_id: number, done = 0) => ({ project_id, done });
+
+  it('開始日が無く済でない予定がある案件だけ返す', () => {
+    const r = scheduleOnlyProjects(projects, [s(1), s(2, 1), s(4)] as never, false);
+    expect(r.map(p => p.id)).toEqual([1]);
+  });
+
+  it('完了系の案件は隠し、showDoneなら出す', () => {
+    expect(scheduleOnlyProjects(projects, [s(3)] as never, false)).toEqual([]);
+    expect(scheduleOnlyProjects(projects, [s(3)] as never, true).map(p => p.id)).toEqual([3]);
+  });
+});
+
+describe('unstartedProjects（R-0220: 行に出た案件は数えない）', () => {
+  it('excludeIdsに入る案件を除く', () => {
+    const projects = [
+      { id: 1, status: '問い合わせ', start_date: null },
+      { id: 2, status: '問い合わせ', start_date: null },
+    ];
+    expect(unstartedProjects(projects, false, new Set([1])).map(p => p.id)).toEqual([2]);
   });
 });
