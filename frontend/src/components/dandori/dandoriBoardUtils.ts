@@ -133,6 +133,7 @@ export interface DandoriBar {
   hours: number | null;
   unknownHours: boolean;
   salesBorderColor?: string;
+  noBar?: boolean;
 }
 
 interface ProjectLike {
@@ -193,4 +194,27 @@ export function buildBar(project: ProjectLike, hoursPerDay: number): DandoriBar 
     hours,
     unknownHours: !hours,
   };
+}
+
+/** R-0220: やること一覧。済でない予定を終了/期限の日付順に並べる */
+export function todoSchedules<T extends { id: number; end_date: string; done: number }>(
+  schedules: T[],
+  showDone: boolean,
+): T[] {
+  return schedules
+    .filter(s => showDone || !s.done)
+    .sort((a, b) => a.end_date.localeCompare(b.end_date) || a.id - b.id);
+}
+
+/** R-0220: ドラッグで予定を動かしたときの新しい日付。期間は同じ日数だけ動かす */
+export function shiftScheduleDates(
+  schedule: { start_date: string | null; end_date: string },
+  deltaDays: number,
+): { start_date?: string; end_date: string } {
+  const end_date = addDaysISO(schedule.end_date, deltaDays);
+  return schedule.start_date ? { start_date: addDaysISO(schedule.start_date, deltaDays), end_date } : { end_date };
+}
+
+export function isScheduleOverdue(schedule: { end_date: string; done: number }, todayISO: string): boolean {
+  return !schedule.done && schedule.end_date < todayISO;
 }

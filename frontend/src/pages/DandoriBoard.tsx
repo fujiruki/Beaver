@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useProjects } from '../api/projects';
 import { useProjectStatuses } from '../api/projectStatuses';
+import { useAllProjectSchedules, useUpdateProjectSchedule } from '../api/projectSchedules';
 import { useAppSettings } from '../contexts/AppSettingsContext';
 import { APP_STORAGE_PREFIX } from '../lib/appId';
 import { api } from '../api/client';
@@ -9,6 +10,8 @@ import type { Project } from '../types/project';
 import GanttScroll from '../components/dandori/GanttScroll';
 import WrapView from '../components/dandori/WrapView';
 import ProjectQuickEditModal from '../components/dandori/ProjectQuickEditModal';
+import ScheduleAddModal from '../components/dandori/ScheduleAddModal';
+import TodoPanel from '../components/dandori/TodoPanel';
 import DataTable, { useSortState } from '../components/DataTable';
 import type { DataTableColumn } from '../components/DataTable';
 import {
@@ -16,6 +19,9 @@ import {
   rangeForPreset,
   todayISOLocal,
   unstartedProjects,
+  scheduleOnlyProjects,
+  loadIntervals,
+  statusCategory,
   nextFreeDay,
   nextExtraDays,
   addDaysISO,
@@ -27,6 +33,7 @@ import {
 import '../components/dandori/dandoriBoard.css';
 
 const FONT_SCALE_KEY = `${APP_STORAGE_PREFIX}dandori_font_scale`;
+const TODO_OPEN_KEY = `${APP_STORAGE_PREFIX}dandori_todo_open`;
 
 export const SALES_CATEGORY_BORDER_COLORS: Readonly<Record<number, string>> = {
   1: '#2563eb', 2: '#38bdf8', 3: '#8b5cf6', 5: '#ffffff',
@@ -47,9 +54,19 @@ function loadFontScale(): number {
   return FONT_SCALES.includes(saved) ? saved : 1;
 }
 
+function loadTodoOpen(): boolean {
+  try {
+    return localStorage.getItem(TODO_OPEN_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
 export default function DandoriBoard() {
   const { data: projects = [], isLoading, error } = useProjects();
   const { data: projectStatuses = [] } = useProjectStatuses();
+  const { data: schedules = [] } = useAllProjectSchedules();
+  const scheduleMutation = useUpdateProjectSchedule();
   const { settings } = useAppSettings();
   const queryClient = useQueryClient();
 
@@ -62,6 +79,8 @@ export default function DandoriBoard() {
   const [editingProjectId, setEditingProjectId] = useState<number | null>(null);
   const [extraDays, setExtraDays] = useState(0);
   const [extraBeforeDays, setExtraBeforeDays] = useState(0);
+  const [todoOpen, setTodoOpen] = useState(loadTodoOpen);
+  const [addingScheduleProjectId, setAddingScheduleProjectId] = useState<number | null>(null);
 
   const todayISO = todayISOLocal();
   const { start: presetRangeStart, end: presetRangeEnd } = useMemo(
@@ -114,7 +133,6 @@ export default function DandoriBoard() {
     commitMutation.mutate({ id, patch });
   }
 
-  const unsetCount = projects.filter(p => !p.start_date).length;
   const allBars = useMemo(
     () => projects.filter(p => p.start_date).map(p => ({
       ...buildBar(p as Project & { start_date: string }, settings.hoursPerDay),
@@ -124,10 +142,51 @@ export default function DandoriBoard() {
   );
   const visibleBars = useMemo(() => allBars.filter(b => showDone || b.category !== 'done'), [allBars, showDone]);
   const overCount = visibleBars.filter(b => b.delivery && b.end > b.delivery).length;
-  const unsetProjects = useMemo(() => unstartedProjects(projects, showDone), [projects, showDone]);
+  const scheduleOnly = useMemo(
+    () => scheduleOnlyProjects(projects, schedules, showDone),
+    [projects, schedules, showDone],
+  );
+  const scheduleOnlyBars = useMemo(
+    () => scheduleOnly.map(p => {
+      const first = schedules
+        .filter(s => s.project_id === p.id && !s.done)
+        .map(s => s.start_date ?? s.end_date)
+        .sort()[0];
+      return {
+        id: p.id,
+        name: p.name,
+        customerName: p.customer_name ?? '',
+        isShop: false,
+        category: statusCategory(p.status),
+        status: p.status,
+        start: first,
+        end: first,
+        delivery: p.delivery_date,
+        hours: null,
+        unknownHours: false,
+        noBar: true,
+      };
+    }),
+    [scheduleOnly, schedules],
+  );
+  const scheduleOnlyIds = useMemo(() => new Set(scheduleOnly.map(p => p.id)), [scheduleOnly]);
+  const unsetCount = projects.filter(p => !p.start_date && !scheduleOnlyIds.has(p.id)).length;
+  const unsetProjects = useMemo(
+    () => unstartedProjects(projects, showDone, scheduleOnlyIds),
+    [projects, showDone, scheduleOnlyIds],
+  );
+  const boardBars = useMemo(() => [...visibleBars, ...scheduleOnlyBars], [visibleBars, scheduleOnlyBars]);
+  const projectNames = useMemo(
+    () => new Map(projects.filter(p => showDone || statusCategory(p.status) !== 'done').map(p => [p.id, p.name])),
+    [projects, showDone],
+  );
+  const nextFreeBars = useMemo(
+    () => loadIntervals(visibleBars, schedules).map(b => ({ start: b.start, end: b.end })),
+    [visibleBars, schedules],
+  );
   const nextFree = useMemo(
-    () => nextFreeDay(visibleBars.map(b => ({ start: b.start, end: b.end })), todayISO),
-    [visibleBars, todayISO],
+    () => nextFreeDay(nextFreeBars, todayISO),
+    [nextFreeBars, todayISO],
   );
 
   const [unsetSort, setUnsetSort] = useSortState('dandori-unset', { key: 'delivery_date', dir: 'asc' });
@@ -222,15 +281,34 @@ export default function DandoriBoard() {
         </div>
 
         <label className="filter">
+          <input
+            type="checkbox"
+            checked={todoOpen}
+            onChange={e => {
+              setTodoOpen(e.target.checked);
+              try {
+                localStorage.setItem(TODO_OPEN_KEY, e.target.checked ? '1' : '0');
+              } catch {
+                // 保存できない環境では表示状態を覚えない
+              }
+            }}
+          />
+          やること
+        </label>
+        <label className="filter">
           <input type="checkbox" checked={showDone} onChange={e => setShowDone(e.target.checked)} />
           完了・キャンセルを表示
         </label>
         <div className="filter">1日 = <b>{settings.hoursPerDay}時間</b>（設定で変更）</div>
       </div>
 
+      <div className="board-body">
       {mode === 'scroll' ? (
         <GanttScroll
-          bars={visibleBars}
+          bars={boardBars}
+          schedules={schedules}
+          onScheduleMove={(id, patch) => scheduleMutation.mutate({ id, ...patch })}
+          onAddSchedule={setAddingScheduleProjectId}
           rangeStart={rangeStart}
           rangeEnd={rangeEnd}
           pxPerDay={pxPerDay}
@@ -248,6 +326,16 @@ export default function DandoriBoard() {
       ) : (
         <WrapView bars={visibleBars} rangeStart={rangeStart} rangeEnd={rangeEnd} todayISO={todayISO} onProjectDoubleClick={setEditingProjectId} />
       )}
+      {todoOpen && (
+        <TodoPanel
+          schedules={schedules}
+          projectNames={projectNames}
+          todayISO={todayISO}
+          onToggleDone={(id, done) => scheduleMutation.mutate({ id, done: done ? 1 : 0 })}
+          onOpenProject={setEditingProjectId}
+        />
+      )}
+      </div>
 
       {unsetProjects.length > 0 && (
         <>
@@ -262,6 +350,14 @@ export default function DandoriBoard() {
             onSortChange={setUnsetSort}
           />
         </>
+      )}
+      {addingScheduleProjectId !== null && (
+        <ScheduleAddModal
+          projectId={addingScheduleProjectId}
+          projectName={projectNames.get(addingScheduleProjectId) ?? ''}
+          defaultDate={todayISO}
+          onClose={() => setAddingScheduleProjectId(null)}
+        />
       )}
       {editingProjectId !== null && (
         <ProjectQuickEditModal
