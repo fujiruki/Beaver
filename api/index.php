@@ -105,6 +105,7 @@ try {
     $routes = [
         'customers'     => __DIR__ . '/routes/customers.php',
         'projects'      => __DIR__ . '/routes/projects.php',
+        'project-schedules' => __DIR__ . '/routes/project_schedules.php',
         'tategu-items'  => __DIR__ . '/routes/tategu_items.php',
         'vouchers'      => __DIR__ . '/routes/vouchers.php',
         'invoices'      => __DIR__ . '/routes/invoices.php',
