@@ -46,9 +46,9 @@ export function barEndDate(startISO: string, workdays: number): string {
   return toISO(current);
 }
 
-/** 範囲内の平日ごとの稼働案件数。keyはYYYY-MM-DD */
+/** 範囲内の平日ごとの稼働案件数。keyはYYYY-MM-DD。idが同じ区間は同じ日に1件と数える */
 export function dailyLoad(
-  bars: { start: string; end: string }[],
+  bars: { id?: number; start: string; end: string }[],
   rangeStart: string,
   rangeEnd: string,
 ): Map<string, number> {
@@ -58,7 +58,8 @@ export function dailyLoad(
   while (current.getTime() <= end.getTime()) {
     if (!isWeekend(current)) {
       const iso = toISO(current);
-      const count = bars.filter(b => b.start <= iso && iso <= b.end).length;
+      const active = bars.filter(b => b.start <= iso && iso <= b.end);
+      const count = new Set(active.map((b, i) => b.id ?? `anon-${i}`)).size;
       load.set(iso, count);
     }
     current = addDays(current, 1);
