@@ -47,7 +47,6 @@ const FONT_LABELS = ['A−', 'A', 'A＋'];
 const PRESETS: RangePreset[] = ['8w', '6m', '1y'];
 const PROJECTS_QUERY_KEY = ['projects', {}];
 const EXTRA_STEP_DAYS = 28; // R-0146: 右端接近1回あたりの延長日数
-const EXTRA_MAX_DAYS = 730; // R-0146: 延長の上限（プリセット終了日から約2年）
 
 function loadFontScale(): number {
   const saved = Number(localStorage.getItem(FONT_SCALE_KEY));
@@ -121,11 +120,11 @@ export default function DandoriBoard() {
   }
 
   function handleNearRightEdge() {
-    setExtraDays(prev => nextExtraDays(prev, EXTRA_STEP_DAYS, EXTRA_MAX_DAYS));
+    setExtraDays(prev => nextExtraDays(prev, EXTRA_STEP_DAYS));
   }
 
   function handleNearLeftEdge() {
-    setExtraBeforeDays(prev => nextExtraDays(prev, EXTRA_STEP_DAYS, EXTRA_MAX_DAYS));
+    setExtraBeforeDays(prev => nextExtraDays(prev, EXTRA_STEP_DAYS));
   }
 
   function handleCommit(id: number, patch: { start_date?: string; delivery_date?: string }) {

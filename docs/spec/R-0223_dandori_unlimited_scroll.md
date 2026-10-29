@@ -21,5 +21,5 @@
 
 ## タスク
 
-- [ ] T1 `nextExtraDays` の上限をなくすテスト（または上限の引数を外す）を先に書く
-- [ ] T2 `EXTRA_MAX_DAYS` をなくす
+- [x] T1 `nextExtraDays` の上限をなくすテスト（または上限の引数を外す）を先に書く
+- [x] T2 `EXTRA_MAX_DAYS` をなくす
