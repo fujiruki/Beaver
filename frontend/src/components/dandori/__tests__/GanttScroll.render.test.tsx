@@ -16,7 +16,8 @@ const bar: DandoriBar = {
   end: '2026-09-03',
   delivery: null,
   hours: 24,
-  unknownHours: false,
+  segments: [{ scheduleId: 10, start: '2026-09-01', end: '2026-09-03', hours: 24, fixedEnd: null, done: false, unknownHours: false }],
+  frame: { start: '2026-09-01', end: '2026-09-03' },
 };
 
 const SALES_CATEGORY_COLORS: Record<number, string> = {
@@ -281,5 +282,80 @@ describe('R-0219 前期間へのシームレススクロール', () => {
     Object.defineProperty(scrollEl, 'scrollWidth', { value: 2672, configurable: true });
     rerender(<GanttScroll {...props} rangeStart="2026-07-28" />);
     expect(scrollEl.scrollLeft).toBe(772);
+  });
+});
+
+describe('R-0222 製作のバー・全体の枠・予定のラベル', () => {
+  const baseProps = {
+    rangeStart: '2026-08-25', rangeEnd: '2026-09-30', pxPerDay: 24, todayISO: '2026-09-01',
+    onCommit: vi.fn(), onProjectDoubleClick: vi.fn(),
+  };
+  const sch = (over: object) => ({
+    id: 1, project_id: 1, kind: '見積', start_date: null, end_date: '2026-09-10', hours: null,
+    memo: '', done: 0, created_at: '', updated_at: '', ...over,
+  });
+
+  function drag(barEl: HTMLElement, px: number) {
+    barEl.setPointerCapture = vi.fn();
+    barEl.releasePointerCapture = vi.fn();
+    fireEvent.pointerDown(barEl, { clientX: 100, pointerId: 1 });
+    fireEvent.pointerMove(barEl, { clientX: 100 + px, pointerId: 1 });
+    fireEvent.pointerUp(barEl, { clientX: 100 + px, pointerId: 1 });
+  }
+
+  it('製作が2本あれば1つの行に2本のバーを描く', () => {
+    const two = {
+      ...bar,
+      segments: [
+        { scheduleId: 10, start: '2026-09-01', end: '2026-09-03', hours: 24, fixedEnd: null, done: false, unknownHours: false },
+        { scheduleId: 11, start: '2026-09-10', end: '2026-09-11', hours: 16, fixedEnd: null, done: false, unknownHours: false },
+      ],
+      frame: { start: '2026-09-01', end: '2026-09-11' },
+    };
+    const { container } = render(<GanttScroll {...baseProps} bars={[two]} />);
+    expect(container.querySelectorAll('.row')).toHaveLength(1);
+    expect(container.querySelectorAll('.bar')).toHaveLength(2);
+  });
+
+  it('製作のバーが無い行（予定だけ）はバーを描かない', () => {
+    const none = { ...bar, segments: [], frame: { start: '2026-09-10', end: '2026-09-10' } };
+    const { container } = render(<GanttScroll {...baseProps} bars={[none]} schedules={[sch({}) as never]} />);
+    expect(container.querySelectorAll('.bar')).toHaveLength(0);
+    expect(container.querySelector('.sched-diamond')).toBeTruthy();
+  });
+
+  it('行に予定全体の薄い枠を、一番早い日から一番遅い日まで描く', () => {
+    const { container } = render(<GanttScroll {...baseProps} bars={[bar]} />);
+    const frame = container.querySelector('.sched-frame') as HTMLElement;
+    expect(frame).toBeTruthy();
+    expect(frame.style.left).toBe(`${7 * 24}px`);
+    expect(frame.style.width).toBe(`${3 * 24}px`);
+  });
+
+  it('枠が無い行（frame=null）には描かない', () => {
+    const { container } = render(<GanttScroll {...baseProps} bars={[{ ...bar, segments: [], frame: null }]} />);
+    expect(container.querySelector('.sched-frame')).toBeNull();
+  });
+
+  it('予定のラベルは種類名の横に時間を出す', () => {
+    const { container } = render(
+      <GanttScroll {...baseProps} bars={[bar]} schedules={[sch({ start_date: '2026-09-08', end_date: '2026-09-10', hours: 2 }) as never]} />,
+    );
+    expect(container.textContent).toContain('見積 2h');
+  });
+
+  it('製作のバーのドラッグは、その製作の予定の開始日を動かす', () => {
+    const onScheduleMove = vi.fn();
+    const { container } = render(<GanttScroll {...baseProps} bars={[bar]} onScheduleMove={onScheduleMove} />);
+    drag(container.querySelector('.bar') as HTMLElement, 48);
+    expect(onScheduleMove).toHaveBeenCalledWith(10, { start_date: '2026-09-03' });
+  });
+
+  it('終了のある製作のバーのドラッグは、終了も同じ日数動かす', () => {
+    const onScheduleMove = vi.fn();
+    const withEnd = { ...bar, segments: [{ ...bar.segments[0], fixedEnd: '2026-09-03' }] };
+    const { container } = render(<GanttScroll {...baseProps} bars={[withEnd]} onScheduleMove={onScheduleMove} />);
+    drag(container.querySelector('.bar') as HTMLElement, 24);
+    expect(onScheduleMove).toHaveBeenCalledWith(10, { start_date: '2026-09-02', end_date: '2026-09-04' });
   });
 });
