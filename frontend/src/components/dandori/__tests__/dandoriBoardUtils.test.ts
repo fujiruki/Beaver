@@ -15,6 +15,9 @@ import {
   nextExtraDays,
   loadIntervals,
   scheduleOnlyProjects,
+  todoSchedules,
+  shiftScheduleDates,
+  isScheduleOverdue,
 } from '../dandoriBoardUtils';
 
 describe('statusCategory', () => {
@@ -241,5 +244,39 @@ describe('unstartedProjects（R-0220: 行に出た案件は数えない）', () 
       { id: 2, status: '問い合わせ', start_date: null },
     ];
     expect(unstartedProjects(projects, false, new Set([1])).map(p => p.id)).toEqual([2]);
+  });
+});
+
+describe('todoSchedules（R-0220: やること一覧）', () => {
+  const sch = (id: number, end_date: string, done = 0) => ({ id, end_date, done });
+
+  it('済でない予定を終了/期限の日付順に並べる', () => {
+    const r = todoSchedules([sch(1, '2024-01-09'), sch(2, '2024-01-03'), sch(3, '2024-01-05', 1)] as never, false);
+    expect(r.map(s => s.id)).toEqual([2, 1]);
+  });
+
+  it('済も表示なら済も並べる', () => {
+    const r = todoSchedules([sch(1, '2024-01-09'), sch(3, '2024-01-05', 1)] as never, true);
+    expect(r.map(s => s.id)).toEqual([3, 1]);
+  });
+});
+
+describe('shiftScheduleDates（R-0220: ドラッグで日付を動かす）', () => {
+  it('期間は開始と終了を同じ日数だけ動かす', () => {
+    expect(shiftScheduleDates({ start_date: '2024-01-01', end_date: '2024-01-03' }, 2))
+      .toEqual({ start_date: '2024-01-03', end_date: '2024-01-05' });
+  });
+
+  it('期限だけの予定は終了だけ動かす', () => {
+    expect(shiftScheduleDates({ start_date: null, end_date: '2024-01-03' }, -1))
+      .toEqual({ end_date: '2024-01-02' });
+  });
+});
+
+describe('isScheduleOverdue', () => {
+  it('期限が今日より前で済でないものだけ true', () => {
+    expect(isScheduleOverdue({ end_date: '2024-01-01', done: 0 }, '2024-01-02')).toBe(true);
+    expect(isScheduleOverdue({ end_date: '2024-01-02', done: 0 }, '2024-01-02')).toBe(false);
+    expect(isScheduleOverdue({ end_date: '2024-01-01', done: 1 }, '2024-01-02')).toBe(false);
   });
 });
