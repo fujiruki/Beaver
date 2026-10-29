@@ -220,3 +220,4 @@
 #### 原文
 
 > まだ機能を使いきれてないけど　そこそこよさそう。　あと案件画面のけんさくのとき、　得意先のよみがなもけんさくたいしょうに入れて
+| 2026-10-29 | R-0200(A)(B)(C)・R-0221: 本番へ反映 | 完了 | dodai-back依頼（晴樹さん「今日入れる」）と、このセッションで晴樹さん「入れてよい」。15:21 本番DBを退避（`backups/database_beaver_20261029_1521_pre_039_r0200.sqlite`）してmigration 039を適用（1回目はスクリプトのcommit漏れでロールバック、当て直して列を確認）、integrity ok。master（ccb462d、R-0221を含む）を本番・betaへ`upload.ps1`（-KeepLocalDBなし）。本番 health・アプリ200、/sync/changes はトークン無しで401。本番の tategu_items 5,607件、code 00001〜05615、空0件 |
