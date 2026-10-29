@@ -470,8 +470,8 @@ switch ($method) {
         $data = json_decode(file_get_contents('php://input'), true) ?? [];
         $code = nextProjectCode($pdo);
         $stmt = $pdo->prepare('
-            INSERT INTO projects (project_code, customer_id, name, description, status, start_date, end_date, delivery_date, address, memo, order_date, owner_name, general_contractor_name, site_contact, manual_estimated_hours)
-            VALUES (:project_code, :customer_id, :name, :description, :status, :start_date, :end_date, :delivery_date, :address, :memo, :order_date, :owner_name, :general_contractor_name, :site_contact, :manual_estimated_hours)
+            INSERT INTO projects (project_code, customer_id, name, description, status, end_date, delivery_date, address, memo, order_date, owner_name, general_contractor_name, site_contact, manual_estimated_hours)
+            VALUES (:project_code, :customer_id, :name, :description, :status, :end_date, :delivery_date, :address, :memo, :order_date, :owner_name, :general_contractor_name, :site_contact, :manual_estimated_hours)
         ');
         $stmt->execute([
             ':project_code'              => $code,
@@ -479,7 +479,6 @@ switch ($method) {
             ':name'                      => $data['name'] ?? '',
             ':description'               => $data['description'] ?? null,
             ':status'                    => $data['status'] ?? '問い合わせ',
-            ':start_date'                => $data['start_date'] ?? null,
             ':end_date'                  => $data['end_date'] ?? null,
             ':delivery_date'             => $data['delivery_date'] ?? null,
             ':address'                   => $data['address'] ?? null,
@@ -500,7 +499,7 @@ switch ($method) {
     case 'PUT':
         if (!$resourceId) { http_response_code(400); echo json_encode(['error' => 'ID required']); exit; }
         $data = json_decode(file_get_contents('php://input'), true) ?? [];
-        $fields = ['project_code','customer_id','name','description','status','start_date','end_date','delivery_date','address','memo','order_date','owner_name','general_contractor_name','site_contact','manual_estimated_hours'];
+        $fields = ['project_code','customer_id','name','description','status','end_date','delivery_date','address','memo','order_date','owner_name','general_contractor_name','site_contact','manual_estimated_hours'];
         $sets = []; $params = [];
         foreach ($fields as $f) {
             if (array_key_exists($f, $data)) { $sets[] = "$f = :$f"; $params[":$f"] = $data[$f]; }
