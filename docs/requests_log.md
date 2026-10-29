@@ -210,3 +210,13 @@
 
 | 2026-10-29 | R-0200(C)・R-0220: Beaver_betaへ反映 | beta済み・本番未 | dodai-back依頼（晴樹さんがdodai-backで「betaで進めてよい」）。13:11 betaのDBを退避（`backups/database_beta_20261029_1311_pre_039_040.sqlite`）してmigration 039（tategu_items.drawing_sha256・last_synced_at）と040（project_schedules）を適用、integrity ok。続けて`upload.ps1 -Beta`（-KeepLocalDBなし、版f607e3d＝master。R-0200(A)(B)(C)・a4affbc・R-0220を含む）、health・アプリ200。本番には入れない |
 | 2026-10-29 | R-0220: 本番へ反映 | 完了（ブラウザ確認は未） | 晴樹さん「はい」（R-0200より先に本番へ）。本番の版 `release/r0214-r0219` にR-0220の6コミットをcherry-pickした `release/r0220`（0872979）で回帰スイート🔵青・tsc成功。14:02 本番DBを退避（`backups/database_beaver_20261029_1402_pre_040_project_schedules.sqlite`）してmigration 040を適用、integrity ok。続けて`upload.ps1`（本番、-KeepLocalDBなし）、health・アプリ・/admin/feedback 200、/project-schedules は未認証で401。migration 039は本番にまだ無い（R-0200のときに手で当てる。migrationは名前ごとに手で当てる方式なので番号の飛びは問題ない）。betaはmasterのまま |
+
+### R-0221 案件の検索で得意先のよみがなも探す（2026-10-29）
+
+- 晴樹さん、会話で直接（R-0220を本番で使ってみた感想のあと）
+- 状態: 仕様化済み
+- 仕様: `docs/spec/R-0221_project_search_customer_kana.md`
+
+#### 原文
+
+> まだ機能を使いきれてないけど　そこそこよさそう。　あと案件画面のけんさくのとき、　得意先のよみがなもけんさくたいしょうに入れて
