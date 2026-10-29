@@ -122,7 +122,7 @@ try {
 
     runTest('種類が一覧外・end_date なし・start_date > end_date は422で何も書かない', function () use ($port, $pdo) {
         $p = newProject($pdo);
-        assertStatus(422, jsonReq($port, 'POST', "/projects/$p/schedules", ['kind' => '製作', 'end_date' => '2026-11-05']));
+        assertStatus(422, jsonReq($port, 'POST', "/projects/$p/schedules", ['kind' => 'へんな種類', 'end_date' => '2026-11-05']));
         assertStatus(422, jsonReq($port, 'POST', "/projects/$p/schedules", ['kind' => '見積']));
         assertStatus(422, jsonReq($port, 'POST', "/projects/$p/schedules", ['kind' => '取付', 'start_date' => '2026-11-06', 'end_date' => '2026-11-05']));
         assertEq(0, (int)$pdo->query("SELECT COUNT(*) FROM project_schedules WHERE project_id = $p")->fetchColumn(), '件数');
