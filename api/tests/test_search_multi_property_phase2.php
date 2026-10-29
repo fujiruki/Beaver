@@ -30,8 +30,8 @@ foreach ($migrations as $migration) {
     }
 }
 
-$pdo->exec("INSERT INTO customers (id, name, honorific_type) VALUES
-    (101, 'さくら建設', '御中'), (102, '北斗工務店', '御中')");
+$pdo->exec("INSERT INTO customers (id, name, name_kana, honorific_type) VALUES
+    (101, 'さくら建設', 'フジタケンセツ', '御中'), (102, '北斗工務店', NULL, '御中')");
 $pdo->exec("INSERT INTO projects (id, project_code, customer_id, name, status) VALUES
     (201, 'P201', 101, 'カタカナ改修', '進行中'), (202, 'P202', 102, '別案件', '進行中')");
 $pdo->exec("INSERT INTO tategu_items (id, code, name, description, status) VALUES
@@ -88,6 +88,13 @@ runTest('伝票: 全対象列・複数語AND・かな揺れ・非ヒット', fun
     assertSameValue([401], ids(callListRoute('vouchers', ['q' => 'さくら 防火'])), 'customer + description AND');
     assertSameValue([401], ids(callListRoute('vouchers', ['q' => 'かたかな'])), 'project kana');
     assertSameValue([], ids(callListRoute('vouchers', ['q' => '存在しない'])), 'miss');
+});
+runTest('案件: 得意先のよみがな・複数語AND・既存の検索・非ヒット', function () {
+    assertSameValue([201], ids(callListRoute('projects', ['q' => 'ふじ'])), 'customer kana');
+    assertSameValue([201], ids(callListRoute('projects', ['q' => 'ふじた カタカナ'])), 'customer kana + project name AND');
+    assertSameValue([], ids(callListRoute('projects', ['q' => 'ふじた 別案件'])), 'kana + other project AND miss');
+    assertSameValue([201], ids(callListRoute('projects', ['q' => 'さくら'])), 'customer name');
+    assertSameValue([], ids(callListRoute('projects', ['q' => '存在しない'])), 'miss');
 });
 runTest('伝票: qとpage併用時にCOUNT JOINを含めて成功', function () {
     $response = callListRoute('vouchers', ['q' => 'さくら', 'page' => '1']);
