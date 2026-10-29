@@ -9,8 +9,11 @@ import {
   isWeekendISO,
   monthBoundaries,
   freeMarkerLabels,
+  loadIntervals,
+  shiftScheduleDates,
   type DandoriBar,
 } from './dandoriBoardUtils';
+import type { ProjectSchedule } from '../../types/projectSchedule';
 
 const DETAIL_THRESHOLD_PX = 12; // これ未満は日付数字を消して月境界表示にする
 const LABEL_THRESHOLD_PX = 10;  // これ未満はバー内ラベルを消す
@@ -178,11 +181,15 @@ interface GanttScrollProps {
   onNearLeftEdge?: () => void;
   statusOptions?: string[];
   onStatusChange?: (id: number, status: string) => void;
+  schedules?: ProjectSchedule[];
+  onScheduleMove?: (id: number, patch: { start_date?: string; end_date: string }) => void;
+  onAddSchedule?: (projectId: number) => void;
 }
 
 export default function GanttScroll({
   bars, rangeStart, rangeEnd, pxPerDay, todayISO, onCommit, onProjectDoubleClick,
   onNearRightEdge, onNearLeftEdge, statusOptions = [], onStatusChange,
+  schedules = [], onScheduleMove, onAddSchedule,
 }: GanttScrollProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const widthBeforePrependRef = useRef<number | null>(null);
@@ -196,7 +203,13 @@ export default function GanttScroll({
   const { nameColWidth, custColWidth, labelTotalWidth, onNameHandleDown, onTotalHandleDown } = useLabelWidths();
 
   const sortedBars = [...bars].sort((a, b) => a.start.localeCompare(b.start));
-  const load = dailyLoad(sortedBars.map(b => ({ start: b.start, end: b.end })), rangeStart, rangeEnd);
+  const visibleProjectIds = new Set(bars.map(b => b.id));
+  const visibleSchedules = schedules.filter(s => visibleProjectIds.has(s.project_id));
+  const load = dailyLoad(
+    loadIntervals(sortedBars.filter(b => !b.noBar), visibleSchedules),
+    rangeStart,
+    rangeEnd,
+  );
   const markers = freeMarkerLabels(load, todayISO);
   const loadDays = enumerateDays(rangeStart, rangeEnd);
 
@@ -282,6 +295,8 @@ export default function GanttScroll({
             gridWidth={gridWidth}
             showBarLabel={showBarLabel}
             todayLeftPx={todayLeftPx}
+            schedules={visibleSchedules.filter(s => s.project_id === bar.id)}
+            onScheduleMove={onScheduleMove}
             nameColWidth={nameColWidth}
             custColWidth={custColWidth}
             labelTotalWidth={labelTotalWidth}
@@ -326,6 +341,22 @@ export default function GanttScroll({
             background: '#fff', boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
           }}
         >
+          {onAddSchedule && (
+            <>
+              <button
+                role="menuitem"
+                type="button"
+                onClick={() => {
+                  onAddSchedule(contextMenu.id);
+                  setContextMenu(null);
+                }}
+                style={{ display: 'block', width: '100%', padding: '6px 10px', textAlign: 'left', background: 'none' }}
+              >
+                予定を追加
+              </button>
+              <hr style={{ margin: '4px 0', borderColor: '#e2e8f0' }} />
+            </>
+          )}
           {statusOptions.map(status => (
             <button
               key={status}
@@ -349,7 +380,7 @@ export default function GanttScroll({
 }
 
 function BarRow({
-  bar, rangeStart, pxPerDay, gridWidth, showBarLabel, todayLeftPx, nameColWidth, custColWidth,
+  bar, rangeStart, pxPerDay, gridWidth, showBarLabel, todayLeftPx, schedules, onScheduleMove, nameColWidth, custColWidth,
   labelTotalWidth, onCommit, onProjectDoubleClick, onContextMenu,
 }: {
   bar: DandoriBar;
@@ -358,6 +389,8 @@ function BarRow({
   gridWidth: number;
   showBarLabel: boolean;
   todayLeftPx: number | null;
+  schedules: ProjectSchedule[];
+  onScheduleMove?: (id: number, patch: { start_date?: string; end_date: string }) => void;
   nameColWidth: number;
   custColWidth: number;
   labelTotalWidth: number;
@@ -377,9 +410,9 @@ function BarRow({
   const labelFitsInside = estimateLabelWidth(labelText) <= widthPx;
 
   return (
-    <div className="row">
+    <div className="row" onContextMenu={event => onContextMenu(event, bar.status)}>
       <div className="label-col" style={{ width: labelTotalWidth }}>
-        <div className="name-col" style={{ width: nameColWidth, textAlign: 'left' }}>
+        <div className="name-col" style={{ width: nameColWidth, textAlign: 'left' }} onDoubleClick={() => onProjectDoubleClick(bar.id)}>
           <span className="name">{bar.name}</span>
         </div>
         <div className="cust-col" style={{ width: custColWidth, textAlign: 'left' }}>
@@ -389,17 +422,27 @@ function BarRow({
       <div className="grid-col" style={{ width: gridWidth }}>
         <div className="grid-bg" style={gridBgStyle(pxPerDay)} />
         <TodayCol leftPx={todayLeftPx} pxPerDay={pxPerDay} />
+        {!bar.noBar && (
         <div
           className={barClassName(bar)}
           style={{ left: leftPx, width: widthPx, ...(bar.salesBorderColor ? { ['--sales-border' as string]: bar.salesBorderColor } : {}) }}
           {...barDrag.handlers}
           onDoubleClick={e => { e.stopPropagation(); onProjectDoubleClick(bar.id); }}
-          onContextMenu={event => onContextMenu(event, bar.status)}
         >
           {showBarLabel && labelFitsInside && labelText}
           {overDays > 0 && <div className="over" style={{ width: overDays * pxPerDay }} />}
         </div>
-        {showBarLabel && !labelFitsInside && (
+        )}
+        {schedules.map(s => (
+          <ScheduleMark
+            key={s.id}
+            schedule={s}
+            rangeStart={rangeStart}
+            pxPerDay={pxPerDay}
+            onMove={onScheduleMove}
+          />
+        ))}
+        {!bar.noBar && showBarLabel && !labelFitsInside && (
           <span className="bar-label-outside" style={{ left: leftPx + widthPx + 6 }}>{labelText}</span>
         )}
         {deadlineLeftPx !== null && (
@@ -407,5 +450,55 @@ function BarRow({
         )}
       </div>
     </div>
+  );
+}
+
+function scheduleTitle(s: ProjectSchedule): string {
+  const period = s.start_date ? `${formatMD(s.start_date)}〜${formatMD(s.end_date)}` : `${formatMD(s.end_date)}まで`;
+  return [s.kind, period, s.memo].filter(Boolean).join(' ');
+}
+
+/** R-0220: 案件の予定。取付は太いバー、それ以外は行の上の細い帯、期限だけは◆で描く */
+function ScheduleMark({
+  schedule, rangeStart, pxPerDay, onMove,
+}: {
+  schedule: ProjectSchedule;
+  rangeStart: string;
+  pxPerDay: number;
+  onMove?: (id: number, patch: { start_date?: string; end_date: string }) => void;
+}) {
+  const drag = useDayDrag(pxPerDay, deltaDays => onMove?.(schedule.id, shiftScheduleDates(schedule, deltaDays)));
+  const isInstall = schedule.kind === '取付';
+  const startISO = schedule.start_date ?? schedule.end_date;
+  const leftPx = daysBetween(rangeStart, startISO) * pxPerDay + drag.dragOffsetPx;
+  const widthPx = (daysBetween(startISO, schedule.end_date) + 1) * pxPerDay;
+  const doneClass = schedule.done ? ' done' : '';
+
+  if (!schedule.start_date && !isInstall) {
+    return (
+      <>
+        <div
+          className={`sched-diamond${doneClass}`}
+          style={{ left: leftPx + pxPerDay / 2 - 5 }}
+          title={scheduleTitle(schedule)}
+          {...drag.handlers}
+        />
+        <span className="sched-label" style={{ left: leftPx + pxPerDay / 2 + 8 }}>{schedule.kind}</span>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <div
+        className={`${isInstall ? 'sched-install' : 'sched-thin'}${doneClass}`}
+        style={{ left: leftPx, width: widthPx }}
+        title={scheduleTitle(schedule)}
+        {...drag.handlers}
+      >
+        {isInstall && widthPx >= 40 && schedule.kind}
+      </div>
+      {!isInstall && <span className="sched-label" style={{ left: leftPx + widthPx + 4 }}>{schedule.kind}</span>}
+    </>
   );
 }

@@ -9,6 +9,7 @@ import type { ComboOption } from '../components/ComboSelect';
 import NewCustomerModal from '../components/NewCustomerModal';
 import CapacityCheckPanel from '../components/CapacityCheckPanel';
 import YoukanLinkButton from '../components/YoukanLinkButton';
+import ProjectSchedulesPanel from '../components/ProjectSchedulesPanel';
 import HardDeleteProjectModal from '../components/HardDeleteProjectModal';
 import { useAppSettings } from '../contexts/AppSettingsContext';
 import { useSmartBack } from '../hooks/useSmartBack';
@@ -399,6 +400,8 @@ export default function ProjectDetail() {
             {isPending ? '保存中...' : '保存'}
           </button>
         </div>
+
+        {!isNew && <ProjectSchedulesPanel projectId={projectId} />}
 
         {/* 見積伝票（編集時のみ） */}
         {!isNew && (

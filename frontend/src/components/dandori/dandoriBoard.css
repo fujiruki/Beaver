@@ -161,3 +161,38 @@
   font-weight: 700; font-size: 12px; padding: 4px 8px; cursor: pointer; font-family: inherit; white-space: nowrap;
 }
 .dandori-board .dt-actions button:hover { background: var(--work); color: #fff; }
+
+/* R-0220: 案件の予定。細い帯は行の上端、取付は製作のバーと同じ高さ */
+.dandori-board .sched-thin {
+  position: absolute; top: 0; height: 8px; border-radius: 3px;
+  background: #4a5fa8; cursor: grab; touch-action: none; z-index: 2;
+}
+.dandori-board .sched-install {
+  position: absolute; top: 2px; height: calc(26px * var(--scale)); border-radius: 5px;
+  background: #24646f; color: #fff; font-weight: 700; font-size: calc(12px * var(--scale));
+  display: flex; align-items: center; padding: 0 8px; white-space: nowrap; overflow: hidden;
+  cursor: grab; touch-action: none; z-index: 2;
+}
+.dandori-board .sched-diamond {
+  position: absolute; top: 0; width: 10px; height: 10px; background: #4a5fa8;
+  transform: rotate(45deg) scale(0.8); cursor: grab; touch-action: none; z-index: 2;
+}
+.dandori-board .sched-thin.done, .dandori-board .sched-diamond.done, .dandori-board .sched-install.done { background: #b9c0d8; }
+.dandori-board .sched-label {
+  position: absolute; top: -1px; font-size: 10px; line-height: 10px; color: #4a5fa8;
+  white-space: nowrap; pointer-events: none; z-index: 2;
+}
+
+/* R-0220: やること一覧 */
+.dandori-board .board-body { display: flex; align-items: flex-start; gap: 12px; }
+.dandori-board .board-body > .gantt-scroll { flex: 1 1 auto; min-width: 0; }
+.dandori-board .todo-panel { flex: 0 0 280px; border: 1px solid var(--line); border-radius: 6px; background: #fff; padding: 8px; font-size: 13px; }
+.dandori-board .todo-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.dandori-board .todo-panel ul { list-style: none; margin: 0; padding: 0; }
+.dandori-board .todo-panel li { display: flex; align-items: center; gap: 6px; padding: 3px 0; border-bottom: 1px solid var(--line); }
+.dandori-board .todo-panel li.done { opacity: 0.55; }
+.dandori-board .todo-date { font-weight: 700; flex: 0 0 auto; }
+.dandori-board .todo-date.overdue { color: var(--danger); }
+.dandori-board .todo-what { flex: 0 1 auto; }
+.dandori-board .todo-project { margin-left: auto; background: none; border: 0; color: var(--muted); text-decoration: underline; cursor: pointer; text-align: right; }
+.dandori-board .todo-empty { color: var(--muted); padding: 8px 0; }
