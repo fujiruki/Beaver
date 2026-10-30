@@ -94,7 +94,7 @@ describe('ProjectDetail 保存 (R-071)', () => {
     await user.clear(memo);
     await user.type(memo, '編集後のメモ');
 
-    await user.click(screen.getByRole('button', { name: '保存' }));
+    await user.tab();
     await waitFor(() => expect(putBodies.length).toBeGreaterThan(0));
     expect(putBodies[0].memo).toBe('編集後のメモ');
   });
@@ -107,7 +107,7 @@ describe('ProjectDetail 保存 (R-071)', () => {
     await user.clear(name);
     await user.type(name, '新しい案件名');
 
-    await user.click(screen.getByRole('button', { name: '保存' }));
+    await user.tab();
     await waitFor(() => expect(putBodies.length).toBeGreaterThan(0));
     expect(putBodies[0].name).toBe('新しい案件名');
   });

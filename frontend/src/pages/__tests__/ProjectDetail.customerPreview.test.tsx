@@ -135,7 +135,7 @@ describe('ProjectDetail 得意先プレビュー・編集ボタン・タイト�
     openSpy.mockRestore();
   });
 
-  it('タイトル横の保存ボタンをクリックすると、下部の保存ボタンと同じ保存処理が実行される', async () => {
+  it('案件名の欄を出ると自動保存が実行される', async () => {
     renderPage();
     const name = await screen.findByDisplayValue('既存案件') as HTMLInputElement;
 
@@ -143,7 +143,7 @@ describe('ProjectDetail 得意先プレビュー・編集ボタン・タイト�
     await user.clear(name);
     await user.type(name, '新しい案件名');
 
-    await user.click(screen.getByRole('button', { name: 'タイトル横保存' }));
+    await user.tab();
     await waitFor(() => expect(putBodies.length).toBeGreaterThan(0));
     expect(putBodies[0].name).toBe('新しい案件名');
   });

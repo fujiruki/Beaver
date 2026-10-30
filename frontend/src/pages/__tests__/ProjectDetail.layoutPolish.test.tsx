@@ -69,24 +69,18 @@ describe('ProjectDetail レイアウト改善 (R-0101)', () => {
     renderPage();
     await screen.findByDisplayValue('既存案件');
 
-    expect(screen.getByText('工数目安（h）')).toBeTruthy();
-    expect(screen.queryByText('工数目安')).toBeNull();
+    expect(screen.getByLabelText('工数目安（h）')).toBeTruthy();
   });
 
-  it('工数目安欄が基本情報の「納品日」の後・「施主」の直前に表示される', async () => {
+  it('工数目安欄が案件の要点にあり、基本情報には置かない', async () => {
     currentProject = { ...baseProject, estimated_factory_hours: 0, estimated_site_hours: 0, manual_estimated_hours: 4.5, effective_estimated_hours: 4.5 };
     stubFetch();
     const { container } = renderPage();
     await screen.findByDisplayValue('既存案件');
 
-    const labels = Array.from(container.querySelectorAll('label')).map(el => el.textContent);
-    const deliveryIdx = labels.indexOf('納品日');
-    const hoursIdx = labels.indexOf('工数目安（h）');
-    const ownerIdx = labels.indexOf('施主');
-
-    expect(deliveryIdx).toBeGreaterThan(-1);
-    expect(hoursIdx).toBeGreaterThan(deliveryIdx);
-    expect(ownerIdx).toBe(hoursIdx + 1);
+    const input = screen.getByLabelText('工数目安（h）');
+    expect(container.querySelector('[data-testid="project-key-points"]')?.contains(input)).toBe(true);
+    expect(container.querySelector('[data-testid="project-basic-info"]')?.contains(input)).toBe(false);
   });
 
   it('工数目安の手動入力欄が狭い固定幅クラスを持つ', async () => {
@@ -97,7 +91,7 @@ describe('ProjectDetail レイアウト改善 (R-0101)', () => {
 
     const input = await screen.findByLabelText('工数目安（h）') as HTMLInputElement;
     expect(input.className).not.toMatch(/\bw-full\b/);
-    expect(input.className).toMatch(/\bw-(1[0-9]|2[0-4])\b/);
+    expect(input.closest('.pd-effort')).toBeTruthy();
   });
 
   it('見積伝票からの自動計算表示も幅が詰められている（w-fullを持たない）', async () => {
@@ -106,25 +100,22 @@ describe('ProjectDetail レイアウト改善 (R-0101)', () => {
     renderPage();
     await screen.findByDisplayValue('既存案件');
 
-    const display = await screen.findByText(/見積伝票から自動計算: 32時間（4\.0日）/);
+    const display = await screen.findByText('見積から');
     expect(display.className).not.toMatch(/\bw-full\b/);
   });
 
   it('受注日・納品日・納期の日付入力欄がw-fullではなく固定幅クラスを持つ', async () => {
     currentProject = { ...baseProject, estimated_factory_hours: 0, estimated_site_hours: 0, manual_estimated_hours: null, effective_estimated_hours: null };
     stubFetch();
-    const { container } = renderPage();
+    renderPage();
     await screen.findByDisplayValue('既存案件');
 
     const dateLabels = ['受注日', '納品日', '納期'];
     for (const label of dateLabels) {
-      const labelEl = Array.from(container.querySelectorAll('label')).find(el => el.textContent === label);
-      expect(labelEl).toBeTruthy();
-      const input = labelEl!.nextElementSibling as HTMLInputElement;
-      expect(input.tagName).toBe('INPUT');
+      const input = screen.getByLabelText(label) as HTMLInputElement;
       expect(input.type).toBe('date');
       expect(input.className).not.toMatch(/\bw-full\b/);
-      expect(input.className).toMatch(/\bw-\d+\b/);
+      expect(input.max).toBe('9999-12-31');
     }
   });
 

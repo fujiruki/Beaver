@@ -22,6 +22,22 @@ function isWeekend(date: Date): boolean {
   return day === 0 || day === 6;
 }
 
+/** 今日から納期までの営業日数。未来は正、過去は負、同日は0。 */
+export function businessDaysUntil(dueISO: string, todayISO: string): number | null {
+  if (!dueISO) return null;
+  const due = parseISO(dueISO);
+  const today = parseISO(todayISO);
+  if (due.getTime() === today.getTime()) return 0;
+  const direction = due > today ? 1 : -1;
+  let count = 0;
+  for (let cursor = addDays(today, direction);
+    direction > 0 ? cursor <= due : cursor >= due;
+    cursor = addDays(cursor, direction)) {
+    if (!isWeekend(cursor)) count += direction;
+  }
+  return count;
+}
+
 /** 工数(h)→営業日数。ceil、最低1。hoursがnull/0でも1 */
 export function workdaysFromHours(hours: number | null, hoursPerDay: number): number {
   if (hoursPerDay <= 0) return 1;

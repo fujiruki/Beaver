@@ -92,9 +92,9 @@ describe('ProjectDetail R-0227', () => {
           end_date: null, hours: null, memo: '', done: 0, created_at: '', updated_at: '',
         }), { status: 201 });
       }
-      if (/\/schedules\/99$/.test(path) && method === 'DELETE') {
+      if (/\/project-schedules\/99$/.test(path) && method === 'DELETE') {
         scheduleWrites.push({ method, path });
-        return new Response(null, { status: 204 });
+        return new Response('{}', { status: 200 });
       }
       if (method === 'PUT') {
         const body = JSON.parse(String(init?.body ?? '{}'));
@@ -184,7 +184,7 @@ describe('ProjectDetail R-0227', () => {
     fireEvent.click(await screen.findByRole('button', { name: '元に戻す' }));
     await waitFor(() => expect(scheduleWrites[1]).toEqual({
       method: 'DELETE',
-      path: '/contents/Beaver/api/projects/5/schedules/99',
+      path: '/contents/Beaver/api/project-schedules/99',
     }));
   });
 });

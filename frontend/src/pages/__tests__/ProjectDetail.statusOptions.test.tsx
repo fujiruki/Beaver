@@ -91,7 +91,7 @@ describe('ProjectDetail ステータスステッパー (R-0089)', () => {
     expect(other.getAttribute('aria-pressed')).toBe('false');
   });
 
-  it('円をクリックするとそのステータスに切り替わり、保存時にPUTへ反映される', async () => {
+  it('円をクリックするとそのステータスに切り替わり、すぐPUTへ反映される', async () => {
     const user = userEvent.setup();
     renderPage();
 
@@ -99,7 +99,6 @@ describe('ProjectDetail ステータスステッパー (R-0089)', () => {
     await user.click(other);
     expect(other.getAttribute('aria-pressed')).toBe('true');
 
-    await user.click(screen.getByRole('button', { name: '保存' }));
     await waitFor(() => expect(putBodies.length).toBeGreaterThan(0));
     expect(putBodies[0].status).toBe('追加ステータス');
   });

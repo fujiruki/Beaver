@@ -1,4 +1,5 @@
 import { useCapacityCheck } from '../api/capacityCheck';
+import YoukanLinkButton from './YoukanLinkButton';
 
 /** R-0118: 案件詳細のYoukan容量判定パネル（結論優先表示） */
 export default function CapacityCheckPanel({ projectId }: { projectId: number }) {
@@ -23,19 +24,21 @@ export default function CapacityCheckPanel({ projectId }: { projectId: number })
   }
 
   return (
-    <div className="bg-white border border-slate-300 rounded-none p-2">
-      <div className="flex items-center justify-between border-b border-slate-300 pb-1 mb-1">
-        <h2 className="text-xs font-bold text-slate-600">Youkan容量判定</h2>
+    <section className="pd-panel">
+      <div className="pd-panel-title">
+        <h2>Youkan</h2>
+        <span className="pd-spacer" />
         <button
           type="button"
           onClick={() => refetch()}
           disabled={isFetching}
-          className="px-3 h-6 text-xs bg-blue-50 border border-blue-300 text-blue-700 rounded-none hover:border-blue-600 hover:bg-blue-100 focus:border-blue-600 disabled:opacity-50"
+          className="pd-btn"
         >
-          {isFetching ? '判定中...' : '再判定'}
+          {isFetching ? '判定中...' : data?.ok ? '再判定' : '判定する'}
         </button>
+        <YoukanLinkButton projectId={projectId} />
       </div>
-      {content}
-    </div>
+      <div className="pd-capacity">{content}</div>
+    </section>
   );
 }

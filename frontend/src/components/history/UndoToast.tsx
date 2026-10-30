@@ -16,27 +16,12 @@ export default function UndoToast({ message, onUndo, onDismiss, pending, autoDis
   }, [onDismiss, autoDismissMs]);
 
   return (
-    <div style={toastStyle} role="status">
+    <div className="pd-undo" role="status">
       <span style={{ flex: 1 }}>{message}</span>
-      <button onClick={onUndo} disabled={pending} style={undoBtnStyle}>
+      <button onClick={onUndo} disabled={pending}>
         {pending ? '元に戻しています...' : '元に戻す'}
       </button>
-      <button onClick={onDismiss} style={closeBtnStyle} aria-label="閉じる">×</button>
+      <button onClick={onDismiss} aria-label="閉じる">×</button>
     </div>
   );
 }
-
-const toastStyle: React.CSSProperties = {
-  position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
-  display: 'flex', alignItems: 'center', gap: 12,
-  background: '#1e293b', color: '#fff', padding: '12px 16px', borderRadius: 8,
-  boxShadow: '0 4px 16px rgba(0,0,0,0.25)', fontSize: 13, zIndex: 200, minWidth: 320,
-};
-const undoBtnStyle: React.CSSProperties = {
-  padding: '4px 12px', background: '#2563eb', color: '#fff', border: 'none',
-  borderRadius: 6, cursor: 'pointer', fontSize: 13, whiteSpace: 'nowrap',
-};
-const closeBtnStyle: React.CSSProperties = {
-  background: 'transparent', border: 'none', color: '#94a3b8', fontSize: 16,
-  cursor: 'pointer', lineHeight: 1,
-};

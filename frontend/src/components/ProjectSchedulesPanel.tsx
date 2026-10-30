@@ -6,7 +6,7 @@ import {
   useDeleteProjectSchedule,
 } from '../api/projectSchedules';
 import { SCHEDULE_KINDS, FIXED_SCHEDULE_KINDS } from '../types/projectSchedule';
-import type { ProjectSchedule, ScheduleKind } from '../types/projectSchedule';
+import type { ProjectSchedule, ProjectScheduleInput, ScheduleKind } from '../types/projectSchedule';
 import { formatHours } from './dandori/dandoriBoardUtils';
 
 const inputCls =
@@ -43,7 +43,14 @@ function orderSchedules(schedules: ProjectSchedule[]): ProjectSchedule[] {
   return [...fixed, ...others];
 }
 
-export default function ProjectSchedulesPanel({ projectId }: { projectId: number }) {
+interface ProjectSchedulesPanelProps {
+  projectId: number;
+  onCreated?: (schedule: ProjectSchedule) => void;
+  onUpdated?: (schedule: ProjectSchedule, patch: Partial<ProjectScheduleInput>) => void;
+  onDeleted?: (schedule: ProjectSchedule) => void;
+}
+
+export default function ProjectSchedulesPanel({ projectId, onCreated, onUpdated, onDeleted }: ProjectSchedulesPanelProps) {
   const { data, isSuccess } = useProjectSchedules(projectId);
   const schedules = Array.isArray(data) ? data : [];
   const createMutation = useCreateProjectSchedule(projectId);
@@ -69,7 +76,7 @@ export default function ProjectSchedulesPanel({ projectId }: { projectId: number
       end_date: draft.end_date || null,
       hours: parseHours(draft.hours),
       memo: draft.memo,
-    });
+    }, { onSuccess: created => onCreated?.(created) });
   }
 
   function changeFixed(kind: ScheduleKind, patch: Partial<Draft>) {
@@ -104,13 +111,15 @@ export default function ProjectSchedulesPanel({ projectId }: { projectId: number
   }
 
   function update(schedule: ProjectSchedule, patch: Partial<ProjectSchedule>) {
-    updateMutation.mutate({ id: schedule.id, ...patch });
+    updateMutation.mutate({ id: schedule.id, ...patch }, {
+      onSuccess: () => onUpdated?.(schedule, patch),
+    });
   }
 
   return (
-    <div className="bg-white border border-slate-300 rounded-none p-2">
-      <h2 className="text-xs font-bold text-slate-600 border-b border-slate-300 pb-1 mb-1">予定</h2>
-      <table className="w-full table-fixed text-xs">
+    <section className="pd-panel">
+      <h2 className="pd-panel-title">予定</h2>
+      <table className="pd-sched table-fixed">
         <thead>
           <tr className="text-xs text-slate-400 border-b">
             <th className="text-center pb-1 w-8">済</th>
@@ -153,7 +162,8 @@ export default function ProjectSchedulesPanel({ projectId }: { projectId: number
                     aria-label={`${kind}の開始`}
                     value={draft.start_date}
                     onChange={e => changeFixed(kind, { start_date: e.target.value })}
-                    className={ghostInputCls}
+                  className={`${ghostInputCls} ${draft.start_date ? '' : 'pd-empty-date'}`}
+                  max="9999-12-31"
                   />
                 </td>
                 <td className="py-1 pr-2">
@@ -162,7 +172,8 @@ export default function ProjectSchedulesPanel({ projectId }: { projectId: number
                     aria-label={`${kind}の終了または期限`}
                     value={draft.end_date}
                     onChange={e => changeFixed(kind, { end_date: e.target.value })}
-                    className={ghostInputCls}
+                  className={`${ghostInputCls} ${draft.end_date ? '' : 'pd-empty-date'}`}
+                  max="9999-12-31"
                   />
                 </td>
                 <td className="py-1 pr-2">
@@ -215,7 +226,8 @@ export default function ProjectSchedulesPanel({ projectId }: { projectId: number
                 aria-label="予定の開始"
                 value={blank.start_date}
                 onChange={e => changeBlank({ start_date: e.target.value })}
-                className={ghostInputCls}
+                className={`${ghostInputCls} ${blank.start_date ? '' : 'pd-empty-date'}`}
+                max="9999-12-31"
               />
             </td>
             <td className="py-1 pr-2">
@@ -224,7 +236,8 @@ export default function ProjectSchedulesPanel({ projectId }: { projectId: number
                 aria-label="予定の終了または期限"
                 value={blank.end_date}
                 onChange={e => changeBlank({ end_date: e.target.value })}
-                className={ghostInputCls}
+                className={`${ghostInputCls} ${blank.end_date ? '' : 'pd-empty-date'}`}
+                max="9999-12-31"
               />
             </td>
             <td className="py-1 pr-2">
@@ -253,7 +266,7 @@ export default function ProjectSchedulesPanel({ projectId }: { projectId: number
       {updateMutation.isError && (
         <p className="text-xs text-red-600 mt-2">予定を保存できませんでした。日付か時間のどれかは必要です。</p>
       )}
-    </div>
+    </section>
   );
 
   function renderScheduleRow(s: ProjectSchedule) {
@@ -307,7 +320,8 @@ export default function ProjectSchedulesPanel({ projectId }: { projectId: number
                   aria-label="予定の開始"
                   defaultValue={s.start_date ?? ''}
                   onBlur={e => e.target.value !== (s.start_date ?? '') && update(s, { start_date: e.target.value || null })}
-                  className={inputCls}
+                  className={`${inputCls} ${s.start_date ? '' : 'pd-empty-date'}`}
+                  max="9999-12-31"
                 />
               </td>
               <td className="py-1 pr-2">
@@ -319,7 +333,8 @@ export default function ProjectSchedulesPanel({ projectId }: { projectId: number
                   title={s.kind === '製作' && s.start_date && !s.end_date
                     ? '空なら時間（無ければ見積の工数）から終了を出します'
                     : undefined}
-                  className={inputCls}
+                  className={`${inputCls} ${s.end_date ? '' : 'pd-empty-date'}`}
+                  max="9999-12-31"
                 />
               </td>
               <td className="py-1 pr-2">
@@ -342,7 +357,7 @@ export default function ProjectSchedulesPanel({ projectId }: { projectId: number
                 />
               </td>
               <td>
-                <button type="button" onClick={() => deleteMutation.mutate(s.id)} className="text-xs text-red-500">
+                <button type="button" onClick={() => deleteMutation.mutate(s.id, { onSuccess: () => onDeleted?.(s) })} className="text-xs text-red-500">
                   削除
                 </button>
               </td>

@@ -70,21 +70,24 @@ describe('ProjectDetail 戻る (R-0096 Phase2)', () => {
     expect(await screen.findByText('一覧画面: ?sort=name&order=desc')).toBeTruthy();
   });
 
-  it('一覧のソート状態を保持したまま「キャンセル」で一覧に戻る', async () => {
-    const user = userEvent.setup();
+  it('保存ボタンとキャンセルボタンを表示しない', async () => {
     renderPage();
 
-    await user.click(await screen.findByRole('button', { name: 'キャンセル' }));
-
-    expect(await screen.findByText('一覧画面: ?sort=name&order=desc')).toBeTruthy();
+    await screen.findByDisplayValue('既存案件');
+    expect(screen.queryByRole('button', { name: 'キャンセル' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '保存' })).toBeNull();
   });
 
-  it('一覧のソート状態を保持したまま保存成功後に一覧に戻る（R-0096 Phase2b）', async () => {
+  it('自動保存後に戻ると一覧の状態を復元する', async () => {
     const user = userEvent.setup();
     renderPage();
 
-    await user.click(await screen.findByRole('button', { name: '保存' }));
-
+    const name = await screen.findByDisplayValue('既存案件');
+    await user.clear(name);
+    await user.type(name, '変更後');
+    await user.tab();
+    await screen.findByText('保存済');
+    await user.click(screen.getByRole('button', { name: '← 戻る' }));
     expect(await screen.findByText('一覧画面: ?sort=name&order=desc')).toBeTruthy();
   });
 

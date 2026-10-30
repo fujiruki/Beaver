@@ -99,7 +99,7 @@ describe('ProjectDetail 工数目安クイックボタン (R-0102)', () => {
     renderPage();
     await screen.findByDisplayValue('既存案件');
 
-    expect(await screen.findByText(/見積伝票から自動計算/)).toBeTruthy();
+    expect(await screen.findByText('見積から')).toBeTruthy();
     expect(screen.queryByRole('button', { name: '4h' })).toBeNull();
     expect(screen.queryByRole('button', { name: '1日' })).toBeNull();
   });

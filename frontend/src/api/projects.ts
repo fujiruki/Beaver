@@ -60,7 +60,7 @@ export function useCreateProject() {
 export function useUpdateProject(id: number) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: ProjectInput) => api.put<Project>(`/projects/${id}`, data),
+    mutationFn: (data: Partial<ProjectInput>) => api.put<Project>(`/projects/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [KEY] });
       queryClient.invalidateQueries({ queryKey: [KEY, id] });

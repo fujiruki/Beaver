@@ -72,7 +72,7 @@ describe('ProjectDetail 工数目安 (R-0097)', () => {
     renderPage();
     await screen.findByDisplayValue('既存案件');
 
-    expect(await screen.findByText(/見積伝票から自動計算: 32時間（4\.0日）/)).toBeTruthy();
+    expect(await screen.findByText('見積から')).toBeTruthy();
     expect(screen.queryByLabelText('工数目安（h）')).toBeNull();
   });
 
@@ -91,7 +91,7 @@ describe('ProjectDetail 工数目安 (R-0097)', () => {
     await user.clear(input);
     await user.type(input, '6.5');
     expect(screen.getByText('0.8日')).toBeTruthy();
-    await user.click(screen.getByRole('button', { name: '保存' }));
+    await user.tab();
 
     await waitFor(() => expect(putBodies.length).toBeGreaterThan(0));
     expect(putBodies[0].manual_estimated_hours).toBe(6.5);
