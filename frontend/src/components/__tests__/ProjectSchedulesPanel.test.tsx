@@ -49,7 +49,7 @@ describe('ProjectSchedulesPanel（R-0222）', () => {
     renderPanel();
     await screen.findAllByTestId('fixed-schedule-row');
     const heads = screen.getAllByRole('columnheader').map(h => h.textContent);
-    expect(heads.slice(0, 6)).toEqual(['済', '種類', '開始', '終了/期限', '時間', 'メモ']);
+    expect(heads.slice(0, 6)).toEqual(['済', '種類', '開始', '終了/期限', '時間(h)', 'メモ']);
   });
 
   it('開始日の欄を示す「製作: 開始日・工数は上の欄」の案内は無い', async () => {
@@ -121,7 +121,7 @@ describe('ProjectSchedulesPanel（R-0222）', () => {
     const { container } = renderPanel();
     await screen.findAllByTestId('fixed-schedule-row');
     expect(container.querySelector('.overflow-x-auto')).toBeNull();
-    expect(container.querySelector('table')?.className).toMatch(/table-fixed/);
+    expect(container.querySelector('table')?.className).toMatch(/pd-sched/);
   });
 
   it('時間は予定の行に出て、右寄せで直せる', async () => {
@@ -130,7 +130,7 @@ describe('ProjectSchedulesPanel（R-0222）', () => {
     renderPanel();
     const hours = (await screen.findByDisplayValue('1.5')) as HTMLInputElement;
     expect(hours.value).toBe('1.5');
-    expect(hours.className).toMatch(/text-right/);
+    expect(hours.className).toMatch(/pd-number/);
     fireEvent.change(hours, { target: { value: '2' } });
     fireEvent.blur(hours);
     await waitFor(() => expect(writes).toHaveLength(1));

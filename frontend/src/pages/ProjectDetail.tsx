@@ -917,27 +917,28 @@ function ExistingProjectDetail({ projectId, goBack }: { projectId: number; goBac
             <div className="pd-key-grid">
               <div className="pd-cell pd-readonly"><span className="pd-label">案件コード</span><span className="pd-value pd-code">{project.project_code}</span></div>
               <label className={`pd-cell ${!String(values.name ?? '').trim() ? 'pd-invalid' : ''}`}><span className="pd-label">案件名</span>{textField('name', '案件名')}</label>
-              <div className="pd-cell"><span className="pd-label">得意先</span><ComboSelect options={customerOptions} value={Number(values.customer_id) || null} onChange={id => {
+              <div className="pd-cell"><span className="pd-label">得意先 *</span><ComboSelect options={customerOptions} value={Number(values.customer_id) || null} onChange={id => {
                 const previous = values.customer_id;
                 change('customer_id', id ?? 0);
                 void saveField('customer_id', id ?? 0, '得意先', previous);
-              }} placeholder="得意先を検索..." headers={['得意先名', '備考']} /></div>
+              }} placeholder="得意先を検索..." headers={['得意先名', '備考']} inputClassName="pd-control" /></div>
               <label className="pd-cell"><span className="pd-label" title="ここまでに納品したい日">納期</span><div className="pd-due-field"><input aria-label="納期" type="date" max="9999-12-31" className="pd-control" value={String(values.delivery_date ?? '')} onChange={event => {
                 const previous = values.delivery_date;
                 change('delivery_date', event.target.value);
                 void saveField('delivery_date', event.target.value, '納期', previous);
               }} />{dueDays !== null && <span className={dueDays < 0 ? 'pd-due-over' : dueDays <= 5 ? 'pd-due-soon' : ''}>{dueDays === 0 ? '今日' : dueDays < 0 ? `${Math.abs(dueDays)} 営業日超過` : `あと ${dueDays} 営業日`}</span>}</div></label>
             </div>
-            {selectedCustomer && <>
-              <div className="pd-customer-line">
-                <span className="pd-ci"><span className="pd-label">住所</span>{[selectedCustomer.address1, selectedCustomer.address2].filter(Boolean).join('') || '—'}</span>
-                {selectedCustomer.tel && <a className="pd-contact-link" href={`tel:${selectedCustomer.tel}`}>TEL: {selectedCustomer.tel}</a>}
-                {selectedCustomer.mobile && <a className="pd-contact-link" href={`tel:${selectedCustomer.mobile}`}>携帯: {selectedCustomer.mobile}</a>}
-                {selectedCustomer.email && <a className="pd-contact-link" href={`mailto:${selectedCustomer.email}`}>{selectedCustomer.email}</a>}
-                {selectedCustomer.memo && <span className="pd-ci-memo">{selectedCustomer.memo}</span>}
-              </div>
-              <div className="pd-customer-actions"><button type="button" className="pd-btn pd-customer-btn" onClick={() => window.open(`${import.meta.env.BASE_URL}customers/${selectedCustomer.id}`, '_blank')}>得意先を編集</button><button type="button" className="pd-btn pd-customer-btn" onClick={() => setModalOpen(true)}>＋ 新規得意先</button></div>
-            </>}
+            {selectedCustomer && <div className="pd-customer-line">
+              <span className="pd-label">得意先</span>
+              <span className="pd-ci">{[selectedCustomer.address1, selectedCustomer.address2].filter(Boolean).join('') || '—'}</span>
+              {selectedCustomer.tel && <span className="pd-ci">電話 <a className="pd-link pd-contact-link pd-mono" href={`tel:${selectedCustomer.tel}`}>{selectedCustomer.tel}</a></span>}
+              {selectedCustomer.mobile && <span className="pd-ci">携帯 <a className="pd-link pd-contact-link pd-mono" href={`tel:${selectedCustomer.mobile}`}>{selectedCustomer.mobile}</a></span>}
+              {selectedCustomer.email && <a className="pd-link pd-contact-link" href={`mailto:${selectedCustomer.email}`}>{selectedCustomer.email}</a>}
+              {selectedCustomer.memo && <span className="pd-ci pd-ci-memo">{selectedCustomer.memo}</span>}
+              <span className="pd-spacer" />
+              <button type="button" className="pd-btn pd-customer-btn" onClick={() => window.open(`${import.meta.env.BASE_URL}customers/${selectedCustomer.id}`, '_blank')}>得意先を編集</button>
+              <button type="button" className="pd-btn pd-customer-btn" onClick={() => setModalOpen(true)}>＋ 新規得意先</button>
+            </div>}
             <div className="pd-status-area"><span className="pd-label">ステータス</span><div className="pd-status-list">{projectStatuses.map(status => <button key={status.id} type="button" aria-label={status.name} aria-pressed={values.status === status.name} className={`pd-status ${values.status === status.name ? 'pd-status-active' : ''}`} onClick={() => {
               const previous = values.status;
               change('status', status.name);
@@ -948,7 +949,7 @@ function ExistingProjectDetail({ projectId, goBack }: { projectId: number; goBac
               change('manual_estimated_hours', hours);
               void saveField('manual_estimated_hours', hours, '工数目安', previous);
             }}>{index === 0 ? '4h' : `${QUICK_HOURS_DAYS[index - 1]}日`}</button>)}</div>}</div>
-            <label className="pd-description"><span className="pd-label">説明</span>{textField('memo', '説明', true)}</label>
+            <label className="pd-description"><span className="pd-label">説明</span><textarea aria-label="説明" className="pd-control" rows={2} placeholder="案件の説明を入力" value={String(values.memo ?? '')} onChange={event => change('memo', event.target.value)} onBlur={event => saveField('memo', event.target.value, '説明', project.memo)} /></label>
           </section>
 
           <ProjectSchedulesPanel projectId={projectId} onCreated={created => showScheduleUndo('予定を作りました', () => deleteSchedule.mutateAsync(created.id))} onUpdated={(schedule, patch) => showScheduleUndo('予定を変更しました', () => updateSchedule.mutateAsync({ id: schedule.id, ...Object.fromEntries(Object.keys(patch).map(key => [key, schedule[key as keyof ProjectSchedule]])) }))} onDeleted={schedule => showScheduleUndo('予定を削除しました', () => createSchedule.mutateAsync({ projectId, ...scheduleInput(schedule) }))} />
@@ -977,7 +978,8 @@ function ExistingProjectDetail({ projectId, goBack }: { projectId: number; goBac
 }
 
 function PdVoucherPanel({ title, vouchers, onCreate, onOpen }: { title: string; vouchers: ProjectVoucher[]; onCreate: () => void; onOpen: (id: number) => void }) {
-  return <section className="pd-panel"><div className="pd-panel-title"><h2>{title}</h2><span className="pd-spacer" /><button type="button" className="pd-btn" onClick={onCreate}>＋ 作成</button></div>{vouchers.length === 0 ? <p className="pd-empty">登録なし</p> : vouchers.map(voucher => <div key={voucher.id} role="button" tabIndex={0} className="pd-voucher-row pd-row-click" onClick={() => onOpen(voucher.id)} onKeyDown={event => event.key === 'Enter' && onOpen(voucher.id)}><span>{voucher.voucher_no}</span><span>{voucher.voucher_date}</span><span>{VOUCHER_STATUS_LABEL[voucher.status] ?? voucher.status}</span><span>{voucher.description}</span><span className="pd-amount">{Number(voucher.total_amount ?? 0).toLocaleString()}</span><span>›</span></div>)}</section>;
+  const createLabel = title.replace('伝票', '作成');
+  return <section className="pd-panel"><div className="pd-panel-title">{title}<span className="pd-spacer" /><button type="button" className="pd-btn" onClick={onCreate}>＋ {createLabel}</button></div><div className="pd-voucher-head"><span>番号</span><span>日付</span><span>状態</span><span>摘要</span><span>金額</span><span /></div>{vouchers.length === 0 ? <p className="pd-empty">登録なし</p> : vouchers.map(voucher => <div key={voucher.id} role="button" tabIndex={0} className="pd-voucher-row pd-row-click" onClick={() => onOpen(voucher.id)} onKeyDown={event => event.key === 'Enter' && onOpen(voucher.id)}><span className="pd-mono">{voucher.voucher_no}</span><span className="pd-mono">{voucher.voucher_date}</span><span>{VOUCHER_STATUS_LABEL[voucher.status] ?? voucher.status}</span><span>{voucher.description}</span><span className="pd-amount">¥{Number(voucher.total_amount ?? 0).toLocaleString()}</span><span>→</span></div>)}</section>;
 }
 
 function Field({ label, error, children, className = '' }: {

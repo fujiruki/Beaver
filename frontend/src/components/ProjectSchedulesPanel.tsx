@@ -9,10 +9,9 @@ import { SCHEDULE_KINDS, FIXED_SCHEDULE_KINDS } from '../types/projectSchedule';
 import type { ProjectSchedule, ProjectScheduleInput, ScheduleKind } from '../types/projectSchedule';
 import { formatHours } from './dandori/dandoriBoardUtils';
 
-const inputCls =
-  'w-full h-6 border border-slate-300 rounded-none px-1.5 text-xs hover:border-blue-600 hover:bg-blue-50 focus:outline-none focus:border-blue-600';
-const ghostInputCls = `${inputCls} text-slate-400`;
-const hoursCls = `${inputCls} text-right`;
+const inputCls = 'pd-control';
+const ghostInputCls = 'pd-control';
+const hoursCls = 'pd-control pd-number';
 
 interface Draft {
   kind: ScheduleKind | '';
@@ -118,17 +117,17 @@ export default function ProjectSchedulesPanel({ projectId, onCreated, onUpdated,
 
   return (
     <section className="pd-panel">
-      <h2 className="pd-panel-title">予定</h2>
-      <table className="pd-sched table-fixed">
+      <div className="pd-panel-title">予定</div>
+      <table className="pd-sched">
         <thead>
-          <tr className="text-xs text-slate-400 border-b">
-            <th className="text-center pb-1 w-8">済</th>
-            <th className="text-left pb-1 w-28">種類</th>
-            <th className="text-left pb-1 w-36">開始</th>
-            <th className="text-left pb-1 w-36">終了/期限</th>
-            <th className="text-right pb-1 w-20">時間</th>
-            <th className="text-left pb-1">メモ</th>
-            <th className="w-10" />
+          <tr>
+            <th className="pd-col-done">済</th>
+            <th className="pd-col-kind">種類</th>
+            <th className="pd-col-date">開始</th>
+            <th className="pd-col-date">終了/期限</th>
+            <th className="pd-col-hours">時間(h)</th>
+            <th>メモ</th>
+            <th className="pd-col-delete" />
           </tr>
         </thead>
         <tbody
@@ -149,34 +148,34 @@ export default function ProjectSchedulesPanel({ projectId, onCreated, onUpdated,
                 key={`fixed-${kind}`}
                 data-testid="fixed-schedule-row"
                 data-kind={kind}
-                className="border-b border-slate-100 text-slate-400"
+                className="pd-placeholder-row"
                 onBlur={event => {
                   if (!event.currentTarget.contains(event.relatedTarget)) commitFixed(kind);
                 }}
               >
-                <td />
-                <td className="py-1 pr-2">{kind}</td>
-                <td className="py-1 pr-2">
+                <td className="pd-col-done" />
+                <td className="pd-edit-cell"><span className="pd-control">{kind}</span></td>
+                <td className="pd-edit-cell">
                   <input
                     type="date"
                     aria-label={`${kind}の開始`}
                     value={draft.start_date}
                     onChange={e => changeFixed(kind, { start_date: e.target.value })}
-                  className={`${ghostInputCls} ${draft.start_date ? '' : 'pd-empty-date'}`}
+                    className={`${ghostInputCls} pd-mono ${draft.start_date ? '' : 'pd-empty-date'}`}
                   max="9999-12-31"
                   />
                 </td>
-                <td className="py-1 pr-2">
+                <td className="pd-edit-cell">
                   <input
                     type="date"
                     aria-label={`${kind}の終了または期限`}
                     value={draft.end_date}
                     onChange={e => changeFixed(kind, { end_date: e.target.value })}
-                  className={`${ghostInputCls} ${draft.end_date ? '' : 'pd-empty-date'}`}
+                    className={`${ghostInputCls} pd-mono ${draft.end_date ? '' : 'pd-empty-date'}`}
                   max="9999-12-31"
                   />
                 </td>
-                <td className="py-1 pr-2">
+                <td className="pd-edit-cell">
                   <input
                     type="number"
                     min={0}
@@ -184,18 +183,19 @@ export default function ProjectSchedulesPanel({ projectId, onCreated, onUpdated,
                     aria-label={`${kind}の時間`}
                     value={draft.hours}
                     onChange={e => changeFixed(kind, { hours: e.target.value })}
-                    className={`${ghostInputCls} text-right`}
+                    className={`${ghostInputCls} pd-number`}
                   />
                 </td>
-                <td className="py-1 pr-2">
+                <td className="pd-edit-cell">
                   <input
                     aria-label={`${kind}のメモ`}
                     value={draft.memo}
+                    placeholder="メモ"
                     onChange={e => changeFixed(kind, { memo: e.target.value })}
                     className={ghostInputCls}
                   />
                 </td>
-                <td />
+                <td className="pd-col-delete" />
               </tr>
             )];
           })}
@@ -203,44 +203,48 @@ export default function ProjectSchedulesPanel({ projectId, onCreated, onUpdated,
             .filter(schedule => !FIXED_SCHEDULE_KINDS.includes(schedule.kind))
             .map(schedule => renderScheduleRow(schedule))}
           <tr
-            className="text-slate-400"
+            className={blank.kind || hasContent(blank) ? 'pd-placeholder-row' : 'pd-add-row'}
             onBlur={event => {
               if (!event.currentTarget.contains(event.relatedTarget)) commitBlank();
             }}
           >
-            <td />
-            <td className="py-1 pr-2">
+            <td className="pd-col-done" />
+            <td className="pd-edit-cell" colSpan={blank.kind || hasContent(blank) ? 1 : 6}>
               <select
                 aria-label="予定の種類"
                 value={blank.kind}
                 onChange={e => changeBlank({ kind: e.target.value as ScheduleKind })}
-                className={`${ghostInputCls} ${blankKindRequired ? 'border-red-400' : ''}`}
+                className={`${ghostInputCls} ${blankKindRequired ? 'pd-invalid' : ''}`}
               >
                 <option value="">＋ 予定を追加（種類を選ぶ）</option>
                 {SCHEDULE_KINDS.map(k => <option key={k} value={k}>{k}</option>)}
               </select>
+              {!blank.kind && !hasContent(blank) && <span className="pd-visually-hidden">
+                <input type="date" aria-label="予定の開始" value={blank.start_date} onChange={e => changeBlank({ start_date: e.target.value })} />
+                <input type="date" aria-label="予定の終了または期限" value={blank.end_date} onChange={e => changeBlank({ end_date: e.target.value })} />
+                <input type="number" aria-label="予定の時間" value={blank.hours} onChange={e => changeBlank({ hours: e.target.value })} />
+                <input aria-label="予定のメモ" value={blank.memo} onChange={e => changeBlank({ memo: e.target.value })} />
+              </span>}
             </td>
-            <td className="py-1 pr-2">
+            {(blank.kind || hasContent(blank)) && <><td className="pd-edit-cell">
               <input
                 type="date"
                 aria-label="予定の開始"
                 value={blank.start_date}
                 onChange={e => changeBlank({ start_date: e.target.value })}
-                className={`${ghostInputCls} ${blank.start_date ? '' : 'pd-empty-date'}`}
+                className={`${ghostInputCls} pd-mono ${blank.start_date ? '' : 'pd-empty-date'}`}
                 max="9999-12-31"
               />
-            </td>
-            <td className="py-1 pr-2">
+            </td><td className="pd-edit-cell">
               <input
                 type="date"
                 aria-label="予定の終了または期限"
                 value={blank.end_date}
                 onChange={e => changeBlank({ end_date: e.target.value })}
-                className={`${ghostInputCls} ${blank.end_date ? '' : 'pd-empty-date'}`}
+                className={`${ghostInputCls} pd-mono ${blank.end_date ? '' : 'pd-empty-date'}`}
                 max="9999-12-31"
               />
-            </td>
-            <td className="py-1 pr-2">
+            </td><td className="pd-edit-cell">
               <input
                 type="number"
                 min={0}
@@ -248,18 +252,17 @@ export default function ProjectSchedulesPanel({ projectId, onCreated, onUpdated,
                 aria-label="予定の時間"
                 value={blank.hours}
                 onChange={e => changeBlank({ hours: e.target.value })}
-                className={`${ghostInputCls} text-right`}
+                className={`${ghostInputCls} pd-number`}
               />
-            </td>
-            <td className="py-1 pr-2">
+            </td><td className="pd-edit-cell">
               <input
                 aria-label="予定のメモ"
                 value={blank.memo}
+                placeholder="メモ"
                 onChange={e => changeBlank({ memo: e.target.value })}
                 className={ghostInputCls}
               />
-            </td>
-            <td />
+            </td><td className="pd-col-delete" /></>}
           </tr>
         </tbody>
       </table>
@@ -271,31 +274,30 @@ export default function ProjectSchedulesPanel({ projectId, onCreated, onUpdated,
 
   function renderScheduleRow(s: ProjectSchedule) {
     return (
-            <tr key={`${s.id}-${s.updated_at}`} className="border-b border-slate-100">
-              <td className="py-1 text-center">
+            <tr key={`${s.id}-${s.updated_at}`}>
+              <td className="pd-col-done">
                 <input
                   type="checkbox"
                   aria-label="予定が済"
                   checked={!!s.done}
                   onChange={e => update(s, { done: e.target.checked ? 1 : 0 })}
-                  className="hover:ring-1 hover:ring-blue-600 focus:ring-1 focus:ring-blue-600"
                 />
               </td>
-              <td className="py-1 pr-2">
+              <td className="pd-edit-cell">
                 {s.kind === 'その他' ? (
-                  <div className="flex">
+                  <div className="pd-other">
                     <input
                       aria-label="予定の工程名"
                       placeholder="工程名"
                       defaultValue={s.name}
                       onBlur={e => e.target.value !== s.name && update(s, { name: e.target.value })}
-                      className={`${inputCls} min-w-0`}
+                      className={inputCls}
                     />
                     <select
                       aria-label="予定の種類"
                       defaultValue=""
                       onChange={e => update(s, { kind: e.target.value as ScheduleKind })}
-                      className={`${inputCls} w-7 px-0`}
+                      className="pd-kind-arrow"
                     >
                       <option value="">▼</option>
                       {SCHEDULE_KINDS.filter(k => k !== 'その他').map(k => (
@@ -314,17 +316,17 @@ export default function ProjectSchedulesPanel({ projectId, onCreated, onUpdated,
                   </select>
                 )}
               </td>
-              <td className="py-1 pr-2">
+              <td className="pd-edit-cell">
                 <input
                   type="date"
                   aria-label="予定の開始"
                   defaultValue={s.start_date ?? ''}
                   onBlur={e => e.target.value !== (s.start_date ?? '') && update(s, { start_date: e.target.value || null })}
-                  className={`${inputCls} ${s.start_date ? '' : 'pd-empty-date'}`}
+                  className={`${inputCls} pd-mono ${s.start_date ? '' : 'pd-empty-date'}`}
                   max="9999-12-31"
                 />
               </td>
-              <td className="py-1 pr-2">
+              <td className="pd-edit-cell">
                 <input
                   type="date"
                   aria-label="予定の終了または期限"
@@ -333,11 +335,11 @@ export default function ProjectSchedulesPanel({ projectId, onCreated, onUpdated,
                   title={s.kind === '製作' && s.start_date && !s.end_date
                     ? '空なら時間（無ければ見積の工数）から終了を出します'
                     : undefined}
-                  className={`${inputCls} ${s.end_date ? '' : 'pd-empty-date'}`}
+                  className={`${inputCls} pd-mono ${s.end_date ? '' : 'pd-empty-date'}`}
                   max="9999-12-31"
                 />
               </td>
-              <td className="py-1 pr-2">
+              <td className="pd-edit-cell">
                 <input
                   type="number"
                   min={0}
@@ -348,16 +350,17 @@ export default function ProjectSchedulesPanel({ projectId, onCreated, onUpdated,
                   className={hoursCls}
                 />
               </td>
-              <td className="py-1 pr-2">
+              <td className="pd-edit-cell">
                 <input
                   aria-label="予定のメモ"
                   defaultValue={s.memo}
+                  placeholder="メモ"
                   onBlur={e => e.target.value !== s.memo && update(s, { memo: e.target.value })}
                   className={inputCls}
                 />
               </td>
-              <td>
-                <button type="button" onClick={() => deleteMutation.mutate(s.id, { onSuccess: () => onDeleted?.(s) })} className="text-xs text-red-500">
+              <td className="pd-col-delete">
+                <button type="button" onClick={() => deleteMutation.mutate(s.id, { onSuccess: () => onDeleted?.(s) })} className="pd-link pd-link-danger">
                   削除
                 </button>
               </td>

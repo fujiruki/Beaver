@@ -12,9 +12,9 @@ afterEach(() => {
 });
 
 describe('YoukanLinkButton (R-0130)', () => {
-  it('ボタン文言が「Youkan↗」に短縮されている（R-0133）', () => {
+  it('ボタン文言が見本どおり「Youkan で見る ↗」になっている（R-0227）', () => {
     render(<YoukanLinkButton projectId={5} />);
-    expect(screen.getByRole('button', { name: 'Youkan↗' })).not.toBeNull();
+    expect(screen.getByRole('button', { name: 'Youkan で見る ↗' })).not.toBeNull();
   });
 
   it('ok:true応答時、window.openが正しいURLで新規タブとして呼ばれる', async () => {

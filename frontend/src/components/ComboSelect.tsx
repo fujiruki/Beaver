@@ -14,6 +14,7 @@ interface Props {
   placeholder?: string;
   disabled?: boolean;
   headers?: [string, string];
+  inputClassName?: string;
 }
 
 const halfWidthKana = '｡｢｣､･ｦｧｨｩｪｫｬｭｮｯｰｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝﾞﾟ';
@@ -50,7 +51,7 @@ function normalize(s: string): string {
     .replace(/[\u30A1-\u30F6]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x60));
 }
 
-export default function ComboSelect({ options, value, onChange, placeholder, disabled, headers }: Props) {
+export default function ComboSelect({ options, value, onChange, placeholder, disabled, headers, inputClassName }: Props) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [highlighted, setHighlighted] = useState(-1);
@@ -131,7 +132,8 @@ export default function ComboSelect({ options, value, onChange, placeholder, dis
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
         disabled={disabled}
-        style={{
+        className={inputClassName}
+        style={inputClassName ? undefined : {
           width: '100%', padding: '7px 10px', border: '1px solid #cbd5e1',
           borderRadius: 6, fontSize: 14, boxSizing: 'border-box',
           background: disabled ? '#f8fafc' : '#fff',

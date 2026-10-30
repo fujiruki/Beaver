@@ -113,9 +113,9 @@ describe('ProjectDetail R-0227', () => {
     const left = screen.getByTestId('project-detail-left-column');
     const right = screen.getByTestId('project-detail-right-column');
 
-    expect(within(left).getAllByRole('heading', { level: 2 }).map(el => el.textContent))
+    expect(Array.from(left.querySelectorAll(':scope > .pd-panel > .pd-panel-title')).map(el => el.firstChild?.textContent))
       .toEqual(['案件の要点', '予定', '見積伝票', '売上伝票']);
-    expect(within(right).getAllByRole('heading', { level: 2 }).slice(0, 3).map(el => el.textContent))
+    expect(Array.from(right.querySelectorAll(':scope > .pd-panel > .pd-panel-title')).slice(0, 3).map(el => el.firstChild?.textContent))
       .toEqual(['基本情報', '画像', 'Youkan']);
     expect(screen.queryByRole('button', { name: /保存/ })).toBeNull();
   });

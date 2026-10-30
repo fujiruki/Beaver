@@ -120,6 +120,7 @@
 .pd-placeholder-row .pd-edit-cell:nth-child(2) { color: var(--pd-placeholder); }
 .pd-add-row { cursor: pointer; color: var(--pd-blue); }
 .pd-add-row:hover, .pd-add-row:focus-within { box-shadow: inset 0 0 0 1px var(--pd-blue); background: var(--pd-blue-soft); }
+.pd-visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 
 .pd-voucher-head, .pd-voucher-row { display: grid; grid-template-columns: 82px 102px 72px minmax(120px, 1fr) 100px 28px; align-items: center; }
 .pd-voucher-head { min-height: 25px; border-bottom: 1px solid var(--pd-line); background: var(--pd-head); color: var(--pd-muted); font-size: 11px; }
