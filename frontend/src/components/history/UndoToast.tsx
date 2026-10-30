@@ -18,10 +18,10 @@ export default function UndoToast({ message, onUndo, onDismiss, pending, autoDis
   return (
     <div className="pd-undo" role="status">
       <span style={{ flex: 1 }}>{message}</span>
-      <button onClick={onUndo} disabled={pending}>
+      <button type="button" onClick={onUndo} disabled={pending}>
         {pending ? '元に戻しています...' : '元に戻す'}
       </button>
-      <button onClick={onDismiss} aria-label="閉じる">×</button>
+      <button type="button" onClick={onDismiss} aria-label="閉じる">×</button>
     </div>
   );
 }

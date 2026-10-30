@@ -898,7 +898,7 @@ function ExistingProjectDetail({ projectId, goBack }: { projectId: number; goBac
   }));
 
   return (
-    <form className="pd-shell" noValidate>
+    <form className="pd-shell" noValidate onSubmit={e => e.preventDefault()}>
       <header className="pd-topbar">
         <button type="button" className="pd-link" onClick={goBack}>← 戻る</button>
         <h1 className="pd-title">案件 編集</h1>
@@ -916,7 +916,7 @@ function ExistingProjectDetail({ projectId, goBack }: { projectId: number; goBac
             <h2 className="pd-panel-title">案件の要点</h2>
             <div className="pd-key-grid">
               <div className="pd-cell pd-readonly"><span className="pd-label">案件コード</span><span className="pd-value pd-code">{project.project_code}</span></div>
-              <label className={`pd-cell ${!String(values.name ?? '').trim() ? 'pd-invalid' : ''}`}><span className="pd-label">案件名</span>{textField('name', '案件名')}</label>
+              <label className={`pd-cell ${!String(values.name ?? '').trim() ? 'pd-invalid' : ''}`}><span className="pd-label">案件名 *</span>{textField('name', '案件名')}</label>
               <div className="pd-cell"><span className="pd-label">得意先 *</span><ComboSelect options={customerOptions} value={Number(values.customer_id) || null} onChange={id => {
                 const previous = values.customer_id;
                 change('customer_id', id ?? 0);

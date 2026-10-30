@@ -64,7 +64,7 @@
 .pd-save-saved { color: var(--pd-muted); }
 .pd-save-saving { color: var(--pd-blue); }
 .pd-save-error { color: var(--pd-red); }
-.pd-due-field { display: flex; align-items: center; gap: 7px; }
+.pd-due-field { display: flex; align-items: center; flex-wrap: wrap; gap: 2px 7px; }
 .pd-due-field .pd-control { min-width: 112px; }
 .pd-due-soon { color: #c2410c; font-size: 11px; font-weight: 700; white-space: nowrap; }
 .pd-due-over { color: var(--pd-red); font-weight: 700; white-space: nowrap; }
