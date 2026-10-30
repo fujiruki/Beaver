@@ -86,3 +86,4 @@
 041_project_schedules_hours_and_production  2026-10-30  beaver_beta (R-0222。project_schedulesを作り直しend_dateをNULL可・hours追加、開始日を製作の予定へ移す（35件）。backup: database_beta_20261030_0443_pre_041.sqlite)
 041_project_schedules_hours_and_production  2026-10-30  prod (R-0222。晴樹さん「よい」、晴樹さんが!で実行。製作の予定38行・既存の予定4件を保持・integrity ok。backup: database_beaver_20261030_0648_pre_041_r0222.sqlite)
 042_project_schedules_name  2026-10-30  beta (R-0224。backup: database_beta_20261030_1439_pre_042_r0224.sqlite、integrity ok)
+042_project_schedules_name  2026-10-30  prod (R-0224。晴樹さん「いれてよい」。予定56件そのまま・integrity ok。backup: database_beaver_20261030_1441_pre_042_r0224.sqlite)
