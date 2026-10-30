@@ -10,6 +10,7 @@ import {
   monthBoundaries,
   freeMarkerLabels,
   loadIntervals,
+  scheduleKindName,
   scheduleLabel,
   shiftScheduleDates,
   formatHours,
@@ -504,7 +505,7 @@ function scheduleTitle(s: ProjectSchedule): string {
   const period = s.start_date && s.end_date
     ? `${formatMD(s.start_date)}〜${formatMD(s.end_date)}`
     : s.start_date ? `${formatMD(s.start_date)}から` : s.end_date ? `${formatMD(s.end_date)}まで` : '';
-  return [s.kind, period, s.hours ? `${formatHours(s.hours)}h` : '', s.memo].filter(Boolean).join(' ');
+  return [scheduleKindName(s), period, s.hours ? `${formatHours(s.hours)}h` : '', s.memo].filter(Boolean).join(' ');
 }
 
 /** R-0220: 案件の予定。取付は太いバー、それ以外は行の上の細い帯、期限だけは◆で描く */

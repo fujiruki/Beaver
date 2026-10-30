@@ -153,6 +153,15 @@ export default function ProjectSchedulesPanel({ projectId }: { projectId: number
                 >
                   {SCHEDULE_KINDS.map(k => <option key={k} value={k}>{k}</option>)}
                 </select>
+                {s.kind === 'その他' && (
+                  <input
+                    aria-label="予定の工程名"
+                    placeholder="工程名"
+                    defaultValue={s.name}
+                    onBlur={e => e.target.value !== s.name && update(s, { name: e.target.value })}
+                    className={`${inputCls} mt-1`}
+                  />
+                )}
               </td>
               <td className="py-1 pr-2">
                 <input

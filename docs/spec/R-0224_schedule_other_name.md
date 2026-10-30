@@ -30,7 +30,7 @@
 
 ## タスク
 
-- [ ] T1 PHP テストと vitest を先に書く（赤）
-- [ ] T2 migration 042 と API
-- [ ] T3 型・入力欄・表示
+- [x] T1 PHP テストと vitest を先に書く（赤）
+- [x] T2 migration 042 と API
+- [x] T3 型・入力欄・表示
 - [ ] T4 ブラウザでの確認

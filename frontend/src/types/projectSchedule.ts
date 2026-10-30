@@ -8,6 +8,7 @@ export interface ProjectSchedule {
   id: number;
   project_id: number;
   kind: ScheduleKind;
+  name: string;
   start_date: string | null;
   end_date: string | null;
   hours: number | null;
@@ -19,6 +20,7 @@ export interface ProjectSchedule {
 
 export interface ProjectScheduleInput {
   kind: ScheduleKind;
+  name?: string;
   start_date?: string | null;
   end_date?: string | null;
   hours?: number | null;

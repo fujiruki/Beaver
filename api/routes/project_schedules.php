@@ -83,8 +83,8 @@ if ($segments[0] === 'projects') {
         $hours = scheduleHoursOrNull($data['hours'] ?? null);
         scheduleCheck($start, $end, $hours);
 
-        $pdo->prepare('INSERT INTO project_schedules (project_id, kind, start_date, end_date, hours, memo, done) VALUES (?, ?, ?, ?, ?, ?, ?)')
-            ->execute([$projectId, $kind, $start, $end, $hours, (string)($data['memo'] ?? ''), empty($data['done']) ? 0 : 1]);
+        $pdo->prepare('INSERT INTO project_schedules (project_id, kind, name, start_date, end_date, hours, memo, done) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+            ->execute([$projectId, $kind, (string)($data['name'] ?? ''), $start, $end, $hours, (string)($data['memo'] ?? ''), empty($data['done']) ? 0 : 1]);
         $newId = (int)$pdo->lastInsertId();
         scheduleSyncProjectStartDate($pdo, $projectId);
         http_response_code(201);
@@ -121,10 +121,11 @@ $start = array_key_exists('start_date', $data) ? scheduleDateOrNull($data['start
 $end = array_key_exists('end_date', $data) ? scheduleDateOrNull($data['end_date']) : $current['end_date'];
 $hours = array_key_exists('hours', $data) ? scheduleHoursOrNull($data['hours']) : ($current['hours'] === null ? null : (float)$current['hours']);
 scheduleCheck($start, $end, $hours);
+$name = array_key_exists('name', $data) ? (string)$data['name'] : $current['name'];
 $memo = array_key_exists('memo', $data) ? (string)$data['memo'] : $current['memo'];
 $done = array_key_exists('done', $data) ? (empty($data['done']) ? 0 : 1) : (int)$current['done'];
 
-$pdo->prepare('UPDATE project_schedules SET kind = ?, start_date = ?, end_date = ?, hours = ?, memo = ?, done = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
-    ->execute([$kind, $start, $end, $hours, $memo, $done, $id]);
+$pdo->prepare('UPDATE project_schedules SET kind = ?, name = ?, start_date = ?, end_date = ?, hours = ?, memo = ?, done = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+    ->execute([$kind, $name, $start, $end, $hours, $memo, $done, $id]);
 scheduleSyncProjectStartDate($pdo, (int)$current['project_id']);
 echo json_encode(scheduleFind($pdo, $id));

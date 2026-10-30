@@ -296,9 +296,15 @@ export function formatHours(hours: number): string {
   return String(Math.round(hours * 10) / 10);
 }
 
+/** R-0224: 「その他」で工程名があれば工程名、それ以外は種類名 */
+export function scheduleKindName(s: { kind: string; name?: string }): string {
+  return s.kind === 'その他' && s.name ? s.name : s.kind;
+}
+
 /** 「見積 2h」のように種類名の横に時間を出す */
-export function scheduleLabel(s: { kind: string; hours: number | null }): string {
-  return s.hours ? `${s.kind} ${formatHours(s.hours)}h` : s.kind;
+export function scheduleLabel(s: { kind: string; name?: string; hours: number | null }): string {
+  const kindName = scheduleKindName(s);
+  return s.hours ? `${kindName} ${formatHours(s.hours)}h` : kindName;
 }
 
 /** R-0220/R-0222: やること一覧。日付（終了/期限、無ければ開始）順に並べ、日付の無い予定は一番下 */

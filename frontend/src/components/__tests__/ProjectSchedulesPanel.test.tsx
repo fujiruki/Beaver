@@ -5,7 +5,7 @@ import ProjectSchedulesPanel from '../ProjectSchedulesPanel';
 import type { ProjectSchedule } from '../../types/projectSchedule';
 
 const schedule = (over: Partial<ProjectSchedule>): ProjectSchedule => ({
-  id: 1, project_id: 5, kind: '見積', start_date: null, end_date: '2026-11-05', hours: null,
+  id: 1, project_id: 5, kind: '見積', name: '', start_date: null, end_date: '2026-11-05', hours: null,
   memo: '', done: 0, created_at: '', updated_at: '', ...over,
 });
 

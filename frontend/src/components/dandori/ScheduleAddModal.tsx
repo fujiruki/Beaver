@@ -15,6 +15,7 @@ const fieldStyle: React.CSSProperties = { display: 'block', width: '100%', paddi
 export default function ScheduleAddModal({ projectId, projectName, defaultDate, onClose }: ScheduleAddModalProps) {
   const createMutation = useCreateProjectSchedule(projectId);
   const [kind, setKind] = useState<ScheduleKind>('見積');
+  const [name, setName] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState(defaultDate);
   const [hours, setHours] = useState('');
@@ -29,7 +30,7 @@ export default function ScheduleAddModal({ projectId, projectName, defaultDate, 
       return;
     }
     createMutation.mutate(
-      { kind, start_date: startDate || null, end_date: endDate || null, hours: hoursValue, memo },
+      { kind, name, start_date: startDate || null, end_date: endDate || null, hours: hoursValue, memo },
       { onSuccess: onClose, onError: () => setError('保存に失敗しました') },
     );
   }
@@ -53,6 +54,12 @@ export default function ScheduleAddModal({ projectId, projectName, defaultDate, 
             {SCHEDULE_KINDS.map(k => <option key={k} value={k}>{k}</option>)}
           </select>
         </label>
+        {kind === 'その他' && (
+          <label>
+            工程名
+            <input value={name} onChange={e => setName(e.target.value)} style={fieldStyle} />
+          </label>
+        )}
         <label>
           開始（期限だけなら空）
           <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} style={fieldStyle} />
