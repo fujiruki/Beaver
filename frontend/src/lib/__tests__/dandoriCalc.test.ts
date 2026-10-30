@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { workdaysFromHours, barEndDate, dailyLoad, freeDayMarkers } from '../dandoriCalc';
+import { workdaysFromHours, barEndDate, dailyLoad, freeDayMarkers, businessDaysUntil } from '../dandoriCalc';
 
 // 2024-01-01は月曜日（以降の曜日は暦通り: 01=月,02=火,03=水,04=木,05=金,06=土,07=日,08=月,09=火）
 
@@ -125,5 +125,23 @@ describe('freeDayMarkers', () => {
       '2024-01-05',
     );
     expect(freeDayMarkers(load, '2024-01-01')).toEqual([]);
+  });
+});
+
+describe('businessDaysUntil（R-0227）', () => {
+  it('土日をまたぐ営業日だけを数える', () => {
+    expect(businessDaysUntil('2026-11-09', '2026-11-06')).toBe(1);
+  });
+
+  it('今日なら0を返す', () => {
+    expect(businessDaysUntil('2026-11-06', '2026-11-06')).toBe(0);
+  });
+
+  it('過ぎた納期は負の営業日数を返す', () => {
+    expect(businessDaysUntil('2026-11-05', '2026-11-09')).toBe(-2);
+  });
+
+  it('納期が空ならnullを返す', () => {
+    expect(businessDaysUntil('', '2026-11-06')).toBeNull();
   });
 });

@@ -33,6 +33,9 @@ const project = {
 };
 
 let putBodies: Record<string, unknown>[];
+let failPut = false;
+let scheduleWrites: { method: string; path: string }[];
+let currentProject = project;
 
 function queryClient() {
   return new QueryClient({
@@ -56,6 +59,9 @@ function renderPage() {
 describe('ProjectDetail R-0227', () => {
   beforeEach(() => {
     putBodies = [];
+    failPut = false;
+    scheduleWrites = [];
+    currentProject = project;
     vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
       const path = new URL(url, 'http://localhost').pathname;
       const method = init?.method ?? 'GET';
@@ -76,15 +82,27 @@ describe('ProjectDetail R-0227', () => {
           created_at: '',
         }]), { status: 200 });
       }
-      if (path.endsWith('/schedules')) {
+      if (path.endsWith('/schedules') && method === 'GET') {
         return new Response(JSON.stringify([]), { status: 200 });
+      }
+      if (path.endsWith('/schedules') && method === 'POST') {
+        scheduleWrites.push({ method, path });
+        return new Response(JSON.stringify({
+          id: 99, project_id: 5, kind: '見積', name: '', start_date: '2026-11-01',
+          end_date: null, hours: null, memo: '', done: 0, created_at: '', updated_at: '',
+        }), { status: 201 });
+      }
+      if (/\/schedules\/99$/.test(path) && method === 'DELETE') {
+        scheduleWrites.push({ method, path });
+        return new Response(null, { status: 204 });
       }
       if (method === 'PUT') {
         const body = JSON.parse(String(init?.body ?? '{}'));
         putBodies.push(body);
-        return new Response(JSON.stringify({ ...project, ...body }), { status: 200 });
+        if (failPut) return new Response(JSON.stringify({ error: '失敗' }), { status: 500 });
+        return new Response(JSON.stringify({ ...currentProject, ...body }), { status: 200 });
       }
-      return new Response(JSON.stringify(project), { status: 200 });
+      return new Response(JSON.stringify(currentProject), { status: 200 });
     }));
   });
 
@@ -97,32 +115,77 @@ describe('ProjectDetail R-0227', () => {
 
     expect(within(left).getAllByRole('heading', { level: 2 }).map(el => el.textContent))
       .toEqual(['案件の要点', '予定', '見積伝票', '売上伝票']);
-    expect(within(right).getAllByRole('heading', { level: 2 }).slice(0, 2).map(el => el.textContent))
-      .toEqual(['基本情報', '画像']);
+    expect(within(right).getAllByRole('heading', { level: 2 }).slice(0, 3).map(el => el.textContent))
+      .toEqual(['基本情報', '画像', 'Youkan']);
+    expect(screen.queryByRole('button', { name: /保存/ })).toBeNull();
   });
 
-  it('要点の説明を変更して保存するとmemoで送り、基本情報には備考を出さない', async () => {
+  it('案件名は欄を出たとき変更項目だけ保存し、元に戻すと前の値を保存する', async () => {
     const user = userEvent.setup();
     renderPage();
 
-    const description = await screen.findByLabelText('説明');
-    expect((description as HTMLTextAreaElement).value).toBe('元の説明');
-    expect(within(screen.getByTestId('project-basic-info')).queryByText('備考')).toBeNull();
-    await user.clear(description);
-    await user.type(description, '変更後の説明');
-    await user.click(screen.getByRole('button', { name: '保存' }));
+    const name = await screen.findByLabelText('案件名');
+    await user.clear(name);
+    await user.type(name, '変更後の案件');
+    await user.tab();
 
     await waitFor(() => expect(putBodies).toHaveLength(1));
-    expect(putBodies[0].memo).toBe('変更後の説明');
+    expect(putBodies[0]).toEqual({ name: '変更後の案件' });
+    await user.click(await screen.findByRole('button', { name: '元に戻す' }));
+    await waitFor(() => expect(putBodies).toHaveLength(2));
+    expect(putBodies[1]).toEqual({ name: '既存案件' });
   });
 
-  it('要点に作業時間の見積合計を表示する', async () => {
+  it('ステータスを押すとその項目をすぐ保存する', async () => {
+    renderPage();
+    await screen.findByDisplayValue('既存案件');
+    fireEvent.click(screen.getByRole('button', { name: '見積中' }));
+    await waitFor(() => expect(putBodies).toEqual([{ status: '見積中' }]));
+  });
+
+  it('保存失敗の案内は消えずに残る', async () => {
+    failPut = true;
+    renderPage();
+    const name = await screen.findByLabelText('案件名');
+    fireEvent.change(name, { target: { value: '失敗する変更' } });
+    fireEvent.blur(name);
+    expect(await screen.findByText(/保存できませんでした/)).toBeTruthy();
+    await new Promise(resolve => setTimeout(resolve, 50));
+    expect(screen.getByText(/保存できませんでした/)).toBeTruthy();
+  });
+
+  it('見積工数があれば見積由来を表示し、工数目安の入力と早押しを出さない', async () => {
     renderPage();
     const keyPoints = await screen.findByTestId('project-key-points');
 
-    expect(within(keyPoints).getByText('作業時間（見積合計）')).toBeTruthy();
-    expect(within(keyPoints).getByText('19.5 h')).toBeTruthy();
-    expect(within(keyPoints).getByText('9.0 h')).toBeTruthy();
+    expect(within(keyPoints).getByText('見積から')).toBeTruthy();
+    expect(screen.queryByLabelText('工数目安（h）')).toBeNull();
+    expect(screen.queryByRole('button', { name: '4h' })).toBeNull();
+  });
+
+  it('見積工数がなければ工数目安の入力と早押しを出す', async () => {
+    currentProject = {
+      ...project,
+      estimated_factory_hours: 0,
+      estimated_site_hours: 0,
+      effective_estimated_hours: 0,
+    };
+    renderPage();
+    expect(await screen.findByLabelText('工数目安（h）')).toBeTruthy();
+    expect(screen.getByRole('button', { name: '4h' })).toBeTruthy();
+  });
+
+  it('予定を作った直後に元に戻すと作成した予定を削除する', async () => {
+    renderPage();
+    const start = (await screen.findAllByLabelText('見積の開始'))[0];
+    fireEvent.change(start, { target: { value: '2026-11-01' } });
+    fireEvent.blur(start, { relatedTarget: document.body });
+    await waitFor(() => expect(scheduleWrites[0]?.method).toBe('POST'));
+    fireEvent.click(await screen.findByRole('button', { name: '元に戻す' }));
+    await waitFor(() => expect(scheduleWrites[1]).toEqual({
+      method: 'DELETE',
+      path: '/contents/Beaver/api/projects/5/schedules/99',
+    }));
   });
 });
 
