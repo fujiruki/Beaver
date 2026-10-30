@@ -108,11 +108,20 @@ describe('ProjectSchedulesPanel（R-0222）', () => {
     expect(writes).toHaveLength(0);
   });
 
-  it('製作の終了が空なら「（時間から）」と薄く出る。終了があれば出ない', async () => {
+  it('製作の終了が空でも「（時間から）」は出さない', async () => {
     current = [schedule({ id: 2, kind: '製作', start_date: '2026-11-10', end_date: null, hours: 8 })];
     stubFetch();
     renderPanel();
-    expect(await screen.findByText('（時間から）')).toBeTruthy();
+    await screen.findByDisplayValue('2026-11-10');
+    expect(screen.queryByText('（時間から）')).toBeNull();
+  });
+
+  it('表を包む横スクロールの箱がなく、表は固定レイアウトになる', async () => {
+    stubFetch();
+    const { container } = renderPanel();
+    await screen.findAllByTestId('fixed-schedule-row');
+    expect(container.querySelector('.overflow-x-auto')).toBeNull();
+    expect(container.querySelector('table')?.className).toMatch(/table-fixed/);
   });
 
   it('時間は予定の行に出て、右寄せで直せる', async () => {
@@ -128,16 +137,22 @@ describe('ProjectSchedulesPanel（R-0222）', () => {
     expect(writes[0]).toMatchObject({ method: 'PUT', body: { hours: 2 } });
   });
 
-  it('末尾の空の行は、開始日を入れて行を出ると選んだ種類（未選択なら見積）で作られる', async () => {
+  it('末尾の追加行は、種類を選ぶまで値を保ち、選んで行を出たときだけ作られる', async () => {
     stubFetch();
     renderPanel();
     await screen.findAllByTestId('fixed-schedule-row');
-    const blankStart = screen.getAllByLabelText('予定の開始').slice(-1)[0];
+    const blankStart = screen.getAllByLabelText('予定の開始').slice(-1)[0] as HTMLInputElement;
     fireEvent.change(blankStart, { target: { value: '2026-12-01' } });
     expect(writes).toHaveLength(0);
     fireEvent.blur(blankStart, { relatedTarget: document.body });
+    expect(writes).toHaveLength(0);
+    expect(blankStart.value).toBe('2026-12-01');
+
+    const kind = screen.getAllByLabelText('予定の種類').slice(-1)[0];
+    fireEvent.change(kind, { target: { value: '打合せ' } });
+    fireEvent.blur(kind, { relatedTarget: document.body });
     await waitFor(() => expect(writes).toHaveLength(1));
-    expect(writes[0].body).toMatchObject({ kind: '見積', start_date: '2026-12-01' });
+    expect(writes[0].body).toMatchObject({ kind: '打合せ', start_date: '2026-12-01' });
   });
 
   it('取り直したデータの日付順が変わっても、表内にフォーカスがある間は保存済み行が動かない', async () => {
