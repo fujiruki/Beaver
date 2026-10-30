@@ -80,13 +80,24 @@ describe('ProjectSchedulesPanel（R-0222）', () => {
     expect(writes[0].body).toMatchObject({ kind: '製作', hours: 12.5 });
   });
 
-  it('薄い字の行に開始日を入れると、その種類の予定が作られる', async () => {
+  it('薄い字の行は、開始日を入れて同じ行を移動しても値を保ち、行を出たとき1回だけ作られる', async () => {
     stubFetch();
     renderPanel();
-    const row = (await screen.findAllByTestId('fixed-schedule-row'))[3];
-    fireEvent.change(within(row).getByLabelText('取付の開始'), { target: { value: '2026-11-20' } });
+    const row = (await screen.findAllByTestId('fixed-schedule-row'))[1];
+    const start = within(row).getByLabelText('見積の開始') as HTMLInputElement;
+    const hours = within(row).getByLabelText('見積の時間');
+
+    fireEvent.change(start, { target: { value: '2026-11-20' } });
+    expect(writes).toHaveLength(0);
+
+    fireEvent.blur(start, { relatedTarget: hours });
+    fireEvent.focus(hours);
+    expect(start.value).toBe('2026-11-20');
+    expect(writes).toHaveLength(0);
+
+    fireEvent.blur(hours, { relatedTarget: document.body });
     await waitFor(() => expect(writes).toHaveLength(1));
-    expect(writes[0].body).toMatchObject({ kind: '取付', start_date: '2026-11-20' });
+    expect(writes[0].body).toMatchObject({ kind: '見積', start_date: '2026-11-20' });
   });
 
   it('何も入れていない薄い字の行は作られない', async () => {
@@ -117,13 +128,59 @@ describe('ProjectSchedulesPanel（R-0222）', () => {
     expect(writes[0]).toMatchObject({ method: 'PUT', body: { hours: 2 } });
   });
 
-  it('末尾の空の行に開始日を入れると、選んだ種類（未選択なら見積）で作られる', async () => {
+  it('末尾の空の行は、開始日を入れて行を出ると選んだ種類（未選択なら見積）で作られる', async () => {
     stubFetch();
     renderPanel();
     await screen.findAllByTestId('fixed-schedule-row');
     const blankStart = screen.getAllByLabelText('予定の開始').slice(-1)[0];
     fireEvent.change(blankStart, { target: { value: '2026-12-01' } });
+    expect(writes).toHaveLength(0);
+    fireEvent.blur(blankStart, { relatedTarget: document.body });
     await waitFor(() => expect(writes).toHaveLength(1));
     expect(writes[0].body).toMatchObject({ kind: '見積', start_date: '2026-12-01' });
+  });
+
+  it('取り直したデータの日付順が変わっても、表内にフォーカスがある間は保存済み行が動かない', async () => {
+    current = [
+      schedule({ id: 10, kind: '見積依頼', start_date: '2026-11-01', memo: '先の行' }),
+      schedule({ id: 20, kind: '打合せ', start_date: '2026-11-02', memo: '後の行' }),
+    ];
+    stubFetch();
+    renderPanel();
+
+    const firstMemo = await screen.findByDisplayValue('先の行');
+    const firstStart = within(firstMemo.closest('tr')!).getByLabelText('予定の開始');
+    fireEvent.focus(firstStart);
+    fireEvent.change(firstStart, { target: { value: '2026-12-31' } });
+    current = [current[1], { ...current[0], start_date: '2026-12-31' }];
+    fireEvent.blur(firstStart, { relatedTarget: firstMemo });
+    fireEvent.focus(firstMemo);
+
+    await waitFor(() => expect(writes).toHaveLength(1));
+    await waitFor(() => {
+      const memo = screen.getAllByLabelText('予定のメモ')[0] as HTMLInputElement;
+      expect(memo.value).toBe('先の行');
+    });
+  });
+
+  it('行は現調・見積・製作・取付、その他の種類、空の行の順に並ぶ', async () => {
+    current = [
+      schedule({ id: 30, kind: '打合せ', memo: 'その他' }),
+      schedule({ id: 20, kind: '取付', memo: '取付済み' }),
+      schedule({ id: 10, kind: '見積', memo: '見積済み' }),
+    ];
+    stubFetch();
+    const { container } = renderPanel();
+    await screen.findAllByTestId('fixed-schedule-row');
+
+    const rows = Array.from(container.querySelectorAll('tbody tr'));
+    const labels = rows.map(row => {
+      const fixedKind = row.getAttribute('data-kind');
+      if (fixedKind) return fixedKind;
+      const memo = row.querySelector<HTMLInputElement>('input[aria-label="予定のメモ"]');
+      if (memo?.value) return memo.value;
+      return '空の行';
+    });
+    expect(labels).toEqual(['現調', '見積済み', '製作', '取付済み', 'その他', '空の行']);
   });
 });
