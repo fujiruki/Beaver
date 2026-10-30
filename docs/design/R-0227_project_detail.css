@@ -153,3 +153,11 @@ input[type="number"]::-webkit-outer-spin-button { margin: 0; appearance: none; -
 .pd-description { display: block; padding: 3px 7px 7px; }
 .pd-effort .pd-control { width: 72px; height: 22px; border: 1px solid var(--pd-line); background: #fff; }
 .pd-effort .pd-control:hover, .pd-effort .pd-control:focus { border-color: var(--pd-blue); background: var(--pd-blue-soft); outline: none; }
+
+/* 2026-10-30 晴樹さん: 入力する場所以外を沈ませて、入力欄（白）に視線を集める */
+:root { --pd-recess: #e4e9ef; --pd-recess-text: #5b6676; --pd-head: #edf1f5; --pd-soft: #f1f4f7; }
+.pd-panel-title { background: var(--pd-recess); color: var(--pd-recess-text); border-bottom-color: #cfd6de; }
+.pd-sched th, .pd-table th, .pd-panel table th { background: var(--pd-head); color: var(--pd-recess-text); }
+.pd-info-label { background: var(--pd-head); color: var(--pd-recess-text); }
+.pd-customer-line { background: var(--pd-soft); }
+.pd-danger .pd-panel-title { background: #f6e3e3; }
