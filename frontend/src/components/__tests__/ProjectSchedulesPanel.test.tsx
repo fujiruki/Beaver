@@ -215,6 +215,29 @@ describe('ProjectSchedulesPanel（R-0222）', () => {
     expect((within(row).getByLabelText('現調の時間') as HTMLInputElement).value).toBe('1');
   });
 
+  it('保存の応答待ちのあいだに2回行から出ても、作成は1回だけ送られる', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      const method = init?.method ?? 'GET';
+      if (method === 'GET') return new Response(JSON.stringify(current), { status: 200 });
+      writes.push({ method, path: String(url), body: JSON.parse(String(init?.body ?? '{}')) });
+      await gate;
+      return new Response(JSON.stringify(schedule({ id: 99, kind: '現調', hours: 1 })), { status: 200 });
+    }));
+    writes = [];
+    renderPanel();
+    const row = (await screen.findAllByTestId('fixed-schedule-row'))[0];
+    const hours = within(row).getByLabelText('現調の時間') as HTMLInputElement;
+    fireEvent.change(hours, { target: { value: '1' } });
+    fireEvent.blur(hours, { relatedTarget: document.body });
+    await waitFor(() => expect(writes).toHaveLength(1));
+    fireEvent.blur(hours, { relatedTarget: document.body });
+    await new Promise(r => setTimeout(r, 30));
+    expect(writes).toHaveLength(1);
+    release();
+  });
+
   it('行は現調・見積・製作・取付、その他の種類、空の行の順に並ぶ', async () => {
     current = [
       schedule({ id: 30, kind: '打合せ', memo: 'その他' }),

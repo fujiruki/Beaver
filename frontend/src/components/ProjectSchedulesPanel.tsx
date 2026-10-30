@@ -60,6 +60,7 @@ export default function ProjectSchedulesPanel({ projectId, onCreated, onUpdated,
   const [fixedDrafts, setFixedDrafts] = useState<Partial<Record<ScheduleKind, Draft>>>({});
   const [visibleSchedules, setVisibleSchedules] = useState<ProjectSchedule[]>([]);
   const tableHasFocus = useRef(false);
+  const pendingCreates = useRef(new Set<string>());
 
   useEffect(() => {
     if (!tableHasFocus.current) setVisibleSchedules(schedules);
@@ -68,7 +69,9 @@ export default function ProjectSchedulesPanel({ projectId, onCreated, onUpdated,
   const displayedSchedules = tableHasFocus.current ? visibleSchedules : schedules;
   const orderedSchedules = orderSchedules(displayedSchedules);
 
-  function create(kind: ScheduleKind, draft: Draft, onSaved: () => void) {
+  function create(pendingKey: string, kind: ScheduleKind, draft: Draft, onSaved: () => void) {
+    if (pendingCreates.current.has(pendingKey)) return;
+    pendingCreates.current.add(pendingKey);
     createMutation.mutate({
       kind,
       start_date: draft.start_date || null,
@@ -80,6 +83,7 @@ export default function ProjectSchedulesPanel({ projectId, onCreated, onUpdated,
         onSaved();
         onCreated?.(created);
       },
+      onSettled: () => { pendingCreates.current.delete(pendingKey); },
     });
   }
 
@@ -97,7 +101,7 @@ export default function ProjectSchedulesPanel({ projectId, onCreated, onUpdated,
   function commitFixed(kind: ScheduleKind) {
     const draft = fixedDrafts[kind] ?? EMPTY_DRAFT;
     if (!hasContent(draft)) return;
-    create(kind, draft, () => setFixedDrafts(prev => ({ ...prev, [kind]: EMPTY_DRAFT })));
+    create(`fixed-${kind}`, kind, draft, () => setFixedDrafts(prev => ({ ...prev, [kind]: EMPTY_DRAFT })));
   }
 
   function commitBlank() {
@@ -109,7 +113,7 @@ export default function ProjectSchedulesPanel({ projectId, onCreated, onUpdated,
     const kind = blank.kind;
     const draft = blank;
     setBlankKindRequired(false);
-    create(kind, draft, () => setBlank(EMPTY_DRAFT));
+    create('blank', kind, draft, () => setBlank(EMPTY_DRAFT));
   }
 
   function update(schedule: ProjectSchedule, patch: Partial<ProjectSchedule>) {
