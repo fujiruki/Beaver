@@ -328,6 +328,13 @@ describe('scheduleLabel', () => {
     expect(scheduleLabel({ kind: '見積', hours: 1.25 })).toBe('見積 1.3h');
     expect(scheduleLabel({ kind: '見積', hours: null })).toBe('見積');
   });
+
+  it('「その他」で工程名があれば工程名を出す。ほかの種類や空の工程名は種類名', () => {
+    expect(scheduleLabel({ kind: 'その他', hours: 2, name: '塗装' })).toBe('塗装 2h');
+    expect(scheduleLabel({ kind: 'その他', hours: null, name: '塗装' })).toBe('塗装');
+    expect(scheduleLabel({ kind: 'その他', hours: null, name: '' })).toBe('その他');
+    expect(scheduleLabel({ kind: '見積', hours: null, name: '塗装' })).toBe('見積');
+  });
 });
 
 describe('todoSchedules（R-0220: やること一覧）', () => {

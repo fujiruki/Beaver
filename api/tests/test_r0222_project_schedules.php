@@ -314,6 +314,41 @@ try {
         jsonReq($port, 'PUT', "/projects/$p", ['start_date' => '2026-12-31']);
         assertEq(null, jsonReq($port, 'GET', "/projects/$p")['body']['start_date'], 'start_date');
     });
+
+    echo "
+=== R-0224 予定の工程名 ===
+";
+
+    runTest('「その他」を name 付きで作ると POST と GET で返る', function () use ($port, $newProject) {
+        $p = $newProject();
+        $r = jsonReq($port, 'POST', "/projects/$p/schedules", ['kind' => 'その他', 'name' => '塗装', 'hours' => 2]);
+        assertStatus(201, $r);
+        assertEq('塗装', $r['body']['name'], 'POST の name');
+        $list = jsonReq($port, 'GET', "/projects/$p/schedules");
+        assertEq('塗装', $list['body'][0]['name'], 'GET の name');
+    });
+
+    runTest('name を送らずに作ると空文字', function () use ($port, $newProject) {
+        $p = $newProject();
+        $r = jsonReq($port, 'POST', "/projects/$p/schedules", ['kind' => 'その他', 'hours' => 1]);
+        assertEq('', $r['body']['name'], 'name');
+    });
+
+    runTest('PUT で name を送らなければ値が残り、送れば変わる', function () use ($port, $newProject) {
+        $p = $newProject();
+        $id = jsonReq($port, 'POST', "/projects/$p/schedules", ['kind' => 'その他', 'name' => '塗装', 'hours' => 2])['body']['id'];
+        $r = jsonReq($port, 'PUT', "/project-schedules/$id", ['memo' => '急ぎ']);
+        assertEq('塗装', $r['body']['name'], '残る');
+        $r = jsonReq($port, 'PUT', "/project-schedules/$id", ['name' => '研磨']);
+        assertEq('研磨', $r['body']['name'], '変わる');
+    });
+
+    runTest('ほかの種類へ変えても name は残る', function () use ($port, $newProject) {
+        $p = $newProject();
+        $id = jsonReq($port, 'POST', "/projects/$p/schedules", ['kind' => 'その他', 'name' => '塗装', 'hours' => 2])['body']['id'];
+        $r = jsonReq($port, 'PUT', "/project-schedules/$id", ['kind' => '見積']);
+        assertEq('塗装', $r['body']['name'], 'name');
+    });
 } catch (Throwable $e) {
     echo "FATAL: " . $e->getMessage() . "\n";
     $failed++;
