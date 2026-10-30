@@ -106,14 +106,14 @@ describe('ProjectDetail R-0227', () => {
     renderPage();
 
     const description = await screen.findByLabelText('説明');
-    expect(description).toHaveValue('元の説明');
+    expect((description as HTMLTextAreaElement).value).toBe('元の説明');
+    expect(within(screen.getByTestId('project-basic-info')).queryByText('備考')).toBeNull();
     await user.clear(description);
     await user.type(description, '変更後の説明');
     await user.click(screen.getByRole('button', { name: '保存' }));
 
     await waitFor(() => expect(putBodies).toHaveLength(1));
     expect(putBodies[0].memo).toBe('変更後の説明');
-    expect(within(screen.getByTestId('project-basic-info')).queryByText('備考')).toBeNull();
   });
 
   it('要点に作業時間の見積合計を表示する', async () => {
@@ -152,10 +152,11 @@ describe('ProjectSchedulesPanel R-0227', () => {
     expect(headers[0]).toBe('済');
 
     const row = container.querySelector('tbody tr:not([data-kind])')!;
-    const kindCell = row.querySelector('td:nth-child(2)')!;
+    const kindCell = row.querySelector<HTMLElement>('td:nth-child(2)')!;
     expect(within(kindCell).queryByText('その他')).toBeNull();
-    expect(within(kindCell).getByLabelText('予定の工程名')).toHaveValue('採寸');
-    expect(within(row.querySelector('td:first-child')!).getByLabelText('予定が済'))
+    expect((within(kindCell).getByLabelText('予定の工程名') as HTMLInputElement).value)
+      .toBe('採寸');
+    expect(within(row.querySelector<HTMLElement>('td:first-child')!).getByLabelText('予定が済'))
       .toBeTruthy();
 
     fireEvent.blur(screen.getByDisplayValue('採寸'));

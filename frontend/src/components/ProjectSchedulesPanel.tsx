@@ -10,7 +10,7 @@ import type { ProjectSchedule, ScheduleKind } from '../types/projectSchedule';
 import { formatHours } from './dandori/dandoriBoardUtils';
 
 const inputCls =
-  'w-full border border-slate-300 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500';
+  'w-full h-6 border border-slate-300 rounded-none px-1.5 text-xs hover:border-blue-600 hover:bg-blue-50 focus:outline-none focus:border-blue-600';
 const ghostInputCls = `${inputCls} text-slate-400`;
 const hoursCls = `${inputCls} text-right`;
 
@@ -108,17 +108,17 @@ export default function ProjectSchedulesPanel({ projectId }: { projectId: number
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-sm p-5">
-      <h2 className="text-sm font-bold text-slate-600 border-b border-slate-100 pb-2 mb-3">予定</h2>
-      <table className="w-full table-fixed text-sm">
+    <div className="bg-white border border-slate-300 rounded-none p-2">
+      <h2 className="text-xs font-bold text-slate-600 border-b border-slate-300 pb-1 mb-1">予定</h2>
+      <table className="w-full table-fixed text-xs">
         <thead>
           <tr className="text-xs text-slate-400 border-b">
+            <th className="text-center pb-1 w-8">済</th>
             <th className="text-left pb-1 w-28">種類</th>
             <th className="text-left pb-1 w-36">開始</th>
             <th className="text-left pb-1 w-36">終了/期限</th>
             <th className="text-right pb-1 w-20">時間</th>
             <th className="text-left pb-1">メモ</th>
-            <th className="text-center pb-1 w-10">済</th>
             <th className="w-10" />
           </tr>
         </thead>
@@ -145,6 +145,7 @@ export default function ProjectSchedulesPanel({ projectId }: { projectId: number
                   if (!event.currentTarget.contains(event.relatedTarget)) commitFixed(kind);
                 }}
               >
+                <td />
                 <td className="py-1 pr-2">{kind}</td>
                 <td className="py-1 pr-2">
                   <input
@@ -184,7 +185,6 @@ export default function ProjectSchedulesPanel({ projectId }: { projectId: number
                   />
                 </td>
                 <td />
-                <td />
               </tr>
             )];
           })}
@@ -197,6 +197,7 @@ export default function ProjectSchedulesPanel({ projectId }: { projectId: number
               if (!event.currentTarget.contains(event.relatedTarget)) commitBlank();
             }}
           >
+            <td />
             <td className="py-1 pr-2">
               <select
                 aria-label="予定の種類"
@@ -246,7 +247,6 @@ export default function ProjectSchedulesPanel({ projectId }: { projectId: number
               />
             </td>
             <td />
-            <td />
           </tr>
         </tbody>
       </table>
@@ -259,23 +259,46 @@ export default function ProjectSchedulesPanel({ projectId }: { projectId: number
   function renderScheduleRow(s: ProjectSchedule) {
     return (
             <tr key={`${s.id}-${s.updated_at}`} className="border-b border-slate-100">
+              <td className="py-1 text-center">
+                <input
+                  type="checkbox"
+                  aria-label="予定が済"
+                  checked={!!s.done}
+                  onChange={e => update(s, { done: e.target.checked ? 1 : 0 })}
+                  className="hover:ring-1 hover:ring-blue-600 focus:ring-1 focus:ring-blue-600"
+                />
+              </td>
               <td className="py-1 pr-2">
-                <select
-                  aria-label="予定の種類"
-                  defaultValue={s.kind}
-                  onChange={e => update(s, { kind: e.target.value as ScheduleKind })}
-                  className={inputCls}
-                >
-                  {SCHEDULE_KINDS.map(k => <option key={k} value={k}>{k}</option>)}
-                </select>
-                {s.kind === 'その他' && (
-                  <input
-                    aria-label="予定の工程名"
-                    placeholder="工程名"
-                    defaultValue={s.name}
-                    onBlur={e => e.target.value !== s.name && update(s, { name: e.target.value })}
-                    className={`${inputCls} mt-1`}
-                  />
+                {s.kind === 'その他' ? (
+                  <div className="flex">
+                    <input
+                      aria-label="予定の工程名"
+                      placeholder="工程名"
+                      defaultValue={s.name}
+                      onBlur={e => e.target.value !== s.name && update(s, { name: e.target.value })}
+                      className={`${inputCls} min-w-0`}
+                    />
+                    <select
+                      aria-label="予定の種類"
+                      defaultValue=""
+                      onChange={e => update(s, { kind: e.target.value as ScheduleKind })}
+                      className={`${inputCls} w-7 px-0`}
+                    >
+                      <option value="">▼</option>
+                      {SCHEDULE_KINDS.filter(k => k !== 'その他').map(k => (
+                        <option key={k} value={k}>{k}</option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <select
+                    aria-label="予定の種類"
+                    defaultValue={s.kind}
+                    onChange={e => update(s, { kind: e.target.value as ScheduleKind })}
+                    className={inputCls}
+                  >
+                    {SCHEDULE_KINDS.map(k => <option key={k} value={k}>{k}</option>)}
+                  </select>
                 )}
               </td>
               <td className="py-1 pr-2">
@@ -316,14 +339,6 @@ export default function ProjectSchedulesPanel({ projectId }: { projectId: number
                   defaultValue={s.memo}
                   onBlur={e => e.target.value !== s.memo && update(s, { memo: e.target.value })}
                   className={inputCls}
-                />
-              </td>
-              <td className="py-1 text-center">
-                <input
-                  type="checkbox"
-                  aria-label="予定が済"
-                  checked={!!s.done}
-                  onChange={e => update(s, { done: e.target.checked ? 1 : 0 })}
                 />
               </td>
               <td>

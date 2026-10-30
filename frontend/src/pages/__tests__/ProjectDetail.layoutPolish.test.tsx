@@ -73,19 +73,19 @@ describe('ProjectDetail レイアウト改善 (R-0101)', () => {
     expect(screen.queryByText('工数目安')).toBeNull();
   });
 
-  it('工数目安欄が「納期」の直後・「施主」の直前に表示される', async () => {
+  it('工数目安欄が基本情報の「納品日」の後・「施主」の直前に表示される', async () => {
     currentProject = { ...baseProject, estimated_factory_hours: 0, estimated_site_hours: 0, manual_estimated_hours: 4.5, effective_estimated_hours: 4.5 };
     stubFetch();
     const { container } = renderPage();
     await screen.findByDisplayValue('既存案件');
 
     const labels = Array.from(container.querySelectorAll('label')).map(el => el.textContent);
-    const deliveryIdx = labels.indexOf('納期');
+    const deliveryIdx = labels.indexOf('納品日');
     const hoursIdx = labels.indexOf('工数目安（h）');
     const ownerIdx = labels.indexOf('施主');
 
     expect(deliveryIdx).toBeGreaterThan(-1);
-    expect(hoursIdx).toBe(deliveryIdx + 1);
+    expect(hoursIdx).toBeGreaterThan(deliveryIdx);
     expect(ownerIdx).toBe(hoursIdx + 1);
   });
 

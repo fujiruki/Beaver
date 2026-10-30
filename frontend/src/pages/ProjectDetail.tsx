@@ -13,7 +13,7 @@ import ProjectSchedulesPanel from '../components/ProjectSchedulesPanel';
 import HardDeleteProjectModal from '../components/HardDeleteProjectModal';
 import { useAppSettings } from '../contexts/AppSettingsContext';
 import { useSmartBack } from '../hooks/useSmartBack';
-import type { ProjectInput } from '../types/project';
+import type { ProjectInput, ProjectVoucher } from '../types/project';
 import { APP_ID } from '../lib/appId';
 import type { Customer } from '../types/customer';
 
@@ -155,9 +155,9 @@ export default function ProjectDetail() {
   }
 
   return (
-    <div className="max-w-2xl">
+    <div className={isNew ? 'max-w-2xl' : 'w-full'}>
       <div className="flex items-center gap-3 mb-6">
-        <button onClick={goBack} className="px-3 py-1 border border-slate-300 rounded text-sm text-slate-600 hover:bg-slate-50">
+        <button onClick={goBack} className={`px-3 py-1 border border-slate-300 text-sm text-slate-600 hover:border-blue-600 hover:bg-blue-50 ${isNew ? 'rounded' : 'rounded-none'}`}>
           ← 戻る
         </button>
         <h1 className="text-xl font-bold flex-1">{isNew ? '案件 新規登録' : '案件 編集'}</h1>
@@ -166,7 +166,7 @@ export default function ProjectDetail() {
           aria-label="タイトル横保存"
           onClick={handleSubmit(onSubmit)}
           disabled={isPending}
-          className="px-4 py-1.5 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:opacity-50"
+          className={`px-4 py-1.5 bg-blue-600 text-white text-sm hover:bg-blue-700 disabled:opacity-50 ${isNew ? 'rounded-md' : 'rounded-none'}`}
         >
           {isPending ? '保存中...' : '保存'}
         </button>
@@ -178,6 +178,234 @@ export default function ProjectDetail() {
         </div>
       )}
 
+      {!isNew && (
+        <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-2 text-xs">
+          <div className="grid grid-cols-1 min-[1100px]:grid-cols-[minmax(0,1.6fr)_minmax(320px,1fr)] gap-2">
+            <div data-testid="project-detail-left-column" className="space-y-2 min-w-0">
+              <section data-testid="project-key-points" className={panelCls}>
+                <h2 className={headingCls}>案件の要点</h2>
+                <div className="grid grid-cols-2 border border-slate-300 [&>*]:p-2 [&>*]:border-b [&>*]:border-slate-300 [&>*:nth-child(odd)]:border-r">
+                  <Field label="案件コード">
+                    <div className={readOnlyCls}>{project?.project_code ?? '—'}</div>
+                  </Field>
+                  <Field label="案件名 *" error={errors.name?.message}>
+                    <input {...register('name', { required: '必須です' })} className={inputCls} />
+                  </Field>
+                  <div className="col-span-2">
+                    <Field label="得意先 *" error={errors.customer_id?.message}>
+                      <div className="flex [&_input]:!rounded-none [&_button]:!rounded-none">
+                        <div className="flex-1">
+                          <ComboSelect
+                            options={customerOptions}
+                            value={customerId}
+                            onChange={handleCustomerChange}
+                            placeholder="得意先を検索..."
+                            headers={['得意先名', '備考']}
+                          />
+                        </div>
+                        <button type="button" onClick={() => setModalOpen(true)} className={secondaryBtnCls}>
+                          ＋ 新規得意先
+                        </button>
+                      </div>
+                      {selectedCustomer && (
+                        <div className="mt-1 flex items-start justify-between text-slate-500">
+                          <div>
+                            {customerAddress && <div>{customerAddress}</div>}
+                            {customerPhone && <div><a href={`tel:${customerPhone}`} className="text-blue-600">{customerPhone}</a></div>}
+                            {selectedCustomer.email && <div><a href={`mailto:${selectedCustomer.email}`} className="text-blue-600">{selectedCustomer.email}</a></div>}
+                            {selectedCustomer.memo && <div>{selectedCustomer.memo}</div>}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => window.open(`${import.meta.env.BASE_URL}customers/${selectedCustomer.id}`, '_blank')}
+                            className={secondaryBtnCls}
+                          >
+                            得意先を編集
+                          </button>
+                        </div>
+                      )}
+                    </Field>
+                  </div>
+                  <div className="col-span-2">
+                    <Field label="ステータス">
+                      <div className="flex">
+                        {projectStatuses.map(status => (
+                          <button
+                            key={status.id}
+                            type="button"
+                            aria-label={status.name}
+                            aria-pressed={currentStatus === status.name}
+                            onClick={() => setValue('status', status.name)}
+                            className={`${statusBtnCls} ${currentStatus === status.name ? 'bg-blue-600 text-white' : 'bg-white'}`}
+                          >
+                            {status.name}
+                          </button>
+                        ))}
+                      </div>
+                    </Field>
+                  </div>
+                  <Field label="納期">
+                    <input {...register('delivery_date')} type="date" className={dateInputCls} />
+                  </Field>
+                  <div>
+                    <div className="mb-1 text-xs font-semibold text-slate-500">作業時間（見積合計）</div>
+                    <div className="grid grid-cols-2 gap-1 font-mono tabular-nums">
+                      <span className="text-right">{Number(project?.estimated_factory_hours ?? 0).toFixed(1)} h</span>
+                      <span className="text-right">{factoryDays} 日</span>
+                      <span className="text-right">{Number(project?.estimated_site_hours ?? 0).toFixed(1)} h</span>
+                      <span className="text-right">{siteDays} 日</span>
+                    </div>
+                  </div>
+                  <div className="col-span-2 border-b-0">
+                    <Field label="説明">
+                      <textarea
+                        aria-label="説明"
+                        {...register('memo')}
+                        rows={4}
+                        className={`${inputCls} resize-y`}
+                      />
+                    </Field>
+                  </div>
+                </div>
+              </section>
+
+              <ProjectSchedulesPanel projectId={projectId} />
+
+              <VoucherPanel
+                title="見積伝票"
+                emptyText="登録なし"
+                vouchers={estimates}
+                onCreate={() => navigate(`/vouchers/new?project_id=${projectId}&customer_id=${customerId ?? ''}&type=estimate`)}
+                onOpen={voucherId => navigate(`/vouchers/${voucherId}`)}
+              />
+              <VoucherPanel
+                title="売上伝票"
+                emptyText="登録なし"
+                vouchers={sales}
+                onCreate={() => navigate(`/vouchers/new?project_id=${projectId}&customer_id=${customerId ?? ''}&type=sales`)}
+                onOpen={voucherId => navigate(`/vouchers/${voucherId}`)}
+              />
+            </div>
+
+            <div data-testid="project-detail-right-column" className="space-y-2 min-w-0">
+              <section data-testid="project-basic-info" className={panelCls}>
+                <h2 className={headingCls}>基本情報</h2>
+                <div className="grid grid-cols-2 border border-slate-300 [&>*]:p-2 [&>*]:border-b [&>*]:border-slate-300 [&>*:nth-child(odd)]:border-r">
+                  <Field label="受注日">
+                    <input {...register('order_date')} type="date" className={dateInputCls} />
+                  </Field>
+                  <Field label="納品日">
+                    <input {...register('end_date')} type="date" className={dateInputCls} />
+                  </Field>
+                  <div className="col-span-2">
+                    <Field label="工数目安（h）">
+                      {voucherSumHours > 0 ? (
+                        <div className={readOnlyCls}>見積伝票から自動計算: {voucherSumHours}時間（{voucherSumDays}日）</div>
+                      ) : (
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <input
+                            type="number"
+                            step="0.1"
+                            aria-label="工数目安（h）"
+                            {...register('manual_estimated_hours', { valueAsNumber: true })}
+                            className={hoursInputCls}
+                          />
+                          <span>{((Number(manualEstimatedHours) || 0) / settings.hoursPerDay).toFixed(1)}日</span>
+                          <button
+                            type="button"
+                            onClick={() => setValue('manual_estimated_hours', 4, { shouldDirty: true })}
+                            className={quickHoursBtnCls}
+                          >
+                            4h
+                          </button>
+                          {QUICK_HOURS_DAYS.map(days => (
+                            <button
+                              key={days}
+                              type="button"
+                              onClick={() => setValue('manual_estimated_hours', days * settings.hoursPerDay, { shouldDirty: true })}
+                              className={quickHoursBtnCls}
+                            >
+                              {days}日
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </Field>
+                  </div>
+                  <Field label="施主"><input {...register('owner_name')} className={inputCls} /></Field>
+                  <Field label="元請"><input {...register('general_contractor_name')} className={inputCls} /></Field>
+                  <Field label="連絡先"><input {...register('site_contact')} className={inputCls} /></Field>
+                  <Field label="施工住所"><input {...register('address')} className={inputCls} /></Field>
+                </div>
+              </section>
+
+              <section className={panelCls}>
+                <div className={`${headingCls} flex items-center justify-between`}>
+                  <h2>画像</h2>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploadImageMutation.isPending}
+                    className={primaryBtnCls}
+                  >
+                    {uploadImageMutation.isPending ? 'アップロード中...' : '＋ 追加'}
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleImageUpload}
+                  />
+                </div>
+                {images.length === 0 ? <p className="p-2 text-slate-400">画像はまだありません</p> : (
+                  <div className="flex flex-wrap gap-1 p-2">
+                    {images.map(image => (
+                      <div key={image.id} className="relative group">
+                        <img src={`/contents/${APP_ID}/api/${image.file_path}`} alt={image.file_name} className="w-24 h-24 object-cover border" />
+                        <button
+                          type="button"
+                          onClick={() => deleteImageMutation.mutate(image.id)}
+                          className="absolute top-0 right-0 bg-red-600 text-white px-1"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              <CapacityCheckPanel projectId={projectId} />
+              <div className={panelCls}><YoukanLinkButton projectId={projectId} /></div>
+            </div>
+          </div>
+
+          <div className="flex justify-end">
+            <button type="button" onClick={goBack} className={secondaryBtnCls}>キャンセル</button>
+            <button type="submit" disabled={isPending} className={primaryBtnCls}>
+              {isPending ? '保存中...' : '保存'}
+            </button>
+          </div>
+
+          <section className="border border-red-200 bg-white p-2 rounded-none">
+            <h2 className="text-xs font-bold text-red-600 border-b border-red-100 pb-1 mb-2">危険な操作</h2>
+            <p className="text-xs text-slate-500 mb-2">
+              この案件を伝票・明細も含めて完全に削除します。請求書に紐づく伝票がある場合は実行できません。
+            </p>
+            <button
+              type="button"
+              onClick={() => { setHardDeleteError(null); setHardDeleteModalOpen(true); }}
+              className="px-3 h-6 bg-red-600 text-white text-xs hover:bg-red-700 rounded-none"
+            >
+              完全削除
+            </button>
+          </section>
+        </form>
+      )}
+
+      {isNew && (
       <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
         {/* 基本情報 */}
         <div className="bg-white rounded-lg shadow-sm p-5 space-y-4">
@@ -515,6 +743,7 @@ export default function ProjectDetail() {
           </div>
         )}
       </form>
+      )}
 
       <NewCustomerModal
         isOpen={modalOpen}
@@ -548,8 +777,50 @@ function Field({ label, error, children, className = '' }: {
   );
 }
 
-const inputCls = 'w-full px-2.5 py-1.5 border border-slate-300 rounded-md text-sm focus:outline-none focus:border-blue-400';
-const dateInputCls = 'w-40 px-2.5 py-1.5 border border-slate-300 rounded-md text-sm focus:outline-none focus:border-blue-400';
-const hoursInputCls = 'w-20 px-2.5 py-1.5 border border-slate-300 rounded-md text-sm focus:outline-none focus:border-blue-400';
-const quickHoursBtnCls = 'px-2 py-1 text-xs bg-slate-100 border border-slate-300 rounded-full text-slate-600 hover:bg-slate-200';
+function VoucherPanel({ title, emptyText, vouchers, onCreate, onOpen }: {
+  title: string;
+  emptyText: string;
+  vouchers: ProjectVoucher[];
+  onCreate: () => void;
+  onOpen: (voucherId: number) => void;
+}) {
+  return (
+    <section className={panelCls}>
+      <div className={`${headingCls} flex items-center justify-between`}>
+        <h2>{title}</h2>
+        <button type="button" onClick={onCreate} className={primaryBtnCls}>＋ {title.replace('伝票', '')}作成</button>
+      </div>
+      {vouchers.length === 0 ? <p className="p-2 text-slate-400">{emptyText}</p> : (
+        <div className="border-x border-slate-300">
+          {vouchers.map(voucher => (
+            <button
+              key={voucher.id}
+              type="button"
+              onClick={() => onOpen(voucher.id)}
+              className="grid w-full grid-cols-[6rem_6rem_4rem_1fr_7rem_1rem] border-b border-slate-300 px-2 py-1 text-left hover:border-blue-600 hover:bg-blue-50 rounded-none"
+            >
+              <span className="font-mono">{voucher.voucher_no}</span>
+              <span>{voucher.voucher_date}</span>
+              <span>{VOUCHER_STATUS_LABEL[voucher.status] ?? voucher.status}</span>
+              <span className="truncate">{voucher.description ?? ''}</span>
+              <span className="text-right font-mono tabular-nums">¥{voucher.total_amount.toLocaleString()}</span>
+              <span>→</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+const inputCls = 'w-full h-6 px-1.5 border border-slate-300 rounded-none text-xs hover:border-blue-600 hover:bg-blue-50 focus:outline-none focus:border-blue-600';
+const dateInputCls = 'w-40 h-6 px-1.5 border border-slate-300 rounded-none text-xs hover:border-blue-600 hover:bg-blue-50 focus:outline-none focus:border-blue-600';
+const hoursInputCls = 'w-20 h-6 px-1.5 border border-slate-300 rounded-none text-xs text-right tabular-nums hover:border-blue-600 hover:bg-blue-50 focus:outline-none focus:border-blue-600';
+const quickHoursBtnCls = 'px-2 h-6 text-xs bg-slate-100 border border-slate-300 rounded-none text-slate-600 hover:border-blue-600 hover:bg-blue-50';
+const panelCls = 'bg-white border border-slate-300 rounded-none p-2';
+const headingCls = 'text-xs font-bold text-slate-600 border-b border-slate-300 pb-1 mb-1';
+const readOnlyCls = 'h-6 px-1.5 border border-slate-200 bg-slate-50 text-xs font-mono text-slate-600 flex items-center rounded-none';
+const primaryBtnCls = 'px-3 h-6 bg-blue-600 border border-blue-600 text-white text-xs hover:bg-blue-700 hover:border-blue-700 focus:border-blue-700 rounded-none disabled:opacity-50';
+const secondaryBtnCls = 'px-3 h-6 bg-white border border-slate-300 text-slate-600 text-xs hover:border-blue-600 hover:bg-blue-50 focus:border-blue-600 rounded-none';
+const statusBtnCls = 'h-6 px-2 border border-slate-300 -ml-px first:ml-0 text-xs hover:border-blue-600 hover:bg-blue-50 focus:z-10 focus:border-blue-600 rounded-none';
 const QUICK_HOURS_DAYS = [1, 2, 3, 5, 8, 14];

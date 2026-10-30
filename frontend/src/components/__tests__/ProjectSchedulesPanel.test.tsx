@@ -44,12 +44,12 @@ describe('ProjectSchedulesPanel（R-0222）', () => {
     expect(rows.map(r => r.getAttribute('data-kind'))).toEqual(['現調', '見積', '製作', '取付']);
   });
 
-  it('列は 種類・開始・終了/期限・時間・メモ・済', async () => {
+  it('列は 済・種類・開始・終了/期限・時間・メモ', async () => {
     stubFetch();
     renderPanel();
     await screen.findAllByTestId('fixed-schedule-row');
     const heads = screen.getAllByRole('columnheader').map(h => h.textContent);
-    expect(heads.slice(0, 6)).toEqual(['種類', '開始', '終了/期限', '時間', 'メモ', '済']);
+    expect(heads.slice(0, 6)).toEqual(['済', '種類', '開始', '終了/期限', '時間', 'メモ']);
   });
 
   it('開始日の欄を示す「製作: 開始日・工数は上の欄」の案内は無い', async () => {
