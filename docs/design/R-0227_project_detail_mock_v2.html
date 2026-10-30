@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>R-0227 案件詳細 v3</title>
+  <title>R-0227 案件詳細 v4</title>
   <link rel="stylesheet" href="R-0227_project_detail.css">
   <style>
     .mock-bar{position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:4px;padding:6px 16px;border-bottom:1px solid #cbd5e1;background:#e2e8f0;font:12px sans-serif}.mock-bar button{padding:3px 8px;border:1px solid #94a3b8;background:#fff}.mock-bar button.on{border-color:#2563eb;background:#eff6ff;color:#1d4ed8}.mock-note{margin-left:auto;color:#475569}.mock-viewport{margin:0 auto}.mock-viewport.w1440{width:1440px}.mock-viewport.w1280{width:1280px}.mock-viewport .pd-topbar{top:32px}
   </style>
 </head>
 <body>
-<div class="mock-bar"><b>画面幅</b><button class="on" data-width="1440">1440px</button><button data-width="1280">1280px</button><span class="mock-note">v3（確定版の見本）・実データ P00061</span></div>
+<div class="mock-bar"><b>画面幅</b><button class="on" data-width="1440">1440px</button><button data-width="1280">1280px</button><span class="mock-note">v4（確定版の見本）・実データ P00061</span></div>
 <div class="mock-viewport w1440" id="viewport">
 <main class="pd-shell">
   <header class="pd-topbar"><a class="pd-link" href="#">← 戻る</a><h1 class="pd-title">案件 編集</h1><span class="pd-spacer"></span><span class="pd-save-status pd-save-saved">保存済</span></header>
@@ -19,12 +19,12 @@
       <section class="pd-panel">
         <div class="pd-panel-title">案件の要点</div>
         <div class="pd-key-grid">
-          <div class="pd-cell"><span class="pd-label">案件コード</span><span class="pd-value pd-code pd-mono">P00061</span></div>
+          <div class="pd-cell pd-readonly"><span class="pd-label">案件コード</span><span class="pd-value pd-code pd-mono">P00061</span></div>
           <label class="pd-cell"><span class="pd-label">案件名 *</span><input class="pd-control" value="宇和島"></label>
           <label class="pd-cell"><span class="pd-label">得意先 *</span><select class="pd-control"><option>竹本工務店</option></select></label>
-          <label class="pd-cell"><span class="pd-label">納期</span><span class="pd-due-field"><input class="pd-control pd-mono" type="date" max="9999-12-31" value="2026-09-30"><span class="pd-due-soon">あと 4 営業日</span></span></label>
+          <label class="pd-cell"><span class="pd-label" title="ここまでに納品したい日">納期</span><span class="pd-due-field"><input class="pd-control pd-mono" type="date" max="9999-12-31" value="2026-09-30"><span class="pd-due-soon">あと 4 営業日</span></span></label>
         </div>
-        <div class="pd-customer-line"><span class="pd-label">得意先</span><span class="pd-ci">大洲市徳森2382-17</span><span class="pd-ci">電話 <a class="pd-link pd-mono" href="tel:0893-25-3370">0893-25-3370</a></span><span class="pd-ci">携帯 <a class="pd-link pd-mono" href="tel:090-2783-0584">090-2783-0584</a></span><span class="pd-ci pd-ci-memo">月末締日 ２０日支払い</span><span class="pd-spacer"></span><button class="pd-btn">得意先を編集</button><button class="pd-btn">＋ 新規得意先</button></div>
+        <div class="pd-customer-line"><span class="pd-label">得意先</span><span class="pd-ci">大洲市徳森2382-17</span><span class="pd-ci">電話 <a class="pd-link pd-contact-link pd-mono" href="tel:0893-25-3370">0893-25-3370</a></span><span class="pd-ci">携帯 <a class="pd-link pd-contact-link pd-mono" href="tel:090-2783-0584">090-2783-0584</a></span><span class="pd-ci pd-ci-memo">月末締日 ２０日支払い</span><span class="pd-spacer"></span><button class="pd-btn pd-customer-btn">得意先を編集</button><button class="pd-btn pd-customer-btn">＋ 新規得意先</button></div>
         <div class="pd-status-area"><span class="pd-label">ステータス</span><div class="pd-status-list"><button class="pd-status">問い合わせ</button><button class="pd-status">見積済</button><button class="pd-status">受注済</button><button class="pd-status pd-status-active">進行中</button><button class="pd-status">納品済</button><button class="pd-status">請求済</button><button class="pd-status">完了</button><button class="pd-status">キャンセル</button></div></div>
         <div class="pd-work"><span class="pd-label">工数</span><div class="pd-work-values"><span><b>工場</b> 32 h</span><span>4 日</span><span><b>現場</b> 8 h</span><span>1 日</span><small>見積から</small></div></div>
         <label class="pd-description"><span class="pd-label">説明</span><textarea class="pd-control" rows="2" placeholder="案件の説明を入力"></textarea></label>
@@ -32,12 +32,12 @@
 
       <section class="pd-panel">
         <div class="pd-panel-title">予定</div>
-        <table class="pd-sched"><thead><tr><th class="pd-col-done">済</th><th class="pd-col-kind">種類</th><th class="pd-col-date">開始</th><th class="pd-col-date">終了/期限</th><th class="pd-col-hours">時間(h)</th><th>メモ</th><th class="pd-col-delete">削除</th></tr></thead><tbody>
-          <tr class="pd-placeholder-row"><td class="pd-col-done"></td><td class="pd-edit-cell"><span class="pd-control">現調</span></td><td class="pd-edit-cell"><input class="pd-control pd-mono" type="date" max="9999-12-31"></td><td class="pd-edit-cell"><input class="pd-control pd-mono" type="date" max="9999-12-31"></td><td class="pd-edit-cell"><input class="pd-control pd-number" type="number" step="0.5"></td><td class="pd-edit-cell"><input class="pd-control" placeholder="メモ"></td><td class="pd-col-delete"></td></tr>
-          <tr class="pd-placeholder-row"><td class="pd-col-done"></td><td class="pd-edit-cell"><span class="pd-control">見積</span></td><td class="pd-edit-cell"><input class="pd-control pd-mono" type="date" max="9999-12-31"></td><td class="pd-edit-cell"><input class="pd-control pd-mono" type="date" max="9999-12-31"></td><td class="pd-edit-cell"><input class="pd-control pd-number" type="number" step="0.5"></td><td class="pd-edit-cell"><input class="pd-control" placeholder="メモ"></td><td class="pd-col-delete"></td></tr>
-          <tr><td class="pd-col-done"><input type="checkbox"></td><td class="pd-edit-cell"><select class="pd-control"><option>製作</option></select></td><td class="pd-edit-cell"><input class="pd-control pd-mono" type="date" max="9999-12-31" value="2026-09-21"></td><td class="pd-edit-cell"><input class="pd-control pd-mono" type="date" max="9999-12-31"></td><td class="pd-edit-cell"><input class="pd-control pd-number" type="number" step="0.5"></td><td class="pd-edit-cell"><input class="pd-control" value=""></td><td class="pd-col-delete"><button class="pd-link pd-link-danger">削除</button></td></tr>
-          <tr class="pd-placeholder-row"><td class="pd-col-done"></td><td class="pd-edit-cell"><span class="pd-control">取付</span></td><td class="pd-edit-cell"><input class="pd-control pd-mono" type="date" max="9999-12-31"></td><td class="pd-edit-cell"><input class="pd-control pd-mono" type="date" max="9999-12-31"></td><td class="pd-edit-cell"><input class="pd-control pd-number" type="number" step="0.5"></td><td class="pd-edit-cell"><input class="pd-control" placeholder="メモ"></td><td class="pd-col-delete"></td></tr>
-          <tr><td class="pd-col-done"><input type="checkbox"></td><td class="pd-edit-cell"><div class="pd-other"><input class="pd-control" value="塗装色確認" placeholder="工程名"><select class="pd-kind-arrow" aria-label="種類"><option></option><option>現調</option><option>見積</option><option>製作</option><option>取付</option><option>その他</option></select></div></td><td class="pd-edit-cell"><input class="pd-control pd-mono" type="date" max="9999-12-31"></td><td class="pd-edit-cell"><input class="pd-control pd-mono" type="date" max="9999-12-31"></td><td class="pd-edit-cell"><input class="pd-control pd-number" type="number" step="0.5" value="12.5"></td><td class="pd-edit-cell"><input class="pd-control" placeholder="メモ"></td><td class="pd-col-delete"><button class="pd-link pd-link-danger">削除</button></td></tr>
+        <table class="pd-sched"><thead><tr><th class="pd-col-done">済</th><th class="pd-col-kind">種類</th><th class="pd-col-date">開始</th><th class="pd-col-date">終了/期限</th><th class="pd-col-hours">時間(h)</th><th>メモ</th><th class="pd-col-delete"></th></tr></thead><tbody>
+          <tr class="pd-placeholder-row"><td class="pd-col-done"></td><td class="pd-edit-cell"><span class="pd-control">現調</span></td><td class="pd-edit-cell"><input class="pd-control pd-mono pd-empty-date" type="date" max="9999-12-31"></td><td class="pd-edit-cell"><input class="pd-control pd-mono pd-empty-date" type="date" max="9999-12-31"></td><td class="pd-edit-cell"><input class="pd-control pd-number" type="number" step="0.5"></td><td class="pd-edit-cell"><input class="pd-control" placeholder="メモ"></td><td class="pd-col-delete"></td></tr>
+          <tr class="pd-placeholder-row"><td class="pd-col-done"></td><td class="pd-edit-cell"><span class="pd-control">見積</span></td><td class="pd-edit-cell"><input class="pd-control pd-mono pd-empty-date" type="date" max="9999-12-31"></td><td class="pd-edit-cell"><input class="pd-control pd-mono pd-empty-date" type="date" max="9999-12-31"></td><td class="pd-edit-cell"><input class="pd-control pd-number" type="number" step="0.5"></td><td class="pd-edit-cell"><input class="pd-control" placeholder="メモ"></td><td class="pd-col-delete"></td></tr>
+          <tr><td class="pd-col-done"><input type="checkbox"></td><td class="pd-edit-cell"><select class="pd-control"><option>製作</option></select></td><td class="pd-edit-cell"><input class="pd-control pd-mono" type="date" max="9999-12-31" value="2026-09-21"></td><td class="pd-edit-cell"><input class="pd-control pd-mono pd-empty-date" type="date" max="9999-12-31"></td><td class="pd-edit-cell"><input class="pd-control pd-number" type="number" step="0.5"></td><td class="pd-edit-cell"><input class="pd-control" value=""></td><td class="pd-col-delete"><button class="pd-link pd-link-danger">削除</button></td></tr>
+          <tr class="pd-placeholder-row"><td class="pd-col-done"></td><td class="pd-edit-cell"><span class="pd-control">取付</span></td><td class="pd-edit-cell"><input class="pd-control pd-mono pd-empty-date" type="date" max="9999-12-31"></td><td class="pd-edit-cell"><input class="pd-control pd-mono pd-empty-date" type="date" max="9999-12-31"></td><td class="pd-edit-cell"><input class="pd-control pd-number" type="number" step="0.5"></td><td class="pd-edit-cell"><input class="pd-control" placeholder="メモ"></td><td class="pd-col-delete"></td></tr>
+          <tr><td class="pd-col-done"><input type="checkbox"></td><td class="pd-edit-cell"><div class="pd-other"><input class="pd-control" value="塗装色確認" placeholder="工程名"><select class="pd-kind-arrow" aria-label="種類"><option></option><option>現調</option><option>見積</option><option>製作</option><option>取付</option><option>その他</option></select></div></td><td class="pd-edit-cell"><input class="pd-control pd-mono pd-empty-date" type="date" max="9999-12-31"></td><td class="pd-edit-cell"><input class="pd-control pd-mono pd-empty-date" type="date" max="9999-12-31"></td><td class="pd-edit-cell"><input class="pd-control pd-number" type="number" step="0.5" value="12.5"></td><td class="pd-edit-cell"><input class="pd-control" placeholder="メモ"></td><td class="pd-col-delete"><button class="pd-link pd-link-danger">削除</button></td></tr>
           <tr class="pd-add-row"><td></td><td colspan="6"><select class="pd-control" aria-label="予定を追加"><option>＋ 予定を追加（種類を選ぶ）</option></select></td></tr>
         </tbody></table>
       </section>
@@ -49,15 +49,14 @@
     <aside class="pd-column">
       <section class="pd-panel"><div class="pd-panel-title">基本情報</div><div class="pd-info">
         <div class="pd-info-label">受注日</div><label class="pd-info-value"><input class="pd-control pd-mono" type="date" max="9999-12-31" value="2026-09-12"></label>
-        <div class="pd-info-label">納品日</div><label class="pd-info-value"><input class="pd-control pd-mono" type="date" max="9999-12-31" value=""></label>
+        <div class="pd-info-label" title="本当に納品した日・納品する日">納品日</div><label class="pd-info-value"><input class="pd-control pd-mono pd-empty-date" type="date" max="9999-12-31" value=""></label>
         <div class="pd-info-label">施主</div><label class="pd-info-value"><input class="pd-control" value=""></label>
         <div class="pd-info-label">元請</div><label class="pd-info-value"><input class="pd-control" value=""></label>
         <div class="pd-info-label">連絡先</div><label class="pd-info-value"><input class="pd-control" value=""></label>
         <div class="pd-info-label">施工住所</div><label class="pd-info-value"><input class="pd-control" value=""></label>
       </div></section>
       <section class="pd-panel"><div class="pd-panel-title">画像<span class="pd-spacer"></span><button class="pd-btn">＋ 追加</button></div><div class="pd-empty">画像なし（0件）</div></section>
-      <section class="pd-panel"><div class="pd-panel-title">Youkan 能力チェック<span class="pd-spacer"></span><button class="pd-btn">判定する</button></div><div class="pd-capacity pd-readonly">未判定</div></section>
-      <section class="pd-panel"><div class="pd-panel-title">Youkan で見る</div><div class="pd-panel-actions"><button class="pd-btn">Youkan で見る ↗</button></div></section>
+      <section class="pd-panel"><div class="pd-panel-title">Youkan<span class="pd-spacer"></span><button class="pd-btn">判定する</button><button class="pd-btn">Youkan で見る ↗</button></div><div class="pd-capacity pd-readonly">能力チェック: 未判定</div></section>
     </aside>
   </div>
   <section class="pd-state-samples"><div class="pd-panel-title">状態の見本: 見積が無い場合</div><div class="pd-sample-row"><span class="pd-label">工数</span><div class="pd-effort"><input class="pd-control pd-number" type="number" value="40"><span>h</span><button class="pd-quick">4h</button><button class="pd-quick">1日</button><button class="pd-quick">2日</button><button class="pd-quick">3日</button><button class="pd-quick">5日</button><button class="pd-quick">8日</button><button class="pd-quick">14日</button></div><span class="pd-sample-due"><span class="pd-label">納期超過</span><span class="pd-due-over"><span class="pd-mono">2026-09-30</span>　3 営業日超過</span></span></div></section>
