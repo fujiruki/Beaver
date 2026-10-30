@@ -31,7 +31,11 @@ export function useCreateProjectSchedule(projectId: number) {
   return useMutation({
     mutationFn: (data: ProjectScheduleInput) =>
       api.post<ProjectSchedule>(`/projects/${projectId}/schedules`, data),
-    onSuccess: () => invalidateSchedules(queryClient),
+    onSuccess: created => {
+      queryClient.setQueryData<ProjectSchedule[]>([KEY, 'project', projectId], old =>
+        Array.isArray(old) && !old.some(s => s.id === created.id) ? [...old, created] : old);
+      invalidateSchedules(queryClient);
+    },
   });
 }
 

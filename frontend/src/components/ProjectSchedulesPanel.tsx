@@ -68,14 +68,19 @@ export default function ProjectSchedulesPanel({ projectId, onCreated, onUpdated,
   const displayedSchedules = tableHasFocus.current ? visibleSchedules : schedules;
   const orderedSchedules = orderSchedules(displayedSchedules);
 
-  function create(kind: ScheduleKind, draft: Draft) {
+  function create(kind: ScheduleKind, draft: Draft, onSaved: () => void) {
     createMutation.mutate({
       kind,
       start_date: draft.start_date || null,
       end_date: draft.end_date || null,
       hours: parseHours(draft.hours),
       memo: draft.memo,
-    }, { onSuccess: created => onCreated?.(created) });
+    }, {
+      onSuccess: created => {
+        onSaved();
+        onCreated?.(created);
+      },
+    });
   }
 
   function changeFixed(kind: ScheduleKind, patch: Partial<Draft>) {
@@ -92,8 +97,7 @@ export default function ProjectSchedulesPanel({ projectId, onCreated, onUpdated,
   function commitFixed(kind: ScheduleKind) {
     const draft = fixedDrafts[kind] ?? EMPTY_DRAFT;
     if (!hasContent(draft)) return;
-    setFixedDrafts(prev => ({ ...prev, [kind]: EMPTY_DRAFT }));
-    create(kind, draft);
+    create(kind, draft, () => setFixedDrafts(prev => ({ ...prev, [kind]: EMPTY_DRAFT })));
   }
 
   function commitBlank() {
@@ -104,9 +108,8 @@ export default function ProjectSchedulesPanel({ projectId, onCreated, onUpdated,
     }
     const kind = blank.kind;
     const draft = blank;
-    setBlank(EMPTY_DRAFT);
     setBlankKindRequired(false);
-    create(kind, draft);
+    create(kind, draft, () => setBlank(EMPTY_DRAFT));
   }
 
   function update(schedule: ProjectSchedule, patch: Partial<ProjectSchedule>) {

@@ -178,6 +178,43 @@ describe('ProjectSchedulesPanel（R-0222）', () => {
     });
   });
 
+  it('薄い字の行は、保存の応答が返るまでのあいだも入れた値が見えている', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      const method = init?.method ?? 'GET';
+      if (method === 'GET') return new Response(JSON.stringify(current), { status: 200 });
+      writes.push({ method, path: String(url), body: JSON.parse(String(init?.body ?? '{}')) });
+      await gate;
+      current = [schedule({ id: 99, kind: '現調', hours: 1, end_date: null })];
+      return new Response(JSON.stringify(current[0]), { status: 200 });
+    }));
+    writes = [];
+    renderPanel();
+    const row = (await screen.findAllByTestId('fixed-schedule-row'))[0];
+    const hours = within(row).getByLabelText('現調の時間') as HTMLInputElement;
+    fireEvent.change(hours, { target: { value: '1' } });
+    fireEvent.blur(hours, { relatedTarget: document.body });
+    await waitFor(() => expect(writes).toHaveLength(1));
+    expect((within(row).getByLabelText('現調の時間') as HTMLInputElement).value).toBe('1');
+    release();
+    await waitFor(() => expect(screen.getByDisplayValue('1')).toBeTruthy());
+  });
+
+  it('保存が失敗したら、薄い字の行に入れた値が残る', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (_url: string, init?: RequestInit) => {
+      if ((init?.method ?? 'GET') === 'GET') return new Response('[]', { status: 200 });
+      return new Response(JSON.stringify({ error: 'x' }), { status: 500 });
+    }));
+    renderPanel();
+    const row = (await screen.findAllByTestId('fixed-schedule-row'))[0];
+    const hours = within(row).getByLabelText('現調の時間') as HTMLInputElement;
+    fireEvent.change(hours, { target: { value: '1' } });
+    fireEvent.blur(hours, { relatedTarget: document.body });
+    await new Promise(r => setTimeout(r, 50));
+    expect((within(row).getByLabelText('現調の時間') as HTMLInputElement).value).toBe('1');
+  });
+
   it('行は現調・見積・製作・取付、その他の種類、空の行の順に並ぶ', async () => {
     current = [
       schedule({ id: 30, kind: '打合せ', memo: 'その他' }),
