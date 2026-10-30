@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   useProjectSchedules,
   useCreateProjectSchedule,
@@ -33,6 +33,16 @@ function hasContent(draft: Draft): boolean {
   return draft.start_date !== '' || draft.end_date !== '' || parseHours(draft.hours) !== null;
 }
 
+function orderSchedules(schedules: ProjectSchedule[]): ProjectSchedule[] {
+  const fixed = FIXED_SCHEDULE_KINDS.flatMap(kind =>
+    schedules.filter(schedule => schedule.kind === kind).sort((a, b) => a.id - b.id),
+  );
+  const others = schedules
+    .filter(schedule => !FIXED_SCHEDULE_KINDS.includes(schedule.kind))
+    .sort((a, b) => a.id - b.id);
+  return [...fixed, ...others];
+}
+
 export default function ProjectSchedulesPanel({ projectId }: { projectId: number }) {
   const { data, isSuccess } = useProjectSchedules(projectId);
   const schedules = Array.isArray(data) ? data : [];
@@ -41,8 +51,15 @@ export default function ProjectSchedulesPanel({ projectId }: { projectId: number
   const deleteMutation = useDeleteProjectSchedule();
   const [blank, setBlank] = useState<Draft>(EMPTY_DRAFT);
   const [fixedDrafts, setFixedDrafts] = useState<Partial<Record<ScheduleKind, Draft>>>({});
+  const [visibleSchedules, setVisibleSchedules] = useState<ProjectSchedule[]>([]);
+  const tableHasFocus = useRef(false);
 
-  const missingFixedKinds = isSuccess ? FIXED_SCHEDULE_KINDS.filter(kind => !schedules.some(s => s.kind === kind)) : [];
+  useEffect(() => {
+    if (!tableHasFocus.current) setVisibleSchedules(schedules);
+  }, [data]);
+
+  const displayedSchedules = tableHasFocus.current ? visibleSchedules : schedules;
+  const orderedSchedules = orderSchedules(displayedSchedules);
 
   function create(kind: ScheduleKind, draft: Draft) {
     createMutation.mutate({
@@ -54,24 +71,28 @@ export default function ProjectSchedulesPanel({ projectId }: { projectId: number
     });
   }
 
-  function changeFixed(kind: ScheduleKind, patch: Partial<Draft>, commit: boolean) {
+  function changeFixed(kind: ScheduleKind, patch: Partial<Draft>) {
     const next = { ...(fixedDrafts[kind] ?? EMPTY_DRAFT), ...patch };
-    if (commit && hasContent(next)) {
-      setFixedDrafts(prev => ({ ...prev, [kind]: EMPTY_DRAFT }));
-      create(kind, next);
-      return;
-    }
     setFixedDrafts(prev => ({ ...prev, [kind]: next }));
   }
 
-  function changeBlank(patch: Partial<Draft>, commit: boolean) {
+  function changeBlank(patch: Partial<Draft>) {
     const next = { ...blank, ...patch };
-    if (commit && hasContent(next)) {
-      setBlank(EMPTY_DRAFT);
-      create(next.kind || '見積', next);
-      return;
-    }
     setBlank(next);
+  }
+
+  function commitFixed(kind: ScheduleKind) {
+    const draft = fixedDrafts[kind] ?? EMPTY_DRAFT;
+    if (!hasContent(draft)) return;
+    setFixedDrafts(prev => ({ ...prev, [kind]: EMPTY_DRAFT }));
+    create(kind, draft);
+  }
+
+  function commitBlank() {
+    if (!hasContent(blank)) return;
+    const draft = blank;
+    setBlank(EMPTY_DRAFT);
+    create(draft.kind || '見積', draft);
   }
 
   function update(schedule: ProjectSchedule, patch: Partial<ProjectSchedule>) {
@@ -81,30 +102,49 @@ export default function ProjectSchedulesPanel({ projectId }: { projectId: number
   return (
     <div className="bg-white rounded-lg shadow-sm p-5">
       <h2 className="text-sm font-bold text-slate-600 border-b border-slate-100 pb-2 mb-3">予定</h2>
+      <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
           <tr className="text-xs text-slate-400 border-b">
             <th className="text-left pb-1 w-32">種類</th>
-            <th className="text-left pb-1 w-40">開始</th>
-            <th className="text-left pb-1 w-40">終了/期限</th>
+            <th className="text-left pb-1 w-36">開始</th>
+            <th className="text-left pb-1 w-36">終了/期限</th>
             <th className="text-right pb-1 w-24">時間</th>
             <th className="text-left pb-1">メモ</th>
             <th className="text-center pb-1 w-12">済</th>
             <th className="w-12" />
           </tr>
         </thead>
-        <tbody>
-          {missingFixedKinds.map(kind => {
+        <tbody
+          onFocus={() => { tableHasFocus.current = true; }}
+          onBlur={event => {
+            if (event.currentTarget.contains(event.relatedTarget)) return;
+            tableHasFocus.current = false;
+            setVisibleSchedules(schedules);
+          }}
+        >
+          {FIXED_SCHEDULE_KINDS.flatMap(kind => {
+            const saved = orderedSchedules.filter(schedule => schedule.kind === kind);
+            if (saved.length > 0) return saved.map(schedule => renderScheduleRow(schedule));
+            if (!isSuccess) return [];
             const draft = fixedDrafts[kind] ?? EMPTY_DRAFT;
-            return (
-              <tr key={`fixed-${kind}`} data-testid="fixed-schedule-row" data-kind={kind} className="border-b border-slate-100 text-slate-400">
+            return [(
+              <tr
+                key={`fixed-${kind}`}
+                data-testid="fixed-schedule-row"
+                data-kind={kind}
+                className="border-b border-slate-100 text-slate-400"
+                onBlur={event => {
+                  if (!event.currentTarget.contains(event.relatedTarget)) commitFixed(kind);
+                }}
+              >
                 <td className="py-1 pr-2">{kind}</td>
                 <td className="py-1 pr-2">
                   <input
                     type="date"
                     aria-label={`${kind}の開始`}
                     value={draft.start_date}
-                    onChange={e => changeFixed(kind, { start_date: e.target.value }, true)}
+                    onChange={e => changeFixed(kind, { start_date: e.target.value })}
                     className={ghostInputCls}
                   />
                 </td>
@@ -113,7 +153,7 @@ export default function ProjectSchedulesPanel({ projectId }: { projectId: number
                     type="date"
                     aria-label={`${kind}の終了または期限`}
                     value={draft.end_date}
-                    onChange={e => changeFixed(kind, { end_date: e.target.value }, true)}
+                    onChange={e => changeFixed(kind, { end_date: e.target.value })}
                     className={ghostInputCls}
                   />
                 </td>
@@ -124,8 +164,7 @@ export default function ProjectSchedulesPanel({ projectId }: { projectId: number
                     step={0.5}
                     aria-label={`${kind}の時間`}
                     value={draft.hours}
-                    onChange={e => changeFixed(kind, { hours: e.target.value }, false)}
-                    onBlur={() => changeFixed(kind, {}, true)}
+                    onChange={e => changeFixed(kind, { hours: e.target.value })}
                     className={`${ghostInputCls} text-right`}
                   />
                 </td>
@@ -133,23 +172,92 @@ export default function ProjectSchedulesPanel({ projectId }: { projectId: number
                   <input
                     aria-label={`${kind}のメモ`}
                     value={draft.memo}
-                    onChange={e => changeFixed(kind, { memo: e.target.value }, false)}
-                    className={ghostInputCls}
+                    onChange={e => changeFixed(kind, { memo: e.target.value })}
+                    className={`${ghostInputCls} min-w-48`}
                   />
                 </td>
                 <td />
                 <td />
               </tr>
-            );
+            )];
           })}
-          {schedules.map(s => (
+          {orderedSchedules
+            .filter(schedule => !FIXED_SCHEDULE_KINDS.includes(schedule.kind))
+            .map(schedule => renderScheduleRow(schedule))}
+          <tr
+            onBlur={event => {
+              if (!event.currentTarget.contains(event.relatedTarget)) commitBlank();
+            }}
+          >
+            <td className="py-1 pr-2">
+              <select
+                aria-label="予定の種類"
+                value={blank.kind}
+                onChange={e => changeBlank({ kind: e.target.value as ScheduleKind })}
+                className={inputCls}
+              >
+                <option value="">空行に入力すると追加</option>
+                {SCHEDULE_KINDS.map(k => <option key={k} value={k}>{k}</option>)}
+              </select>
+            </td>
+            <td className="py-1 pr-2">
+              <input
+                type="date"
+                aria-label="予定の開始"
+                value={blank.start_date}
+                onChange={e => changeBlank({ start_date: e.target.value })}
+                className={inputCls}
+              />
+            </td>
+            <td className="py-1 pr-2">
+              <input
+                type="date"
+                aria-label="予定の終了または期限"
+                value={blank.end_date}
+                onChange={e => changeBlank({ end_date: e.target.value })}
+                className={inputCls}
+              />
+            </td>
+            <td className="py-1 pr-2">
+              <input
+                type="number"
+                min={0}
+                step={0.5}
+                aria-label="予定の時間"
+                value={blank.hours}
+                onChange={e => changeBlank({ hours: e.target.value })}
+                className={hoursCls}
+              />
+            </td>
+            <td className="py-1 pr-2">
+              <input
+                aria-label="予定のメモ"
+                value={blank.memo}
+                onChange={e => changeBlank({ memo: e.target.value })}
+                className={`${inputCls} min-w-48`}
+              />
+            </td>
+            <td />
+            <td />
+          </tr>
+        </tbody>
+      </table>
+      </div>
+      {updateMutation.isError && (
+        <p className="text-xs text-red-600 mt-2">予定を保存できませんでした。日付か時間のどれかは必要です。</p>
+      )}
+    </div>
+  );
+
+  function renderScheduleRow(s: ProjectSchedule) {
+    return (
             <tr key={`${s.id}-${s.updated_at}`} className="border-b border-slate-100">
               <td className="py-1 pr-2">
                 <select
                   aria-label="予定の種類"
                   defaultValue={s.kind}
                   onChange={e => update(s, { kind: e.target.value as ScheduleKind })}
-                  className={inputCls}
+                  className={`${inputCls} min-w-48`}
                 >
                   {SCHEDULE_KINDS.map(k => <option key={k} value={k}>{k}</option>)}
                 </select>
@@ -217,65 +325,6 @@ export default function ProjectSchedulesPanel({ projectId }: { projectId: number
                 </button>
               </td>
             </tr>
-          ))}
-          <tr>
-            <td className="py-1 pr-2">
-              <select
-                aria-label="予定の種類"
-                value={blank.kind}
-                onChange={e => changeBlank({ kind: e.target.value as ScheduleKind }, false)}
-                className={inputCls}
-              >
-                <option value="">空行に入力すると追加</option>
-                {SCHEDULE_KINDS.map(k => <option key={k} value={k}>{k}</option>)}
-              </select>
-            </td>
-            <td className="py-1 pr-2">
-              <input
-                type="date"
-                aria-label="予定の開始"
-                value={blank.start_date}
-                onChange={e => changeBlank({ start_date: e.target.value }, true)}
-                className={inputCls}
-              />
-            </td>
-            <td className="py-1 pr-2">
-              <input
-                type="date"
-                aria-label="予定の終了または期限"
-                value={blank.end_date}
-                onChange={e => changeBlank({ end_date: e.target.value }, true)}
-                className={inputCls}
-              />
-            </td>
-            <td className="py-1 pr-2">
-              <input
-                type="number"
-                min={0}
-                step={0.5}
-                aria-label="予定の時間"
-                value={blank.hours}
-                onChange={e => changeBlank({ hours: e.target.value }, false)}
-                onBlur={() => changeBlank({}, true)}
-                className={hoursCls}
-              />
-            </td>
-            <td className="py-1 pr-2">
-              <input
-                aria-label="予定のメモ"
-                value={blank.memo}
-                onChange={e => changeBlank({ memo: e.target.value }, false)}
-                className={inputCls}
-              />
-            </td>
-            <td />
-            <td />
-          </tr>
-        </tbody>
-      </table>
-      {updateMutation.isError && (
-        <p className="text-xs text-red-600 mt-2">予定を保存できませんでした。日付か時間のどれかは必要です。</p>
-      )}
-    </div>
-  );
+    );
+  }
 }
