@@ -124,7 +124,7 @@ function customerAccessLink(PDO $pdo, int $customerId): void {
 // GET /customers/sync の1件と POST /customers の競合応答(R-0157)で共有する列。
 // carry_forward_balance は正本がAccess側のため絶対にSELECTしない
 const CUSTOMER_SYNC_COLUMNS = 'id, access_customer_no, code, name, name_kana, honorific_type, gender,
-                   postal_code, address1, address2, tel, mobile, fax, email, cutoff_day, memo,
+                   postal_code, address1, address2, tel, mobile, fax, email, cutoff_day, memo, billing_date_print,
                    is_active, updated_at, last_synced_at';
 
 function customerSyncRowToJst(array $row): array {

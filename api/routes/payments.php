@@ -52,6 +52,8 @@ function syncPaymentUpsert(PDO $pdo): void {
     $paymentDate = isset($data['payment_date']) ? (string)$data['payment_date'] : date('Y-m-d');
     $amount      = isset($data['amount']) ? (float)$data['amount'] : 0.0;
     $memo        = $data['memo'] ?? null;
+    $paymentTypeGiven = array_key_exists('payment_type', $data) ? 1 : 0;
+    $paymentType = $paymentTypeGiven && $data['payment_type'] !== null ? (string)$data['payment_type'] : '現金';
 
     $invoiceId = null;
     if (isset($data['receivable_id']) && is_numeric($data['receivable_id'])) {
@@ -75,6 +77,7 @@ function syncPaymentUpsert(PDO $pdo): void {
                     invoice_id   = :invoice_id,
                     payment_date = :payment_date,
                     amount       = :amount,
+                    payment_type = CASE WHEN CAST(:payment_type_given AS INTEGER) = 1 THEN :payment_type ELSE payment_type END,
                     memo         = :memo,
                     origin       = :origin,
                     updated_at   = CURRENT_TIMESTAMP
@@ -84,6 +87,8 @@ function syncPaymentUpsert(PDO $pdo): void {
                 ':invoice_id'   => $invoiceId,
                 ':payment_date' => $paymentDate,
                 ':amount'       => $amount,
+                ':payment_type'       => $paymentType,
+                ':payment_type_given' => $paymentTypeGiven,
                 ':memo'         => $memo,
                 ':origin'       => 'access',
                 ':id'           => $paymentId,
@@ -103,7 +108,7 @@ function syncPaymentUpsert(PDO $pdo): void {
                 ':invoice_id'        => $invoiceId,
                 ':payment_date'      => $paymentDate,
                 ':amount'            => $amount,
-                ':payment_type'      => '現金',
+                ':payment_type'      => $paymentType,
                 ':memo'              => $memo,
                 ':access_payment_no' => $accessPaymentNo,
                 ':origin'            => 'access',
@@ -166,7 +171,7 @@ if ($method === 'GET' && isset($segments[1]) && $segments[1] === 'sync' && !isse
         $cursor = (int)$_GET['cursor'];
     }
 
-    $sql = 'SELECT p.id, p.access_payment_no, p.amount, p.updated_at,
+    $sql = 'SELECT p.id, p.access_payment_no, p.amount, p.payment_type, p.updated_at,
                    inv.access_receivable_id
             FROM payments p
             LEFT JOIN customers c ON c.id = p.customer_id
