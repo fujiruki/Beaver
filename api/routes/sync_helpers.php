@@ -111,7 +111,7 @@ function jstToUtc(string $jstDateTime): ?string {
 const VOUCHER_SYNC_SELECT_COLUMNS = 'v.id, v.voucher_no, v.voucher_type, v.status, v.voucher_date,
                    v.access_voucher_id, v.access_voucher_no, v.customer_id, v.project_id,
                    v.total_amount, v.updated_at, v.last_synced_at,
-                   v.trade_type, v.consumption_tax_type, v.description,
+                   v.trade_type, v.consumption_tax_type, v.description, v.memo,
                    v.print_date_flag, v.print_tax_excl_flag, v.print_company_seal,
                    v.sales_category_id, v.delivery_date, v.billing_date,
                    v.source_estimate_no, v.validity_period,
@@ -467,6 +467,7 @@ function syncVoucherUpsert(PDO $pdo, ?int $projectId): void {
 
     $accessVoucherNo = isset($data['access_voucher_no']) ? (string)$data['access_voucher_no'] : null;
     $memo            = $data['memo']        ?? null;
+    $memoGiven       = array_key_exists('memo', $data) ? 1 : 0;
     $description     = $data['description'] ?? null;
 
     // R-066(a): 未同期フィールドを受信して保存する。
@@ -572,7 +573,7 @@ function syncVoucherUpsert(PDO $pdo, ?int $projectId): void {
                 voucher_date        = excluded.voucher_date,
                 total_amount        = excluded.total_amount,
                 access_voucher_no   = excluded.access_voucher_no,
-                memo                = excluded.memo,
+                memo                = CASE WHEN CAST(:memo_given AS INTEGER) = 1 THEN excluded.memo ELSE memo END,
                 description         = excluded.description,
                 trade_type          = COALESCE(excluded.trade_type, trade_type),
                 -- R-066 回帰対応: NOT NULL 列は excluded(=VALUES句で既定値補完済み)ではなく
@@ -605,6 +606,7 @@ function syncVoucherUpsert(PDO $pdo, ?int $projectId): void {
             ':access_voucher_id'   => $accessVoucherId,
             ':access_voucher_no'   => $accessVoucherNo,
             ':memo'                => $memo,
+            ':memo_given'          => $memoGiven,
             ':description'         => $description,
             ':trade_type'          => $tradeType,
             ':consumption_tax_type' => $consumptionTaxType,
