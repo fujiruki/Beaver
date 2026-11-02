@@ -310,7 +310,7 @@ export default function VoucherEdit() {
   const { control, getValues, handleSubmit, reset, setValue, trigger, watch, formState: { isDirty } } = form;
   const queryClient = useQueryClient();
 
-  const { fields, append, remove, swap } = useFieldArray({ control, name: 'lines' });
+  const { fields, append, remove, replace, swap } = useFieldArray({ control, name: 'lines' });
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const createdVoucherIdRef = useRef<number | null>(null);
   const savedNewLineCountRef = useRef(0);
@@ -669,12 +669,39 @@ export default function VoucherEdit() {
 
   function handleInsertLine() {
     if (!formReady) return;
-    const insertAt = selectedIdx !== null ? selectedIdx + 1 : (watchedLines?.length ?? 0);
+    if (selectedIdx === null) {
+      handleAddLine();
+      return;
+    }
+    const insertAt = selectedIdx;
     const nextNo = insertAt + 1;
+    const currentLines = getValues('lines');
+    const insertedLine = { ...defaultLine, line_no: nextNo, cost_labor_rate: defaultLaborRate };
     if (isNew) {
-      append({ ...defaultLine, line_no: nextNo, cost_labor_rate: defaultLaborRate });
+      replace([
+        ...currentLines.slice(0, insertAt),
+        insertedLine,
+        ...currentLines.slice(insertAt),
+      ].map((line, index) => ({ ...line, line_no: index + 1 })));
+      setSelectedIdx(insertAt);
     } else {
-      addLineOnServer({ ...defaultLine, line_no: nextNo, cost_labor_rate: defaultLaborRate });
+      // サーバーでは末尾に作られるため、作成後に新規行と後続行を同じ保存経路で再採番する
+      void enqueueVoucherWrite(expectedUpdatedAt => addLineMutation.mutateAsync({
+        ...insertedLine,
+        voucher_id: voucherId,
+        expected_updated_at: expectedUpdatedAt ?? undefined,
+      } as any)).then(created => {
+        const reorderedLines = [
+          ...currentLines.slice(0, insertAt),
+          toLineFormValues(created),
+          ...currentLines.slice(insertAt),
+        ].map((line, index) => ({ ...line, line_no: index + 1 }));
+        replace(reorderedLines);
+        setSelectedIdx(insertAt);
+        for (const line of reorderedLines.slice(insertAt)) {
+          if (line.id) void saveLine(line.id, { line_no: line.line_no });
+        }
+      }, () => undefined);
     }
   }
 
