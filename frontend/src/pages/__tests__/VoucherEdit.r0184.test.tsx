@@ -81,6 +81,16 @@ beforeEach(() => {
 });
 
 describe('R-0184 明細入力レイアウト F3 詰め版', () => {
+  it('R-0233 AI宛にコピーでMarkdownをクリップボードへ書き込む', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    const user = userEvent.setup();
+    renderPage(true);
+    await user.click(await screen.findByRole('button', { name: 'AI宛にコピー' }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledOnce());
+    expect(writeText.mock.calls[0][0]).toContain('# 見積 E03981');
+    expect(await screen.findByText('コピーしました')).not.toBeNull();
+  });
   it('必要な入力と計算結果を明細1行に表示する', async () => {
     renderPage();
     const row = await screen.findByTestId('line-item-0');
