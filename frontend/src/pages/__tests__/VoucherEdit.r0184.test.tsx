@@ -83,8 +83,8 @@ beforeEach(() => {
 describe('R-0184 明細入力レイアウト F3 詰め版', () => {
   it('R-0233 AI宛にコピーでMarkdownをクリップボードへ書き込む', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
-    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
     const user = userEvent.setup();
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
     renderPage(true);
     await user.click(await screen.findByRole('button', { name: 'AI宛にコピー' }));
     await waitFor(() => expect(writeText).toHaveBeenCalledOnce());

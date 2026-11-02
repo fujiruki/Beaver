@@ -27,6 +27,8 @@ import { useSmartBack } from '../hooks/useSmartBack';
 import { useDefaultLaborRate } from '../api/settings';
 import type { Voucher, VoucherLine, VoucherType, VoucherStatus, TaxInputType, LineCategoryValue } from '../types/voucher';
 import { getVoucherEditBlockReason, getVoucherVoidBlockReason } from '../lib/voucherVoid';
+import { buildVoucherMarkdown } from '../lib/voucherMarkdown';
+import type { TateguItem } from '../types/tateguItem';
 
 export type VoucherFormValues = {
   voucher_type: VoucherType;
@@ -327,6 +329,7 @@ export default function VoucherEdit() {
   const [saveError, setSaveError] = useState<unknown>(null);
   const [staleVoucher, setStaleVoucher] = useState<Voucher | null>(null);
   const [formInitialized, setFormInitialized] = useState(isNew);
+  const [copyMessage, setCopyMessage] = useState('');
   const optionsReady = customersQuery.isSuccess && projectsQuery.isSuccess && salesCategoriesQuery.isSuccess;
   const optionsError = customersQuery.isError || projectsQuery.isError || salesCategoriesQuery.isError;
   const formReady = optionsReady && (isNew || formInitialized);
@@ -394,6 +397,29 @@ export default function VoucherEdit() {
     line_type: (l?.line_type ?? 'normal') as 'normal' | 'discount' | 'subtotal',
     line_total: l?.line_total ?? 0,
   }));
+
+  async function copyForAi() {
+    const values = getValues();
+    const ids = [...new Set(values.lines.map(line => line.tategu_item_id).filter((value): value is number => Boolean(value)))];
+    const ledgers = new Map<number, TateguItem | null>();
+    await Promise.all(ids.map(async ledgerId => {
+      try { ledgers.set(ledgerId, await api.get<TateguItem>(`/tategu-items/${ledgerId}`)); }
+      catch { ledgers.set(ledgerId, null); }
+    }));
+    const markdown = buildVoucherMarkdown({
+      form: values,
+      voucherNo: voucher?.voucher_no ?? '',
+      customerName: customers.find(customer => String(customer.id) === values.customer_id)?.name ?? '',
+      projectName: projects.find(project => String(project.id) === values.project_id)?.name ?? '',
+      ledgers,
+    });
+    try {
+      await navigator.clipboard.writeText(markdown);
+      setCopyMessage('コピーしました');
+    } catch {
+      setCopyMessage('コピーできませんでした');
+    }
+  }
 
   function toHeader(data: VoucherFormValues) {
     return {
@@ -828,6 +854,10 @@ export default function VoucherEdit() {
           </div>
 
           <div style={{ display: 'flex', gap: 6 }}>
+            <button type="button" className="bv-btn" onClick={() => void copyForAi()}>
+              AI宛にコピー
+            </button>
+            {copyMessage && <span role="status" className="bv-panel-note">{copyMessage}</span>}
             {isReadOnly && canEdit && (
               <button type="button" onClick={() => navigate(`/vouchers/${voucherId}`)} style={subBtnStyle}>
                 編集
