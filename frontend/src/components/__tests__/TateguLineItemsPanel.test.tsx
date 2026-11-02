@@ -190,6 +190,34 @@ describe('TateguCostLinesPanel', () => {
 });
 
 describe('TateguLaborLinesPanel', () => {
+  it('R-0237 工場時間・現場時間の空行は工数を空で表示する', () => {
+    render(<TateguLaborLinesPanel lines={[]} onChange={vi.fn()} categories={categories} />);
+
+    expect(screen.getAllByLabelText('工数').map((input) => (input as HTMLInputElement).value))
+      .toEqual(['', '']);
+  });
+
+  it('R-0237 工程名だけ入力して行を出ると工数0の行を1つ追加する', () => {
+    const onChange = vi.fn();
+    render(<TateguLaborLinesPanel lines={[]} onChange={onChange} categories={categories} />);
+
+    typeAndLeave(screen.getAllByLabelText('工程名')[0], '組立');
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange).toHaveBeenCalledWith([
+      expect.objectContaining({ process_name: '組立', work_hours: 0 }),
+    ]);
+  });
+
+  it('R-0237 何も入力せずに空行を出ても行を追加しない', () => {
+    const onChange = vi.fn();
+    render(<TateguLaborLinesPanel lines={[]} onChange={onChange} categories={categories} />);
+
+    fireEvent.blur(screen.getAllByLabelText('工程名')[0], { relatedTarget: document.body });
+
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
   it('R-0234 労務費の列を材料費と同じ並びと幅にする', () => {
     render(<TateguLaborLinesPanel lines={[]} onChange={vi.fn()} categories={categories} />);
 
