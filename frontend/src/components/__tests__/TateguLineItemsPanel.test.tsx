@@ -103,7 +103,7 @@ describe('TateguCostLinesPanel', () => {
 
     render(<TateguCostLinesPanel lines={[]} onChange={onChange} categories={categories} />);
     expect(screen.queryByText('+ 行追加')).toBeNull();
-    fireEvent.change(screen.getByLabelText('材料名'), { target: { value: '框材' } });
+    fireEvent.change(screen.getAllByLabelText('材料名')[0], { target: { value: '框材' } });
 
     expect(onChange).toHaveBeenCalledWith([{
       category_code: 'MAIN',
@@ -198,12 +198,12 @@ describe('TateguLaborLinesPanel', () => {
     const onChange = vi.fn();
     const { rerender } = render(<TateguLaborLinesPanel lines={[]} onChange={onChange} categories={categories} />);
 
-    fireEvent.change(screen.getByLabelText('工程名'), { target: { value: '組立' } });
+    fireEvent.change(screen.getAllByLabelText('工程名')[0], { target: { value: '組立' } });
     expect(onChange).toHaveBeenCalledWith([expect.objectContaining({ process_name: '組立' })]);
     expect(screen.queryByText('+ 行追加')).toBeNull();
 
     const added = onChange.mock.calls[0][0] as LaborLineDraft[];
     rerender(<TateguLaborLinesPanel lines={added} onChange={onChange} categories={categories} />);
-    expect(screen.getAllByLabelText('工程名')).toHaveLength(2);
+    expect(screen.getAllByLabelText('工程名')).toHaveLength(3);
   });
 });

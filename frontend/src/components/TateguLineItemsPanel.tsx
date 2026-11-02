@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { AggregationCategoryMaster } from '../api/aggregationCategories';
 import type { CostLine, LaborLine } from '../types/tateguItem';
 
@@ -16,9 +16,6 @@ interface LaborLinesProps {
   categories: AggregationCategoryMaster[];
 }
 
-const inputCls =
-  'w-full px-2.5 py-1.5 border border-slate-300 rounded-md text-sm focus:outline-none focus:border-blue-400';
-const numericCls = `${inputCls} text-right tabular-nums`;
 const moneyCodes = ['body', 'hardware', 'glass', 'MAIN', 'HARDWARE', 'GLASS'];
 const timeCodes = ['FACTORY_TIME', 'SITE_TIME'];
 const fallbackMoneyCategories = [
@@ -34,20 +31,36 @@ const fallbackTimeCategories = [
 function categoryOptions(categories: AggregationCategoryMaster[], measureType: 'money' | 'time') {
   const allowed = measureType === 'money' ? moneyCodes : timeCodes;
   const active = categories
-    .filter((c) => c.measure_type === measureType && c.is_active !== 0 && allowed.includes(c.code))
+    .filter((category) => category.measure_type === measureType && category.is_active !== 0 && allowed.includes(category.code))
     .sort((a, b) => a.sort_order - b.sort_order);
   return active.length ? active : measureType === 'money' ? fallbackMoneyCategories : fallbackTimeCategories;
 }
+
 const costAmount = (line: Pick<CostLineDraft, 'quantity' | 'unit_cost'>) =>
   (Number(line.quantity) || 0) * (Number(line.unit_cost) || 0);
 const laborAmount = (line: Pick<LaborLineDraft, 'work_hours' | 'labor_rate'>) =>
   (Number(line.work_hours) || 0) * (Number(line.labor_rate) || 0);
 const moneyText = (value: number) => `¥${Math.round(value).toLocaleString('ja-JP')}`;
 const numberText = (value: number) => Number(value).toLocaleString('ja-JP', { maximumFractionDigits: 10 });
-const withCostOrders = (lines: CostLineDraft[]) =>
-  lines.map((line, index) => ({ ...line, amount: costAmount(line), sort_order: index }));
-const withLaborOrders = (lines: LaborLineDraft[]) =>
-  lines.map((line, index) => ({ ...line, amount: laborAmount(line), sort_order: index }));
+
+function orderByCategory<T extends { category_code: string }>(
+  lines: T[],
+  options: Array<{ code: string }>,
+) {
+  const categoryOrder = new Map(options.map((option, index) => [option.code, index]));
+  return lines
+    .map((line, index) => ({ line, index }))
+    .sort((a, b) =>
+      (categoryOrder.get(a.line.category_code) ?? options.length) -
+        (categoryOrder.get(b.line.category_code) ?? options.length) ||
+      a.index - b.index)
+    .map(({ line }) => line);
+}
+
+const withCostOrders = (lines: CostLineDraft[], options: Array<{ code: string }>) =>
+  orderByCategory(lines, options).map((line, index) => ({ ...line, amount: costAmount(line), sort_order: index }));
+const withLaborOrders = (lines: LaborLineDraft[], options: Array<{ code: string }>) =>
+  orderByCategory(lines, options).map((line, index) => ({ ...line, amount: laborAmount(line), sort_order: index }));
 
 function NumericCell({
   label,
@@ -55,6 +68,7 @@ function NumericCell({
   money = false,
   integer = false,
   disabled = false,
+  placeholder,
   onChange,
 }: {
   label: string;
@@ -62,9 +76,10 @@ function NumericCell({
   money?: boolean;
   integer?: boolean;
   disabled?: boolean;
+  placeholder?: string;
   onChange: (value: number) => void;
 }) {
-  const format = (n: number) => (money ? moneyText(n) : numberText(n));
+  const format = (number: number) => (money ? moneyText(number) : numberText(number));
   const [raw, setRaw] = useState('');
   const [focused, setFocused] = useState(false);
   return (
@@ -73,133 +88,124 @@ function NumericCell({
       inputMode={integer ? 'numeric' : 'decimal'}
       value={focused ? raw : format(value)}
       disabled={disabled}
-      className={numericCls}
+      className="bv-control bv-number"
       style={{ textAlign: 'right' }}
       step={integer ? 1 : undefined}
+      placeholder={placeholder}
       onFocus={() => {
         setRaw(String(value || ''));
         setFocused(true);
       }}
-      onChange={(e) => {
+      onChange={(event) => {
         const cleaned = integer
-          ? e.target.value.replace(/\D/g, '')
-          : e.target.value.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1');
+          ? event.target.value.replace(/\D/g, '')
+          : event.target.value.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1');
         setRaw(cleaned);
         onChange(Number(cleaned) || 0);
       }}
-      onBlur={() => {
-        setFocused(false);
-      }}
+      onBlur={() => setFocused(false)}
     />
+  );
+}
+
+function CategorySelect({
+  label,
+  value,
+  options,
+  disabled,
+  onCommit,
+}: {
+  label: string;
+  value: string;
+  options: Array<{ code: string; name: string }>;
+  disabled?: boolean;
+  onCommit: (value: string) => void;
+}) {
+  const [draft, setDraft] = useState(value);
+  useEffect(() => setDraft(value), [value]);
+  return (
+    <select
+      aria-label={label}
+      value={draft}
+      disabled={disabled}
+      className="bv-control"
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={() => {
+        if (draft !== value) onCommit(draft);
+      }}
+    >
+      {options.map((option) => <option key={option.code} value={option.code}>{option.name}</option>)}
+    </select>
   );
 }
 
 export function TateguCostLinesPanel({ lines, onChange, categories }: CostLinesProps) {
   const options = categoryOptions(categories, 'money');
-  const blank: CostLineDraft = {
-    category_code: options[0]?.code ?? 'MAIN',
-    name: '',
-    quantity: 1,
-    unit_cost: 0,
-    amount: 0,
-    source: 'manual',
-    sort_order: lines.length,
+  const orderedLines = orderByCategory(lines, options);
+  const updateExisting = (line: CostLineDraft, patch: Partial<CostLineDraft>) => {
+    const originalIndex = lines.indexOf(line);
+    const updated = lines.map((item, index) => index === originalIndex ? { ...item, ...patch } : item);
+    onChange(withCostOrders(updated, options));
   };
-  const rendered = [...lines, blank];
-  const update = (index: number, patch: Partial<CostLineDraft>) => {
-    const base = index === lines.length ? [...lines, blank] : lines;
-    onChange(withCostOrders(base.map((line, i) => (i === index ? { ...line, ...patch } : line))));
+  const addBlank = (categoryCode: string, patch: Partial<CostLineDraft>) => {
+    const blank: CostLineDraft = {
+      category_code: categoryCode,
+      name: '',
+      quantity: 1,
+      unit_cost: 0,
+      amount: 0,
+      source: 'manual',
+      sort_order: lines.length,
+      ...patch,
+    };
+    onChange(withCostOrders([...lines, blank], options));
   };
-  const remove = (index: number) => onChange(withCostOrders(lines.filter((_, i) => i !== index)));
+  const remove = (line: CostLineDraft) => onChange(withCostOrders(lines.filter((item) => item !== line), options));
   const total = lines.reduce((sum, line) => sum + costAmount(line), 0);
+
   return (
-    <div>
-      {lines.length > 0 && (
-        <div className="flex flex-wrap gap-3 mb-5">
-          {options.map((option) => (
-            <div key={option.code} className="flex-1 min-w-28 bg-slate-50 border border-slate-200 rounded-lg px-4 py-3">
-              <div className="text-xs text-slate-400 mb-1">{option.name}合計</div>
-              <div className="font-bold text-sm">
-                {moneyText(lines.filter((l) => l.category_code === option.code).reduce((s, l) => s + costAmount(l), 0))}
-              </div>
-            </div>
-          ))}
-          <div className="flex-1 min-w-36 bg-slate-800 text-white rounded-lg px-4 py-3">
-            <div className="text-xs text-slate-300 mb-1">材料費合計</div>
-            <div className="font-bold text-lg">{moneyText(total)}</div>
+    <div className="bv-ui">
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${options.length + 1}, minmax(0, 1fr))` }}>
+        {options.map((option) => (
+          <div key={option.code} className="bv-cell bv-readonly">
+            <span className="bv-label">{option.name}合計</span>
+            <span className="bv-value bv-amount">
+              {moneyText(lines.filter((line) => line.category_code === option.code).reduce((sum, line) => sum + costAmount(line), 0))}
+            </span>
           </div>
+        ))}
+        <div className="bv-cell bv-readonly">
+          <span className="bv-label">材料費合計</span>
+          <strong className="bv-value bv-amount">{moneyText(total)}</strong>
         </div>
-      )}
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="text-xs text-slate-400 border-b">
-            <th className="text-left pb-1 w-28">区分</th>
-            <th className="text-left pb-1">名称</th>
-            <th className="text-right pb-1 w-24">数量</th>
-            <th className="text-right pb-1 w-28">単価</th>
-            <th className="text-right pb-1 w-28">金額</th>
-            <th className="w-12" />
-          </tr>
-        </thead>
+      </div>
+      <table className="bv-table" aria-label="材料費明細">
+        <thead><tr><th style={{ width: 112 }}>区分</th><th>名称</th><th className="bv-number" style={{ width: 96 }}>数量</th><th className="bv-number" style={{ width: 112 }}>単価</th><th className="bv-number" style={{ width: 112 }}>金額</th><th style={{ width: 48 }} /></tr></thead>
         <tbody>
-          {rendered.map((line, index) => {
-            const blankRow = index === lines.length;
-            const locked = line.source === 'wood_calc';
-            return (
-              <tr key={blankRow ? 'blank' : index} className="border-b border-slate-100">
-                <td className="py-1 pr-2">
-                  <select
-                    aria-label="材料区分"
-                    value={line.category_code}
-                    disabled={locked}
-                    onChange={(e) => update(index, { category_code: e.target.value })}
-                    className={inputCls}
-                  >
-                    {options.map((o) => (
-                      <option key={o.code} value={o.code}>
-                        {o.name}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td className="py-1 pr-2">
-                  <input
-                    aria-label="材料名"
-                    value={line.name}
-                    disabled={locked}
-                    onChange={(e) => update(index, { name: e.target.value })}
-                    className={inputCls}
-                    placeholder={blankRow ? '空行に入力すると追加' : '材料名'}
-                  />
-                </td>
-                <td className="py-1 pr-2">
-                  <NumericCell
-                    label="数量"
-                    value={line.quantity}
-                    disabled={locked}
-                    onChange={(v) => update(index, { quantity: v })}
-                  />
-                </td>
-                <td className="py-1 pr-2">
-                  <NumericCell
-                    label="材料単価"
-                    value={line.unit_cost}
-                    money
-                    integer
-                    disabled={locked}
-                    onChange={(v) => update(index, { unit_cost: v })}
-                  />
-                </td>
-                <td className="py-1 pr-2 text-right font-semibold">{moneyText(costAmount(line))}</td>
-                <td>
-                  {!blankRow && !locked && (
-                    <button type="button" onClick={() => remove(index)} className="text-xs text-red-500">
-                      削除
-                    </button>
-                  )}
-                </td>
-              </tr>
-            );
+          {options.flatMap((option) => {
+            const categoryLines = orderedLines.filter((line) => line.category_code === option.code);
+            return [
+              ...categoryLines.map((line) => {
+                const locked = line.source === 'wood_calc';
+                return (
+                  <tr key={`line-${lines.indexOf(line)}`}>
+                    <td className="bv-edit-cell"><CategorySelect label="材料区分" value={line.category_code} options={options} disabled={locked} onCommit={(category_code) => updateExisting(line, { category_code })} /></td>
+                    <td className="bv-edit-cell"><input aria-label="材料名" value={line.name} disabled={locked} onChange={(event) => updateExisting(line, { name: event.target.value })} className="bv-control" placeholder="材料名" /></td>
+                    <td className="bv-edit-cell"><NumericCell label="数量" value={line.quantity} disabled={locked} onChange={(quantity) => updateExisting(line, { quantity })} /></td>
+                    <td className="bv-edit-cell"><NumericCell label="材料単価" value={line.unit_cost} money integer disabled={locked} onChange={(unit_cost) => updateExisting(line, { unit_cost })} /></td>
+                    <td className="bv-amount"><strong>{moneyText(costAmount(line))}</strong></td>
+                    <td>{!locked && <button type="button" onClick={() => remove(line)} className="bv-link bv-link-danger">削除</button>}</td>
+                  </tr>
+                );
+              }),
+              <tr key={`blank-${option.code}`} className="bv-placeholder-row">
+                <td><span className="bv-control">{option.name}</span></td>
+                <td className="bv-edit-cell"><input aria-label="材料名" value="" onChange={(event) => addBlank(option.code, { name: event.target.value })} className="bv-control" placeholder="空行に入力すると追加" /></td>
+                <td className="bv-edit-cell"><NumericCell label="数量" value={1} placeholder="数量" onChange={(quantity) => addBlank(option.code, { quantity })} /></td>
+                <td className="bv-edit-cell"><NumericCell label="材料単価" value={0} money integer placeholder="単価" onChange={(unit_cost) => addBlank(option.code, { unit_cost })} /></td>
+                <td className="bv-amount">¥0</td><td />
+              </tr>,
+            ];
           })}
         </tbody>
       </table>
@@ -209,109 +215,56 @@ export function TateguCostLinesPanel({ lines, onChange, categories }: CostLinesP
 
 export function TateguLaborLinesPanel({ lines, onChange, categories }: LaborLinesProps) {
   const options = categoryOptions(categories, 'time');
-  const blank: LaborLineDraft = {
-    process_name: '',
-    category_code: options[0]?.code ?? 'FACTORY_TIME',
-    work_hours: 1,
-    labor_rate: 0,
-    amount: 0,
-    sort_order: lines.length,
+  const orderedLines = orderByCategory(lines, options);
+  const updateExisting = (line: LaborLineDraft, patch: Partial<LaborLineDraft>) => {
+    const originalIndex = lines.indexOf(line);
+    const updated = lines.map((item, index) => index === originalIndex ? { ...item, ...patch } : item);
+    onChange(withLaborOrders(updated, options));
   };
-  const rendered = [...lines, blank];
-  const update = (index: number, patch: Partial<LaborLineDraft>) => {
-    const base = index === lines.length ? [...lines, blank] : lines;
-    onChange(withLaborOrders(base.map((line, i) => (i === index ? { ...line, ...patch } : line))));
+  const addBlank = (categoryCode: string, patch: Partial<LaborLineDraft>) => {
+    const blank: LaborLineDraft = {
+      process_name: '', category_code: categoryCode, work_hours: 1, labor_rate: 0,
+      amount: 0, sort_order: lines.length, ...patch,
+    };
+    onChange(withLaborOrders([...lines, blank], options));
   };
-  const remove = (index: number) => onChange(withLaborOrders(lines.filter((_, i) => i !== index)));
-  const totalHours = lines.reduce((s, l) => s + (Number(l.work_hours) || 0), 0);
-  const total = lines.reduce((s, l) => s + laborAmount(l), 0);
+  const remove = (line: LaborLineDraft) => onChange(withLaborOrders(lines.filter((item) => item !== line), options));
+  const totalHours = lines.reduce((sum, line) => sum + (Number(line.work_hours) || 0), 0);
+  const total = lines.reduce((sum, line) => sum + laborAmount(line), 0);
+
   return (
-    <div>
-      {lines.length > 0 && (
-        <div className="flex flex-wrap gap-3 mb-5">
-          {options.map((o) => (
-            <div key={o.code} className="flex-1 min-w-28 bg-slate-50 border rounded-lg px-4 py-3">
-              <div className="text-xs text-slate-400">{o.name}合計</div>
-              <div className="font-bold">
-                {numberText(lines.filter((l) => l.category_code === o.code).reduce((s, l) => s + l.work_hours, 0))} h
-              </div>
-              <div className="text-xs text-slate-400">
-                {moneyText(lines.filter((l) => l.category_code === o.code).reduce((s, l) => s + laborAmount(l), 0))}
-              </div>
-            </div>
-          ))}
-          <div className="flex-1 min-w-36 bg-slate-800 text-white rounded-lg px-4 py-3">
-            <div className="text-xs">労務費合計</div>
-            <div className="font-bold text-lg">{moneyText(total)}</div>
-            <div className="text-xs">{numberText(totalHours)} h</div>
-          </div>
-        </div>
-      )}
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="text-xs text-slate-400 border-b">
-            <th className="text-left pb-1">工程名</th>
-            <th className="text-left pb-1 w-28">区分</th>
-            <th className="text-right pb-1 w-24">工数</th>
-            <th className="text-right pb-1 w-28">労務単価</th>
-            <th className="text-right pb-1 w-28">金額</th>
-            <th className="w-12" />
-          </tr>
-        </thead>
+    <div className="bv-ui">
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${options.length + 1}, minmax(0, 1fr))` }}>
+        {options.map((option) => {
+          const categoryLines = lines.filter((line) => line.category_code === option.code);
+          return <div key={option.code} className="bv-cell bv-readonly"><span className="bv-label">{option.name}合計</span><span className="bv-value bv-number">{numberText(categoryLines.reduce((sum, line) => sum + line.work_hours, 0))} h / {moneyText(categoryLines.reduce((sum, line) => sum + laborAmount(line), 0))}</span></div>;
+        })}
+        <div className="bv-cell bv-readonly"><span className="bv-label">労務費合計</span><strong className="bv-value bv-amount">{moneyText(total)} / {numberText(totalHours)} h</strong></div>
+      </div>
+      <table className="bv-table" aria-label="労務費明細">
+        <thead><tr><th>工程名</th><th style={{ width: 112 }}>区分</th><th className="bv-number" style={{ width: 96 }}>工数</th><th className="bv-number" style={{ width: 112 }}>労務単価</th><th className="bv-number" style={{ width: 112 }}>金額</th><th style={{ width: 48 }} /></tr></thead>
         <tbody>
-          {rendered.map((line, index) => {
-            const blankRow = index === lines.length;
-            return (
-              <tr key={blankRow ? 'blank' : index} className="border-b border-slate-100">
-                <td className="py-1 pr-2">
-                  <input
-                    aria-label="工程名"
-                    value={line.process_name}
-                    onChange={(e) => update(index, { process_name: e.target.value })}
-                    className={inputCls}
-                    placeholder={blankRow ? '空行に入力すると追加' : '工程名'}
-                  />
-                </td>
-                <td className="py-1 pr-2">
-                  <select
-                    aria-label="労務区分"
-                    value={line.category_code}
-                    onChange={(e) => update(index, { category_code: e.target.value })}
-                    className={inputCls}
-                  >
-                    {options.map((o) => (
-                      <option key={o.code} value={o.code}>
-                        {o.name}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td className="py-1 pr-2">
-                  <NumericCell
-                    label="工数"
-                    value={line.work_hours}
-                    onChange={(v) => update(index, { work_hours: v })}
-                  />
-                </td>
-                <td className="py-1 pr-2">
-                  <NumericCell
-                    label="労務単価"
-                    value={line.labor_rate}
-                    money
-                    integer
-                    onChange={(v) => update(index, { labor_rate: v })}
-                  />
-                </td>
-                <td className="py-1 pr-2 text-right font-semibold">{moneyText(laborAmount(line))}</td>
-                <td>
-                  {!blankRow && (
-                    <button type="button" onClick={() => remove(index)} className="text-xs text-red-500">
-                      削除
-                    </button>
-                  )}
-                </td>
-              </tr>
-            );
+          {options.flatMap((option) => {
+            const categoryLines = orderedLines.filter((line) => line.category_code === option.code);
+            return [
+              ...categoryLines.map((line) => (
+                <tr key={`line-${lines.indexOf(line)}`}>
+                  <td className="bv-edit-cell"><input aria-label="工程名" value={line.process_name} onChange={(event) => updateExisting(line, { process_name: event.target.value })} className="bv-control" placeholder="工程名" /></td>
+                  <td className="bv-edit-cell"><CategorySelect label="労務区分" value={line.category_code} options={options} onCommit={(category_code) => updateExisting(line, { category_code })} /></td>
+                  <td className="bv-edit-cell"><NumericCell label="工数" value={line.work_hours} onChange={(work_hours) => updateExisting(line, { work_hours })} /></td>
+                  <td className="bv-edit-cell"><NumericCell label="労務単価" value={line.labor_rate} money integer onChange={(labor_rate) => updateExisting(line, { labor_rate })} /></td>
+                  <td className="bv-amount"><strong>{moneyText(laborAmount(line))}</strong></td>
+                  <td><button type="button" onClick={() => remove(line)} className="bv-link bv-link-danger">削除</button></td>
+                </tr>
+              )),
+              <tr key={`blank-${option.code}`} className="bv-placeholder-row">
+                <td className="bv-edit-cell"><input aria-label="工程名" value="" onChange={(event) => addBlank(option.code, { process_name: event.target.value })} className="bv-control" placeholder="空行に入力すると追加" /></td>
+                <td><span className="bv-control">{option.name}</span></td>
+                <td className="bv-edit-cell"><NumericCell label="工数" value={1} placeholder="工数" onChange={(work_hours) => addBlank(option.code, { work_hours })} /></td>
+                <td className="bv-edit-cell"><NumericCell label="労務単価" value={0} money integer placeholder="単価" onChange={(labor_rate) => addBlank(option.code, { labor_rate })} /></td>
+                <td className="bv-amount">¥0</td><td />
+              </tr>,
+            ];
           })}
         </tbody>
       </table>
