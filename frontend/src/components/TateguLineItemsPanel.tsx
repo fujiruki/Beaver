@@ -218,8 +218,8 @@ function LaborBlankRow({ categoryName, onCommit }: { categoryName: string; onCom
   };
   return (
     <tr className="bv-placeholder-row" data-blank-row="true" data-category={categoryName} onBlur={commit} onKeyDown={handleKeyDown}>
-      <td className="bv-edit-cell bv-fill-cell"><input aria-label="工程名" value={draft.process_name} onChange={(event) => setDraft({ ...draft, process_name: event.target.value })} className="bv-control" placeholder="空行に入力すると追加" /></td>
       <td><span className="bv-control">{categoryName}</span></td>
+      <td className="bv-edit-cell bv-fill-cell"><input aria-label="工程名" value={draft.process_name} onChange={(event) => setDraft({ ...draft, process_name: event.target.value })} className="bv-control" placeholder="空行に入力すると追加" /></td>
       <td className="bv-edit-cell bv-fill-cell"><NumericCell label="工数" value={draft.work_hours} placeholder="工数" onChange={(work_hours) => setDraft((d) => ({ ...d, work_hours }))} /></td>
       <td className="bv-edit-cell bv-fill-cell"><NumericCell label="労務単価" value={draft.labor_rate} money integer placeholder="単価" onChange={(labor_rate) => setDraft((d) => ({ ...d, labor_rate }))} /></td>
       <td className="bv-amount">{moneyText(laborAmount({ work_hours: draft.work_hours, labor_rate: draft.labor_rate }))}</td><td />
@@ -324,15 +324,15 @@ export function TateguLaborLinesPanel({ lines, onChange, categories }: LaborLine
         <div className="bv-cell bv-readonly"><span className="bv-label">労務費合計</span><strong className="bv-value bv-amount">{moneyText(total)} / {hoursText(totalHours)} h</strong></div>
       </div>
       <table className="bv-table" aria-label="労務費明細">
-        <thead><tr><th>工程名</th><th style={{ width: 112 }}>区分</th><th className="bv-number" style={{ width: 96 }}>工数</th><th className="bv-number" style={{ width: 112 }}>労務単価</th><th className="bv-number" style={{ width: 112 }}>金額</th><th style={{ width: 48 }} /></tr></thead>
+        <thead><tr><th style={{ width: 112 }}>区分</th><th>工程名</th><th className="bv-number" style={{ width: 96 }}>工数</th><th className="bv-number" style={{ width: 112 }}>労務単価</th><th className="bv-number" style={{ width: 112 }}>金額</th><th style={{ width: 48 }} /></tr></thead>
         <tbody>
           {options.flatMap((option) => {
             const categoryLines = orderedLines.filter((line) => line.category_code === option.code);
             return [
               ...categoryLines.map((line) => (
                 <tr key={`line-${lines.indexOf(line)}`}>
-                  <td className="bv-edit-cell bv-fill-cell"><input aria-label="工程名" value={line.process_name} onChange={(event) => updateExisting(line, { process_name: event.target.value })} className="bv-control" placeholder="工程名" /></td>
                   <td className="bv-edit-cell bv-fill-cell"><CategorySelect label="労務区分" value={line.category_code} options={options} onCommit={(category_code) => updateExisting(line, { category_code })} /></td>
+                  <td className="bv-edit-cell bv-fill-cell"><input aria-label="工程名" value={line.process_name} onChange={(event) => updateExisting(line, { process_name: event.target.value })} className="bv-control" placeholder="工程名" /></td>
                   <td className="bv-edit-cell bv-fill-cell"><NumericCell label="工数" value={line.work_hours} onChange={(work_hours) => updateExisting(line, { work_hours })} /></td>
                   <td className="bv-edit-cell bv-fill-cell"><NumericCell label="労務単価" value={line.labor_rate} money integer onChange={(labor_rate) => updateExisting(line, { labor_rate })} /></td>
                   <td className="bv-amount"><strong>{moneyText(laborAmount(line))}</strong></td>
