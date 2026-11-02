@@ -166,6 +166,10 @@ export function calcLineProfitSummary(
   };
 }
 
+function sumDiscount(lines: { line_type: string; line_total: number }[]): number {
+  return lines.filter(l => l.line_type === 'discount').reduce((s, l) => s + (l.line_total || 0), 0);
+}
+
 export function calcProfitSummary(
   lines: CostLineForCalc[],
   taxExclusiveTotal: number,
@@ -183,7 +187,9 @@ export function calcProfitSummary(
     materialCost += mat;
     totalWorkHours += (l.cost_factory_hours + l.cost_site_hours) * l.quantity;
   }
-  const totalSales = normalLines.reduce((s, l) => s + l.line_total, 0);
+  const discountAmount = sumDiscount(lines);
+  grossProfit -= discountAmount;
+  const totalSales = normalLines.reduce((s, l) => s + l.line_total, 0) - discountAmount;
   const grossMargin = totalSales - materialCost;
   const grossProfitRate = taxExclusiveTotal > 0 ? grossProfit / taxExclusiveTotal : null;
   const grossMarginRate = taxExclusiveTotal > 0 ? grossMargin / taxExclusiveTotal : null;
@@ -212,7 +218,9 @@ export function calcProfitSummaryDynamic(
       .filter(c => c.measure_type === 'time')
       .reduce((s, c) => s + (c.value || 0), 0) * l.quantity;
   }
-  const totalSales = normalLines.reduce((s, l) => s + l.line_total, 0);
+  const discountAmount = sumDiscount(lines);
+  grossProfit -= discountAmount;
+  const totalSales = normalLines.reduce((s, l) => s + l.line_total, 0) - discountAmount;
   const grossMargin = totalSales - materialCost;
   const grossProfitRate = taxExclusiveTotal > 0 ? grossProfit / taxExclusiveTotal : null;
   const grossMarginRate = taxExclusiveTotal > 0 ? grossMargin / taxExclusiveTotal : null;
