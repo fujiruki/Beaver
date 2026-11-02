@@ -172,6 +172,19 @@ export function useAddLine(voucherId: number) {
   });
 }
 
+/** 明細の並べ替え（全行の順番を1回で送る。R-0238） */
+export function useReorderLines(voucherId: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { line_ids: number[]; expected_updated_at?: string }) =>
+      api.put<{ voucher_updated_at: string }>(`/vouchers/${voucherId}/line-order`, data),
+    onSettled: () => {
+      invalidateProjects(queryClient);
+      queryClient.invalidateQueries({ queryKey: [KEY, voucherId] });
+    },
+  });
+}
+
 /** 明細行更新（楽観的更新付き） */
 export function useUpdateLine(voucherId: number) {
   const queryClient = useQueryClient();

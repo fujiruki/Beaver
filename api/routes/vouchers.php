@@ -13,6 +13,7 @@
  * POST   /vouchers/{id}/lines             明細追加
  * PUT    /vouchers/{id}/lines/{lineId}    明細更新
  * DELETE /vouchers/{id}/lines/{lineId}    明細削除
+ * PUT    /vouchers/{id}/line-order        明細の並べ替え（line_ids を上から順に）
  */
 
 $segments   = explode('/', trim($path, '/'));
@@ -950,6 +951,44 @@ switch ($method) {
         break;
 
     case 'PUT':
+        // ---- R-0238 明細の並べ替え（全行の順番を1回で振り直す）----
+        if ($resourceId && $subAction === 'line-order') {
+            $data = json_decode(file_get_contents('php://input'), true) ?? [];
+            $lineIds = $data['line_ids'] ?? null;
+            if (!is_array($lineIds) || array_filter($lineIds, fn($v) => !is_int($v))) {
+                http_response_code(400);
+                echo json_encode(['error' => 'line_ids は行IDの配列で指定してください']);
+                exit;
+            }
+            beginVoucherWrite($pdo, $resourceId, $data);
+            assertVoucherEditable($pdo, $resourceId);
+            $cur = $pdo->prepare('SELECT id, line_no FROM voucher_lines WHERE voucher_id = ?');
+            $cur->execute([$resourceId]);
+            $oldNos = $cur->fetchAll(PDO::FETCH_KEY_PAIR);
+            $expectedIds = array_keys($oldNos);
+            $given = $lineIds;
+            sort($given);
+            sort($expectedIds);
+            if ($given !== $expectedIds) {
+                $pdo->rollBack();
+                http_response_code(400);
+                echo json_encode(['error' => 'line_ids がこの伝票の行と一致しません']);
+                exit;
+            }
+            // UNIQUE(voucher_id, line_no) に当たらないよう、いったん負の値へ退避してから振り直す
+            $pdo->prepare('UPDATE voucher_lines SET line_no = -id WHERE voucher_id = ?')->execute([$resourceId]);
+            $setNo = $pdo->prepare('UPDATE voucher_lines SET line_no = ? WHERE id = ?');
+            $markEdited = $pdo->prepare('UPDATE voucher_lines SET edited_in_beaver = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?');
+            foreach ($lineIds as $i => $lineId) {
+                $setNo->execute([$i + 1, $lineId]);
+                if ((int)$oldNos[$lineId] !== $i + 1) $markEdited->execute([$lineId]);
+            }
+            $pdo->prepare('UPDATE vouchers SET updated_at = CURRENT_TIMESTAMP WHERE id = ?')->execute([$resourceId]);
+            $result = ['voucher_updated_at' => voucherUpdatedAtJst($pdo, $resourceId)];
+            $pdo->commit();
+            echo json_encode($result);
+            break;
+        }
         // ---- 明細更新 ----
         if ($resourceId && $subAction === 'lines' && $subId) {
             $data = json_decode(file_get_contents('php://input'), true) ?? [];

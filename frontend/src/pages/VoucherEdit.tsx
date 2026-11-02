@@ -4,7 +4,7 @@ import { useForm, FormProvider, useFieldArray, useWatch } from 'react-hook-form'
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import {
   useVoucher, useCreateVoucher, useUpdateVoucher,
-  useAddLine, useDeleteLine, useConvertToSales, useReloadSnapshots, useUpdateLine, useVoidVoucher, useUnvoidVoucher,
+  useAddLine, useDeleteLine, useConvertToSales, useReloadSnapshots, useUpdateLine, useReorderLines, useVoidVoucher, useUnvoidVoucher,
 } from '../api/vouchers';
 import { api, ApiError } from '../api/client';
 import { useCustomers } from '../api/customers';
@@ -295,6 +295,7 @@ export default function VoucherEdit() {
   const convertMutation = useConvertToSales(voucherId);
   const reloadMutation = useReloadSnapshots(voucherId);
   const updateLineMutation = useUpdateLine(voucherId);
+  const reorderMutation = useReorderLines(voucherId);
   const voidMutation = useVoidVoucher();
   const unvoidMutation = useUnvoidVoucher();
 
@@ -698,9 +699,7 @@ export default function VoucherEdit() {
         ].map((line, index) => ({ ...line, line_no: index + 1 }));
         replace(reorderedLines);
         setSelectedIdx(insertAt);
-        for (const line of reorderedLines.slice(insertAt)) {
-          if (line.id) void saveLine(line.id, { line_no: line.line_no });
-        }
+        void saveLineOrder(reorderedLines);
       }, () => undefined);
     }
   }
@@ -708,13 +707,10 @@ export default function VoucherEdit() {
   function handleMoveUp() {
     if (!formReady) return;
     if (selectedIdx === null || selectedIdx === 0) return;
-    const moving = watchedLines?.[selectedIdx];
-    const displaced = watchedLines?.[selectedIdx - 1];
+    const reordered = [...(watchedLines ?? [])];
+    [reordered[selectedIdx - 1], reordered[selectedIdx]] = [reordered[selectedIdx], reordered[selectedIdx - 1]];
     swap(selectedIdx, selectedIdx - 1);
-    if (!isNew) {
-      if (moving?.id) void saveLine(moving.id, { line_no: selectedIdx });
-      if (displaced?.id) void saveLine(displaced.id, { line_no: selectedIdx + 1 });
-    }
+    if (!isNew) void saveLineOrder(reordered);
     setSelectedIdx(selectedIdx - 1);
   }
 
@@ -722,13 +718,10 @@ export default function VoucherEdit() {
     if (!formReady) return;
     const len = watchedLines?.length ?? 0;
     if (selectedIdx === null || selectedIdx >= len - 1) return;
-    const moving = watchedLines?.[selectedIdx];
-    const displaced = watchedLines?.[selectedIdx + 1];
+    const reordered = [...(watchedLines ?? [])];
+    [reordered[selectedIdx], reordered[selectedIdx + 1]] = [reordered[selectedIdx + 1], reordered[selectedIdx]];
     swap(selectedIdx, selectedIdx + 1);
-    if (!isNew) {
-      if (moving?.id) void saveLine(moving.id, { line_no: selectedIdx + 2 });
-      if (displaced?.id) void saveLine(displaced.id, { line_no: selectedIdx + 1 });
-    }
+    if (!isNew) void saveLineOrder(reordered);
     setSelectedIdx(selectedIdx + 1);
   }
 
@@ -757,6 +750,23 @@ export default function VoucherEdit() {
       setSaveStatus('saved');
     } catch (error) {
       failedLineRef.current = { lineId, data };
+      setSaveError(error);
+      setSaveStatus(staleRef.current ? 'unsaved' : 'error');
+    }
+  }
+
+  async function saveLineOrder(orderedLines: Array<{ id?: number }>) {
+    if (!formReady) return;
+    const lineIds = orderedLines.map(line => line.id).filter((id): id is number => typeof id === 'number');
+    setSaveStatus('saving');
+    setSaveError(null);
+    try {
+      await enqueueVoucherWrite(expectedUpdatedAt => reorderMutation.mutateAsync({
+        line_ids: lineIds, expected_updated_at: expectedUpdatedAt ?? undefined,
+      }));
+      setSavedAt(new Date());
+      setSaveStatus('saved');
+    } catch (error) {
       setSaveError(error);
       setSaveStatus(staleRef.current ? 'unsaved' : 'error');
     }
