@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { useState } from 'react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { TateguCostLinesPanel, TateguLaborLinesPanel } from '../TateguLineItemsPanel';
 import type { AggregationCategoryMaster } from '../../api/aggregationCategories';
 import type { CostLineDraft, LaborLineDraft } from '../TateguLineItemsPanel';
@@ -12,7 +13,66 @@ const categories: AggregationCategoryMaster[] = [
   { id: 5, code: 'SITE_TIME', name: '現場時間', measure_type: 'time', sort_order: 5, is_active: 1, synced_at: '' },
 ];
 
+function CostLinesHarness() {
+  const [lines, setLines] = useState<CostLineDraft[]>([]);
+  return <TateguCostLinesPanel lines={lines} onChange={setLines} categories={categories} />;
+}
+
+function materialRows() {
+  return screen.getByRole('table', { name: '材料費明細' }).querySelectorAll('tbody tr');
+}
+
+function laborRows() {
+  return screen.getByRole('table', { name: '労務費明細' }).querySelectorAll('tbody tr');
+}
+
 describe('TateguCostLinesPanel', () => {
+  it('R-0231 AC1: 行が無いとき区分順に材料費の空行を1行ずつ表示する', () => {
+    render(<TateguCostLinesPanel lines={[]} onChange={vi.fn()} categories={categories} />);
+
+    expect(Array.from(materialRows(), (row) => within(row as HTMLElement).getByText(/本体|金物|ガラス/).textContent))
+      .toEqual(['本体', '金物', 'ガラス']);
+  });
+
+  it('R-0231 AC2: 本体とガラスの空行へ続けて入力すると各区分の直後に新しい空行を表示する', () => {
+    render(<CostLinesHarness />);
+
+    fireEvent.change(within(materialRows()[0] as HTMLElement).getByLabelText('材料名'), { target: { value: '框材' } });
+    expect(Array.from(materialRows(), (row) => row.textContent)).toEqual([
+      expect.stringContaining('本体'),
+      expect.stringContaining('本体'),
+      expect.stringContaining('金物'),
+      expect.stringContaining('ガラス'),
+    ]);
+    expect((within(materialRows()[0] as HTMLElement).getByLabelText('材料名') as HTMLInputElement).value).toBe('框材');
+    expect((within(materialRows()[1] as HTMLElement).getByLabelText('材料名') as HTMLInputElement).value).toBe('');
+
+    fireEvent.change(within(materialRows()[3] as HTMLElement).getByLabelText('材料名'), { target: { value: '透明ガラス' } });
+    expect(Array.from(materialRows(), (row) => row.textContent)).toEqual([
+      expect.stringContaining('本体'),
+      expect.stringContaining('本体'),
+      expect.stringContaining('金物'),
+      expect.stringContaining('ガラス'),
+      expect.stringContaining('ガラス'),
+    ]);
+    expect((within(materialRows()[3] as HTMLElement).getByLabelText('材料名') as HTMLInputElement).value).toBe('透明ガラス');
+    expect((within(materialRows()[4] as HTMLElement).getByLabelText('材料名') as HTMLInputElement).value).toBe('');
+  });
+
+  it('R-0231 AC3: 空でない行だけを正しい区分で変更通知する', () => {
+    const onChange = vi.fn();
+    render(<TateguCostLinesPanel lines={[]} onChange={onChange} categories={categories} />);
+
+    fireEvent.change(within(materialRows()[1] as HTMLElement).getByLabelText('材料名'), { target: { value: '丁番' } });
+
+    expect(onChange).toHaveBeenLastCalledWith([expect.objectContaining({
+      category_code: 'HARDWARE',
+      name: '丁番',
+      sort_order: 0,
+    })]);
+    expect(onChange.mock.calls.at(-1)?.[0]).toHaveLength(1);
+  });
+
   it('数量と単価から金額を自動計算し、変更内容を返す', () => {
     const onChange = vi.fn();
     const lines: CostLineDraft[] = [{
@@ -86,6 +146,13 @@ describe('TateguCostLinesPanel', () => {
 });
 
 describe('TateguLaborLinesPanel', () => {
+  it('R-0231 AC4: 区分順に工程の空行を1行ずつ表示する', () => {
+    render(<TateguLaborLinesPanel lines={[]} onChange={vi.fn()} categories={categories} />);
+
+    expect(Array.from(laborRows(), (row) => within(row as HTMLElement).getByText(/工場時間|現場時間/).textContent))
+      .toEqual(['工場時間', '現場時間']);
+  });
+
   it('工数と労務単価から金額を自動計算し、変更内容を返す', () => {
     const onChange = vi.fn();
     const lines: LaborLineDraft[] = [{
