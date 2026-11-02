@@ -461,3 +461,13 @@
 #### 原文
 
 > beaverのでんぴょうで行を上下移動しても保存されてないかも。　その行の上下移動はちゃんとaccessにも同期反映されてほしいし　双方向同期してほしいそこも。
+
+### R-0239 入金の種類・請求日印字・引用日を Access と同期する（2026-11-02）
+
+- 晴樹さん（dodai-back 経由。同期項目の棚卸し AccessTategu 65f385f への答え）
+- 状態: 仕様化済み
+- 仕様: `docs/spec/R-0239_sync_payment_type_billing_print_quoted_at.md`
+
+#### 原文（dodai-back が伝えた晴樹さんの答え）
+
+> 直すのは次の4つで、全部です。(a) 値引の行（line_type）・性別・行の順番 (b) 入金の種類 (c) 請求日印字・引用日 (d) Access だけの項目も Beaver に足す
