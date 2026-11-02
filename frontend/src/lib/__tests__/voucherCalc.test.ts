@@ -412,3 +412,55 @@ describe('R-0183 利益率・粗利率・日割粗利', () => {
     expect(result.dailyGrossProfit).toBe(expected);
   });
 });
+
+describe('R-0240 値引きの行を利益と粗利から引く', () => {
+  const money = (value: number): LineCategoryValue[] => [
+    { category_code: 'MAIN', category_name: '材料', measure_type: 'money', value, sort_order: 1 },
+  ];
+  const dynamicLines = (withDiscount: boolean) => [
+    { costs: money(158500), cost_labor_rate: 0, quantity: 1, line_type: 'normal' as const, line_total: 230000 },
+    { costs: money(128000), cost_labor_rate: 0, quantity: 1, line_type: 'normal' as const, line_total: 160000 },
+    { costs: [], cost_labor_rate: 0, quantity: 1, line_type: 'subtotal' as const, line_total: 390000 },
+    ...(withDiscount
+      ? [{ costs: [], cost_labor_rate: 0, quantity: 1, line_type: 'discount' as const, line_total: 20000 }]
+      : []),
+  ];
+
+  it('動的原価: 値引き20,000で利益83,500・粗利も20,000減り、利益率は税抜370,000で割る', () => {
+    const result = calcProfitSummaryDynamic(dynamicLines(true), 370000);
+    expect(result.grossProfit).toBe(83500);
+    expect(result.grossMargin).toBe(390000 - 286500 - 20000);
+    expect(result.grossProfitRate).toBeCloseTo(83500 / 370000);
+    expect(result.grossMarginRate).toBeCloseTo(83500 / 370000);
+  });
+
+  it('動的原価: 値引きの行が無ければ今と同じ値', () => {
+    const result = calcProfitSummaryDynamic(dynamicLines(false), 390000);
+    expect(result.grossProfit).toBe(103500);
+    expect(result.grossMargin).toBe(103500);
+  });
+
+  it('固定原価: 値引き20,000で利益83,500、粗利も20,000減る', () => {
+    const base = { cost_hardware: 0, cost_glass: 0, cost_factory_hours: 0, cost_site_hours: 0, cost_labor_rate: 0, quantity: 1 };
+    const result = calcProfitSummary([
+      { ...base, cost_body: 158500, line_type: 'normal', line_total: 230000 },
+      { ...base, cost_body: 128000, line_type: 'normal', line_total: 160000 },
+      { ...base, cost_body: 0, line_type: 'discount', line_total: 20000 },
+    ], 370000);
+    expect(result.grossProfit).toBe(83500);
+    expect(result.grossMargin).toBe(83500);
+    expect(result.grossProfitRate).toBeCloseTo(83500 / 370000);
+  });
+
+  it('値引き後の粗利から時間あたり粗利と日割り粗利を出す', () => {
+    const result = calcProfitSummaryDynamic([
+      {
+        costs: [{ category_code: 'FACTORY_TIME', category_name: '作業時間', measure_type: 'time', value: 16, sort_order: 1 }],
+        cost_labor_rate: 0, quantity: 1, line_type: 'normal', line_total: 100000,
+      },
+      { costs: [], cost_labor_rate: 0, quantity: 1, line_type: 'discount', line_total: 20000 },
+    ], 80000);
+    expect(result.grossProfitPerHour).toBeCloseTo(80000 / 16);
+    expect(result.dailyGrossProfit).toBe(40000);
+  });
+});

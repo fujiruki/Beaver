@@ -37,4 +37,10 @@ describe('R-0233 伝票のAI向けMarkdown', () => {
     expect(markdown).toContain('## 製品台帳 ID:10');
     expect(markdown).toContain('（読み込めませんでした）');
   });
+
+  it('値引きの行があれば利益から引く', () => {
+    const discount = { ...line, line_no: 3, line_type: 'discount' as const, line_total: 20000, tategu_item_id: null, costs: [] };
+    const markdown = buildVoucherMarkdown({ form: { ...form, lines: [...form.lines, discount] }, voucherNo: '', customerName: '', projectName: '', ledgers: new Map() });
+    expect(markdown).toContain('- 利益: ¥220,000');
+  });
 });
