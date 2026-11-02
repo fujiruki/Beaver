@@ -1,0 +1,82 @@
+/* R-0230 伝票編集の画面固有配置。色・基本部品は beaver-ui.css を正とする。 */
+.ve-page { min-width: 0; container-type: inline-size; background: #fff; color: #1f2937; }
+.ve-topbar { top: 0; justify-content: space-between; }
+.ve-topbar-main, .ve-topbar-actions, .ve-id, .ve-row-actions { display: flex; align-items: center; gap: 5px; }
+.ve-title { color: #334155; font-size: 15px; }
+.ve-badge { padding: 2px 6px; border: 1px solid var(--bv-line); background: var(--bv-soft); color: var(--bv-muted); font-size: 11px; white-space: nowrap; }
+.ve-badge-access { border-color: #bfdbfe; background: var(--bv-blue-soft); color: #1e40af; }
+.ve-meta { color: var(--bv-placeholder); font-size: 11px; white-space: nowrap; }
+.ve-notice { padding: 7px 10px; border: 1px solid var(--bv-line); border-top: 0; color: var(--bv-muted); font-size: 12px; }
+.ve-notice-error { border-color: #fecaca; background: var(--bv-red-soft); color: #991b1b; }
+.ve-notice-warn { border-color: #fde68a; background: #fffbeb; color: #92400e; }
+.ve-notice-info { border-color: #bfdbfe; background: var(--bv-blue-soft); color: #1e40af; }
+.ve-shell { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; padding: 8px 10px 20px; }
+.ve-main { min-width: 0; }
+.ve-header-grid { display: grid; grid-template-columns: 2fr 2fr 1fr 1fr 1fr; border-bottom: 1px solid var(--bv-line); }
+.ve-header-grid-secondary { grid-template-columns: 3fr 1fr 1fr 1fr 1.2fr 1.25fr; }
+.ve-header-grid-sales { grid-template-columns: 3fr 1fr 1fr 1fr 1.25fr; }
+.ve-summary { min-width: 0; }
+.ve-summary-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 250px; }
+.ve-metric-group { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-right: 1px solid var(--bv-line); }
+.ve-metric { min-width: 0; padding: 7px 9px; border-right: 1px solid var(--bv-line); }
+.ve-metric:last-child { border-right: 0; }
+.ve-metric-label { color: var(--bv-muted); font-size: 11px; }
+.ve-metric-value { margin-top: 2px; color: #1f2937; font-size: 20px; line-height: 1.2; text-align: right; }
+.ve-summary-detail { padding: 5px 8px; background: var(--bv-soft); font-size: 11px; }
+.ve-detail-row { display: flex; justify-content: space-between; gap: 12px; padding: 2px 0; color: var(--bv-muted); }
+.ve-detail-row span:last-child { color: #334155; }
+.ve-rate { border-bottom: 1px solid var(--bv-line); padding-bottom: 4px; margin-bottom: 2px; }
+.ve-summary-side { display: none; }
+.ve-profit-rate { display: flex; align-items: center; gap: 7px; margin-top: 8px; padding: 5px 7px; border: 1px solid var(--bv-line); background: var(--bv-soft); }
+.ve-profit-rate .bv-toggle-list { flex: 1; border-top: 0; }
+.ve-row-actions { padding: 5px 0; }
+.ve-lines-panel { min-width: 0; }
+.ve-lines-scroll { overflow-x: auto; border-top: 1px solid var(--bv-line); }
+.ve-lines { width: 1283px; }
+.ve-line-heading { display: grid; grid-template-columns: 38px 325px 920px; height: 27px; border-bottom: 1px solid var(--bv-line); background: var(--bv-head); color: var(--bv-muted); font-size: 11px; }
+.ve-line-heading > span { padding: 5px; border-right: 1px solid var(--bv-line); }
+.ve-line-heading > span:last-child { border-right: 0; }
+.ve-line { display: grid; grid-template-columns: 38px 325px 920px; border-bottom: 1px solid var(--bv-line); background: #fff; font-size: 11px; }
+.ve-line-selected { box-shadow: inset 3px 0 0 var(--bv-blue); background: var(--bv-blue-soft); }
+.ve-line-no { padding: 8px 5px; border-right: 1px solid var(--bv-line); text-align: center; }
+.ve-line-main { display: grid; grid-template-columns: 1.5fr 1fr 42px; border-right: 1px solid var(--bv-line); }
+.ve-line-main > div { min-width: 0; padding: 5px; border-right: 1px solid var(--bv-line); }
+.ve-line-main > div:last-child { border-right: 0; }
+.ve-line-note { grid-column: 1 / -1; border-top: 1px solid var(--bv-line); color: var(--bv-muted); }
+.ve-bands { min-width: 0; }
+.ve-band { display: grid; grid-template-columns: 55px repeat(3, 92px) 78px 72px 72px 90px 90px 1fr; min-height: 27px; border-bottom: 1px solid var(--bv-line); }
+.ve-band:last-child { border-bottom: 0; }
+.ve-band > span { padding: 5px; border-right: 1px solid var(--bv-line); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ve-band > span:last-child { border-right: 0; }
+.ve-band-price { background: #eef6ee; }
+.ve-band-cost { background: #fdf3e7; }
+.ve-band-profit { background: var(--bv-soft); }
+.ve-line-discount .ve-band, .ve-line-subtotal .ve-band { min-height: 54px; align-items: center; }
+.ve-lines-footer { display: flex; justify-content: space-between; padding: 6px 8px; }
+.ve-bottom { display: flex; justify-content: space-between; align-items: flex-start; padding-top: 8px; }
+.ve-tax-detail { width: 330px; border: 1px solid var(--bv-line); font-size: 12px; }
+.ve-tax-detail .ve-detail-row { padding: 4px 7px; border-bottom: 1px solid var(--bv-line); }
+.ve-tax-detail .ve-detail-row:last-child { border-bottom: 0; }
+.ve-save-float { position: fixed; right: 14px; bottom: 14px; z-index: 20; padding: 6px 10px; border: 1px solid var(--bv-line); background: #fff; font-size: 12px; }
+.ve-state-readonly .bv-control, .ve-state-readonly .ve-band { background: var(--bv-soft); color: #475569; }
+.ve-state-readonly .ve-row-actions, .ve-state-readonly .ve-profit-rate, .ve-state-readonly .bv-add-row { display: none; }
+
+@container (min-width: 1593px) {
+  .ve-shell { grid-template-columns: minmax(0, 1fr) 286px; align-items: start; }
+  .ve-main-summary { display: none; }
+  .ve-summary-side { display: block; position: sticky; top: 49px; max-height: calc(100vh - 59px); overflow-y: auto; }
+  .ve-summary-side .ve-summary-body { display: block; }
+  .ve-summary-side .ve-metric-group { grid-template-columns: 1fr; border-right: 0; border-bottom: 1px solid var(--bv-line); }
+  .ve-summary-side .ve-metric { display: grid; grid-template-columns: 1fr auto; align-items: baseline; border-right: 0; border-bottom: 1px solid var(--bv-line); }
+  .ve-summary-side .ve-metric:last-child { border-bottom: 0; }
+  .ve-summary-side .ve-metric-value { font-size: 18px; }
+}
+
+@container (max-width: 1360px) {
+  .ve-topbar { align-items: flex-start; }
+  .ve-topbar-actions { flex-wrap: wrap; justify-content: flex-end; }
+  .ve-meta { display: none; }
+  .ve-summary-body { grid-template-columns: 1fr 1fr; }
+  .ve-summary-detail { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, 1fr); gap: 0 12px; border-top: 1px solid var(--bv-line); }
+  .ve-rate { border-bottom: 0; margin: 0; padding: 2px 0; }
+}
