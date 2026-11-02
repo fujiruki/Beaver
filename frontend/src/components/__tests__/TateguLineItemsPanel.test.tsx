@@ -190,7 +190,20 @@ describe('TateguCostLinesPanel', () => {
 });
 
 describe('TateguLaborLinesPanel', () => {
-  it('R-0232 入力した工場時間空行の単価でTabすると追加後の同区分工程名へ移る', () => {
+  it('R-0234 労務費の列を材料費と同じ並びと幅にする', () => {
+    render(<TateguLaborLinesPanel lines={[]} onChange={vi.fn()} categories={categories} />);
+
+    const table = screen.getByRole('table', { name: '労務費明細' });
+    const headers = within(table).getAllByRole('columnheader');
+    expect(headers.map((header) => header.textContent)).toEqual(['区分', '工程名', '工数', '労務単価', '金額', '']);
+    expect(headers.map((header) => header.style.width)).toEqual(['112px', '', '96px', '112px', '112px', '48px']);
+
+    const factoryBlankCells = (laborRows()[0] as HTMLTableRowElement).cells;
+    expect(factoryBlankCells[0].textContent).toBe('工場時間');
+    expect(within(factoryBlankCells[1] as HTMLElement).getByLabelText('工程名')).toBeTruthy();
+  });
+
+  it('R-0234 入力した工場時間空行の単価でTabすると追加後の同区分工程名へ移る', () => {
     function Harness() {
       const [lines, setLines] = useState<LaborLineDraft[]>([]);
       return <TateguLaborLinesPanel lines={lines} onChange={setLines} categories={categories} />;
