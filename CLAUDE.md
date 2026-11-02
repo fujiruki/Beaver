@@ -25,6 +25,8 @@
 2. **`docs/handover/Hikitsugi_LATEST.md`** — 直前の作業内容・現在地・次のタスク（過去の引き継ぎは同ディレクトリに `YYYYMMDD_Hikitsugi.md` として日付別保管）
 3. **`docs/`** — 設計ドキュメント（DB設計・画面設計・フロー解説）
 
+画面を作る・直すときは `docs/design/DESIGN_SYSTEM.md` を読み、good-design（v1.6）で進める。
+
 ## システム概要
 
 ```

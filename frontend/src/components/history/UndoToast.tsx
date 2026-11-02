@@ -16,7 +16,7 @@ export default function UndoToast({ message, onUndo, onDismiss, pending, autoDis
   }, [onDismiss, autoDismissMs]);
 
   return (
-    <div className="pd-undo" role="status">
+    <div className="bv-undo" role="status">
       <span style={{ flex: 1 }}>{message}</span>
       <button type="button" onClick={onUndo} disabled={pending}>
         {pending ? '元に戻しています...' : '元に戻す'}

@@ -24,15 +24,15 @@ export default function CapacityCheckPanel({ projectId }: { projectId: number })
   }
 
   return (
-    <section className="pd-panel">
-      <div className="pd-panel-title">
+    <section className="bv-panel">
+      <div className="bv-panel-title">
         <h2>Youkan</h2>
         <span className="pd-spacer" />
         <button
           type="button"
           onClick={() => refetch()}
           disabled={isFetching}
-          className="pd-btn"
+          className="bv-btn"
         >
           {isFetching ? '判定中...' : data?.ok ? '再判定' : '判定する'}
         </button>

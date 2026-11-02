@@ -860,7 +860,7 @@ function ExistingProjectDetail({ projectId, goBack }: { projectId: number; goBac
     const value = String(values[key] ?? '');
     const props = {
       'aria-label': label,
-      className: 'pd-control',
+      className: 'bv-control',
       value,
       onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => change(key, event.target.value as never),
       onBlur: (event: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) =>
@@ -898,12 +898,12 @@ function ExistingProjectDetail({ projectId, goBack }: { projectId: number; goBac
   }));
 
   return (
-    <form className="pd-shell" noValidate onSubmit={e => e.preventDefault()}>
-      <header className="pd-topbar">
-        <button type="button" className="pd-link" onClick={goBack}>← 戻る</button>
+    <form className="bv-ui pd-shell" noValidate onSubmit={e => e.preventDefault()}>
+      <header className="bv-topbar pd-topbar">
+        <button type="button" className="bv-link" onClick={goBack}>← 戻る</button>
         <h1 className="pd-title">案件 編集</h1>
         <span className="pd-spacer" />
-        <span className={`pd-save-status pd-save-${saveState}`}>
+        <span className={`pd-save-status bv-save-${saveState}`}>
           {saveState === 'saved' && '保存済'}
           {saveState === 'saving' && '保存中…'}
           {saveState === 'error' && <>保存できませんでした［<button type="button" onClick={() => location.reload()}>再試行</button>］</>}
@@ -912,44 +912,44 @@ function ExistingProjectDetail({ projectId, goBack }: { projectId: number; goBac
 
       <div className="pd-layout">
         <div className="pd-column" data-testid="project-detail-left-column">
-          <section className="pd-panel" data-testid="project-key-points">
-            <h2 className="pd-panel-title">案件の要点</h2>
+          <section className="bv-panel" data-testid="project-key-points">
+            <h2 className="bv-panel-title">案件の要点</h2>
             <div className="pd-key-grid">
-              <div className="pd-cell pd-readonly"><span className="pd-label">案件コード</span><span className="pd-value pd-code">{project.project_code}</span></div>
-              <label className={`pd-cell ${!String(values.name ?? '').trim() ? 'pd-invalid' : ''}`}><span className="pd-label">案件名 *</span>{textField('name', '案件名')}</label>
-              <div className="pd-cell"><span className="pd-label">得意先 *</span><ComboSelect options={customerOptions} value={Number(values.customer_id) || null} onChange={id => {
+              <div className="bv-cell bv-readonly"><span className="bv-label">案件コード</span><span className="bv-value pd-code">{project.project_code}</span></div>
+              <label className={`bv-cell ${!String(values.name ?? '').trim() ? 'pd-invalid' : ''}`}><span className="bv-label">案件名 *</span>{textField('name', '案件名')}</label>
+              <div className="bv-cell"><span className="bv-label">得意先 *</span><ComboSelect options={customerOptions} value={Number(values.customer_id) || null} onChange={id => {
                 const previous = values.customer_id;
                 change('customer_id', id ?? 0);
                 void saveField('customer_id', id ?? 0, '得意先', previous);
-              }} placeholder="得意先を検索..." headers={['得意先名', '備考']} inputClassName="pd-control" /></div>
-              <label className="pd-cell"><span className="pd-label" title="ここまでに納品したい日">納期</span><div className="pd-due-field"><input aria-label="納期" type="date" max="9999-12-31" className="pd-control" value={String(values.delivery_date ?? '')} onChange={event => {
+              }} placeholder="得意先を検索..." headers={['得意先名', '備考']} inputClassName="bv-control" /></div>
+              <label className="bv-cell"><span className="bv-label" title="ここまでに納品したい日">納期</span><div className="pd-due-field"><input aria-label="納期" type="date" max="9999-12-31" className="bv-control" value={String(values.delivery_date ?? '')} onChange={event => {
                 const previous = values.delivery_date;
                 change('delivery_date', event.target.value);
                 void saveField('delivery_date', event.target.value, '納期', previous);
-              }} />{dueDays !== null && <span className={dueDays < 0 ? 'pd-due-over' : dueDays <= 5 ? 'pd-due-soon' : ''}>{dueDays === 0 ? '今日' : dueDays < 0 ? `${Math.abs(dueDays)} 営業日超過` : `あと ${dueDays} 営業日`}</span>}</div></label>
+              }} />{dueDays !== null && <span className={dueDays < 0 ? 'bv-due-over' : dueDays <= 5 ? 'bv-due-soon' : ''}>{dueDays === 0 ? '今日' : dueDays < 0 ? `${Math.abs(dueDays)} 営業日超過` : `あと ${dueDays} 営業日`}</span>}</div></label>
             </div>
             {selectedCustomer && <div className="pd-customer-line">
-              <span className="pd-label">得意先</span>
+              <span className="bv-label">得意先</span>
               <span className="pd-ci">{[selectedCustomer.address1, selectedCustomer.address2].filter(Boolean).join('') || '—'}</span>
-              {selectedCustomer.tel && <span className="pd-ci">電話 <a className="pd-link pd-contact-link pd-mono" href={`tel:${selectedCustomer.tel}`}>{selectedCustomer.tel}</a></span>}
-              {selectedCustomer.mobile && <span className="pd-ci">携帯 <a className="pd-link pd-contact-link pd-mono" href={`tel:${selectedCustomer.mobile}`}>{selectedCustomer.mobile}</a></span>}
-              {selectedCustomer.email && <a className="pd-link pd-contact-link" href={`mailto:${selectedCustomer.email}`}>{selectedCustomer.email}</a>}
+              {selectedCustomer.tel && <span className="pd-ci">電話 <a className="bv-link pd-contact-link bv-mono" href={`tel:${selectedCustomer.tel}`}>{selectedCustomer.tel}</a></span>}
+              {selectedCustomer.mobile && <span className="pd-ci">携帯 <a className="bv-link pd-contact-link bv-mono" href={`tel:${selectedCustomer.mobile}`}>{selectedCustomer.mobile}</a></span>}
+              {selectedCustomer.email && <a className="bv-link pd-contact-link" href={`mailto:${selectedCustomer.email}`}>{selectedCustomer.email}</a>}
               {selectedCustomer.memo && <span className="pd-ci pd-ci-memo">{selectedCustomer.memo}</span>}
               <span className="pd-spacer" />
-              <button type="button" className="pd-btn pd-customer-btn" onClick={() => window.open(`${import.meta.env.BASE_URL}customers/${selectedCustomer.id}`, '_blank')}>得意先を編集</button>
-              <button type="button" className="pd-btn pd-customer-btn" onClick={() => setModalOpen(true)}>＋ 新規得意先</button>
+              <button type="button" className="bv-btn pd-customer-btn" onClick={() => window.open(`${import.meta.env.BASE_URL}customers/${selectedCustomer.id}`, '_blank')}>得意先を編集</button>
+              <button type="button" className="bv-btn pd-customer-btn" onClick={() => setModalOpen(true)}>＋ 新規得意先</button>
             </div>}
-            <div className="pd-status-area"><span className="pd-label">ステータス</span><div className="pd-status-list">{projectStatuses.map(status => <button key={status.id} type="button" aria-label={status.name} aria-pressed={values.status === status.name} className={`pd-status ${values.status === status.name ? 'pd-status-active' : ''}`} onClick={() => {
+            <div className="bv-toggle-area"><span className="bv-label">ステータス</span><div className="bv-toggle-list">{projectStatuses.map(status => <button key={status.id} type="button" aria-label={status.name} aria-pressed={values.status === status.name} className={`bv-toggle ${values.status === status.name ? 'bv-toggle-active' : ''}`} onClick={() => {
               const previous = values.status;
               change('status', status.name);
               void saveField('status', status.name, 'ステータス', previous, true, true);
             }}>{status.name}</button>)}</div></div>
-            <div className="pd-work"><span className="pd-label">工数</span>{voucherHours > 0 ? <div className="pd-work-values"><span>工場 {Number(project.estimated_factory_hours).toFixed(1)}h {(Number(project.estimated_factory_hours) / settings.hoursPerDay).toFixed(1)}日</span><span>現場 {Number(project.estimated_site_hours).toFixed(1)}h {(Number(project.estimated_site_hours) / settings.hoursPerDay).toFixed(1)}日</span><small>見積から</small></div> : <div className="pd-effort"><input aria-label="工数目安（h）" type="number" step="0.1" className="pd-control" value={values.manual_estimated_hours ?? ''} onChange={event => change('manual_estimated_hours', event.target.value === '' ? null : Number(event.target.value))} onBlur={() => saveField('manual_estimated_hours', values.manual_estimated_hours ?? null, '工数目安', project.manual_estimated_hours)} /><span className="pd-days">{((Number(values.manual_estimated_hours) || 0) / settings.hoursPerDay).toFixed(1)}日</span>{[4, ...QUICK_HOURS_DAYS.map(day => day * settings.hoursPerDay)].map((hours, index) => <button key={hours} type="button" className="pd-quick" onClick={() => {
+            <div className="pd-work"><span className="bv-label">工数</span>{voucherHours > 0 ? <div className="pd-work-values"><span>工場 {Number(project.estimated_factory_hours).toFixed(1)}h {(Number(project.estimated_factory_hours) / settings.hoursPerDay).toFixed(1)}日</span><span>現場 {Number(project.estimated_site_hours).toFixed(1)}h {(Number(project.estimated_site_hours) / settings.hoursPerDay).toFixed(1)}日</span><small>見積から</small></div> : <div className="pd-effort"><input aria-label="工数目安（h）" type="number" step="0.1" className="bv-control" value={values.manual_estimated_hours ?? ''} onChange={event => change('manual_estimated_hours', event.target.value === '' ? null : Number(event.target.value))} onBlur={() => saveField('manual_estimated_hours', values.manual_estimated_hours ?? null, '工数目安', project.manual_estimated_hours)} /><span className="pd-days">{((Number(values.manual_estimated_hours) || 0) / settings.hoursPerDay).toFixed(1)}日</span>{[4, ...QUICK_HOURS_DAYS.map(day => day * settings.hoursPerDay)].map((hours, index) => <button key={hours} type="button" className="pd-quick" onClick={() => {
               const previous = values.manual_estimated_hours;
               change('manual_estimated_hours', hours);
               void saveField('manual_estimated_hours', hours, '工数目安', previous);
             }}>{index === 0 ? '4h' : `${QUICK_HOURS_DAYS[index - 1]}日`}</button>)}</div>}</div>
-            <label className="pd-description"><span className="pd-label">説明</span><textarea aria-label="説明" className="pd-control" rows={2} placeholder="案件の説明を入力" value={String(values.memo ?? '')} onChange={event => change('memo', event.target.value)} onBlur={event => saveField('memo', event.target.value, '説明', project.memo)} /></label>
+            <label className="pd-description"><span className="bv-label">説明</span><textarea aria-label="説明" className="bv-control" rows={2} placeholder="案件の説明を入力" value={String(values.memo ?? '')} onChange={event => change('memo', event.target.value)} onBlur={event => saveField('memo', event.target.value, '説明', project.memo)} /></label>
           </section>
 
           <ProjectSchedulesPanel projectId={projectId} onCreated={created => showScheduleUndo('予定を作りました', () => deleteSchedule.mutateAsync(created.id))} onUpdated={(schedule, patch) => showScheduleUndo('予定を変更しました', () => updateSchedule.mutateAsync({ id: schedule.id, ...Object.fromEntries(Object.keys(patch).map(key => [key, schedule[key as keyof ProjectSchedule]])) }))} onDeleted={schedule => showScheduleUndo('予定を削除しました', () => createSchedule.mutateAsync({ projectId, ...scheduleInput(schedule) }))} />
@@ -958,18 +958,18 @@ function ExistingProjectDetail({ projectId, goBack }: { projectId: number; goBac
         </div>
 
         <div className="pd-column" data-testid="project-detail-right-column">
-          <section className="pd-panel" data-testid="project-basic-info"><h2 className="pd-panel-title">基本情報</h2><div className="pd-info">
-            {([['order_date', '受注日'], ['end_date', '納品日']] as const).map(([key, label]) => <Fragment key={key}><span className="pd-info-label" title={key === 'end_date' ? '本当に納品した日・納品する日' : undefined}>{label}</span><span className="pd-info-value"><input aria-label={label} type="date" max="9999-12-31" className={`pd-control ${values[key] ? '' : 'pd-empty-date'}`} value={String(values[key] ?? '')} onChange={event => {
+          <section className="bv-panel" data-testid="project-basic-info"><h2 className="bv-panel-title">基本情報</h2><div className="bv-info">
+            {([['order_date', '受注日'], ['end_date', '納品日']] as const).map(([key, label]) => <Fragment key={key}><span className="bv-info-label" title={key === 'end_date' ? '本当に納品した日・納品する日' : undefined}>{label}</span><span className="bv-info-value"><input aria-label={label} type="date" max="9999-12-31" className={`bv-control ${values[key] ? '' : 'bv-empty-date'}`} value={String(values[key] ?? '')} onChange={event => {
               const previous = values[key]; change(key, event.target.value); void saveField(key, event.target.value, label, previous);
             }} /></span></Fragment>)}
-            {([['owner_name', '施主'], ['general_contractor_name', '元請'], ['site_contact', '連絡先'], ['address', '施工住所']] as const).map(([key, label]) => <Fragment key={key}><span className="pd-info-label">{label}</span><span className="pd-info-value">{textField(key, label)}</span></Fragment>)}
+            {([['owner_name', '施主'], ['general_contractor_name', '元請'], ['site_contact', '連絡先'], ['address', '施工住所']] as const).map(([key, label]) => <Fragment key={key}><span className="bv-info-label">{label}</span><span className="bv-info-value">{textField(key, label)}</span></Fragment>)}
           </div></section>
-          <section className="pd-panel"><div className="pd-panel-title"><h2>画像</h2><span className="pd-spacer" /><button type="button" className="pd-btn" onClick={() => fileInput.current?.click()}>＋ 追加</button><input ref={fileInput} hidden type="file" multiple accept="image/*" onChange={uploadFiles} /></div>{project.images?.length ? <div className="pd-panel-actions">{project.images.map(image => <div key={image.id}><button type="button" onClick={() => window.open(`/contents/${APP_ID}/api/${image.file_path}`, '_blank')}><img src={`/contents/${APP_ID}/api/${image.file_path}`} alt={image.file_name} width="72" height="72" /></button><button type="button" className="pd-link-danger" onClick={() => deleteImage.mutate(image.id)}>削除</button></div>)}</div> : <p className="pd-empty">画像なし（0件）</p>}</section>
+          <section className="bv-panel"><div className="bv-panel-title"><h2>画像</h2><span className="pd-spacer" /><button type="button" className="bv-btn" onClick={() => fileInput.current?.click()}>＋ 追加</button><input ref={fileInput} hidden type="file" multiple accept="image/*" onChange={uploadFiles} /></div>{project.images?.length ? <div className="bv-panel-actions">{project.images.map(image => <div key={image.id}><button type="button" onClick={() => window.open(`/contents/${APP_ID}/api/${image.file_path}`, '_blank')}><img src={`/contents/${APP_ID}/api/${image.file_path}`} alt={image.file_name} width="72" height="72" /></button><button type="button" className="bv-link-danger" onClick={() => deleteImage.mutate(image.id)}>削除</button></div>)}</div> : <p className="pd-empty">画像なし（0件）</p>}</section>
           <CapacityCheckPanel projectId={projectId} />
         </div>
       </div>
 
-      <section className="pd-panel pd-danger"><h2 className="pd-panel-title">危険な操作</h2><div className="pd-danger-body"><p>この案件を伝票・明細も含めて完全に削除します。</p><button type="button" className="pd-btn pd-btn-danger" onClick={() => setHardDeleteOpen(true)}>完全削除</button></div></section>
+      <section className="bv-panel bv-danger pd-danger"><h2 className="bv-panel-title">危険な操作</h2><div className="pd-danger-body"><p>この案件を伝票・明細も含めて完全に削除します。</p><button type="button" className="bv-btn bv-btn-danger" onClick={() => setHardDeleteOpen(true)}>完全削除</button></div></section>
       {undo && <UndoToast message={undo.message} onDismiss={() => setUndo(null)} onUndo={async () => { await undo.run(); setUndo(null); }} />}
       <NewCustomerModal isOpen={modalOpen} onClose={() => setModalOpen(false)} onCreated={async customer => { await refetchCustomers(); const previous = values.customer_id; change('customer_id', customer.id); await saveField('customer_id', customer.id, '得意先', previous); setModalOpen(false); }} />
       <HardDeleteProjectModal isOpen={hardDeleteOpen} isPending={hardDelete.isPending} errorMessage={hardDeleteError} onClose={() => setHardDeleteOpen(false)} onConfirm={async () => { try { await hardDelete.mutateAsync(projectId); goBack(); } catch (error) { setHardDeleteError(extractServerErrorMessage(error)); } }} />
@@ -979,7 +979,7 @@ function ExistingProjectDetail({ projectId, goBack }: { projectId: number; goBac
 
 function PdVoucherPanel({ title, vouchers, onCreate, onOpen }: { title: string; vouchers: ProjectVoucher[]; onCreate: () => void; onOpen: (id: number) => void }) {
   const createLabel = title.replace('伝票', '作成');
-  return <section className="pd-panel"><div className="pd-panel-title">{title}<span className="pd-spacer" /><button type="button" className="pd-btn" onClick={onCreate}>＋ {createLabel}</button></div><div className="pd-voucher-head"><span>番号</span><span>日付</span><span>状態</span><span>摘要</span><span>金額</span><span /></div>{vouchers.length === 0 ? <p className="pd-empty">登録なし</p> : vouchers.map(voucher => <div key={voucher.id} role="button" tabIndex={0} className="pd-voucher-row pd-row-click" onClick={() => onOpen(voucher.id)} onKeyDown={event => event.key === 'Enter' && onOpen(voucher.id)}><span className="pd-mono">{voucher.voucher_no}</span><span className="pd-mono">{voucher.voucher_date}</span><span>{VOUCHER_STATUS_LABEL[voucher.status] ?? voucher.status}</span><span>{voucher.description}</span><span className="pd-amount">¥{Number(voucher.total_amount ?? 0).toLocaleString()}</span><span>→</span></div>)}</section>;
+  return <section className="bv-panel"><div className="bv-panel-title">{title}<span className="pd-spacer" /><button type="button" className="bv-btn" onClick={onCreate}>＋ {createLabel}</button></div><div className="pd-voucher-head"><span>番号</span><span>日付</span><span>状態</span><span>摘要</span><span>金額</span><span /></div>{vouchers.length === 0 ? <p className="pd-empty">登録なし</p> : vouchers.map(voucher => <div key={voucher.id} role="button" tabIndex={0} className="pd-voucher-row bv-row-click" onClick={() => onOpen(voucher.id)} onKeyDown={event => event.key === 'Enter' && onOpen(voucher.id)}><span className="bv-mono">{voucher.voucher_no}</span><span className="bv-mono">{voucher.voucher_date}</span><span>{VOUCHER_STATUS_LABEL[voucher.status] ?? voucher.status}</span><span>{voucher.description}</span><span className="bv-amount">¥{Number(voucher.total_amount ?? 0).toLocaleString()}</span><span>→</span></div>)}</section>;
 }
 
 function Field({ label, error, children, className = '' }: {

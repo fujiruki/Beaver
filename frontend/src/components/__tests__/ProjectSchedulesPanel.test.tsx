@@ -130,7 +130,7 @@ describe('ProjectSchedulesPanel（R-0222）', () => {
     renderPanel();
     const hours = (await screen.findByDisplayValue('1.5')) as HTMLInputElement;
     expect(hours.value).toBe('1.5');
-    expect(hours.className).toMatch(/pd-number/);
+    expect(hours.className).toMatch(/bv-number/);
     fireEvent.change(hours, { target: { value: '2' } });
     fireEvent.blur(hours);
     await waitFor(() => expect(writes).toHaveLength(1));

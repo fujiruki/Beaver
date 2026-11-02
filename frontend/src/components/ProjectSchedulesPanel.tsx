@@ -9,9 +9,9 @@ import { SCHEDULE_KINDS, FIXED_SCHEDULE_KINDS } from '../types/projectSchedule';
 import type { ProjectSchedule, ProjectScheduleInput, ScheduleKind } from '../types/projectSchedule';
 import { formatHours } from './dandori/dandoriBoardUtils';
 
-const inputCls = 'pd-control';
-const ghostInputCls = 'pd-control';
-const hoursCls = 'pd-control pd-number';
+const inputCls = 'bv-control';
+const ghostInputCls = 'bv-control';
+const hoursCls = 'bv-control bv-number';
 
 interface Draft {
   kind: ScheduleKind | '';
@@ -123,9 +123,9 @@ export default function ProjectSchedulesPanel({ projectId, onCreated, onUpdated,
   }
 
   return (
-    <section className="pd-panel">
-      <div className="pd-panel-title">予定</div>
-      <table className="pd-sched">
+    <section className="bv-panel">
+      <div className="bv-panel-title">予定</div>
+      <table className="bv-table pd-sched">
         <thead>
           <tr>
             <th className="pd-col-done">済</th>
@@ -155,34 +155,34 @@ export default function ProjectSchedulesPanel({ projectId, onCreated, onUpdated,
                 key={`fixed-${kind}`}
                 data-testid="fixed-schedule-row"
                 data-kind={kind}
-                className="pd-placeholder-row"
+                className="bv-placeholder-row"
                 onBlur={event => {
                   if (!event.currentTarget.contains(event.relatedTarget)) commitFixed(kind);
                 }}
               >
                 <td className="pd-col-done" />
-                <td className="pd-edit-cell"><span className="pd-control">{kind}</span></td>
-                <td className="pd-edit-cell">
+                <td className="bv-edit-cell"><span className="bv-control">{kind}</span></td>
+                <td className="bv-edit-cell">
                   <input
                     type="date"
                     aria-label={`${kind}の開始`}
                     value={draft.start_date}
                     onChange={e => changeFixed(kind, { start_date: e.target.value })}
-                    className={`${ghostInputCls} pd-mono ${draft.start_date ? '' : 'pd-empty-date'}`}
+                    className={`${ghostInputCls} bv-mono ${draft.start_date ? '' : 'bv-empty-date'}`}
                   max="9999-12-31"
                   />
                 </td>
-                <td className="pd-edit-cell">
+                <td className="bv-edit-cell">
                   <input
                     type="date"
                     aria-label={`${kind}の終了または期限`}
                     value={draft.end_date}
                     onChange={e => changeFixed(kind, { end_date: e.target.value })}
-                    className={`${ghostInputCls} pd-mono ${draft.end_date ? '' : 'pd-empty-date'}`}
+                    className={`${ghostInputCls} bv-mono ${draft.end_date ? '' : 'bv-empty-date'}`}
                   max="9999-12-31"
                   />
                 </td>
-                <td className="pd-edit-cell">
+                <td className="bv-edit-cell">
                   <input
                     type="number"
                     min={0}
@@ -190,10 +190,10 @@ export default function ProjectSchedulesPanel({ projectId, onCreated, onUpdated,
                     aria-label={`${kind}の時間`}
                     value={draft.hours}
                     onChange={e => changeFixed(kind, { hours: e.target.value })}
-                    className={`${ghostInputCls} pd-number`}
+                    className={`${ghostInputCls} bv-number`}
                   />
                 </td>
-                <td className="pd-edit-cell">
+                <td className="bv-edit-cell">
                   <input
                     aria-label={`${kind}のメモ`}
                     value={draft.memo}
@@ -210,13 +210,13 @@ export default function ProjectSchedulesPanel({ projectId, onCreated, onUpdated,
             .filter(schedule => !FIXED_SCHEDULE_KINDS.includes(schedule.kind))
             .map(schedule => renderScheduleRow(schedule))}
           <tr
-            className={blank.kind || hasContent(blank) ? 'pd-placeholder-row' : 'pd-add-row'}
+            className={blank.kind || hasContent(blank) ? 'bv-placeholder-row' : 'bv-add-row'}
             onBlur={event => {
               if (!event.currentTarget.contains(event.relatedTarget)) commitBlank();
             }}
           >
             <td className="pd-col-done" />
-            <td className="pd-edit-cell" colSpan={blank.kind || hasContent(blank) ? 1 : 6}>
+            <td className="bv-edit-cell" colSpan={blank.kind || hasContent(blank) ? 1 : 6}>
               <select
                 aria-label="予定の種類"
                 value={blank.kind}
@@ -233,25 +233,25 @@ export default function ProjectSchedulesPanel({ projectId, onCreated, onUpdated,
                 <input aria-label="予定のメモ" value={blank.memo} onChange={e => changeBlank({ memo: e.target.value })} />
               </span>}
             </td>
-            {(blank.kind || hasContent(blank)) && <><td className="pd-edit-cell">
+            {(blank.kind || hasContent(blank)) && <><td className="bv-edit-cell">
               <input
                 type="date"
                 aria-label="予定の開始"
                 value={blank.start_date}
                 onChange={e => changeBlank({ start_date: e.target.value })}
-                className={`${ghostInputCls} pd-mono ${blank.start_date ? '' : 'pd-empty-date'}`}
+                className={`${ghostInputCls} bv-mono ${blank.start_date ? '' : 'bv-empty-date'}`}
                 max="9999-12-31"
               />
-            </td><td className="pd-edit-cell">
+            </td><td className="bv-edit-cell">
               <input
                 type="date"
                 aria-label="予定の終了または期限"
                 value={blank.end_date}
                 onChange={e => changeBlank({ end_date: e.target.value })}
-                className={`${ghostInputCls} pd-mono ${blank.end_date ? '' : 'pd-empty-date'}`}
+                className={`${ghostInputCls} bv-mono ${blank.end_date ? '' : 'bv-empty-date'}`}
                 max="9999-12-31"
               />
-            </td><td className="pd-edit-cell">
+            </td><td className="bv-edit-cell">
               <input
                 type="number"
                 min={0}
@@ -259,9 +259,9 @@ export default function ProjectSchedulesPanel({ projectId, onCreated, onUpdated,
                 aria-label="予定の時間"
                 value={blank.hours}
                 onChange={e => changeBlank({ hours: e.target.value })}
-                className={`${ghostInputCls} pd-number`}
+                className={`${ghostInputCls} bv-number`}
               />
-            </td><td className="pd-edit-cell">
+            </td><td className="bv-edit-cell">
               <input
                 aria-label="予定のメモ"
                 value={blank.memo}
@@ -290,7 +290,7 @@ export default function ProjectSchedulesPanel({ projectId, onCreated, onUpdated,
                   onChange={e => update(s, { done: e.target.checked ? 1 : 0 })}
                 />
               </td>
-              <td className="pd-edit-cell">
+              <td className="bv-edit-cell">
                 {s.kind === 'その他' ? (
                   <div className="pd-other">
                     <input
@@ -323,17 +323,17 @@ export default function ProjectSchedulesPanel({ projectId, onCreated, onUpdated,
                   </select>
                 )}
               </td>
-              <td className="pd-edit-cell">
+              <td className="bv-edit-cell">
                 <input
                   type="date"
                   aria-label="予定の開始"
                   defaultValue={s.start_date ?? ''}
                   onBlur={e => e.target.value !== (s.start_date ?? '') && update(s, { start_date: e.target.value || null })}
-                  className={`${inputCls} pd-mono ${s.start_date ? '' : 'pd-empty-date'}`}
+                  className={`${inputCls} bv-mono ${s.start_date ? '' : 'bv-empty-date'}`}
                   max="9999-12-31"
                 />
               </td>
-              <td className="pd-edit-cell">
+              <td className="bv-edit-cell">
                 <input
                   type="date"
                   aria-label="予定の終了または期限"
@@ -342,11 +342,11 @@ export default function ProjectSchedulesPanel({ projectId, onCreated, onUpdated,
                   title={s.kind === '製作' && s.start_date && !s.end_date
                     ? '空なら時間（無ければ見積の工数）から終了を出します'
                     : undefined}
-                  className={`${inputCls} pd-mono ${s.end_date ? '' : 'pd-empty-date'}`}
+                  className={`${inputCls} bv-mono ${s.end_date ? '' : 'bv-empty-date'}`}
                   max="9999-12-31"
                 />
               </td>
-              <td className="pd-edit-cell">
+              <td className="bv-edit-cell">
                 <input
                   type="number"
                   min={0}
@@ -357,7 +357,7 @@ export default function ProjectSchedulesPanel({ projectId, onCreated, onUpdated,
                   className={hoursCls}
                 />
               </td>
-              <td className="pd-edit-cell">
+              <td className="bv-edit-cell">
                 <input
                   aria-label="予定のメモ"
                   defaultValue={s.memo}
@@ -367,7 +367,7 @@ export default function ProjectSchedulesPanel({ projectId, onCreated, onUpdated,
                 />
               </td>
               <td className="pd-col-delete">
-                <button type="button" onClick={() => deleteMutation.mutate(s.id, { onSuccess: () => onDeleted?.(s) })} className="pd-link pd-link-danger">
+                <button type="button" onClick={() => deleteMutation.mutate(s.id, { onSuccess: () => onDeleted?.(s) })} className="bv-link bv-link-danger">
                   削除
                 </button>
               </td>
