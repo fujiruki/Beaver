@@ -75,6 +75,8 @@
 .bv-toggle { min-height: 25px; padding: 3px 8px; border: 0; border-right: 1px solid var(--bv-line); border-bottom: 1px solid var(--bv-line); background: #fff; color: var(--bv-muted); }
 .bv-toggle:hover, .bv-toggle:focus-visible { position: relative; z-index: 1; box-shadow: 0 0 0 1px var(--bv-blue); background: var(--bv-blue-soft); outline: 0; }
 .bv-toggle-active { background: #dbeafe; color: #1d4ed8; font-weight: 700; }
+.bv-toggle-area { display: flex; align-items: center; gap: 7px; padding: 5px 7px; border-bottom: 1px solid var(--bv-line); }
+.bv-toggle-area > .bv-label { flex: 0 0 auto; margin: 0; }
 
 .bv-save-saved { color: var(--bv-muted); }
 .bv-save-saving { color: var(--bv-blue); }
