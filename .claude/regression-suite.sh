@@ -50,6 +50,8 @@ php "$root/api/tests/test_r0173_line_cost_sync.php" >/tmp/bv_r0173_line_cost_syn
 php "$root/api/tests/test_r0170_voucher_unvoid.php" >/tmp/bv_r0170_voucher_unvoid.log 2>&1 || fail "[test_r0170_voucher_unvoid] $(tail -n 8 /tmp/bv_r0170_voucher_unvoid.log)"
 php "$root/api/tests/test_r0220_project_schedules.php" >/tmp/bv_r0220_project_schedules.log 2>&1 || fail "[test_r0220_project_schedules] $(tail -n 8 /tmp/bv_r0220_project_schedules.log)"
 php "$root/api/tests/test_r0222_project_schedules.php" >/tmp/bv_r0222_project_schedules.log 2>&1 || fail "[test_r0222_project_schedules] $(tail -n 8 /tmp/bv_r0222_project_schedules.log)"
+php "$root/api/tests/test_r0238_line_order.php" >/tmp/bv_r0238_line_order.log 2>&1 || fail "[test_r0238_line_order] $(tail -n 8 /tmp/bv_r0238_line_order.log)"
+php "$root/api/tests/test_r0236_memo_sync.php" >/tmp/bv_r0236_memo_sync.log 2>&1 || fail "[test_r0236_memo_sync] $(tail -n 8 /tmp/bv_r0236_memo_sync.log)"
 
 rm -f "$root"/api/tests/*.sqlite 2>/dev/null
 exit 0
