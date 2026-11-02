@@ -50,6 +50,9 @@ beforeEach(() => {
     if (method === 'POST' && url.endsWith('/vouchers/6/lines')) {
       return new Response(JSON.stringify({ ...makeLine(99, ''), line_no: 4 }), { status: 201 });
     }
+    if (method === 'PUT' && url.endsWith('/vouchers/6/line-order')) {
+      return new Response(JSON.stringify({ voucher_updated_at: '2026-11-02 12:00:00' }));
+    }
     if (method === 'PUT' && /\/vouchers\/6\/lines\/\d+$/.test(url)) {
       return new Response(JSON.stringify({ voucher_updated_at: '2026-11-02 12:00:00' }));
     }
@@ -98,7 +101,7 @@ describe('VoucherEdit R-0235 行を選択して挿入', () => {
     ]);
   });
 
-  it('保存済み伝票ではPOST後に新しい行と後続行を再採番し、画面でも挿入行を選択する', async () => {
+  it('保存済み伝票ではPOST後にline-orderへ全行の順番を1回だけ送り、画面でも挿入行を選択する', async () => {
     const user = userEvent.setup();
     renderVoucher('/vouchers/6');
     await screen.findByDisplayValue('明細1');
@@ -110,11 +113,9 @@ describe('VoucherEdit R-0235 行を選択して挿入', () => {
     expect(screen.getAllByRole('radio').map(radio => (radio as HTMLInputElement).checked)).toEqual([false, true, false, false]);
     await waitFor(() => {
       const writes = requests.filter(request => request.method === 'POST' || request.method === 'PUT');
-      expect(writes.map(request => [request.method, request.url.match(/\/lines(?:\/(\d+))?$/)?.[1] ?? 'new', request.body.line_no])).toEqual([
-        ['POST', 'new', 2],
-        ['PUT', '99', 2],
-        ['PUT', '2', 3],
-        ['PUT', '3', 4],
+      expect(writes.map(request => [request.method, request.url.replace(/^.*\/vouchers\/6/, ''), request.body.line_ids ?? null])).toEqual([
+        ['POST', '/lines', null],
+        ['PUT', '/line-order', [1, 99, 2, 3]],
       ]);
     });
   });
