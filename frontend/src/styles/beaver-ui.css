@@ -54,6 +54,10 @@
 .bv-table { width: 100%; table-layout: fixed; border-collapse: collapse; }
 .bv-table th { height: 25px; padding: 3px 5px; border-right: 1px solid var(--bv-line); border-bottom: 1px solid var(--bv-line); background: var(--bv-head); color: var(--bv-muted); font-size: 11px; text-align: left; }
 .bv-table td { height: 31px; padding: 0 5px; border-right: 1px solid var(--bv-line); border-bottom: 1px solid var(--bv-line); vertical-align: middle; }
+.bv-table td.bv-fill-cell { padding: 0 !important; background: #fff; }
+.bv-fill-cell .bv-control { padding: 2px 5px; }
+.bv-table td.bv-fill-cell.bv-readonly { background: var(--bv-soft); }
+.bv-fill-cell.bv-readonly .bv-control { background: transparent; color: inherit; -webkit-text-fill-color: currentColor; opacity: 1; }
 .bv-table th:last-child, .bv-table td:last-child { border-right: 0; }
 .bv-table tbody tr:last-child td { border-bottom: 0; }
 .bv-placeholder-row .bv-edit-cell:nth-child(2) { color: var(--bv-placeholder); }

@@ -26,7 +26,28 @@ function laborRows() {
   return screen.getByRole('table', { name: '労務費明細' }).querySelectorAll('tbody tr');
 }
 
+function typeAndLeave(input: HTMLElement, value: string) {
+  fireEvent.change(input, { target: { value } });
+  fireEvent.blur(input, { relatedTarget: document.body });
+}
+
 describe('TateguCostLinesPanel', () => {
+  it('R-0231 空の行へ続けて入力しても1行のままフォーカスが外れず、行から出ると1行だけ加わる', () => {
+    render(<CostLinesHarness />);
+    const input = within(materialRows()[0] as HTMLElement).getByLabelText('材料名') as HTMLInputElement;
+    input.focus();
+    fireEvent.change(input, { target: { value: '芯' } });
+    fireEvent.change(input, { target: { value: '芯材' } });
+    expect(materialRows()).toHaveLength(3);
+    expect(document.activeElement).toBe(input);
+    expect((within(materialRows()[0] as HTMLElement).getByLabelText('材料名') as HTMLInputElement).value).toBe('芯材');
+
+    fireEvent.blur(input, { relatedTarget: document.body });
+    expect(materialRows()).toHaveLength(4);
+    expect((within(materialRows()[0] as HTMLElement).getByLabelText('材料名') as HTMLInputElement).value).toBe('芯材');
+    expect((within(materialRows()[1] as HTMLElement).getByLabelText('材料名') as HTMLInputElement).value).toBe('');
+  });
+
   it('R-0231 AC1: 行が無いとき区分順に材料費の空行を1行ずつ表示する', () => {
     render(<TateguCostLinesPanel lines={[]} onChange={vi.fn()} categories={categories} />);
 
@@ -37,7 +58,7 @@ describe('TateguCostLinesPanel', () => {
   it('R-0231 AC2: 本体とガラスの空行へ続けて入力すると各区分の直後に新しい空行を表示する', () => {
     render(<CostLinesHarness />);
 
-    fireEvent.change(within(materialRows()[0] as HTMLElement).getByLabelText('材料名'), { target: { value: '框材' } });
+    typeAndLeave(within(materialRows()[0] as HTMLElement).getByLabelText('材料名'), '框材');
     expect(Array.from(materialRows(), (row) => row.textContent)).toEqual([
       expect.stringContaining('本体'),
       expect.stringContaining('本体'),
@@ -47,7 +68,7 @@ describe('TateguCostLinesPanel', () => {
     expect((within(materialRows()[0] as HTMLElement).getByLabelText('材料名') as HTMLInputElement).value).toBe('框材');
     expect((within(materialRows()[1] as HTMLElement).getByLabelText('材料名') as HTMLInputElement).value).toBe('');
 
-    fireEvent.change(within(materialRows()[3] as HTMLElement).getByLabelText('材料名'), { target: { value: '透明ガラス' } });
+    typeAndLeave(within(materialRows()[3] as HTMLElement).getByLabelText('材料名'), '透明ガラス');
     expect(Array.from(materialRows(), (row) => row.textContent)).toEqual([
       expect.stringContaining('本体'),
       expect.stringContaining('本体'),
@@ -63,7 +84,7 @@ describe('TateguCostLinesPanel', () => {
     const onChange = vi.fn();
     render(<TateguCostLinesPanel lines={[]} onChange={onChange} categories={categories} />);
 
-    fireEvent.change(within(materialRows()[1] as HTMLElement).getByLabelText('材料名'), { target: { value: '丁番' } });
+    typeAndLeave(within(materialRows()[1] as HTMLElement).getByLabelText('材料名'), '丁番');
 
     expect(onChange).toHaveBeenLastCalledWith([expect.objectContaining({
       category_code: 'HARDWARE',
@@ -103,7 +124,7 @@ describe('TateguCostLinesPanel', () => {
 
     render(<TateguCostLinesPanel lines={[]} onChange={onChange} categories={categories} />);
     expect(screen.queryByText('+ 行追加')).toBeNull();
-    fireEvent.change(screen.getAllByLabelText('材料名')[0], { target: { value: '框材' } });
+    typeAndLeave(screen.getAllByLabelText('材料名')[0], '框材');
 
     expect(onChange).toHaveBeenCalledWith([{
       category_code: 'MAIN',
@@ -146,6 +167,25 @@ describe('TateguCostLinesPanel', () => {
 });
 
 describe('TateguLaborLinesPanel', () => {
+  it('R-0231 空の行へ続けて入力しても1行のままフォーカスが外れず、行から出ると1行だけ加わる', () => {
+    function Harness() {
+      const [lines, setLines] = useState<LaborLineDraft[]>([]);
+      return <TateguLaborLinesPanel lines={lines} onChange={setLines} categories={categories} />;
+    }
+    render(<Harness />);
+    const input = within(laborRows()[0] as HTMLElement).getByLabelText('工程名') as HTMLInputElement;
+    input.focus();
+    fireEvent.change(input, { target: { value: '組' } });
+    fireEvent.change(input, { target: { value: '組立' } });
+    expect(laborRows()).toHaveLength(2);
+    expect(document.activeElement).toBe(input);
+
+    fireEvent.blur(input, { relatedTarget: document.body });
+    expect(laborRows()).toHaveLength(3);
+    expect((within(laborRows()[0] as HTMLElement).getByLabelText('工程名') as HTMLInputElement).value).toBe('組立');
+    expect((within(laborRows()[1] as HTMLElement).getByLabelText('工程名') as HTMLInputElement).value).toBe('');
+  });
+
   it('R-0231 AC4: 区分順に工程の空行を1行ずつ表示する', () => {
     render(<TateguLaborLinesPanel lines={[]} onChange={vi.fn()} categories={categories} />);
 
@@ -198,12 +238,40 @@ describe('TateguLaborLinesPanel', () => {
     const onChange = vi.fn();
     const { rerender } = render(<TateguLaborLinesPanel lines={[]} onChange={onChange} categories={categories} />);
 
-    fireEvent.change(screen.getAllByLabelText('工程名')[0], { target: { value: '組立' } });
+    typeAndLeave(screen.getAllByLabelText('工程名')[0], '組立');
     expect(onChange).toHaveBeenCalledWith([expect.objectContaining({ process_name: '組立' })]);
     expect(screen.queryByText('+ 行追加')).toBeNull();
 
     const added = onChange.mock.calls[0][0] as LaborLineDraft[];
     rerender(<TateguLaborLinesPanel lines={added} onChange={onChange} categories={categories} />);
     expect(screen.getAllByLabelText('工程名')).toHaveLength(3);
+  });
+});
+
+describe('R-0231 表のマスの見た目', () => {
+  it('入力できるマスは入力欄をマスいっぱいにするクラスを持つ', () => {
+    render(<TateguCostLinesPanel lines={[]} onChange={vi.fn()} categories={categories} />);
+    const cell = screen.getAllByLabelText('材料名')[0].closest('td') as HTMLElement;
+    expect(cell.className).toContain('bv-fill-cell');
+  });
+
+  it('wood_calc の行のマスは readonly で、編集用クラスを持たない', () => {
+    render(<TateguCostLinesPanel lines={[{
+      category_code: 'MAIN', name: '木材計算', quantity: 2, unit_cost: 800,
+      amount: 1600, source: 'wood_calc', sort_order: 0,
+    }]} onChange={vi.fn()} categories={categories} />);
+    for (const label of ['材料区分', '材料名', '数量', '材料単価']) {
+      const cell = screen.getAllByLabelText(label)[0].closest('td') as HTMLElement;
+      expect(cell.className).toContain('bv-readonly');
+      expect(cell.className).not.toContain('bv-edit-cell');
+    }
+  });
+
+  it('工数合計は小数2桁までに丸めて表示する', () => {
+    render(<TateguLaborLinesPanel lines={[{
+      process_name: '組立', category_code: 'FACTORY_TIME', work_hours: 16.6999999881, labor_rate: 0, amount: 0, sort_order: 0,
+    }]} onChange={vi.fn()} categories={categories} />);
+    expect(screen.getAllByText(/16\.7 h/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/16\.69999/)).toBeNull();
   });
 });
