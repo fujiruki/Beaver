@@ -33,6 +33,11 @@ export default function VoucherHeader({
   const voucherType = watch('voucher_type');
   const salesCategoryId = watch('sales_category_id');
 
+  const resizeMemo = (element: HTMLTextAreaElement) => {
+    element.style.height = 'auto';
+    element.style.height = `${element.scrollHeight}px`;
+  };
+
   return (
     <div style={{
       background: '#fff', borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
@@ -204,6 +209,25 @@ export default function VoucherHeader({
           </div>
         </div>
       </div>
+
+      {/* 行3: 説明 */}
+      <div style={{ padding: '0 16px 12px' }}>
+        <Field label="説明">
+          <textarea
+            {...register('memo')}
+            aria-label="説明"
+            rows={2}
+            placeholder="見積書に載せる説明"
+            style={memoStyle}
+            disabled={readOnly}
+            ref={(element) => {
+              register('memo').ref(element);
+              if (element) resizeMemo(element);
+            }}
+            onInput={(event) => resizeMemo(event.currentTarget)}
+          />
+        </Field>
+      </div>
     </div>
   );
 }
@@ -231,4 +255,11 @@ const inpStyle: React.CSSProperties = {
 const selStyle: React.CSSProperties = {
   width: '100%', padding: '6px 10px', border: '1px solid #cbd5e1',
   borderRadius: 6, fontSize: 13, boxSizing: 'border-box',
+};
+const memoStyle: React.CSSProperties = {
+  ...inpStyle,
+  display: 'block',
+  minHeight: 54,
+  overflow: 'hidden',
+  resize: 'none',
 };

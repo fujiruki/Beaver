@@ -56,7 +56,7 @@ describe('R-0236 伝票の説明欄', () => {
     renderPage();
     const memo = await screen.findByRole('textbox', { name: '説明' }) as HTMLTextAreaElement;
 
-    expect(memo.rows).toBe(2);
+    expect(memo.getAttribute('rows')).toBe('2');
     expect(memo.value).toBe('既存の説明');
     fireEvent.change(memo, { target: { value: '印刷にも載せる説明' } });
     fireEvent.blur(memo);

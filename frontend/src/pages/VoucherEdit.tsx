@@ -539,7 +539,7 @@ export default function VoucherEdit() {
 
   function handleHeaderBlur(event: React.FocusEvent<HTMLFormElement>) {
     const target = event.target as unknown as HTMLInputElement;
-    if (target.tagName !== 'INPUT' || target.type === 'date' || !HEADER_FIELDS.has(target.name as keyof VoucherFormValues)) return;
+    if (!['INPUT', 'TEXTAREA'].includes(target.tagName) || target.type === 'date' || !HEADER_FIELDS.has(target.name as keyof VoucherFormValues)) return;
     void queueHeaderSave();
   }
 
@@ -917,7 +917,7 @@ export default function VoucherEdit() {
                 blockReason={getVoucherVoidBlockReason(voucher)} />
             )}
             {!isNew && voucher?.status === 'void' && <UnvoidVoucherButton performUnvoid={performUnvoid} />}
-            <button type="button" style={subBtnStyle}
+            <button type="button" className="bv-btn"
               onClick={() => window.print()}>
               プレビュー
             </button>
