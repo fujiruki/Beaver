@@ -126,7 +126,7 @@ function voucherSyncRowsToJst(PDO $pdo, array $rows): array {
         $placeholders = implode(',', array_fill(0, count($voucherIds), '?'));
         // R-0171: 内訳テーブル（voucher_line_prices）がある行はその MAIN/HARDWARE/GLASS を返す（fallbackPrices と同じ考え方）
         $lineStmt = $pdo->prepare("
-            SELECT l.voucher_id, l.id AS beaver_line_id, l.access_line_id, l.line_no, l.item_name, l.quantity,
+            SELECT l.voucher_id, l.id AS beaver_line_id, l.access_line_id, l.line_no, l.line_type, l.item_name, l.quantity,
                    CASE WHEN lp.voucher_line_id IS NULL THEN l.price_body ELSE lp.main END AS price_body,
                    CASE WHEN lp.voucher_line_id IS NULL THEN l.price_hardware ELSE lp.hardware END AS price_hardware,
                    CASE WHEN lp.voucher_line_id IS NULL THEN l.price_glass ELSE lp.glass END AS price_glass,
