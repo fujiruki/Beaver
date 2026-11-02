@@ -151,8 +151,31 @@ function CostBlankRow({ categoryName, onCommit }: { categoryName: string; onComm
     if (draft.name || draft.quantity !== 1 || draft.unit_cost !== 0) onCommit(draft);
     setDraft(empty);
   };
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLTableRowElement>) => {
+    if (event.key !== 'Tab' || event.nativeEvent.isComposing) return;
+    const target = event.target as HTMLInputElement;
+    const row = event.currentTarget;
+    const blankRows = Array.from(row.closest('tbody')?.querySelectorAll<HTMLTableRowElement>('tr[data-blank-row="true"]') ?? []);
+    const rowIndex = blankRows.indexOf(row);
+    if (target.getAttribute('aria-label') === '材料名') {
+      const destination = blankRows[rowIndex + (event.shiftKey ? -1 : 1)]?.querySelector<HTMLInputElement>('[aria-label="材料名"]');
+      if (destination && (event.shiftKey || (!draft.name && draft.quantity === 1 && draft.unit_cost === 0))) {
+        event.preventDefault();
+        destination.focus();
+      }
+      return;
+    }
+    if (!event.shiftKey && target.getAttribute('aria-label') === '材料単価') {
+      event.preventDefault();
+      const tbody = row.closest('tbody');
+      const category = row.dataset.category;
+      if (draft.name || draft.quantity !== 1 || draft.unit_cost !== 0) onCommit(draft);
+      setDraft(empty);
+      tbody?.querySelector<HTMLInputElement>(`tr[data-blank-row="true"][data-category="${category}"] [aria-label="材料名"]`)?.focus();
+    }
+  };
   return (
-    <tr className="bv-placeholder-row" onBlur={commit}>
+    <tr className="bv-placeholder-row" data-blank-row="true" data-category={categoryName} onBlur={commit} onKeyDown={handleKeyDown}>
       <td><span className="bv-control">{categoryName}</span></td>
       <td className="bv-edit-cell bv-fill-cell"><input aria-label="材料名" value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} className="bv-control" placeholder="空行に入力すると追加" /></td>
       <td className="bv-edit-cell bv-fill-cell"><NumericCell label="数量" value={draft.quantity} placeholder="数量" onChange={(quantity) => setDraft((d) => ({ ...d, quantity }))} /></td>
@@ -170,8 +193,31 @@ function LaborBlankRow({ categoryName, onCommit }: { categoryName: string; onCom
     if (draft.process_name || draft.work_hours !== 1 || draft.labor_rate !== 0) onCommit(draft);
     setDraft(empty);
   };
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLTableRowElement>) => {
+    if (event.key !== 'Tab' || event.nativeEvent.isComposing) return;
+    const target = event.target as HTMLInputElement;
+    const row = event.currentTarget;
+    const blankRows = Array.from(row.closest('tbody')?.querySelectorAll<HTMLTableRowElement>('tr[data-blank-row="true"]') ?? []);
+    const rowIndex = blankRows.indexOf(row);
+    if (target.getAttribute('aria-label') === '工程名') {
+      const destination = blankRows[rowIndex + (event.shiftKey ? -1 : 1)]?.querySelector<HTMLInputElement>('[aria-label="工程名"]');
+      if (destination && (event.shiftKey || (!draft.process_name && draft.work_hours === 1 && draft.labor_rate === 0))) {
+        event.preventDefault();
+        destination.focus();
+      }
+      return;
+    }
+    if (!event.shiftKey && target.getAttribute('aria-label') === '労務単価') {
+      event.preventDefault();
+      const tbody = row.closest('tbody');
+      const category = row.dataset.category;
+      if (draft.process_name || draft.work_hours !== 1 || draft.labor_rate !== 0) onCommit(draft);
+      setDraft(empty);
+      tbody?.querySelector<HTMLInputElement>(`tr[data-blank-row="true"][data-category="${category}"] [aria-label="工程名"]`)?.focus();
+    }
+  };
   return (
-    <tr className="bv-placeholder-row" onBlur={commit}>
+    <tr className="bv-placeholder-row" data-blank-row="true" data-category={categoryName} onBlur={commit} onKeyDown={handleKeyDown}>
       <td className="bv-edit-cell bv-fill-cell"><input aria-label="工程名" value={draft.process_name} onChange={(event) => setDraft({ ...draft, process_name: event.target.value })} className="bv-control" placeholder="空行に入力すると追加" /></td>
       <td><span className="bv-control">{categoryName}</span></td>
       <td className="bv-edit-cell bv-fill-cell"><NumericCell label="工数" value={draft.work_hours} placeholder="工数" onChange={(work_hours) => setDraft((d) => ({ ...d, work_hours }))} /></td>
