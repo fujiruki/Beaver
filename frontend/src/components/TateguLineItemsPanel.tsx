@@ -69,6 +69,7 @@ function NumericCell({
   value,
   money = false,
   integer = false,
+  emptyWhenZero = false,
   disabled = false,
   placeholder,
   onChange,
@@ -77,11 +78,12 @@ function NumericCell({
   value: number;
   money?: boolean;
   integer?: boolean;
+  emptyWhenZero?: boolean;
   disabled?: boolean;
   placeholder?: string;
   onChange: (value: number) => void;
 }) {
-  const format = (number: number) => (money ? moneyText(number) : numberText(number));
+  const format = (number: number) => emptyWhenZero && number === 0 ? '' : (money ? moneyText(number) : numberText(number));
   const [raw, setRaw] = useState('');
   const [focused, setFocused] = useState(false);
   return (
@@ -186,11 +188,11 @@ function CostBlankRow({ categoryName, onCommit }: { categoryName: string; onComm
 }
 
 function LaborBlankRow({ categoryName, onCommit }: { categoryName: string; onCommit: (patch: Partial<LaborLineDraft>) => void }) {
-  const empty = { process_name: '', work_hours: 1, labor_rate: 0 };
+  const empty = { process_name: '', work_hours: 0, labor_rate: 0 };
   const [draft, setDraft] = useState(empty);
   const commit = (event: React.FocusEvent<HTMLTableRowElement>) => {
     if (!leavesRow(event)) return;
-    if (draft.process_name || draft.work_hours !== 1 || draft.labor_rate !== 0) onCommit(draft);
+    if (draft.process_name || draft.work_hours !== 0 || draft.labor_rate !== 0) onCommit(draft);
     setDraft(empty);
   };
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTableRowElement>) => {
@@ -201,7 +203,7 @@ function LaborBlankRow({ categoryName, onCommit }: { categoryName: string; onCom
     const rowIndex = blankRows.indexOf(row);
     if (target.getAttribute('aria-label') === '工程名') {
       const destination = blankRows[rowIndex + (event.shiftKey ? -1 : 1)]?.querySelector<HTMLInputElement>('[aria-label="工程名"]');
-      if (destination && (event.shiftKey || (!draft.process_name && draft.work_hours === 1 && draft.labor_rate === 0))) {
+      if (destination && (event.shiftKey || (!draft.process_name && draft.work_hours === 0 && draft.labor_rate === 0))) {
         event.preventDefault();
         destination.focus();
       }
@@ -211,7 +213,7 @@ function LaborBlankRow({ categoryName, onCommit }: { categoryName: string; onCom
       event.preventDefault();
       const tbody = row.closest('tbody');
       const category = row.dataset.category;
-      if (draft.process_name || draft.work_hours !== 1 || draft.labor_rate !== 0) onCommit(draft);
+      if (draft.process_name || draft.work_hours !== 0 || draft.labor_rate !== 0) onCommit(draft);
       setDraft(empty);
       tbody?.querySelector<HTMLInputElement>(`tr[data-blank-row="true"][data-category="${category}"] [aria-label="工程名"]`)?.focus();
     }
@@ -220,7 +222,7 @@ function LaborBlankRow({ categoryName, onCommit }: { categoryName: string; onCom
     <tr className="bv-placeholder-row" data-blank-row="true" data-category={categoryName} onBlur={commit} onKeyDown={handleKeyDown}>
       <td><span className="bv-control">{categoryName}</span></td>
       <td className="bv-edit-cell bv-fill-cell"><input aria-label="工程名" value={draft.process_name} onChange={(event) => setDraft({ ...draft, process_name: event.target.value })} className="bv-control" placeholder="空行に入力すると追加" /></td>
-      <td className="bv-edit-cell bv-fill-cell"><NumericCell label="工数" value={draft.work_hours} placeholder="工数" onChange={(work_hours) => setDraft((d) => ({ ...d, work_hours }))} /></td>
+      <td className="bv-edit-cell bv-fill-cell"><NumericCell label="工数" value={draft.work_hours} emptyWhenZero placeholder="工数" onChange={(work_hours) => setDraft((d) => ({ ...d, work_hours }))} /></td>
       <td className="bv-edit-cell bv-fill-cell"><NumericCell label="労務単価" value={draft.labor_rate} money integer placeholder="単価" onChange={(labor_rate) => setDraft((d) => ({ ...d, labor_rate }))} /></td>
       <td className="bv-amount">{moneyText(laborAmount({ work_hours: draft.work_hours, labor_rate: draft.labor_rate }))}</td><td />
     </tr>
@@ -305,7 +307,7 @@ export function TateguLaborLinesPanel({ lines, onChange, categories }: LaborLine
   };
   const addBlank = (categoryCode: string, patch: Partial<LaborLineDraft>) => {
     const blank: LaborLineDraft = {
-      process_name: '', category_code: categoryCode, work_hours: 1, labor_rate: 0,
+      process_name: '', category_code: categoryCode, work_hours: 0, labor_rate: 0,
       amount: 0, sort_order: lines.length, ...patch,
     };
     onChange(withLaborOrders([...lines, blank], options));
