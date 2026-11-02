@@ -32,6 +32,29 @@ function typeAndLeave(input: HTMLElement, value: string) {
 }
 
 describe('TateguCostLinesPanel', () => {
+  it('R-0232 入力した本体空行の単価でTabすると追加後の本体空行の材料名へ移る', () => {
+    render(<CostLinesHarness />);
+    const row = materialRows()[0] as HTMLElement;
+    fireEvent.change(within(row).getByLabelText('材料名'), { target: { value: 'オーデ' } });
+    fireEvent.change(within(row).getByLabelText('数量'), { target: { value: '2' } });
+    const unitCost = within(row).getByLabelText('材料単価');
+    fireEvent.change(unitCost, { target: { value: '1000' } });
+    fireEvent.keyDown(unitCost, { key: 'Tab' });
+
+    expect(materialRows()).toHaveLength(4);
+    expect(document.activeElement).toBe(within(materialRows()[1] as HTMLElement).getByLabelText('材料名'));
+  });
+
+  it('R-0232 空の本体材料名のTabと金物材料名のShift+Tabは空行の名称間を移る', () => {
+    render(<CostLinesHarness />);
+    const bodyName = within(materialRows()[0] as HTMLElement).getByLabelText('材料名');
+    const hardwareName = within(materialRows()[1] as HTMLElement).getByLabelText('材料名');
+    bodyName.focus();
+    fireEvent.keyDown(bodyName, { key: 'Tab' });
+    expect(document.activeElement).toBe(hardwareName);
+    fireEvent.keyDown(hardwareName, { key: 'Tab', shiftKey: true });
+    expect(document.activeElement).toBe(bodyName);
+  });
   it('R-0231 空の行へ続けて入力しても1行のままフォーカスが外れず、行から出ると1行だけ加わる', () => {
     render(<CostLinesHarness />);
     const input = within(materialRows()[0] as HTMLElement).getByLabelText('材料名') as HTMLInputElement;
@@ -167,6 +190,33 @@ describe('TateguCostLinesPanel', () => {
 });
 
 describe('TateguLaborLinesPanel', () => {
+  it('R-0232 入力した工場時間空行の単価でTabすると追加後の同区分工程名へ移る', () => {
+    function Harness() {
+      const [lines, setLines] = useState<LaborLineDraft[]>([]);
+      return <TateguLaborLinesPanel lines={lines} onChange={setLines} categories={categories} />;
+    }
+    render(<Harness />);
+    const row = laborRows()[0] as HTMLElement;
+    fireEvent.change(within(row).getByLabelText('工程名'), { target: { value: '組立' } });
+    fireEvent.change(within(row).getByLabelText('工数'), { target: { value: '2' } });
+    const rate = within(row).getByLabelText('労務単価');
+    fireEvent.change(rate, { target: { value: '1000' } });
+    fireEvent.keyDown(rate, { key: 'Tab' });
+
+    expect(laborRows()).toHaveLength(3);
+    expect(document.activeElement).toBe(within(laborRows()[1] as HTMLElement).getByLabelText('工程名'));
+  });
+
+  it('R-0232 IME変換中のTabとEnterを横取りしない', () => {
+    render(<TateguLaborLinesPanel lines={[]} onChange={vi.fn()} categories={categories} />);
+    const name = screen.getAllByLabelText('工程名')[0];
+    const tab = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true, isComposing: true });
+    const enter = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true, isComposing: true });
+    name.dispatchEvent(tab);
+    name.dispatchEvent(enter);
+    expect(tab.defaultPrevented).toBe(false);
+    expect(enter.defaultPrevented).toBe(false);
+  });
   it('R-0231 空の行へ続けて入力しても1行のままフォーカスが外れず、行から出ると1行だけ加わる', () => {
     function Harness() {
       const [lines, setLines] = useState<LaborLineDraft[]>([]);
