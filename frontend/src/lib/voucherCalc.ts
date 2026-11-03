@@ -241,3 +241,8 @@ export function calcPriceFromProfit(line: CostFields, profitRate: number): Price
   if (profitRate >= 1) return { line_total: cost };
   return { line_total: Math.ceil(cost / (1 - profitRate)) };
 }
+
+/** 明細の売値（円未満切り捨て）。切り捨ての前に小数第6位で丸めて浮動小数点の誤差を消す（R-0245） */
+export function calcLineSellTotal(unitPrice: number, quantity: number): number {
+  return Math.floor(Number((unitPrice * quantity).toFixed(6)));
+}
