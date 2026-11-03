@@ -8,7 +8,7 @@ import type { TateguItem } from '../../types/tateguItem';
 import type { LineCategoryValue } from '../../types/voucher';
 import type { VoucherFormValues } from '../../pages/VoucherEdit';
 import type { AggregationCategoryMaster } from '../../api/aggregationCategories';
-import { calcLineProfitSummary } from '../../lib/voucherCalc';
+import { calcLineProfitSummary, calcLineSellTotal } from '../../lib/voucherCalc';
 import {
   createCategoryGridTemplate,
   getLineItemRightWidth,
@@ -107,7 +107,7 @@ export default function LineItemRow({
 
   useEffect(() => {
     const unitPrice = prices.reduce((sum, price) => sum + (price.value || 0), 0);
-    setValue(`lines.${index}.line_total`, unitPrice * quantity);
+    setValue(`lines.${index}.line_total`, calcLineSellTotal(unitPrice, quantity));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(prices), quantity, index, setValue]);
 
