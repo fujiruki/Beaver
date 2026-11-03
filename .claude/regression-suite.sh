@@ -55,6 +55,7 @@ php "$root/api/tests/test_r0236_memo_sync.php" >/tmp/bv_r0236_memo_sync.log 2>&1
 php "$root/api/tests/test_r0238_line_type_sync.php" >/tmp/bv_r0238_line_type_sync.log 2>&1 || fail "[test_r0238_line_type_sync] $(tail -n 8 /tmp/bv_r0238_line_type_sync.log)"
 
 php "$root/api/tests/test_r0239_sync_fields.php" >/tmp/bv_r0239_sync_fields.log 2>&1 || fail "[test_r0239_sync_fields] $(tail -n 8 /tmp/bv_r0239_sync_fields.log)"
+php "$root/api/tests/test_r0241_hidden_note.php" >/tmp/bv_r0241_hidden_note.log 2>&1 || fail "[test_r0241_hidden_note] $(tail -n 8 /tmp/bv_r0241_hidden_note.log)"
 
 rm -f "$root"/api/tests/*.sqlite 2>/dev/null
 exit 0
