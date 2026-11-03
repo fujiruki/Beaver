@@ -66,7 +66,7 @@ try {
         assertEq('返り値の記録', $found['hidden_note'], '値');
     });
 
-    runTest('POST・PUT /vouchers で受け、255文字超は400', function () use ($pdo, $port) {
+    runTest('POST・PUT /vouchers で受け、上限なし（1,000文字も保存）', function () use ($pdo, $port) {
         $r = httpJson($port, '/vouchers', 'POST', ['voucher_type' => 'estimate', 'customer_id' => null, 'hidden_note' => '作成時']);
         assertTrue(str_contains($r['status'], '20'), 'POST 成功: ' . $r['status']);
         $id = (int)$r['body']['id'];
@@ -74,8 +74,20 @@ try {
         $r = httpJson($port, "/vouchers/$id", 'PUT', ['hidden_note' => '更新時']);
         assertTrue(str_contains($r['status'], '200'), 'PUT 成功: ' . $r['status']);
         assertEq('更新時', $pdo->query("SELECT hidden_note FROM vouchers WHERE id = $id")->fetchColumn(), 'PUT で保存');
-        $r = httpJson($port, "/vouchers/$id", 'PUT', ['hidden_note' => str_repeat('あ', 256)]);
-        assertTrue(str_contains($r['status'], '400'), '256文字は400: ' . $r['status']);
+        $long = str_repeat('あ', 1000);
+        $r = httpJson($port, "/vouchers/$id", 'PUT', ['hidden_note' => $long]);
+        assertTrue(str_contains($r['status'], '200'), 'PUT 1000文字: ' . $r['status']);
+        assertEq($long, $pdo->query("SELECT hidden_note FROM vouchers WHERE id = $id")->fetchColumn(), 'PUT で1000文字保存');
+        $r = httpJson($port, '/vouchers', 'POST', ['voucher_type' => 'estimate', 'customer_id' => null, 'hidden_note' => $long]);
+        assertTrue(str_contains($r['status'], '20'), 'POST 1000文字: ' . $r['status']);
+        assertEq($long, $pdo->query("SELECT hidden_note FROM vouchers WHERE id = " . (int)$r['body']['id'])->fetchColumn(), 'POST で1000文字保存');
+    });
+
+    runTest('/vouchers/sync でも1,000文字の非表示記録が保存される', function () use ($pdo, $port) {
+        $long = str_repeat('い', 1000);
+        $r = pushVoucher($port, 61005, ['hidden_note' => $long]);
+        assertTrue(!str_contains($r['status'], '400'), 'sync 1000文字: ' . $r['status']);
+        assertEq($long, noteOf($pdo, 61005), 'sync で1000文字保存');
     });
 } finally {
     harnessFinish();
