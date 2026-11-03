@@ -63,8 +63,8 @@ function FormattedNumberInput({ label, placeholder, value, onValueChange, onBlur
       value={displayValue}
       onFocus={() => { focusedRef.current = true; }}
       onChange={event => {
-        const raw = event.target.value;
-        setDisplayValue(raw === '' ? '' : formatNumber(parseNumber(raw)));
+        const raw = event.target.value.replace(/^0+(?=\d)/, '');
+        setDisplayValue(raw);
         onValueChange(raw);
       }}
       onBlur={() => {
