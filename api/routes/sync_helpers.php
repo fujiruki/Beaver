@@ -25,9 +25,9 @@ if (!function_exists('respond')) {
     }
 }
 
-/** R-0190: 対象文字列が255文字以内かをUTF-8文字数で検証する。 */
+/** R-0190: 対象文字列が255文字以内か（hidden_note は R-0241 で上限なし）をUTF-8文字数で検証する。 */
 function validateVoucherTextLengths(array $data, bool $linePayload = false): ?array {
-    $fields = $linePayload ? ['item_name', 'location_name', 'memo'] : ['description', 'hidden_note'];
+    $fields = $linePayload ? ['item_name', 'location_name', 'memo'] : ['description'];
     foreach ($fields as $field) {
         if (array_key_exists($field, $data) && $data[$field] !== null && mb_strlen((string)$data[$field], 'UTF-8') > 255) {
             return ['error' => 'text_too_long', 'field' => $field, 'max' => 255];
