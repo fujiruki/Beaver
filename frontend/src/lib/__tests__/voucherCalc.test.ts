@@ -3,6 +3,7 @@ import {
   calcManufactureCost,
   calcVoucherTotal,
   calcPriceFromProfit,
+  calcLineSellTotal,
   calcMaterialCostDynamic,
   calcLaborCostDynamic,
   calcManufactureCostDynamic,
@@ -462,5 +463,20 @@ describe('R-0240 値引きの行を利益と粗利から引く', () => {
     ], 80000);
     expect(result.grossProfitPerHour).toBeCloseTo(80000 / 16);
     expect(result.dailyGrossProfit).toBe(40000);
+  });
+});
+
+describe('calcLineSellTotal (R-0245)', () => {
+  it('単価1000・数量1.5 → 1500', () => {
+    expect(calcLineSellTotal(1000, 1.5)).toBe(1500);
+  });
+  it('単価333・数量1.5 → 499（499.5を切り捨て）', () => {
+    expect(calcLineSellTotal(333, 1.5)).toBe(499);
+  });
+  it('単価100・数量0.29 → 29（浮動小数点の誤差で1円下がらない）', () => {
+    expect(calcLineSellTotal(100, 0.29)).toBe(29);
+  });
+  it('整数の数量では単価×数量', () => {
+    expect(calcLineSellTotal(1234, 3)).toBe(3702);
   });
 });
