@@ -46,6 +46,7 @@ export type VoucherFormValues = {
   description: string | null;
   profit_rate: number;
   memo: string | null;
+  hidden_note: string | null;
   sales_category_id: number | null;
   validity_period: string | null;
   lines: LineFormValues[];
@@ -122,6 +123,7 @@ const defaultValues: VoucherFormValues = {
   description: null,
   profit_rate: 0.3,
   memo: null,
+  hidden_note: null,
   sales_category_id: 1,
   validity_period: null,
   lines: [{ ...defaultLine }],
@@ -131,7 +133,7 @@ const LEAVE_MESSAGE = '保存されていない変更があります。破棄し
 const HEADER_FIELDS = new Set<keyof VoucherFormValues>([
   'voucher_type', 'status', 'customer_id', 'project_id', 'voucher_date', 'due_date', 'delivery_date',
   'tax_input_type', 'consumption_tax_type', 'override_billing_date', 'trade_type', 'description',
-  'profit_rate', 'memo', 'sales_category_id', 'validity_period',
+  'profit_rate', 'memo', 'hidden_note', 'sales_category_id', 'validity_period',
 ]);
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error' | 'unsaved';
@@ -153,6 +155,7 @@ function toFormValues(voucher: Voucher): VoucherFormValues {
     description: (voucher as any).description ?? null,
     profit_rate: voucher.profit_rate,
     memo: voucher.memo,
+    hidden_note: voucher.hidden_note ?? null,
     sales_category_id: (voucher as any).sales_category_id ?? null,
     validity_period: voucher.validity_period ?? null,
     lines: voucher.lines.map(toLineFormValues),
@@ -438,6 +441,7 @@ export default function VoucherEdit() {
       description: data.description,
       profit_rate: data.profit_rate,
       memo: data.memo,
+      hidden_note: data.hidden_note,
       sales_category_id: data.sales_category_id,
       validity_period: data.validity_period,
     };

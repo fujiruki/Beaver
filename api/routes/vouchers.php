@@ -909,14 +909,14 @@ switch ($method) {
                 (voucher_no, voucher_type, status, project_id, customer_id,
                  voucher_date, due_date, delivery_date, tax_input_type, consumption_tax_type,
                  cutoff_date, billing_date, override_billing_date,
-                 trade_type, profit_rate, memo, description,
+                 trade_type, profit_rate, memo, hidden_note, description,
                  print_date_flag, print_tax_excl_flag, print_company_seal,
                  validity_period, sales_category_id)
             VALUES
                 (:voucher_no, :voucher_type, "draft", :project_id, :customer_id,
                  :voucher_date, :due_date, :delivery_date, :tax_input_type, :consumption_tax_type,
                  :cutoff_date, :billing_date, :override_billing_date,
-                 :trade_type, :profit_rate, :memo, :description,
+                 :trade_type, :profit_rate, :memo, :hidden_note, :description,
                  :print_date_flag, :print_tax_excl_flag, :print_company_seal,
                  :validity_period, :sales_category_id)
         ');
@@ -936,6 +936,7 @@ switch ($method) {
             ':trade_type'           => $data['trade_type'] ?? '掛売上',
             ':profit_rate'          => $data['profit_rate'] ?? 0.30,
             ':memo'                 => $data['memo'] ?? null,
+            ':hidden_note'          => $data['hidden_note'] ?? null,
             ':description'          => $data['description'] ?? null,
             ':print_date_flag'      => $data['print_date_flag'] ?? 0,
             ':print_tax_excl_flag'  => $data['print_tax_excl_flag'] ?? 0,
@@ -1062,7 +1063,7 @@ switch ($method) {
         }
         $fields = ['status','project_id','customer_id','voucher_date','due_date','delivery_date',
                    'tax_input_type','consumption_tax_type','cutoff_date','billing_date','override_billing_date',
-                   'trade_type','profit_rate','memo','description',
+                   'trade_type','profit_rate','memo','hidden_note','description',
                    'print_date_flag','print_tax_excl_flag','print_company_seal',
                    'validity_period','sales_category_id'];
         $sets = []; $params = [];

@@ -27,7 +27,7 @@ if (!function_exists('respond')) {
 
 /** R-0190: 対象文字列が255文字以内かをUTF-8文字数で検証する。 */
 function validateVoucherTextLengths(array $data, bool $linePayload = false): ?array {
-    $fields = $linePayload ? ['item_name', 'location_name', 'memo'] : ['description'];
+    $fields = $linePayload ? ['item_name', 'location_name', 'memo'] : ['description', 'hidden_note'];
     foreach ($fields as $field) {
         if (array_key_exists($field, $data) && $data[$field] !== null && mb_strlen((string)$data[$field], 'UTF-8') > 255) {
             return ['error' => 'text_too_long', 'field' => $field, 'max' => 255];
@@ -111,7 +111,7 @@ function jstToUtc(string $jstDateTime): ?string {
 const VOUCHER_SYNC_SELECT_COLUMNS = 'v.id, v.voucher_no, v.voucher_type, v.status, v.voucher_date,
                    v.access_voucher_id, v.access_voucher_no, v.customer_id, v.project_id,
                    v.total_amount, v.updated_at, v.last_synced_at,
-                   v.trade_type, v.consumption_tax_type, v.description, v.memo, v.quoted_at,
+                   v.trade_type, v.consumption_tax_type, v.description, v.memo, v.hidden_note, v.quoted_at,
                    v.print_date_flag, v.print_tax_excl_flag, v.print_company_seal,
                    v.sales_category_id, v.delivery_date, v.billing_date,
                    v.source_estimate_no, v.validity_period,
@@ -468,6 +468,8 @@ function syncVoucherUpsert(PDO $pdo, ?int $projectId): void {
     $accessVoucherNo = isset($data['access_voucher_no']) ? (string)$data['access_voucher_no'] : null;
     $memo            = $data['memo']        ?? null;
     $memoGiven       = array_key_exists('memo', $data) ? 1 : 0;
+    $hiddenNote      = $data['hidden_note'] ?? null;
+    $hiddenNoteGiven = array_key_exists('hidden_note', $data) ? 1 : 0;
     $quotedAt        = $data['quoted_at'] ?? null;
     $quotedAtGiven   = array_key_exists('quoted_at', $data) ? 1 : 0;
     $description     = $data['description'] ?? null;
@@ -543,7 +545,7 @@ function syncVoucherUpsert(PDO $pdo, ?int $projectId): void {
             INSERT INTO vouchers
                 (voucher_no, voucher_type, status, project_id, customer_id,
                  voucher_date, total_amount, access_voucher_id, access_voucher_no,
-                 memo, quoted_at, description,
+                 memo, hidden_note, quoted_at, description,
                  trade_type, consumption_tax_type,
                  print_date_flag, print_tax_excl_flag, print_company_seal,
                  sales_category_id, delivery_date, billing_date, source_estimate_no,
@@ -552,7 +554,7 @@ function syncVoucherUpsert(PDO $pdo, ?int $projectId): void {
             VALUES
                 (:voucher_no, :voucher_type, :status, :project_id, :customer_id,
                  :voucher_date, :total_amount, :access_voucher_id, :access_voucher_no,
-                 :memo, :quoted_at, :description,
+                 :memo, :hidden_note, :quoted_at, :description,
                  :trade_type,
                  -- NOT NULL 列: fresh INSERT で未送信(null)ならスキーマ既定値を補完する。
                  COALESCE(:consumption_tax_type, ' . "'外税/伝票計'" . '),
@@ -576,6 +578,7 @@ function syncVoucherUpsert(PDO $pdo, ?int $projectId): void {
                 total_amount        = excluded.total_amount,
                 access_voucher_no   = excluded.access_voucher_no,
                 memo                = CASE WHEN CAST(:memo_given AS INTEGER) = 1 THEN excluded.memo ELSE memo END,
+                hidden_note         = CASE WHEN CAST(:hidden_note_given AS INTEGER) = 1 THEN excluded.hidden_note ELSE hidden_note END,
                 quoted_at           = CASE WHEN CAST(:quoted_at_given AS INTEGER) = 1 THEN excluded.quoted_at ELSE quoted_at END,
                 description         = excluded.description,
                 trade_type          = COALESCE(excluded.trade_type, trade_type),
@@ -610,6 +613,8 @@ function syncVoucherUpsert(PDO $pdo, ?int $projectId): void {
             ':access_voucher_no'   => $accessVoucherNo,
             ':memo'                => $memo,
             ':memo_given'          => $memoGiven,
+            ':hidden_note'         => $hiddenNote,
+            ':hidden_note_given'   => $hiddenNoteGiven,
             ':quoted_at'           => $quotedAt,
             ':quoted_at_given'     => $quotedAtGiven,
             ':description'         => $description,

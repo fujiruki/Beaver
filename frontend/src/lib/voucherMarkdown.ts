@@ -8,7 +8,7 @@ type MarkdownLine = {
 };
 type MarkdownForm = {
   voucher_type: VoucherType; status: VoucherStatus; voucher_date: string; tax_input_type: TaxInputType;
-  consumption_tax_type: string; description?: string | null; lines: MarkdownLine[];
+  consumption_tax_type: string; description?: string | null; hidden_note?: string | null; lines: MarkdownLine[];
 };
 type Ledger = Record<string, any>;
 
@@ -32,6 +32,8 @@ export function buildVoucherMarkdown({ form, voucherNo, customerName, projectNam
     `- 摘要: ${cell(form.description)}`,
     `- ステータス: ${statusLabels[form.status] ?? form.status}`,
     `- 税の扱い: ${form.tax_input_type === 'exclusive' ? '税抜' : '税込'}（${cell(form.consumption_tax_type)}）`,
+    ...(form.hidden_note ? ['', '## 非表示記録（社内メモ）', '', form.hidden_note] : []),
+    ...(form.hidden_note ? ['', '## 非表示記録（社内メモ）', '', form.hidden_note] : []),
     '', '## 明細',
     '', '| No | 品名 | 取付場所 | 数量 | 単位 | 売値単価 | 売値金額 | 原価 | 作業時間 | 利益 | 備考 | 製品№ |',
     '|---:|---|---|---:|---|---:|---:|---:|---:|---:|---|---|',

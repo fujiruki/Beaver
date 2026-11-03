@@ -228,12 +228,32 @@ export default function VoucherHeader({
           />
         </Field>
       </div>
+
+      <div className="no-print" style={{ padding: '0 16px 12px' }}>
+        <style>{'@media print { .no-print { display: none !important; } }'}</style>
+        <Field label="非表示記録" hint="帳票に出ない">
+          <textarea
+            {...register('hidden_note')}
+            aria-label="非表示記録"
+            rows={2}
+            placeholder="社内の記録（見積書・印刷には出ません）"
+            style={memoStyle}
+            disabled={readOnly}
+            ref={(element) => {
+              register('hidden_note').ref(element);
+              if (element) resizeMemo(element);
+            }}
+            onInput={(event) => resizeMemo(event.currentTarget)}
+          />
+        </Field>
+      </div>
     </div>
   );
 }
 
-function Field({ label, error, children }: {
+function Field({ label, hint, error, children }: {
   label: string;
+  hint?: string;
   error?: string;
   children: React.ReactNode;
 }) {
@@ -241,6 +261,7 @@ function Field({ label, error, children }: {
     <div>
       <label style={{ display: 'block', marginBottom: 4, fontSize: 12, fontWeight: 'bold', color: '#475569' }}>
         {label}
+        {hint && <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 'normal', color: '#94a3b8' }}>{hint}</span>}
       </label>
       {children}
       {error && <p style={{ margin: '4px 0 0', fontSize: 11, color: '#dc2626' }}>{error}</p>}

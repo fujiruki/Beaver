@@ -37,6 +37,7 @@ export interface Voucher {
   profit_rate: number;
   description: string | null;
   memo: string | null;
+  hidden_note?: string | null;
   sales_category_id?: number | null;
   validity_period?: string | null;
   /** 引用元の見積伝票ID（売上伝票のみ） */
