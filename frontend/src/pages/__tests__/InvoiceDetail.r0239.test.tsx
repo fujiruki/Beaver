@@ -33,7 +33,8 @@ describe('R-0239 追記2 入金の種類', () => {
       </QueryClientProvider>,
     );
     fireEvent.click(await screen.findByRole('button', { name: '+ 入金登録' }));
-    const select = (await screen.findByDisplayValue('伊予銀行　長浜支店　藤田建具店')) as HTMLSelectElement;
+    const select = (await screen.findByText('入金種別')).parentElement!.querySelector('select')!;
+    expect(select.value).toBe('伊予銀行　長浜支店　藤田建具店');
     expect(Array.from(select.options).map(o => o.value)).toEqual([
       '現金売上', '伊予銀行　長浜支店　宗三', '愛媛たいき農協　大和支所', '小切手', 'その他', '値引き',
       '伊予銀行　長浜支店　藤田建具店',

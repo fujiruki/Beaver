@@ -52,8 +52,8 @@ function syncPaymentUpsert(PDO $pdo): void {
     $paymentDate = isset($data['payment_date']) ? (string)$data['payment_date'] : date('Y-m-d');
     $amount      = isset($data['amount']) ? (float)$data['amount'] : 0.0;
     $memo        = $data['memo'] ?? null;
-    $paymentTypeGiven = array_key_exists('payment_type', $data) ? 1 : 0;
-    $paymentType = $paymentTypeGiven && $data['payment_type'] !== null ? (string)$data['payment_type'] : '現金';
+    $paymentTypeGiven = isset($data['payment_type']) && $data['payment_type'] !== '' ? 1 : 0;
+    $paymentType = $paymentTypeGiven ? (string)$data['payment_type'] : '現金売上';
 
     $invoiceId = null;
     if (isset($data['receivable_id']) && is_numeric($data['receivable_id'])) {
@@ -282,7 +282,7 @@ switch ($method) {
             ':invoice_id'   => $data['invoice_id'] ?? null,
             ':payment_date' => $data['payment_date'] ?? date('Y-m-d'),
             ':amount'       => $data['amount'] ?? 0,
-            ':payment_type' => $data['payment_type'] ?? '現金',
+            ':payment_type' => ($data['payment_type'] ?? '') !== '' ? $data['payment_type'] : '現金売上',
             ':memo'         => $data['memo'] ?? null,
             ':origin'       => 'beaver',
         ]);

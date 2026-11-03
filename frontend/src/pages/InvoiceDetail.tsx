@@ -1,3 +1,4 @@
+import { DEFAULT_PAYMENT_TYPE, paymentTypeOptions } from '../lib/paymentTypes';
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
@@ -65,7 +66,7 @@ export default function InvoiceDetail() {
       invoice_id: invoiceId,
       payment_date: new Date().toISOString().split('T')[0],
       amount: 0,
-      payment_type: '振込',
+      payment_type: DEFAULT_PAYMENT_TYPE,
       memo: null,
     },
   });
@@ -278,11 +279,7 @@ export default function InvoiceDetail() {
                   </Field>
                   <Field label="入金種別">
                     <select {...payForm.register('payment_type')} style={inputStyle}>
-                      <option>振込</option>
-                      <option>現金</option>
-                      <option>小切手</option>
-                      <option>手形</option>
-                      <option>相殺</option>
+                      {paymentTypeOptions(payForm.watch('payment_type')).map(t => <option key={t} value={t}>{t}</option>)}
                     </select>
                   </Field>
                   <Field label="備考">
