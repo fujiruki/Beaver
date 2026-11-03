@@ -50,9 +50,9 @@ try {
         pushPayment($port, 70001, ['payment_type' => '振込']);
         assertEq('振込', col($pdo, 'SELECT payment_type FROM payments WHERE access_payment_no = 70001'), '追加');
     });
-    runTest('入金: キーなしの追加は現金', function () use ($pdo, $port) {
+    runTest('入金: キーなしの追加は現金売上', function () use ($pdo, $port) {
         pushPayment($port, 70002);
-        assertEq('現金', col($pdo, 'SELECT payment_type FROM payments WHERE access_payment_no = 70002'), '既定');
+        assertEq('現金売上', col($pdo, 'SELECT payment_type FROM payments WHERE access_payment_no = 70002'), '既定');
     });
     runTest('入金: キーありの更新で値が入り、選択肢外の値も保存', function () use ($pdo, $port) {
         pushPayment($port, 70003, ['payment_type' => '振込']);
@@ -63,6 +63,17 @@ try {
         pushPayment($port, 70004, ['payment_type' => '手形']);
         pushPayment($port, 70004, ['amount' => 2000]);
         assertEq('手形', col($pdo, 'SELECT payment_type FROM payments WHERE access_payment_no = 70004'), '残る');
+    });
+    runTest('入金: 空文字・nullの追加は現金売上、更新は前の値のまま', function () use ($pdo, $port) {
+        pushPayment($port, 70006, ['payment_type' => '']);
+        assertEq('現金売上', col($pdo, 'SELECT payment_type FROM payments WHERE access_payment_no = 70006'), '空文字の追加');
+        pushPayment($port, 70007, ['payment_type' => null]);
+        assertEq('現金売上', col($pdo, 'SELECT payment_type FROM payments WHERE access_payment_no = 70007'), 'nullの追加');
+        pushPayment($port, 70008, ['payment_type' => '小切手']);
+        pushPayment($port, 70008, ['payment_type' => '']);
+        assertEq('小切手', col($pdo, 'SELECT payment_type FROM payments WHERE access_payment_no = 70008'), '空文字の更新');
+        pushPayment($port, 70008, ['payment_type' => null]);
+        assertEq('小切手', col($pdo, 'SELECT payment_type FROM payments WHERE access_payment_no = 70008'), 'nullの更新');
     });
     runTest('入金: GET /payments/sync の返り値に payment_type が入る', function () use ($port) {
         pushPayment($port, 70005, ['payment_type' => '相殺']);
