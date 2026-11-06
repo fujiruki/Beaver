@@ -1,3 +1,4 @@
+import { useAutoFocusSearch } from '../hooks/useAutoFocusSearch';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useProjectsPaged, useDeleteProject, useCreateProject, useHardDeleteProject } from '../api/projects';
@@ -73,6 +74,7 @@ export default function ProjectList() {
     parseSortKeys(searchParams.get('sort'), searchParams.get('order')),
   );
   const isComposingRef = useRef(false);
+  const searchRef = useAutoFocusSearch();
   const { data: customers = [] } = useCustomers();
   const { settings } = useAppSettings();
   const filters = {
@@ -344,6 +346,7 @@ export default function ProjectList() {
       <div className="mb-3 flex items-center justify-between flex-wrap gap-2">
         <input
           type="text"
+          ref={searchRef}
           placeholder="案件名・得意先名で検索"
           value={inputValue}
           onChange={handleChange}

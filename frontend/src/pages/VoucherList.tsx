@@ -1,3 +1,4 @@
+import { useAutoFocusSearch } from '../hooks/useAutoFocusSearch';
 import { useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useVouchersPaged } from '../api/vouchers';
@@ -41,6 +42,7 @@ function VoucherListBody() {
   const [searchInput, setSearchInput] = useState(() => searchParams.get('q') ?? '');
   const [searchQuery, setSearchQuery] = useState(() => searchParams.get('q') ?? '');
   const isComposingRef = useRef(false);
+  const searchRef = useAutoFocusSearch();
   const urlSortKey = searchParams.get('sort');
   const [sort, setSortStorage] = useSortState('vouchers',
     urlSortKey ? { key: urlSortKey, dir: searchParams.get('order') === 'desc' ? 'desc' : 'asc' } : undefined);
@@ -239,6 +241,7 @@ function VoucherListBody() {
             onChange={handleSearchChange}
             onCompositionStart={() => { isComposingRef.current = true; }}
             onCompositionEnd={e => { isComposingRef.current = false; commitSearch(e.currentTarget.value); }}
+            ref={searchRef}
             placeholder="伝票番号・得意先・案件・摘要で検索"
             style={{ ...filterStyle, width: '100%' }}
           />

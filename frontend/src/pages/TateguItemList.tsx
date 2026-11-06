@@ -1,3 +1,4 @@
+import { useAutoFocusSearch } from '../hooks/useAutoFocusSearch';
 import { useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTateguItemsPaged, useDeleteTateguItem } from '../api/tateguItems';
@@ -20,6 +21,7 @@ export default function TateguItemList() {
   const [sort, setSortStorage] = useSortState('tategu-items',
     urlSortKey ? { key: urlSortKey, dir: searchParams.get('order') === 'desc' ? 'desc' : 'asc' } : undefined);
   const isComposingRef = useRef(false);
+  const searchRef = useAutoFocusSearch();
   const { data, isLoading, error } = useTateguItemsPaged(page, search, sort);
   const deleteMutation = useDeleteTateguItem();
 
@@ -129,6 +131,7 @@ export default function TateguItemList() {
       <div className="mb-3">
         <input
           type="text"
+          ref={searchRef}
           placeholder="品番・品名・仕様で検索"
           value={inputValue}
           onChange={handleChange}

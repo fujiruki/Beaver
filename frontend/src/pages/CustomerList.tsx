@@ -1,3 +1,4 @@
+import { useAutoFocusSearch } from '../hooks/useAutoFocusSearch';
 import { useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useCustomersPaged, useDeleteCustomer } from '../api/customers';
@@ -21,6 +22,7 @@ export default function CustomerList() {
   const [sort, setSortStorage] = useSortState('customers',
     urlSortKey ? { key: urlSortKey, dir: searchParams.get('order') === 'desc' ? 'desc' : 'asc' } : undefined);
   const isComposingRef = useRef(false);
+  const searchRef = useAutoFocusSearch();
   const { data, isLoading, error, refetch } = useCustomersPaged(page, search, sort);
   const deleteMutation = useDeleteCustomer();
   const [deleteConflict, setDeleteConflict] = useState(false);
@@ -141,6 +143,7 @@ export default function CustomerList() {
       <div style={{ marginBottom: 12 }}>
         <input
           type="text"
+          ref={searchRef}
           placeholder="得意先名・コードで検索"
           value={inputValue}
           onChange={handleChange}

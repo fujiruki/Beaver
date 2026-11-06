@@ -1,3 +1,4 @@
+import { useAutoFocusSearch } from '../hooks/useAutoFocusSearch';
 import { useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useInvoices } from '../api/invoices';
@@ -50,6 +51,7 @@ export default function InvoiceList() {
   const [searchInput, setSearchInput] = useState(() => searchParams.get('q') ?? '');
   const [searchQuery, setSearchQuery] = useState(() => searchParams.get('q') ?? '');
   const isComposingRef = useRef(false);
+  const searchRef = useAutoFocusSearch();
   const urlSortKey = searchParams.get('sort');
   const [sort, setSortStorage] = useSortState('invoices',
     urlSortKey ? { key: urlSortKey, dir: searchParams.get('order') === 'desc' ? 'desc' : 'asc' } : undefined);
@@ -163,6 +165,7 @@ export default function InvoiceList() {
           onChange={handleSearchChange}
           onCompositionStart={() => { isComposingRef.current = true; }}
           onCompositionEnd={e => { isComposingRef.current = false; commitSearch(e.currentTarget.value); }}
+          ref={searchRef}
           placeholder="請求書番号・得意先で検索"
           style={{ ...filterStyle, minWidth: 260 }}
         />
