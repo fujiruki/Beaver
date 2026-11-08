@@ -680,9 +680,9 @@ export default function VoucherEdit() {
     }
     const insertAt = selectedIdx;
     const nextNo = insertAt + 1;
-    const currentLines = getValues('lines');
     const insertedLine = { ...defaultLine, line_no: nextNo, cost_labor_rate: defaultLaborRate };
     if (isNew) {
+      const currentLines = getValues('lines');
       replace([
         ...currentLines.slice(0, insertAt),
         insertedLine,
@@ -691,19 +691,23 @@ export default function VoucherEdit() {
       setSelectedIdx(insertAt);
     } else {
       // サーバーでは末尾に作られるため、作成後に新規行と後続行を同じ保存経路で再採番する
+      const anchorId = getValues('lines')[insertAt]?.id;
       void enqueueVoucherWrite(expectedUpdatedAt => addLineMutation.mutateAsync({
         ...insertedLine,
         voucher_id: voucherId,
         expected_updated_at: expectedUpdatedAt ?? undefined,
       } as any)).then(created => {
+        const currentLines = getValues('lines');
+        const anchorIdx = anchorId === undefined ? -1 : currentLines.findIndex(line => line.id === anchorId);
+        const at = anchorIdx === -1 ? currentLines.length : anchorIdx;
         const reorderedLines = [
-          ...currentLines.slice(0, insertAt),
+          ...currentLines.slice(0, at),
           toLineFormValues(created),
-          ...currentLines.slice(insertAt),
+          ...currentLines.slice(at),
         ].map((line, index) => ({ ...line, line_no: index + 1 }));
         replace(reorderedLines);
-        setSelectedIdx(insertAt);
-        void saveLineOrder(reorderedLines);
+        setSelectedIdx(at);
+        void saveLineOrder();
       }, () => undefined);
     }
   }
@@ -711,10 +715,8 @@ export default function VoucherEdit() {
   function handleMoveUp() {
     if (!formReady) return;
     if (selectedIdx === null || selectedIdx === 0) return;
-    const reordered = [...(watchedLines ?? [])];
-    [reordered[selectedIdx - 1], reordered[selectedIdx]] = [reordered[selectedIdx], reordered[selectedIdx - 1]];
     swap(selectedIdx, selectedIdx - 1);
-    if (!isNew) void saveLineOrder(reordered);
+    if (!isNew) void saveLineOrder();
     setSelectedIdx(selectedIdx - 1);
   }
 
@@ -722,10 +724,8 @@ export default function VoucherEdit() {
     if (!formReady) return;
     const len = watchedLines?.length ?? 0;
     if (selectedIdx === null || selectedIdx >= len - 1) return;
-    const reordered = [...(watchedLines ?? [])];
-    [reordered[selectedIdx], reordered[selectedIdx + 1]] = [reordered[selectedIdx + 1], reordered[selectedIdx]];
     swap(selectedIdx, selectedIdx + 1);
-    if (!isNew) void saveLineOrder(reordered);
+    if (!isNew) void saveLineOrder();
     setSelectedIdx(selectedIdx + 1);
   }
 
@@ -759,14 +759,14 @@ export default function VoucherEdit() {
     }
   }
 
-  async function saveLineOrder(orderedLines: Array<{ id?: number }>) {
+  async function saveLineOrder() {
     if (!formReady) return;
-    const lineIds = orderedLines.map(line => line.id).filter((id): id is number => typeof id === 'number');
     setSaveStatus('saving');
     setSaveError(null);
     try {
       await enqueueVoucherWrite(expectedUpdatedAt => reorderMutation.mutateAsync({
-        line_ids: lineIds, expected_updated_at: expectedUpdatedAt ?? undefined,
+        line_ids: getValues('lines').map(line => line.id).filter((id): id is number => typeof id === 'number'),
+        expected_updated_at: expectedUpdatedAt ?? undefined,
       }));
       setSavedAt(new Date());
       setSaveStatus('saved');
