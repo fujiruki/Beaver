@@ -1,5 +1,5 @@
 export const LINE_ITEM_NO_WIDTH = 42;
-export const LINE_ITEM_LEFT_WIDTH = 330;
+export const LINE_ITEM_LEFT_WIDTH = 400;
 export const LINE_ITEM_BAND_LABEL_WIDTH = 67;
 export const LINE_ITEM_MONEY_COLUMN_WIDTH = 72;
 export const LINE_ITEM_TIME_COLUMN_WIDTH = 54;

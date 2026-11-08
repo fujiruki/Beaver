@@ -81,3 +81,51 @@ const containerStyle: React.CSSProperties = {
   padding: '12px 16px',
   minWidth: 280,
 };
+
+export function TopSummary({ lines, taxInputType, taxRate, costLines }: Props) {
+  const { tax_amount, total } = useTotalCalc(lines, taxInputType, taxRate);
+  const { settings } = useAppSettings();
+  const sales = total - tax_amount;
+  const profit = calcProfitSummaryDynamic(costLines ?? [], sales, settings.hoursPerDay);
+  const normal = (costLines ?? []).filter(l => l.line_type === 'normal');
+  const hoursOf = (code: string) => normal.reduce((sum, l) =>
+    sum + l.costs.filter(c => c.category_code === code).reduce((s, c) => s + (c.value || 0), 0) * l.quantity, 0);
+  const material = new Map<string, number>();
+  for (const l of normal) {
+    for (const c of l.costs) {
+      if (c.measure_type !== 'money' || !c.value) continue;
+      material.set(c.category_name, (material.get(c.category_name) ?? 0) + c.value * l.quantity);
+    }
+  }
+  const rate = profit.grossProfitRate;
+
+  return (
+    <div data-testid="top-summary" style={containerStyle}>
+      <Row label="売上" value={sales} bold />
+      <Row label="原価" value={Math.round(sales - profit.grossProfit)} bold />
+      <Row label="利益" value={Math.round(profit.grossProfit)} bold colored={profit.grossProfit >= 0} />
+      <HoursRow label="工場時間" hours={hoursOf('FACTORY_TIME')} />
+      <HoursRow label="現場時間" hours={hoursOf('SITE_TIME')} />
+      <HoursRow label="合計時間" hours={profit.totalWorkHours} />
+      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderTop: '1px solid #e2e8f0' }}>
+        <span style={{ fontSize: 13, color: '#64748b' }}>利益率</span>
+        <span style={{ fontSize: 14, color: '#475569' }}>{rate !== null ? `${(rate * 100).toFixed(1)}%` : '—'}</span>
+      </div>
+      {material.size > 0 && (
+        <div data-testid="top-summary-material" style={{ padding: '6px 0', borderTop: '1px solid #e2e8f0', fontSize: 13, color: '#64748b' }}>
+          材料原価　{[...material].map(([name, value]) => `${name} ¥${Math.round(value).toLocaleString()}`).join('　')}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function HoursRow({ label, hours }: { label: string; hours: number }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0',
+      borderTop: '1px solid #e2e8f0', fontWeight: 'bold' }}>
+      <span style={{ fontSize: 13, color: '#1e293b' }}>{label}</span>
+      <span style={{ fontSize: 16, color: '#1e293b' }}>{hours.toFixed(1)} h</span>
+    </div>
+  );
+}

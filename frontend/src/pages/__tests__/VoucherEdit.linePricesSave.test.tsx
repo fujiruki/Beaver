@@ -79,7 +79,7 @@ describe('明細の売値の内訳を入力してフォーカスを外すと、�
     renderPage();
     await screen.findByText('Beaver作成');
     await screen.findAllByPlaceholderText('本体');
-    const price = (name: string) => document.querySelectorAll(`input[placeholder="${name}"]`)[0] as HTMLInputElement;
+    const price = (name: string) => document.querySelectorAll(`input[placeholder="${name}"]`)[1] as HTMLInputElement;
     await user.clear(price('本体'));
     await user.type(price('本体'), '35700');
     await user.clear(price('金物'));
@@ -102,7 +102,7 @@ describe('明細の売値の内訳を入力してフォーカスを外すと、�
     renderPage();
     await screen.findByText('Beaver作成');
     await screen.findAllByPlaceholderText('本体');
-    const main = document.querySelectorAll('input[placeholder="本体"]')[0] as HTMLInputElement;
+    const main = document.querySelectorAll('input[placeholder="本体"]')[1] as HTMLInputElement;
     await user.clear(main);
     await user.type(main, '35700');
     await user.tab();
@@ -122,7 +122,7 @@ describe('明細の売値の内訳を入力してフォーカスを外すと、�
     await screen.findByText('Beaver作成');
     await screen.findAllByPlaceholderText('本体');
     for (const [name, v] of [['本体', '5000'], ['金物', '2000'], ['ガラス', '3000']]) {
-      const costInput = document.querySelectorAll(`input[placeholder="${name}"]`)[1] as HTMLInputElement;
+      const costInput = document.querySelectorAll(`input[placeholder="${name}"]`)[0] as HTMLInputElement;
       await user.clear(costInput);
       await user.type(costInput, v);
       await user.tab();

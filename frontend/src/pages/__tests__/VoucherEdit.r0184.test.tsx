@@ -172,7 +172,7 @@ describe('R-0184 明細入力レイアウト F3 詰め版', () => {
     renderPage();
     const row = await screen.findByTestId('line-item-0');
 
-    for (const testId of ['location-quantity-group', 'price-group', 'cost-group', 'work-group', 'tax-group']) {
+    for (const testId of ['quantity-group', 'price-group', 'cost-group', 'work-group', 'tax-group']) {
       const group = within(row).getByTestId(testId);
       expect(group.style.border).toBe('1px solid #b6bdc6');
       expect(group.style.borderRadius).toBe('5px');

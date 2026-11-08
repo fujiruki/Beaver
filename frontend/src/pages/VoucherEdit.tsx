@@ -22,7 +22,7 @@ import {
 import ProfitRateBar from '../components/voucher/ProfitRateBar';
 import VoidVoucherButton from '../components/voucher/VoidVoucherButton';
 import UnvoidVoucherButton from '../components/voucher/UnvoidVoucherButton';
-import TotalSummary from '../components/voucher/TotalSummary';
+import TotalSummary, { TopSummary } from '../components/voucher/TotalSummary';
 import { useSmartBack } from '../hooks/useSmartBack';
 import { useDefaultLaborRate } from '../api/settings';
 import type { Voucher, VoucherLine, VoucherType, VoucherStatus, TaxInputType, LineCategoryValue } from '../types/voucher';
@@ -401,6 +401,13 @@ export default function VoucherEdit() {
     line_type: (l?.line_type ?? 'normal') as 'normal' | 'discount' | 'subtotal',
     line_total: l?.line_total ?? 0,
   }));
+
+  const [viewportWidth, setViewportWidth] = useState(() => window.innerWidth);
+  useEffect(() => {
+    const onResize = () => setViewportWidth(window.innerWidth);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   async function copyForAi() {
     const values = getValues();
@@ -817,6 +824,10 @@ export default function VoucherEdit() {
 
   const moneyCategories = categories.filter(c => c.measure_type === 'money');
   const timeCategories  = categories.filter(c => c.measure_type === 'time');
+  const wideSummary = viewportWidth >= getLineItemWidth(moneyCategories.length, timeCategories.length) + 280 + 16 + 64;
+  const topSummary = (
+    <TopSummary lines={linesForCalc} taxInputType={watchedTaxInputType} taxRate={0.10} costLines={costLinesForCalc} />
+  );
 
   return (
     <FormProvider {...form}>
@@ -1017,6 +1028,8 @@ export default function VoucherEdit() {
             onTaxInputTypeChange={() => queueMicrotask(() => void queueHeaderSave())}
           />
 
+          {!wideSummary && topSummary}
+
           <ProfitRateBar categories={categories} selectedIdx={selectedIdx} setSelectedIdx={setSelectedIdx} isNew={isNew} onSaveLine={saveLine} />
 
           {/* 明細行 */}
@@ -1033,7 +1046,8 @@ export default function VoucherEdit() {
                 disabled={selectedIdx === null || (watchedLines?.length ?? 0) - 1 === selectedIdx} style={rowOpBtnStyle}>▼</button>
             </div>
           )}
-          <div style={{ background: '#fff', marginBottom: 16, overflowX: 'auto' }}>
+          <div style={wideSummary ? { display: 'flex', gap: 16, alignItems: 'flex-start', marginBottom: 16 } : undefined}>
+          <div style={{ background: '#fff', marginBottom: wideSummary ? 0 : 16, overflowX: 'auto', flex: wideSummary ? '1 1 0' : undefined, minWidth: 0 }}>
             {!formReady ? (
               <div style={{ padding: 16, color: '#64748b' }}>明細を読み込んでいます…</div>
             ) : categories.length === 0 ? (
@@ -1043,7 +1057,7 @@ export default function VoucherEdit() {
             ) : <div style={{ width: 'fit-content', minWidth: getLineItemWidth(moneyCategories.length, timeCategories.length) }}>
               <div data-testid="line-item-heading" style={lineHeadingStyle}>
                 <span style={{ width: LINE_ITEM_NO_WIDTH }}>No</span>
-                <span style={{ width: LINE_ITEM_LEFT_WIDTH }}>取付製品／取付場所・数量・備考</span>
+                <span style={{ width: LINE_ITEM_LEFT_WIDTH }}>取付場所・品名／数量・備考</span>
                 <span data-testid="category-grid-heading" style={{ display: 'grid', gridTemplateColumns: createCategoryGridTemplate(moneyCategories.length, timeCategories.length) }}>
                   <span />
                   {moneyCategories.map(category => (
@@ -1077,6 +1091,8 @@ export default function VoucherEdit() {
                 </button>
               </div>
             )}
+          </div>
+          {wideSummary && <div data-testid="summary-side" style={{ position: 'sticky', top: 8, flex: '0 0 auto' }}>{topSummary}</div>}
           </div>
 
           {/* 合計 + ボタン */}

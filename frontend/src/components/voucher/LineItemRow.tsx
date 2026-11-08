@@ -292,6 +292,15 @@ export default function LineItemRow({
             <option value="discount">値引</option>
             <option value="subtotal">小計</option>
           </select>
+          <input
+            aria-label="取付場所"
+            placeholder="取付場所"
+            {...register(`lines.${index}.location_name`)}
+            maxLength={255}
+            disabled={readOnly || lineType !== 'normal'}
+            onBlur={saveLineToDb}
+            style={{ ...inputStyle, width: 100 }}
+          />
           <textarea
             aria-label="取付製品"
             placeholder="品名"
@@ -300,7 +309,7 @@ export default function LineItemRow({
             disabled={readOnly}
             onBlur={saveLineToDb}
             rows={3}
-            style={{ ...inputStyle, width: 222, height: 45, lineHeight: '15px', resize: 'none' }}
+            style={{ ...inputStyle, width: 150, height: 45, lineHeight: '15px', resize: 'none' }}
           />
           {!readOnly && lineType === 'normal' && <div style={{ position: 'relative', display: 'flex' }}>
             <button
@@ -359,16 +368,7 @@ export default function LineItemRow({
           </div>}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
-          <div data-testid="location-quantity-group" style={joinedGroupStyle}>
-            <input
-              aria-label="取付場所"
-              placeholder="取付場所"
-              {...register(`lines.${index}.location_name`)}
-              maxLength={255}
-              disabled={readOnly || lineType !== 'normal'}
-              onBlur={saveLineToDb}
-              style={{ ...groupedInputStyle, width: 170 }}
-            />
+          <div data-testid="quantity-group" style={joinedGroupStyle}>
             <span style={joinedCellStyle}>
               {numericInput('数量', quantity, raw => setValue(`lines.${index}.quantity`, parseNumber(raw)), 56, undefined, true)}
             </span>
@@ -398,6 +398,31 @@ export default function LineItemRow({
       <div data-testid="line-item-right" style={{ width: rightWidth }}>
         {lineType === 'normal' ? (
           <>
+            <div style={{ ...bandStyle, gridTemplateColumns: categoryGridTemplate, background: '#fdf3e7' }}>
+              <span style={{ ...bandLabelStyle, color: '#9a5b13' }}>原価・作業</span>
+              <div data-testid="cost-group" style={{ ...joinedGroupStyle, gridColumn: `2 / span ${moneyCategories.length}` }}>
+                {moneyCategories.map(category => (
+                  <span key={category.code} style={joinedCellStyle}>
+                    {numericInput(`原価 ${category.name}`, getValue(costs, category.code), raw => setCategoryValue('costs', category, raw), 72, category.name, true)}
+                  </span>
+                ))}
+              </div>
+              <div data-testid="work-group" style={{ ...joinedGroupStyle, gridColumn: `${moneyCategories.length + 2} / span ${timeCategories.length + 1}` }}>
+                {timeCategories.map(category => (
+                  <span key={category.code} style={joinedCellStyle}>
+                    {numericInput(formatWorkCategoryName(category.name), getValue(costs, category.code), raw => setCategoryValue('costs', category, raw), 54, undefined, true)}
+                  </span>
+                ))}
+                <span style={joinedCellStyle}>
+                  {numericInput('労務単価', laborRate, raw => setValue(`lines.${index}.cost_labor_rate`, parseNumber(raw)), 72, undefined, true)}
+                </span>
+              </div>
+              <div style={{ ...resultStyle, gridColumn: moneyCategories.length + timeCategories.length + 3 }}>
+                <span style={mutedResultStyle}>材料原価 ¥{formatNumber(Math.round(materialCostTotal))}</span>
+                <span style={mutedResultStyle}>労務費 ¥{formatNumber(Math.round(laborCostTotal))}</span>
+                <strong>製造原価 ¥{formatNumber(Math.round(manufactureCostTotal))}</strong>
+              </div>
+            </div>
             <div data-testid={`category-grid-row-${index}`} style={{ ...bandStyle, gridTemplateColumns: categoryGridTemplate, background: '#eef6ee' }}>
               <span style={{ ...bandLabelStyle, color: '#2f6f3a' }}>売値</span>
               <div data-testid="price-group" style={{ ...joinedGroupStyle, gridColumn: `2 / span ${moneyCategories.length}` }}>
@@ -422,31 +447,6 @@ export default function LineItemRow({
               <div style={{ ...resultStyle, gridColumn: moneyCategories.length + timeCategories.length + 3 }}>
                 <span style={mutedResultStyle}>単価 ¥{formatNumber(unitPrice)}</span>
                 <strong>金額 ¥{formatNumber(lineTotal)}</strong>
-              </div>
-            </div>
-            <div style={{ ...bandStyle, gridTemplateColumns: categoryGridTemplate, background: '#fdf3e7' }}>
-              <span style={{ ...bandLabelStyle, color: '#9a5b13' }}>原価・作業</span>
-              <div data-testid="cost-group" style={{ ...joinedGroupStyle, gridColumn: `2 / span ${moneyCategories.length}` }}>
-                {moneyCategories.map(category => (
-                  <span key={category.code} style={joinedCellStyle}>
-                    {numericInput(`原価 ${category.name}`, getValue(costs, category.code), raw => setCategoryValue('costs', category, raw), 72, category.name, true)}
-                  </span>
-                ))}
-              </div>
-              <div data-testid="work-group" style={{ ...joinedGroupStyle, gridColumn: `${moneyCategories.length + 2} / span ${timeCategories.length + 1}` }}>
-                {timeCategories.map(category => (
-                  <span key={category.code} style={joinedCellStyle}>
-                    {numericInput(formatWorkCategoryName(category.name), getValue(costs, category.code), raw => setCategoryValue('costs', category, raw), 54, undefined, true)}
-                  </span>
-                ))}
-                <span style={joinedCellStyle}>
-                  {numericInput('労務単価', laborRate, raw => setValue(`lines.${index}.cost_labor_rate`, parseNumber(raw)), 72, undefined, true)}
-                </span>
-              </div>
-              <div style={{ ...resultStyle, gridColumn: moneyCategories.length + timeCategories.length + 3 }}>
-                <span style={mutedResultStyle}>材料原価 ¥{formatNumber(Math.round(materialCostTotal))}</span>
-                <span style={mutedResultStyle}>労務費 ¥{formatNumber(Math.round(laborCostTotal))}</span>
-                <strong>製造原価 ¥{formatNumber(Math.round(manufactureCostTotal))}</strong>
               </div>
             </div>
           </>
