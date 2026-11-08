@@ -147,7 +147,7 @@ describe('R-0230 明細の入力順', () => {
     for (let i = 0; i < els.length - 1; i++) expect(follows(els[i], els[i + 1])).toBe(true);
   });
 
-  it('品名の横に製品台帳のボタンがあり、取付場所は品名より前の同じ段にある', async () => {
+  it('製品台帳のボタンと取付場所は品名と同じ左の欄の中にあり、数量は別の段にある', async () => {
     renderPage();
     const row = await screen.findByTestId('line-item-0');
     const location = within(row).getByRole('textbox', { name: '取付場所' });

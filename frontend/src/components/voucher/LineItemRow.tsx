@@ -14,6 +14,7 @@ import {
   getLineItemRightWidth,
   getLineItemWidth,
   LINE_ITEM_LEFT_WIDTH,
+  LINE_ITEM_NAME_WIDTH,
   LINE_ITEM_NO_WIDTH,
   LINE_ITEM_PROFIT_WIDTH,
   LINE_TYPE_SELECT_WIDTH,
@@ -95,6 +96,8 @@ export default function LineItemRow({
   const { register, setValue, getValues, control } = useFormContext<VoucherFormValues>();
   const { settings } = useAppSettings();
   const line = useWatch({ control, name: `lines.${index}` });
+  const itemNameRegister = register(`lines.${index}.item_name`);
+  const itemNameRef = useRef<HTMLTextAreaElement | null>(null);
   const costs: LineCategoryValue[] = line?.costs ?? [];
   const prices: LineCategoryValue[] = line?.prices ?? [];
   const laborRate = line?.cost_labor_rate ?? 0;
@@ -110,6 +113,13 @@ export default function LineItemRow({
     setValue(`lines.${index}.line_total`, calcLineSellTotal(unitPrice, quantity));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(prices), quantity, index, setValue]);
+
+  useEffect(() => {
+    const element = itemNameRef.current;
+    if (!element) return;
+    element.style.height = '20px';
+    element.style.height = `${Math.max(20, element.scrollHeight + 2)}px`;
+  }, [line?.item_name]);
 
   useEffect(() => {
     if (line?.memo) setMemoOpen(true);
@@ -280,18 +290,7 @@ export default function LineItemRow({
       </div>
 
       <div data-testid="line-item-left" style={{ width: LINE_ITEM_LEFT_WIDTH, paddingRight: 6, boxSizing: 'border-box' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 3 }}>
-          <select
-            aria-label="行種別"
-            {...register(`lines.${index}.line_type`)}
-            disabled={readOnly}
-            onBlur={saveLineToDb}
-            style={{ ...inputStyle, width: LINE_TYPE_SELECT_WIDTH }}
-          >
-            <option value="normal">通常</option>
-            <option value="discount">値引</option>
-            <option value="subtotal">小計</option>
-          </select>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', alignItems: 'start', columnGap: 3, rowGap: 2 }}>
           <input
             aria-label="取付場所"
             placeholder="取付場所"
@@ -299,19 +298,43 @@ export default function LineItemRow({
             maxLength={255}
             disabled={readOnly || lineType !== 'normal'}
             onBlur={saveLineToDb}
-            style={{ ...inputStyle, width: 100 }}
+            style={{ ...inputStyle, gridRow: 1, gridColumn: 1, minWidth: 0 }}
           />
           <textarea
             aria-label="取付製品"
             placeholder="品名"
-            {...register(`lines.${index}.item_name`)}
+            {...itemNameRegister}
+            ref={element => { itemNameRegister.ref(element); itemNameRef.current = element; }}
             maxLength={255}
             disabled={readOnly}
             onBlur={saveLineToDb}
-            rows={3}
-            style={{ ...inputStyle, width: 150, height: 45, lineHeight: '15px', resize: 'none' }}
-          />
-          {!readOnly && lineType === 'normal' && <div style={{ position: 'relative', display: 'flex' }}>
+            rows={1}
+            style={{ ...inputStyle, gridRow: 2, gridColumn: '1 / -1', width: LINE_ITEM_NAME_WIDTH, height: 20, lineHeight: '15px', padding: '2px 6px', resize: 'none', overflowY: 'hidden' }}
+            />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, gridRow: 3, gridColumn: '1 / -1' }}>
+            <div data-testid="quantity-group" style={joinedGroupStyle}>
+              <span style={joinedCellStyle}>
+                {numericInput('数量', quantity, raw => setValue(`lines.${index}.quantity`, parseNumber(raw)), 56, undefined, true)}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={event => { event.stopPropagation(); setMemoOpen(open => !open); }}
+              style={memoButtonStyle}
+            >備考 {memoOpen ? '−' : '＋'}</button>
+        </div>
+          <select
+            aria-label="行種別"
+            {...register(`lines.${index}.line_type`)}
+            disabled={readOnly}
+            onBlur={saveLineToDb}
+            style={{ ...inputStyle, gridRow: 1, gridColumn: 2, width: LINE_TYPE_SELECT_WIDTH }}
+          >
+            <option value="normal">通常</option>
+            <option value="discount">値引</option>
+            <option value="subtotal">小計</option>
+          </select>
+          {!readOnly && lineType === 'normal' && <div style={{ position: 'relative', display: 'flex', gridRow: 1, gridColumn: 3 }}>
             <button
               type="button"
               onClick={event => {
@@ -366,18 +389,6 @@ export default function LineItemRow({
               </div>
             )}
           </div>}
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
-          <div data-testid="quantity-group" style={joinedGroupStyle}>
-            <span style={joinedCellStyle}>
-              {numericInput('数量', quantity, raw => setValue(`lines.${index}.quantity`, parseNumber(raw)), 56, undefined, true)}
-            </span>
-          </div>
-          <button
-            type="button"
-            onClick={event => { event.stopPropagation(); setMemoOpen(open => !open); }}
-            style={memoButtonStyle}
-          >備考 {memoOpen ? '−' : '＋'}</button>
         </div>
         {!readOnly && <TateguSelector isOpen={selectorOpen} onClose={() => setSelectorOpen(false)} onSelect={handleTateguSelect} />}
         {!readOnly && ledgerMode && (
