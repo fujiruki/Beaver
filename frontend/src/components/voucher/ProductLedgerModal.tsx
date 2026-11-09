@@ -213,6 +213,7 @@ export default function ProductLedgerModal({
         ...item,
         ...payload,
         id: item.id,
+        cost_breakdown: undefined,
         cost_body: totals.body,
         cost_hardware: totals.hardware,
         cost_glass: totals.glass,
