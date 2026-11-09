@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useLocation, useParams } from 'react-router-dom';
+import { buildLedgerCloneDraft } from '../lib/ledgerClone';
 import { useForm } from 'react-hook-form';
 import {
   useTateguItem,
@@ -27,6 +28,10 @@ export default function TateguItemDetail() {
   const itemId = id ? Number(id) : 0;
   const isNew  = !id;
 
+  const location = useLocation();
+  const cloneFromId = isNew ? Number((location.state as { cloneFromId?: number } | null)?.cloneFromId) || 0 : 0;
+  const { data: cloneSource } = useTateguItem(cloneFromId);
+  const [cloneSourceCode, setCloneSourceCode] = useState<string | null>(null);
   const { data: item, isLoading } = useTateguItem(itemId);
   const createMutation = useCreateTateguItem();
   const updateMutation = useUpdateTateguItem(itemId);
@@ -72,6 +77,15 @@ export default function TateguItemDetail() {
       })));
     }
   }, [item, reset]);
+
+  useEffect(() => {
+    if (!cloneSource) return;
+    const draft = buildLedgerCloneDraft(cloneSource);
+    reset({ ...draft.form });
+    setCostLines(draft.costLines);
+    setLaborLines(draft.laborLines);
+    setCloneSourceCode(draft.sourceCode ?? '採番待ち');
+  }, [cloneSource, reset]);
 
   const w = watch(['cost_body', 'cost_hardware', 'cost_glass', 'cost_factory_hours', 'cost_site_hours', 'cost_labor_rate']);
   const [cb, ch, cg, cfh, csh, clr] = w.map(v => Number(v) || 0);
@@ -142,6 +156,7 @@ export default function TateguItemDetail() {
           ← 戻る
         </button>
         <h1 className="text-xl font-bold">{isNew ? '製品台帳 新規登録' : '製品台帳 編集'}</h1>
+        {cloneSourceCode && <span className="text-xs text-slate-500">（引用元 製品№ {cloneSourceCode}）</span>}
       </div>
 
       {mutError && (

@@ -4,6 +4,8 @@ import { api } from '../../api/client';
 import { useTateguItem } from '../../api/tateguItems';
 import type { AggregationCategoryMaster } from '../../api/aggregationCategories';
 import type { TateguItem } from '../../types/tateguItem';
+import { buildLedgerCloneDraft } from '../../lib/ledgerClone';
+import TateguSelector from './TateguSelector';
 import {
   TateguCostLinesPanel,
   TateguLaborLinesPanel,
@@ -66,10 +68,31 @@ export default function ProductLedgerModal({
   const [laborLines, setLaborLines] = useState<LaborLineDraft[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [selectorOpen, setSelectorOpen] = useState(false);
+  const [cloneSourceCode, setCloneSourceCode] = useState<string | null>(null);
+
+  async function cloneFrom(picked: TateguItem) {
+    try {
+      const draft = buildLedgerCloneDraft(await api.get<TateguItem>(`/tategu-items/${picked.id}`));
+      const { form: f } = draft;
+      setForm({
+        ...f,
+        description: f.description ?? '',
+        unit: f.unit ?? '',
+      });
+      setCostLines(draft.costLines);
+      setLaborLines(draft.laborLines);
+      setCloneSourceCode(draft.sourceCode ?? '採番待ち');
+      setError('');
+    } catch (e) {
+      setError(`引用に失敗しました: ${String(e)}`);
+    }
+  }
 
   useEffect(() => {
     if (!isOpen) return;
     if (mode === 'create') {
+      setCloneSourceCode(null);
       setForm({ ...empty, name: initialName });
       setCostLines([]);
       setLaborLines([]);
@@ -216,11 +239,20 @@ export default function ProductLedgerModal({
             <h2 style={{ margin: '3px 0 0', fontSize: 20 }}>
               {mode === 'create' ? '製品台帳を新しく作る' : `製品台帳 ${form.code || '採番待ち'}を直す`}
             </h2>
+            {cloneSourceCode && <small style={{ color: '#64748b' }}>（引用元 製品№ {cloneSourceCode}）</small>}
           </div>
-          <button type="button" onClick={onClose}>
-            ✕
-          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {mode === 'create' && (
+              <button type="button" className="px-2.5 py-1 bg-slate-100 border border-slate-300 text-slate-600 rounded-md text-sm hover:bg-slate-200" onClick={() => setSelectorOpen(true)}>
+                既存の台帳から引用
+              </button>
+            )}
+            <button type="button" onClick={onClose}>
+              ✕
+            </button>
+          </div>
         </header>
+        <TateguSelector isOpen={selectorOpen} onClose={() => setSelectorOpen(false)} onSelect={cloneFrom} />
         <div style={{ padding: '8px 12px', background: '#eff6ff', color: '#1e40af', fontSize: 13, marginBottom: 12 }}>
           この保存は製品台帳を更新し、この伝票の明細{lineNo}だけに原価を反映します。他の伝票は変わりません。
         </div>
