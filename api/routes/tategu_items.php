@@ -512,7 +512,13 @@ switch ($method) {
                         (:tategu_item_id, :category_code, :name, :quantity, :unit_cost, :amount, :source, :sort_order)
                 ');
                 foreach ($lines as $i => $line) {
-                    if (($line['source'] ?? 'manual') === 'wood_calc') continue;
+                    if (($line['source'] ?? 'manual') === 'wood_calc') {
+                        if (!empty($line['id'])) {
+                            $pdo->prepare("UPDATE tategu_item_cost_lines SET sort_order = ? WHERE id = ? AND tategu_item_id = ? AND source = 'wood_calc'")
+                                ->execute([$line['sort_order'] ?? $i, $line['id'], $resourceId]);
+                        }
+                        continue;
+                    }
                     $quantity = (float)($line['quantity'] ?? 0);
                     $unitCost = (float)($line['unit_cost'] ?? 0);
                     $source = $line['source'] ?? 'manual';

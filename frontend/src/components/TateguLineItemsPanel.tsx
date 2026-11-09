@@ -3,7 +3,7 @@ import type React from 'react';
 import type { AggregationCategoryMaster } from '../api/aggregationCategories';
 import type { CostLine, LaborLine } from '../types/tateguItem';
 
-export type CostLineDraft = Omit<CostLine, 'id' | 'tategu_item_id'>;
+export type CostLineDraft = Omit<CostLine, 'id' | 'tategu_item_id'> & { id?: number };
 export type LaborLineDraft = Omit<LaborLine, 'id' | 'tategu_item_id'>;
 
 interface CostLinesProps {

@@ -58,7 +58,8 @@ export default function TateguItemDetail() {
       setBreakdownLines((item.cost_breakdown ?? []).map(({ category_code, category_name, measure_type, value, sort_order }) => ({
         category_code, category_name, measure_type, value, sort_order,
       })));
-      setCostLines((item.cost_lines ?? []).map(({ category_code, name, quantity, unit_cost, amount, source, sort_order }, index) => ({
+      setCostLines((item.cost_lines ?? []).map(({ id, category_code, name, quantity, unit_cost, amount, source, sort_order }, index) => ({
+        ...(source === 'wood_calc' ? { id } : {}),
         category_code,
         name,
         quantity,
