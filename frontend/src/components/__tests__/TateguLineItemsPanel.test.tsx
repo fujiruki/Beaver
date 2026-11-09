@@ -323,11 +323,11 @@ describe('TateguLaborLinesPanel', () => {
 
   it('R-0251 書き: 現場を0にすると現場の行は作らず、両方0でも工程名があれば工場0で残す', () => {
     const onChange = vi.fn();
-    render(<TateguLaborLinesPanel
-      lines={[labor('A', 'FACTORY_TIME', 2, 1), labor('A', 'SITE_TIME', 3, 2)]}
-      onChange={onChange}
-      categories={categories}
-    />);
+    function Harness() {
+      const [lines, setLines] = useState([labor('A', 'FACTORY_TIME', 2, 1), labor('A', 'SITE_TIME', 3, 2)]);
+      return <TateguLaborLinesPanel lines={lines} onChange={(next) => { onChange(next); setLines(next); }} categories={categories} />;
+    }
+    render(<Harness />);
 
     fireEvent.change(within(laborRows()[0] as HTMLElement).getByLabelText('現場時間'), { target: { value: '0' } });
     expect((onChange.mock.calls.at(-1)?.[0] as LaborLineDraft[]).map((l) => [l.category_code, l.sort_order])).toEqual([['FACTORY_TIME', 1]]);
@@ -419,7 +419,7 @@ describe('R-0251 材料費の▲▼', () => {
     const rows = Array.from(materialRows());
     expect((within(rows[0] as HTMLElement).getByRole('button', { name: '上へ' }) as HTMLButtonElement).disabled).toBe(true);
     expect((within(rows[1] as HTMLElement).getByRole('button', { name: '下へ' }) as HTMLButtonElement).disabled).toBe(true);
-    expect((within(rows[2] as HTMLElement).getByRole('button', { name: '上へ' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((within(rows[3] as HTMLElement).getByRole('button', { name: '上へ' }) as HTMLButtonElement).disabled).toBe(true);
 
     fireEvent.click(within(rows[0] as HTMLElement).getByRole('button', { name: '下へ' }));
     expect((onChange.mock.calls.at(-1)?.[0] as CostLineDraft[]).map((l) => [l.name, l.sort_order])).toEqual([

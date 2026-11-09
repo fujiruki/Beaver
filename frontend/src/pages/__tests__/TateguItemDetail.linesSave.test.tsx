@@ -116,7 +116,7 @@ function renderPage() {
 
 function removeLineByDisplayValue(value: string) {
   const row = screen.getByDisplayValue(value).closest('tr');
-  const button = row?.querySelector('button');
+  const button = Array.from(row?.querySelectorAll('button') ?? []).find((b) => b.textContent === '削除');
   expect(button).toBeTruthy();
   fireEvent.click(button!);
 }
