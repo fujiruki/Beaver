@@ -111,7 +111,8 @@ export default function ProductLedgerModal({
         cost_labor_rate: loaded.cost_labor_rate,
       });
       setCostLines(
-        (loaded.cost_lines ?? []).map(({ category_code, name, quantity, unit_cost, amount, source, sort_order }) => ({
+        (loaded.cost_lines ?? []).map(({ id, category_code, name, quantity, unit_cost, amount, source, sort_order }) => ({
+          ...(source === 'wood_calc' ? { id } : {}),
           category_code,
           name,
           quantity,
