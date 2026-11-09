@@ -13,12 +13,13 @@ export function useTateguItems() {
 }
 
 /** 建具台帳一覧取得（ページネーション付き・一覧ページ用） */
-export function useTateguItemsPaged(page: number, search = '', sort?: SortParam) {
+export function useTateguItemsPaged(page: number, search = '', sort?: SortParam, favoriteOnly = false) {
   return useQuery({
-    queryKey: [KEY, 'paged', page, search, sort?.key, sort?.dir],
+    queryKey: [KEY, 'paged', page, search, sort?.key, sort?.dir, favoriteOnly],
     queryFn: () => {
       const params = new URLSearchParams({ page: String(page), per_page: '50' });
       if (search) params.set('q', search);
+      if (favoriteOnly) params.set('favorite', '1');
       if (sort) {
         params.set('sort', sort.key);
         params.set('order', sort.dir);
@@ -87,6 +88,15 @@ export function useDeleteTateguItem() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: number) => api.delete<void>(`/tategu-items/${id}`),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: [KEY] }); },
+  });
+}
+
+export function useToggleFavorite() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; is_favorite: boolean }) =>
+      api.put<unknown>(`/tategu-items/${v.id}/favorite`, { is_favorite: v.is_favorite }),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: [KEY] }); },
   });
 }

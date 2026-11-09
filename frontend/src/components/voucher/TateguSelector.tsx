@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { useTateguItems } from '../../api/tateguItems';
+import { useTateguItems, useToggleFavorite } from '../../api/tateguItems';
+import { useLedgerCatalogs, useLedgerCatalogItems } from '../../api/ledgerCatalogs';
+import FavoriteStar from '../FavoriteStar';
 import type { TateguItem } from '../../types/tateguItem';
 
 type Props = {
@@ -8,15 +10,39 @@ type Props = {
   onSelect: (item: TateguItem) => void;
 };
 
+type TabKey = 'recent' | 'favorite' | 'all' | `catalog:${number}`;
+
+const RECENT_LIMIT = 10;
+const byRecent = (a: TateguItem, b: TateguItem) => (b.updated_at ?? '').localeCompare(a.updated_at ?? '');
+
 export default function TateguSelector({ isOpen, onClose, onSelect }: Props) {
   const [search, setSearch] = useState('');
+  const [tab, setTab] = useState<TabKey>('recent');
   const { data: items = [], isLoading } = useTateguItems();
+  const { data: catalogs = [] } = useLedgerCatalogs(isOpen);
+  const toggleFavorite = useToggleFavorite();
+  const catalogId = tab.startsWith('catalog:') ? Number(tab.slice(8)) : 0;
+  const { data: catalogItems = [] } = useLedgerCatalogItems(catalogId);
 
   if (!isOpen) return null;
 
-  const filtered = items.filter(item =>
+  const sorted = [...items].sort(byRecent);
+  const tabItems =
+    tab === 'recent' ? sorted.slice(0, RECENT_LIMIT)
+    : tab === 'favorite' ? sorted.filter(i => i.is_favorite)
+    : tab === 'all' ? sorted
+    : catalogItems;
+  const filtered = tabItems.filter(item =>
     item.name.includes(search) || (item.code ?? '').includes(search) || (item.description ?? '').includes(search)
   );
+  const favoriteOf = (item: TateguItem) => !!(items.find(i => i.id === item.id) ?? item).is_favorite;
+
+  const tabs: { key: TabKey; label: string }[] = [
+    { key: 'recent', label: '最近' },
+    { key: 'favorite', label: 'お気に入り' },
+    ...catalogs.map(c => ({ key: `catalog:${c.id}` as TabKey, label: c.name })),
+    { key: 'all', label: 'すべて' },
+  ];
 
   return (
     <div style={overlayStyle} onClick={onClose}>
@@ -24,6 +50,20 @@ export default function TateguSelector({ isOpen, onClose, onSelect }: Props) {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <h3 style={{ margin: 0, fontSize: 16 }}>製品台帳から選択</h3>
           <button onClick={onClose} style={closeBtnStyle}>✕</button>
+        </div>
+
+        <div role="tablist" style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 10 }}>
+          {tabs.map(t => (
+            <button
+              key={t.key}
+              role="tab"
+              aria-selected={tab === t.key}
+              onClick={() => setTab(t.key)}
+              className={tab === t.key
+                ? 'px-3 py-1 rounded-md text-sm bg-blue-600 text-white'
+                : 'px-3 py-1 rounded-md text-sm bg-slate-100 text-slate-600 hover:bg-slate-200'}
+            >{t.label}</button>
+          ))}
         </div>
 
         <input
@@ -45,6 +85,7 @@ export default function TateguSelector({ isOpen, onClose, onSelect }: Props) {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ background: '#f1f5f9', position: 'sticky', top: 0 }}>
+                    <th style={{ ...thStyle, width: 36 }}></th>
                     <th style={thStyle}>品番</th>
                     <th style={thStyle}>品名</th>
                     <th style={thStyle}>仕様</th>
@@ -57,8 +98,14 @@ export default function TateguSelector({ isOpen, onClose, onSelect }: Props) {
                       style={{ cursor: 'pointer' }}
                       onMouseEnter={e => (e.currentTarget.style.background = '#f0f9ff')}
                       onMouseLeave={e => (e.currentTarget.style.background = '')}>
+                      <td style={tdStyle}>
+                        <FavoriteStar
+                          isFavorite={favoriteOf(item)}
+                          onToggle={() => toggleFavorite.mutate({ id: item.id, is_favorite: !favoriteOf(item) })}
+                        />
+                      </td>
                       <td style={tdStyle}>{item.code || '採番待ち'}</td>
-                      <td style={tdStyle}>{item.name}</td>
+                      <td style={tdStyle} data-testid="ledger-row-name">{item.name}</td>
                       <td style={tdStyle}>{item.description ?? ''}</td>
                       <td style={tdStyle}>{item.unit ?? ''}</td>
                     </tr>
@@ -75,7 +122,7 @@ export default function TateguSelector({ isOpen, onClose, onSelect }: Props) {
 
 const overlayStyle: React.CSSProperties = {
   position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
-  display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+  display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200,
 };
 const modalStyle: React.CSSProperties = {
   background: '#fff', borderRadius: 10, padding: 20, width: 640, maxWidth: '90vw',

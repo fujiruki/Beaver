@@ -11,6 +11,7 @@ const CustomerList         = lazy(() => import('./pages/CustomerList'));
 const CustomerDetail       = lazy(() => import('./pages/CustomerDetail'));
 const TateguItemList       = lazy(() => import('./pages/TateguItemList'));
 const TateguItemDetail     = lazy(() => import('./pages/TateguItemDetail'));
+const TateguCatalogs       = lazy(() => import('./pages/TateguCatalogs'));
 const ProjectList          = lazy(() => import('./pages/ProjectList'));
 const ProjectDetail        = lazy(() => import('./pages/ProjectDetail'));
 const DandoriBoard         = lazy(() => import('./pages/DandoriBoard'));
@@ -39,6 +40,7 @@ const router = createBrowserRouter(createRoutesFromElements(
     <Route path="customers/new" element={<CustomerDetail />} />
     <Route path="customers/:id" element={<CustomerDetail />} />
     <Route path="tategu" element={<TateguItemList />} />
+    <Route path="tategu/catalogs" element={<TateguCatalogs />} />
     <Route path="tategu/new" element={<TateguItemDetail />} />
     <Route path="tategu/:id" element={<TateguItemDetail />} />
     <Route path="projects" element={<ProjectList />} />

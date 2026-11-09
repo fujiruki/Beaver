@@ -39,6 +39,7 @@ function tateguSyncRow(PDO $pdo, int $id): ?array {
     $stmt->execute([$id]);
     $row['labor_lines'] = $stmt->fetchAll();
     $row['updated_at'] = utcToJst($row['updated_at']);
+    unset($row['is_favorite']);
     return $row;
 }
 
@@ -98,6 +99,16 @@ function writeTateguSync(PDO $pdo, array $data, ?int $id = null): int {
     replaceTateguSyncLines($pdo, $id, $data);
     $pdo->prepare('UPDATE tategu_items SET last_synced_at = updated_at WHERE id = ?')->execute([$id]);
     return $id;
+}
+
+// R-0252: お気に入りの切り替え。同期に出さないので updated_at は進めない。
+if ($resourceId && $subAction === 'favorite' && $method === 'PUT') {
+    $fav = !empty(readJsonBody()['is_favorite']) ? 1 : 0;
+    $stmt = $pdo->prepare('UPDATE tategu_items SET is_favorite = ? WHERE id = ?');
+    $stmt->execute([$fav, $resourceId]);
+    if ($stmt->rowCount() === 0) { respond(404, ['error' => 'not_found']); exit; }
+    respond(200, ['id' => $resourceId, 'is_favorite' => $fav]);
+    exit;
 }
 
 // R-0200: 製品台帳同期API。
@@ -341,6 +352,9 @@ switch ($method) {
                 );
                 $where .= ' AND ' . $searchClause;
                 $params = array_merge($params, $searchParams);
+            }
+            if (!empty($_GET['favorite'])) {
+                $where .= ' AND is_favorite = 1';
             }
             if (!isset($_GET['include_archived'])) {
                 $where .= ' AND status = "active"';

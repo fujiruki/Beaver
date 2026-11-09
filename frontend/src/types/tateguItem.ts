@@ -44,6 +44,7 @@ export interface TateguItem {
   cost_site_hours: number;
   cost_labor_rate: number;
   unit: string | null;
+  is_favorite?: number;
   memo: string | null;
   created_at: string;
   updated_at: string;
