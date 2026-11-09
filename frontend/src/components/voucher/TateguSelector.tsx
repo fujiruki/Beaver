@@ -49,12 +49,13 @@ export default function TateguSelector({ isOpen, onClose, onSelect }: Props) {
       <div style={modalStyle} onClick={e => e.stopPropagation()}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <h3 style={{ margin: 0, fontSize: 16 }}>製品台帳から選択</h3>
-          <button onClick={onClose} style={closeBtnStyle}>✕</button>
+          <button type="button" onClick={onClose} style={closeBtnStyle}>✕</button>
         </div>
 
         <div role="tablist" style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginBottom: 10 }}>
           {tabs.map(t => (
             <button
+              type="button"
               key={t.key}
               role="tab"
               aria-selected={tab === t.key}
