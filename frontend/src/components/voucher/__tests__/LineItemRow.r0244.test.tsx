@@ -75,3 +75,27 @@ describe('R-0244 明細の数値欄の小数入力', () => {
     expect(input.value).toBe('12,000');
   });
 });
+
+describe('R-0254 明細の数量・時間は小数第2位', () => {
+  it('1.234 と打って欄から出ると 1.23、値も 1.23', async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+    const input = screen.getByRole('textbox', { name: '工場h' }) as HTMLInputElement;
+    await user.click(input);
+    await user.keyboard('1.234');
+    await user.tab();
+    expect(input.value).toBe('1.23');
+    expect(savedValue()).toBe(1.23);
+  });
+
+  it('数量にも同じ丸めがかかる', async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+    const qty = screen.getByRole('textbox', { name: '数量' }) as HTMLInputElement;
+    await user.clear(qty);
+    await user.keyboard('2.345');
+    await user.tab();
+    expect(qty.value).toBe('2.35');
+    expect(formRef.getValues('lines.0.quantity')).toBe(2.35);
+  });
+});
