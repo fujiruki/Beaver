@@ -8,6 +8,7 @@ import type { TateguItem } from '../../types/tateguItem';
 import type { LineCategoryValue } from '../../types/voucher';
 import type { VoucherFormValues } from '../../pages/VoucherEdit';
 import type { AggregationCategoryMaster } from '../../api/aggregationCategories';
+import { formatDecimal, round2 } from '../../lib/decimal';
 import { calcLineProfitSummary, calcLineSellTotal } from '../../lib/voucherCalc';
 import {
   createCategoryGridTemplate,
@@ -46,14 +47,16 @@ type FormattedNumberInputProps = {
   disabled: boolean;
   width: number;
   grouped?: boolean;
+  decimal2?: boolean;
 };
 
-function FormattedNumberInput({ label, placeholder, value, onValueChange, onBlur, disabled, width, grouped = false }: FormattedNumberInputProps) {
-  const [displayValue, setDisplayValue] = useState(() => formatNumber(value));
+function FormattedNumberInput({ label, placeholder, value, onValueChange, onBlur, disabled, width, grouped = false, decimal2 = false }: FormattedNumberInputProps) {
+  const format = decimal2 ? formatDecimal : formatNumber;
+  const [displayValue, setDisplayValue] = useState(() => format(value));
   const focusedRef = useRef(false);
 
   useEffect(() => {
-    if (!focusedRef.current) setDisplayValue(formatNumber(value));
+    if (!focusedRef.current) setDisplayValue(format(value));
   }, [value]);
 
   return (
@@ -70,7 +73,7 @@ function FormattedNumberInput({ label, placeholder, value, onValueChange, onBlur
       }}
       onBlur={() => {
         focusedRef.current = false;
-        setDisplayValue(formatNumber(value));
+        setDisplayValue(format(value));
         onBlur();
       }}
       disabled={disabled}
@@ -130,7 +133,7 @@ export default function LineItemRow({
 
   function setCategoryValue(kind: 'costs' | 'prices', category: AggregationCategoryMaster, raw: string) {
     const current = kind === 'costs' ? costs : prices;
-    const value = parseNumber(raw);
+    const value = category.measure_type === 'time' ? round2(parseNumber(raw)) : parseNumber(raw);
     const updated = current.filter(item => item.category_code !== category.code);
     if (value !== 0) {
       updated.push({
@@ -248,6 +251,7 @@ export default function LineItemRow({
     width = 72,
     placeholder?: string,
     grouped = false,
+    decimal2 = false,
   ) => (
     <FormattedNumberInput
       label={label}
@@ -258,6 +262,7 @@ export default function LineItemRow({
       disabled={readOnly}
       width={width}
       grouped={grouped}
+      decimal2={decimal2}
     />
   );
 
@@ -314,7 +319,7 @@ export default function LineItemRow({
           <div style={{ display: 'flex', alignItems: 'center', gap: 4, gridRow: 3, gridColumn: '1 / -1' }}>
             <div data-testid="quantity-group" style={joinedGroupStyle}>
               <span style={joinedCellStyle}>
-                {numericInput('数量', quantity, raw => setValue(`lines.${index}.quantity`, parseNumber(raw)), 56, undefined, true)}
+                {numericInput('数量', quantity, raw => setValue(`lines.${index}.quantity`, round2(parseNumber(raw))), 56, undefined, true, true)}
               </span>
             </div>
             <button
@@ -421,7 +426,7 @@ export default function LineItemRow({
               <div data-testid="work-group" style={{ ...joinedGroupStyle, gridColumn: `${moneyCategories.length + 2} / span ${timeCategories.length + 1}` }}>
                 {timeCategories.map(category => (
                   <span key={category.code} style={joinedCellStyle}>
-                    {numericInput(formatWorkCategoryName(category.name), getValue(costs, category.code), raw => setCategoryValue('costs', category, raw), 54, undefined, true)}
+                    {numericInput(formatWorkCategoryName(category.name), getValue(costs, category.code), raw => setCategoryValue('costs', category, raw), 54, undefined, true, true)}
                   </span>
                 ))}
                 <span style={joinedCellStyle}>

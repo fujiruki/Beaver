@@ -1,3 +1,4 @@
+import { formatDecimal, round2 } from '../lib/decimal';
 import { useEffect, useState } from 'react';
 import type React from 'react';
 import type { AggregationCategoryMaster } from '../api/aggregationCategories';
@@ -42,8 +43,8 @@ const costAmount = (line: Pick<CostLineDraft, 'quantity' | 'unit_cost'>) =>
 const laborAmount = (line: Pick<LaborLineDraft, 'work_hours' | 'labor_rate'>) =>
   (Number(line.work_hours) || 0) * (Number(line.labor_rate) || 0);
 const moneyText = (value: number) => `¥${Math.round(value).toLocaleString('ja-JP')}`;
-const hoursText = (value: number) => Number(value).toLocaleString('ja-JP', { maximumFractionDigits: 2 });
-const numberText = (value: number) => Number(value).toLocaleString('ja-JP', { maximumFractionDigits: 10 });
+const hoursText = formatDecimal;
+const numberText = formatDecimal;
 
 function orderByCategory<T extends { category_code: string }>(
   lines: T[],
@@ -95,7 +96,7 @@ function NumericCell({
       step={integer ? 1 : undefined}
       placeholder={placeholder}
       onFocus={() => {
-        setRaw(String(value || ''));
+        setRaw(String((integer ? value : round2(value)) || ''));
         setFocused(true);
       }}
       onChange={(event) => {
@@ -103,7 +104,7 @@ function NumericCell({
           ? event.target.value.replace(/\D/g, '')
           : event.target.value.replace(/[^\d.]/g, '').replace(/(\..*)\./g, '$1');
         setRaw(cleaned);
-        onChange(Number(cleaned) || 0);
+        onChange(integer ? Number(cleaned) || 0 : round2(Number(cleaned) || 0));
       }}
       onBlur={() => setFocused(false)}
     />

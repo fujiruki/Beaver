@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import TateguItemDetail from '../TateguItemDetail';
@@ -38,12 +38,12 @@ describe('R-0254 製品台帳の時間・数量', () => {
     await screen.findByDisplayValue('Test');
     expect(screen.getAllByDisplayValue('4.7').length).toBeGreaterThanOrEqual(2);
     expect(screen.queryByDisplayValue('4.7000000029802')).toBeNull();
-    expect(screen.getByText('4.7 h', { exact: false })).toBeTruthy();
+    expect(screen.getAllByText('4.7 h', { exact: false }).length).toBeGreaterThan(0);
   });
 
   it('材料の数量に 1.234 と入れて欄から出ると 1.23、渡す値も 1.23', () => {
     const onChange = vi.fn();
-    const lines = [{ category_code: 'MAIN', name: 'A', quantity: 1, unit_cost: 100, amount: 100, source: 'manual', sort_order: 0 }];
+    const lines = [{ category_code: 'MAIN', name: 'A', quantity: 1, unit_cost: 100, amount: 100, source: 'manual' as const, sort_order: 0 }];
     render(<TateguCostLinesPanel lines={lines} onChange={onChange} categories={[]} />);
     const input = screen.getAllByLabelText('数量')[0] as HTMLInputElement;
     fireEvent.focus(input);

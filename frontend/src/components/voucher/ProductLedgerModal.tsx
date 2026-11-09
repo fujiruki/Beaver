@@ -1,3 +1,4 @@
+import { round2 } from '../../lib/decimal';
 import { useEffect, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api/client';
@@ -147,8 +148,8 @@ export default function ProductLedgerModal({
     const allHours = hours('FACTORY_TIME') + hours('SITE_TIME');
     const hasCosts = costLines.length > 0;
     const hasLabor = laborLines.length > 0;
-    const factory = hasLabor ? hours('FACTORY_TIME') : form.cost_factory_hours;
-    const site = hasLabor ? hours('SITE_TIME') : form.cost_site_hours;
+    const factory = round2(hasLabor ? hours('FACTORY_TIME') : form.cost_factory_hours);
+    const site = round2(hasLabor ? hours('SITE_TIME') : form.cost_site_hours);
     const rate = allHours ? lineLaborAmount / allHours : form.cost_labor_rate;
     return {
       body: hasCosts ? money('MAIN') : form.cost_body,
@@ -193,16 +194,18 @@ export default function ProductLedgerModal({
       await api.put(`/tategu-items/${item.id}/cost-lines`, {
         lines: costLines.map((l, i) => ({
           ...l,
+          quantity: round2(l.quantity),
           unit_cost: Math.round(l.unit_cost),
-          amount: l.quantity * Math.round(l.unit_cost),
+          amount: round2(l.quantity) * Math.round(l.unit_cost),
           sort_order: i,
         })),
       });
       await api.put(`/tategu-items/${item.id}/labor-lines`, {
         lines: laborLines.map((l, i) => ({
           ...l,
+          work_hours: round2(l.work_hours),
           labor_rate: Math.round(l.labor_rate),
-          amount: l.work_hours * Math.round(l.labor_rate),
+          amount: round2(l.work_hours) * Math.round(l.labor_rate),
           sort_order: i,
         })),
       });

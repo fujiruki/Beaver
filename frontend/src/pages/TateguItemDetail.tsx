@@ -1,3 +1,4 @@
+import { round2 } from '../lib/decimal';
 import { useState, useEffect } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
 import { buildLedgerCloneDraft } from '../lib/ledgerClone';
@@ -54,7 +55,7 @@ export default function TateguItemDetail() {
 
   useEffect(() => {
     if (item) {
-      reset(item);
+      reset({ ...item, cost_factory_hours: round2(item.cost_factory_hours), cost_site_hours: round2(item.cost_site_hours) });
       setBreakdownLines((item.cost_breakdown ?? []).map(({ category_code, category_name, measure_type, value, sort_order }) => ({
         category_code, category_name, measure_type, value, sort_order,
       })));
@@ -218,11 +219,11 @@ export default function TateguItemDetail() {
               {hasCostLines && <AutoCalcNote />}
             </Field>
             <Field label="工場工数（h）">
-              <input {...register('cost_factory_hours', { valueAsNumber: true })} type="number" min="0" step="0.5" readOnly={hasLaborLines} className={hasLaborLines ? readOnlyInputCls : inputCls} />
+              <input {...register('cost_factory_hours', { setValueAs: hoursValue })} type="number" min="0" step="0.01" readOnly={hasLaborLines} className={hasLaborLines ? readOnlyInputCls : inputCls} />
               {hasLaborLines && <AutoCalcNote />}
             </Field>
             <Field label="現場工数（h）">
-              <input {...register('cost_site_hours', { valueAsNumber: true })} type="number" min="0" step="0.5" readOnly={hasLaborLines} className={hasLaborLines ? readOnlyInputCls : inputCls} />
+              <input {...register('cost_site_hours', { setValueAs: hoursValue })} type="number" min="0" step="0.01" readOnly={hasLaborLines} className={hasLaborLines ? readOnlyInputCls : inputCls} />
               {hasLaborLines && <AutoCalcNote />}
             </Field>
             <Field label="労務単価（円/h）">
@@ -311,7 +312,8 @@ function AutoCalcNote() {
 function prepareCostLines(lines: CostLineDraft[]) {
   return lines.map((line, index) => ({
     ...line,
-    amount: (Number(line.quantity) || 0) * (Number(line.unit_cost) || 0),
+    quantity: round2(Number(line.quantity) || 0),
+    amount: round2(Number(line.quantity) || 0) * (Number(line.unit_cost) || 0),
     source: line.source ?? 'manual',
     sort_order: index,
   }));
@@ -320,7 +322,8 @@ function prepareCostLines(lines: CostLineDraft[]) {
 function prepareLaborLines(lines: LaborLineDraft[]) {
   return lines.map((line, index) => ({
     ...line,
-    amount: (Number(line.work_hours) || 0) * (Number(line.labor_rate) || 0),
+    work_hours: round2(Number(line.work_hours) || 0),
+    amount: round2(Number(line.work_hours) || 0) * (Number(line.labor_rate) || 0),
     sort_order: index,
   }));
 }
@@ -346,3 +349,5 @@ function prepareUpdatePayload(
 
 const inputCls = 'w-full px-2.5 py-1.5 border border-slate-300 rounded-md text-sm focus:outline-none focus:border-blue-400';
 const readOnlyInputCls = `${inputCls} bg-slate-50 text-slate-500`;
+
+const hoursValue = (value: unknown) => round2(Number(value) || 0);

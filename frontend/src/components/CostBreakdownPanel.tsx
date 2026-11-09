@@ -1,3 +1,4 @@
+import { formatDecimal, round2 } from '../lib/decimal';
 import type { AggregationCategoryMaster } from '../api/aggregationCategories';
 import type { CostBreakdownLine } from '../types/tateguItem';
 
@@ -68,7 +69,7 @@ function SummaryCards({ lines, categories, laborRate }: { lines: BreakdownDraft[
           <div className="font-bold text-sm">
             {cat.measure_type === 'money'
               ? `¥${total.toLocaleString()}`
-              : `${total} h`}
+              : `${formatDecimal(total)} h`}
           </div>
           {cat.measure_type === 'time' && laborRate > 0 && (
             <div className="text-xs text-slate-400 mt-0.5">換算 ¥{(total * laborRate).toLocaleString()}</div>
@@ -80,7 +81,7 @@ function SummaryCards({ lines, categories, laborRate }: { lines: BreakdownDraft[
           <div className="text-xs text-slate-400 mb-1">その他合計</div>
           <div className="font-bold text-sm">
             {otherMoney > 0 && <span>¥{otherMoney.toLocaleString()}</span>}
-            {otherTime > 0 && <span>{otherTime} h</span>}
+            {otherTime > 0 && <span>{formatDecimal(otherTime)} h</span>}
           </div>
         </div>
       )}
@@ -133,7 +134,7 @@ export default function CostBreakdownPanel({ lines, onChange, laborRate, categor
                     <div className="text-xs font-semibold text-slate-600 mb-1 flex items-center gap-2">
                       <span>■ {group.name}</span>
                       <span className="text-slate-400">
-                        {group.measure_type === 'money' ? `¥${groupTotal.toLocaleString()}` : `${groupTotal} h`}
+                        {group.measure_type === 'money' ? `¥${groupTotal.toLocaleString()}` : `${formatDecimal(groupTotal)} h`}
                       </span>
                     </div>
                     <table className="w-full text-sm">
@@ -169,8 +170,8 @@ export default function CostBreakdownPanel({ lines, onChange, laborRate, categor
                             <td className="py-1 pr-2">
                               <input
                                 type="number"
-                                value={line.value}
-                                onChange={e => updateLine(index, 'value', Number(e.target.value))}
+                                value={cellValue(line)}
+                                onChange={e => updateLine(index, 'value', cellInput(line, e.target.value))}
                                 className={inputCls}
                                 step="0.01"
                               />
@@ -247,8 +248,8 @@ export default function CostBreakdownPanel({ lines, onChange, laborRate, categor
                     <td className="py-1 pr-2">
                       <input
                         type="number"
-                        value={line.value}
-                        onChange={e => updateLine(i, 'value', Number(e.target.value))}
+                        value={cellValue(line)}
+                        onChange={e => updateLine(i, 'value', cellInput(line, e.target.value))}
                         className={inputCls}
                         step="0.01"
                       />
@@ -281,3 +282,6 @@ export default function CostBreakdownPanel({ lines, onChange, laborRate, categor
     </div>
   );
 }
+
+const cellValue = (line: BreakdownDraft) => line.measure_type === 'time' ? round2(line.value) : line.value;
+const cellInput = (line: BreakdownDraft, raw: string) => line.measure_type === 'time' ? round2(Number(raw)) : Number(raw);

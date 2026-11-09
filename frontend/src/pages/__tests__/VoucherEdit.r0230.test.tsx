@@ -94,9 +94,9 @@ describe('R-0230 サマリーの置き場所と中身', () => {
     const pair = (label: string) => within(summary).getByText(label).nextSibling?.textContent;
     expect(pair('原価')).toBe(numberText(276000));
     expect(pair('利益')).toBe(`¥${(-116400).toLocaleString()}`);
-    expect(pair('工場時間')).toBe('24.0 h');
-    expect(pair('現場時間')).toBe('12.0 h');
-    expect(pair('合計時間')).toBe('36.0 h');
+    expect(pair('工場時間')).toBe('24 h');
+    expect(pair('現場時間')).toBe('12 h');
+    expect(pair('合計時間')).toBe('36 h');
     expect(within(summary).queryByText(/売値/)).toBeNull();
   });
 

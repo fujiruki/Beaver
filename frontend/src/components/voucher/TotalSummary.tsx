@@ -1,3 +1,4 @@
+import { formatDecimal } from '../../lib/decimal';
 import { useTotalCalc } from '../../hooks/useTaxCalc';
 import { calcProfitSummaryDynamic, type LineForCalc, type DynamicCostLine } from '../../lib/voucherCalc';
 import { useAppSettings } from '../../contexts/AppSettingsContext';
@@ -46,7 +47,7 @@ export default function TotalSummary({ lines, taxInputType, taxRate, costLines }
             borderTop: '1px solid #e2e8f0' }}>
             <span style={{ fontSize: 13, color: '#64748b' }}>作業時間合計</span>
             <span style={{ fontSize: 14, color: '#475569' }}>
-              {profit.totalWorkHours.toFixed(1)} h
+              {formatDecimal(profit.totalWorkHours)} h
             </span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0',
@@ -125,7 +126,7 @@ function HoursRow({ label, hours }: { label: string; hours: number }) {
     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0',
       borderTop: '1px solid #e2e8f0', fontWeight: 'bold' }}>
       <span style={{ fontSize: 13, color: '#1e293b' }}>{label}</span>
-      <span style={{ fontSize: 16, color: '#1e293b' }}>{hours.toFixed(1)} h</span>
+      <span style={{ fontSize: 16, color: '#1e293b' }}>{formatDecimal(hours)} h</span>
     </div>
   );
 }
