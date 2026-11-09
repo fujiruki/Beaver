@@ -2,7 +2,7 @@ import { useAutoFocusSearch } from '../hooks/useAutoFocusSearch';
 import { useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTateguItemsPaged, useDeleteTateguItem, useToggleFavorite } from '../api/tateguItems';
-import { useLedgerCatalogs, useAddToLedgerCatalog, useCreateLedgerCatalog } from '../api/ledgerCatalogs';
+import { useLedgerCatalogs, useAddToLedgerCatalog, useRemoveFromLedgerCatalog, useCreateLedgerCatalog } from '../api/ledgerCatalogs';
 import FavoriteStar from '../components/FavoriteStar';
 import Pagination from '../components/Pagination';
 import DataTable, { useSortState } from '../components/DataTable';
@@ -31,6 +31,7 @@ export default function TateguItemList() {
   const toggleFavorite = useToggleFavorite();
   const { data: catalogs = [] } = useLedgerCatalogs(menuItemId !== null);
   const addToCatalog = useAddToLedgerCatalog();
+  const removeFromCatalog = useRemoveFromLedgerCatalog();
   const createCatalog = useCreateLedgerCatalog();
 
   const items = data?.data ?? [];
@@ -93,6 +94,9 @@ export default function TateguItemList() {
       + (item.cost_factory_hours + item.cost_site_hours) * item.cost_labor_rate;
   }
 
+  const inCatalogs = (item: TateguItem) => (item.catalog_names ?? []).length > 0;
+  const catalogLabel = (item: TateguItem) => (item.catalog_names ?? []).join('、');
+
   async function addToNewCatalog(itemId: number) {
     const name = prompt('新しいカタログの名前')?.trim();
     if (!name) return;
@@ -134,13 +138,29 @@ export default function TateguItemList() {
       render: item => (
         <>
           <span className="relative inline-block mr-1">
-            <button aria-label="カタログに追加" onClick={() => setMenuItemId(menuItemId === item.id ? null : item.id)} className="px-2.5 py-1 bg-slate-100 border border-slate-300 text-slate-600 rounded text-xs hover:bg-slate-200">カタログに追加▼</button>
+            <button
+              type="button"
+              aria-label={inCatalogs(item) ? catalogLabel(item) : 'カタログに追加'}
+              title={inCatalogs(item) ? catalogLabel(item) : undefined}
+              onClick={() => setMenuItemId(menuItemId === item.id ? null : item.id)}
+              className={`px-2.5 py-1 bg-slate-100 border border-slate-300 rounded text-xs hover:bg-slate-200 align-middle ${inCatalogs(item) ? 'text-slate-800 inline-flex max-w-44' : 'text-slate-600'}`}
+            >
+              {inCatalogs(item)
+                ? <><span className="truncate">{catalogLabel(item)}</span>▼</>
+                : 'カタログに追加▼'}
+            </button>
             {menuItemId === item.id && (
               <div role="menu" className="absolute right-0 z-10 mt-1 min-w-40 bg-white border border-slate-200 rounded-md shadow-lg py-1 text-left">
-                {catalogs.map(c => (
-                  <button key={c.id} role="menuitem" className="block w-full text-left px-3 py-1.5 text-sm hover:bg-slate-100"
-                    onClick={() => { addToCatalog.mutate({ catalogId: c.id, itemId: item.id }); setMenuItemId(null); }}>{c.name}</button>
-                ))}
+                {catalogs.map(c => {
+                  const included = (item.catalog_ids ?? []).includes(c.id);
+                  return (
+                    <button key={c.id} type="button" role="menuitem" className="block w-full text-left px-3 py-1.5 text-sm hover:bg-slate-100"
+                      onClick={() => {
+                        (included ? removeFromCatalog : addToCatalog).mutate({ catalogId: c.id, itemId: item.id });
+                        setMenuItemId(null);
+                      }}>{included ? `✓ ${c.name}` : c.name}</button>
+                  );
+                })}
                 <button role="menuitem" className="block w-full text-left px-3 py-1.5 text-sm text-blue-600 hover:bg-slate-100"
                   onClick={() => addToNewCatalog(item.id)}>＋ 新しいカタログを作る</button>
               </div>

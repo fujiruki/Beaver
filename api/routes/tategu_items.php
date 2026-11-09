@@ -43,6 +43,23 @@ function tateguSyncRow(PDO $pdo, int $id): ?array {
     return $row;
 }
 
+function attachCatalogNames(PDO $pdo, array &$rows): void {
+    foreach ($rows as &$r) { $r['catalog_names'] = []; $r['catalog_ids'] = []; }
+    unset($r);
+    if (!$rows) return;
+    $index = [];
+    foreach ($rows as $i => $r) $index[(int)$r['id']] = $i;
+    $in = implode(',', array_keys($index));
+    $q = $pdo->query("SELECT ci.tategu_item_id, c.id, c.name FROM ledger_catalog_items ci
+        JOIN ledger_catalogs c ON c.id = ci.catalog_id
+        WHERE ci.tategu_item_id IN ($in) ORDER BY c.sort_order, c.id");
+    foreach ($q as $m) {
+        $i = $index[(int)$m['tategu_item_id']];
+        $rows[$i]['catalog_names'][] = $m['name'];
+        $rows[$i]['catalog_ids'][] = (int)$m['id'];
+    }
+}
+
 function validateTateguUnitCosts(array $lines): ?array {
     foreach ($lines as $index => $line) {
         $value = $line['unit_cost'] ?? 0;
@@ -386,6 +403,8 @@ switch ($method) {
                     $row['total_cost'] = (float)$row['cost_body'] + (float)$row['cost_hardware'] + (float)$row['cost_glass']
                         + ((float)$row['cost_factory_hours'] + (float)$row['cost_site_hours']) * (float)$row['cost_labor_rate'];
                 }
+                unset($row);
+                attachCatalogNames($pdo, $rows);
                 echo json_encode([
                     'data' => $rows,
                     'meta' => ['total' => $total, 'page' => $page, 'per_page' => $perPage, 'last_page' => (int)ceil($total / $perPage)],
@@ -398,6 +417,8 @@ switch ($method) {
                     $row['total_cost'] = (float)$row['cost_body'] + (float)$row['cost_hardware'] + (float)$row['cost_glass']
                         + ((float)$row['cost_factory_hours'] + (float)$row['cost_site_hours']) * (float)$row['cost_labor_rate'];
                 }
+                unset($row);
+                attachCatalogNames($pdo, $rows);
                 echo json_encode($rows);
             }
         }

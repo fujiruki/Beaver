@@ -29,7 +29,10 @@ export function useLedgerCatalogItems(catalogId: number) {
 
 function useInvalidate() {
   const queryClient = useQueryClient();
-  return () => queryClient.invalidateQueries({ queryKey: [KEY] });
+  return () => {
+    queryClient.invalidateQueries({ queryKey: [KEY] });
+    queryClient.invalidateQueries({ queryKey: ['tateguItems'] });
+  };
 }
 
 export function useCreateLedgerCatalog() {
@@ -74,6 +77,18 @@ export function useAddToLedgerCatalog() {
       const current = await api.get<TateguItem[]>(`/ledger-catalogs/${v.catalogId}/items`);
       const ids = current.map(i => i.id).filter(id => id !== v.itemId);
       return api.put(`/ledger-catalogs/${v.catalogId}/items`, { tategu_item_ids: [...ids, v.itemId] });
+    },
+    onSuccess: invalidate,
+  });
+}
+
+export function useRemoveFromLedgerCatalog() {
+  const invalidate = useInvalidate();
+  return useMutation({
+    mutationFn: async (v: { catalogId: number; itemId: number }) => {
+      const current = await api.get<TateguItem[]>(`/ledger-catalogs/${v.catalogId}/items`);
+      const ids = current.map(i => i.id).filter(id => id !== v.itemId);
+      return api.put(`/ledger-catalogs/${v.catalogId}/items`, { tategu_item_ids: ids });
     },
     onSuccess: invalidate,
   });
