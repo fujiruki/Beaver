@@ -78,6 +78,24 @@ try {
         assertEq([5, 9], array_map('intval', column($row['cost_lines'], 'sort_order')), 'GET cost');
         assertEq(['A', 'A', 'B'], column($row['labor_lines'], 'process_name'), 'GET labor の順');
     });
+
+    runTest('木材原価の行も、並べ替えた位置の sort_order で残り、中身は変わらない', function () use ($port, $pdo) {
+        $pdo->exec("INSERT INTO tategu_items (code, name, status) VALUES ('91002', '木材混在台帳', 'active')");
+        $wid = (int)$pdo->lastInsertId();
+        $pdo->exec("INSERT INTO tategu_item_cost_lines (tategu_item_id, category_code, name, quantity, unit_cost, amount, source, sort_order) VALUES ($wid, 'MAIN', '木材A', 2, 500, 1000, 'wood_calc', 0)");
+        $woodId = (int)$pdo->lastInsertId();
+        $r = httpJson($port, "/tategu-items/$wid/cost-lines", 'PUT', ['lines' => [
+            ['id' => $woodId, 'category_code' => 'MAIN', 'name' => '改ざん', 'quantity' => 9, 'unit_cost' => 9, 'amount' => 81, 'source' => 'wood_calc', 'sort_order' => 2],
+            costLine('MAIN', '手入力1', 0), costLine('MAIN', '手入力2', 1),
+        ]]);
+        assertTrue(str_contains($r['status'], '200'), 'status: ' . $r['status']);
+        $item = httpJson($port, "/tategu-items/$wid", 'GET');
+        $got = $item['body']['cost_lines'];
+        assertEq(['手入力1', '手入力2', '木材A'], column($got, 'name'), '読み直し');
+        assertEq([0, 1, 2], array_map('intval', column($got, 'sort_order')), 'sort_order');
+        assertEq(2.0, (float)$got[2]['quantity'], '数量は元のまま');
+        assertEq(1000.0, (float)$got[2]['amount'], '金額は元のまま');
+    });
 } finally {
     harnessFinish();
 }
