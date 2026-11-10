@@ -59,8 +59,7 @@ function setup(opts: { screenLines: unknown[]; latestLines: unknown[]; lineHandl
       return new Response(JSON.stringify({ voucher_updated_at: `2026-10-10 10:00:0${++clock}` }));
     }
     if (url.endsWith('/vouchers/5')) {
-      const reordered = requests.some(r => r.method === 'PUT' && r.url.endsWith('/line-order'));
-      return new Response(JSON.stringify(baseVoucher(reordered ? opts.latestLines : opts.screenLines)));
+      return new Response(JSON.stringify(headerPuts === 0 ? baseVoucher(opts.screenLines) : baseVoucher(opts.latestLines, '2026-10-10 10:00:00')));
     }
     return new Response('{}');
   }));

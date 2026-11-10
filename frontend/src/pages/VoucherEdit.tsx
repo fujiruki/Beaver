@@ -332,6 +332,8 @@ export default function VoucherEdit() {
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [saveError, setSaveError] = useState<unknown>(null);
   const [staleVoucher, setStaleVoucher] = useState<Voucher | null>(null);
+  const [overwriting, setOverwriting] = useState(false);
+  const [overwriteMessages, setOverwriteMessages] = useState<string[]>([]);
   const [formInitialized, setFormInitialized] = useState(isNew);
   const [copyMessage, setCopyMessage] = useState('');
   const optionsReady = customersQuery.isSuccess && projectsQuery.isSuccess && salesCategoriesQuery.isSuccess;
@@ -795,6 +797,63 @@ export default function VoucherEdit() {
     setSaveStatus('idle');
   }
 
+  async function overwriteWithThisScreen() {
+    if (overwriting) return;
+    setOverwriting(true);
+    setOverwriteMessages([]);
+    await writeQueueRef.current;
+    let done = 0;
+    try {
+      const latest = await api.get<Voucher>(`/vouchers/${voucherId}`);
+      let expected: string | null = latest.updated_at ?? null;
+      const next = (r: VoucherWriteResult) => { expected = r.voucher_updated_at ?? r.updated_at ?? expected; };
+      next(await api.put<VoucherWriteResult>(`/vouchers/${voucherId}`, { ...toHeader(getValues()), expected_updated_at: expected ?? undefined }));
+      const screenLines = getValues('lines').filter(l => typeof l.id === 'number');
+      const keptIds: number[] = [];
+      let deleted = 0;
+      for (const l of screenLines) {
+        const payload: Record<string, unknown> = {
+          location_name: l.location_name, item_name: l.item_name, line_type: l.line_type, quantity: l.quantity,
+          cost_labor_rate: l.cost_labor_rate, line_total: l.line_total, tax_category: l.tax_category, memo: l.memo,
+          costs: l.costs, prices: l.prices, tategu_item_id: l.tategu_item_id,
+          cost_body: l.cost_body, cost_hardware: l.cost_hardware, cost_glass: l.cost_glass,
+          cost_factory_hours: l.cost_factory_hours, cost_site_hours: l.cost_site_hours,
+        };
+        const put = (data: Record<string, unknown>) =>
+          api.put<VoucherLine & VoucherWriteResult>(`/vouchers/${voucherId}/lines/${l.id}`, { ...data, expected_updated_at: expected ?? undefined });
+        try {
+          let res = await put(payload);
+          next(res);
+          if (l.tategu_item_id && Number(res.cost_labor_rate) !== Number(l.cost_labor_rate)) {
+            const { tategu_item_id: _omit, ...rest } = payload;
+            res = await put(rest);
+            next(res);
+          }
+          keptIds.push(l.id as number);
+        } catch (error) {
+          if (!isVoucherNotFoundError(error)) throw error;
+          deleted += 1;
+        }
+        done += 1;
+      }
+      next(await api.put<VoucherWriteResult>(`/vouchers/${voucherId}/line-order`, { line_ids: keptIds, expected_updated_at: expected ?? undefined }));
+      const screenIds = new Set(screenLines.map(l => l.id));
+      const added = latest.lines.filter(l => !screenIds.has(l.id)).length;
+      const messages: string[] = [];
+      if (added) messages.push(`もう一方の画面で足された明細が${added}行あります`);
+      if (deleted) messages.push(`もう一方の画面で消された明細が${deleted}行あり、上書きしませんでした`);
+      await reloadLatestVoucher();
+      setSavedAt(new Date());
+      setSaveStatus('saved');
+      setOverwriteMessages(messages);
+    } catch (error) {
+      setSaveError(error);
+      setOverwriteMessages([`上書きに失敗しました（明細は${done}行目まで保存しました）: ${formatSaveError(error)}`]);
+    } finally {
+      setOverwriting(false);
+    }
+  }
+
   async function performVoid(reason?: string) {
     await enqueueVoucherWrite(expectedUpdatedAt => voidMutation.mutateAsync({
       id: voucherId, reason, expected_updated_at: expectedUpdatedAt ?? undefined,
@@ -842,8 +901,11 @@ export default function VoucherEdit() {
                   ほかで更新されています（最終更新: {staleVoucher.updated_at}）。再読み込みすると、この画面で保存されていない入力は失われます。
                 </span>
                 <button type="button" onClick={() => void reloadLatestVoucher()} style={subBtnStyle}>再読み込み</button>
+                <button type="button" onClick={() => void overwriteWithThisScreen()} disabled={overwriting} style={subBtnStyle}>この画面の内容で上書き</button>
+                <small style={{ display: 'block' }}>もう一方の画面で保存した内容は、この画面の内容に置き換わります</small>
               </div>
             )}
+            {overwriteMessages.map(message => <div key={message} role="status">{message}</div>)}
             {saveStatus === 'saving' && <span>保存中…</span>}
             {saveStatus === 'saved' && savedAt && (
               <span>保存しました {savedAt.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' })}</span>
