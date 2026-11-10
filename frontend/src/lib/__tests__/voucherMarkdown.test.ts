@@ -44,3 +44,26 @@ describe('R-0233 伝票のAI向けMarkdown', () => {
     expect(markdown).toContain('- 利益: ¥220,000');
   });
 });
+
+describe('R-0256 AI向けMarkdownの時間・数量を小数第2位で出す', () => {
+  it('浮動小数の誤差を出さず、末尾の0を省く', () => {
+    const l = {
+      ...line, quantity: 1,
+      costs: [
+        { category_code: 'FACTORY_TIME', category_name: '工場時間', measure_type: 'time' as const, value: 12.1, sort_order: 1 },
+        { category_code: 'SITE_TIME', category_name: '現場時間', measure_type: 'time' as const, value: 0.1 + 0.2 - 0.2, sort_order: 2 },
+      ],
+    };
+    const markdown = buildVoucherMarkdown({ form: { ...form, lines: [{ ...l, quantity: 3 }, l] }, voucherNo: '', customerName: '', projectName: '', ledgers: new Map() });
+    expect(markdown).not.toMatch(/\d\.\d{4,}/);
+    expect(markdown).toContain('| 12.2 |');
+    expect(markdown).toContain('| 36.6 |');
+  });
+
+  it('台帳の工数・数量も小数第2位で出す', () => {
+    const l2 = { ...ledger, cost_lines: [{ ...ledger.cost_lines[0], quantity: 0.1 + 0.2 }], labor_lines: [{ ...ledger.labor_lines[0], work_hours: 12.100000000000001 }] };
+    const markdown = buildVoucherMarkdown({ form, voucherNo: '', customerName: '', projectName: '', ledgers: new Map([[10, l2]]) });
+    expect(markdown).toContain('| 本体 | オーデ | 0.3 |');
+    expect(markdown).toContain('| 組立 | 12.1 |');
+  });
+});
