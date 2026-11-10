@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { useState } from 'react';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { render, screen, fireEvent, within, waitFor } from '@testing-library/react';
 import { TateguCostLinesPanel, TateguLaborLinesPanel } from '../TateguLineItemsPanel';
 import type { AggregationCategoryMaster } from '../../api/aggregationCategories';
 import type { CostLineDraft, LaborLineDraft } from '../TateguLineItemsPanel';
@@ -43,6 +43,21 @@ describe('TateguCostLinesPanel', () => {
 
     expect(materialRows()).toHaveLength(4);
     expect(document.activeElement).toBe(within(materialRows()[1] as HTMLElement).getByLabelText('材料名'));
+  });
+
+  it('R-0262 行が加わってフォーカスが移ったら、移った先の行が見えるまでスクロールする', async () => {
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    render(<CostLinesHarness />);
+    const row = materialRows()[0] as HTMLElement;
+    fireEvent.change(within(row).getByLabelText('材料名'), { target: { value: 'オーデ' } });
+    const unitCost = within(row).getByLabelText('材料単価');
+    fireEvent.change(unitCost, { target: { value: '1000' } });
+    fireEvent.keyDown(unitCost, { key: 'Tab' });
+
+    const focusedRow = (document.activeElement as HTMLElement).closest('tr');
+    await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' }));
+    expect(scrollIntoView.mock.contexts.at(-1)).toBe(focusedRow);
   });
 
   it('R-0232 空の本体材料名のTabと金物材料名のShift+Tabは空行の名称間を移る', () => {
