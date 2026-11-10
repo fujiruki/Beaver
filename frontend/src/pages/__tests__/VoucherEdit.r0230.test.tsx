@@ -87,6 +87,7 @@ describe('R-0230 サマリーの置き場所と中身', () => {
   afterEach(() => { window.innerWidth = originalWidth; });
 
   it('大きく出す6つが出て、売値の内訳は出ない', async () => {
+    window.innerWidth = 800;
     renderPage();
     const summary = await screen.findByTestId('top-summary');
     await waitFor(() => expect(within(summary).getByText('売上').nextSibling?.textContent).toBe(numberText(159600)));

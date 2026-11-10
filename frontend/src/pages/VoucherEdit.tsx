@@ -884,7 +884,7 @@ export default function VoucherEdit() {
 
   const moneyCategories = categories.filter(c => c.measure_type === 'money');
   const timeCategories  = categories.filter(c => c.measure_type === 'time');
-  const wideSummary = viewportWidth >= getLineItemWidth(moneyCategories.length, timeCategories.length) + 280 + 16 + 64;
+  const wideSummary = viewportWidth >= 1024;
   const rowOps = (
     !isReadOnly && (
       <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
@@ -1169,7 +1169,7 @@ export default function VoucherEdit() {
               </div>
             )}
           </div>
-          {wideSummary && <div data-testid="summary-side" style={{ position: 'sticky', top: 8, flex: '0 0 auto' }}>{topSummary}</div>}
+          {wideSummary && <div data-testid="summary-side" style={{ position: 'sticky', top: 8, flex: '0 0 auto', maxHeight: 'calc(100vh - 16px)', overflowY: 'auto' }}>{topSummary}</div>}
           </div>
 
           {/* 合計 + ボタン */}
