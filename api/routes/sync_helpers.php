@@ -1569,7 +1569,6 @@ function syncVoucherAccessLink(PDO $pdo, int $voucherId): void {
             UPDATE vouchers
             SET access_voucher_id = :access_voucher_id,
                 access_voucher_no = COALESCE(:access_voucher_no, access_voucher_no),
-                updated_at = CURRENT_TIMESTAMP,
                 last_synced_at = CURRENT_TIMESTAMP
             WHERE id = :id
         ')->execute([
