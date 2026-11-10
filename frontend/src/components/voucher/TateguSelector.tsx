@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useTateguItems, useToggleFavorite } from '../../api/tateguItems';
 import { useLedgerCatalogs, useLedgerCatalogItems } from '../../api/ledgerCatalogs';
 import FavoriteStar from '../FavoriteStar';
@@ -18,6 +19,9 @@ const byRecent = (a: TateguItem, b: TateguItem) => (b.updated_at ?? '').localeCo
 export default function TateguSelector({ isOpen, onClose, onSelect }: Props) {
   const [search, setSearch] = useState('');
   const [tab, setTab] = useState<TabKey>('recent');
+  const [reloading, setReloading] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const queryClient = useQueryClient();
   const { data: items = [], isLoading } = useTateguItems();
   const { data: catalogs = [] } = useLedgerCatalogs(isOpen);
   const toggleFavorite = useToggleFavorite();
@@ -25,6 +29,23 @@ export default function TateguSelector({ isOpen, onClose, onSelect }: Props) {
   const { data: catalogItems = [] } = useLedgerCatalogItems(catalogId);
 
   if (!isOpen) return null;
+
+  const reload = async () => {
+    setReloading(true);
+    try {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['tateguItems'] }),
+        queryClient.invalidateQueries({ queryKey: ['ledgerCatalogs'] }),
+      ]);
+    } finally {
+      setReloading(false);
+    }
+  };
+
+  const clearSearch = () => {
+    setSearch('');
+    searchRef.current?.focus();
+  };
 
   const sorted = [...items].sort(byRecent);
   const tabItems =
@@ -65,16 +86,35 @@ export default function TateguSelector({ isOpen, onClose, onSelect }: Props) {
                 : 'px-3 py-1 rounded-md text-sm bg-slate-100 text-slate-600 hover:bg-slate-200'}
             >{t.label}</button>
           ))}
+          <button
+            type="button"
+            onClick={reload}
+            disabled={reloading}
+            className="px-3 py-1 rounded-md text-sm bg-slate-100 text-slate-600 hover:bg-slate-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ marginLeft: 'auto' }}
+          >{reloading ? '読み込み中…' : '再読み込み'}</button>
         </div>
 
-        <input
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="品番・品名・仕様で検索"
-          autoFocus
-          style={{ width: '100%', padding: '7px 10px', border: '1px solid #cbd5e1', borderRadius: 6,
-            fontSize: 14, boxSizing: 'border-box', marginBottom: 12 }}
-        />
+        <div style={{ position: 'relative', marginBottom: 12 }}>
+          <input
+            ref={searchRef}
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="品番・品名・仕様で検索"
+            autoFocus
+            style={{ width: '100%', padding: '7px 28px 7px 10px', border: '1px solid #cbd5e1', borderRadius: 6,
+              fontSize: 14, boxSizing: 'border-box' }}
+          />
+          {search && (
+            <button
+              type="button"
+              aria-label="検索語を消す"
+              onClick={clearSearch}
+              className="absolute right-2 top-1/2 -translate-y-1/2 leading-none text-slate-400 hover:text-slate-600"
+              style={{ background: 'none', border: 'none', fontSize: 14, cursor: 'pointer', padding: 0 }}
+            >✕</button>
+          )}
+        </div>
 
         {isLoading ? (
           <div style={{ padding: 20, textAlign: 'center', color: '#94a3b8' }}>読み込み中...</div>
