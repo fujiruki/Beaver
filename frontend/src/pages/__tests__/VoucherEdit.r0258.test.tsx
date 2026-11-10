@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import VoucherEdit from '../VoucherEdit';
@@ -107,31 +107,31 @@ describe('R-0259 利益率のバーはサマリーの中', () => {
   const originalWidth = window.innerWidth;
   afterEach(() => { window.innerWidth = originalWidth; });
 
-  it('広い画面ではサマリーの中、数字の下にあり、明細の上には無い', async () => {
+  it('広い画面では操作の列の中（R-0267 でサマリーから分けた）で、明細の上には無い', async () => {
     window.innerWidth = 4000;
     renderPage();
     const summary = await wait();
     const button = screen.getByRole('button', { name: '原価から売値を設定' });
     expect(screen.getAllByRole('button', { name: '原価から売値を設定' })).toHaveLength(1);
-    expect(summary.contains(button)).toBe(true);
-    expect(screen.getByTestId('summary-side').contains(button)).toBe(true);
-    expect(within(summary).getByText('合計時間').compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+    expect(summary.contains(button)).toBe(false);
+    expect(screen.getByTestId('ops-side').contains(button)).toBe(true);
   });
 
-  it('狭い画面ではサマリーの外で、明細の見出しと同じ上にくっつく帯の中', async () => {
+  it('狭い画面でも操作の列の中で、見出しの帯には含まれない（R-0267）', async () => {
     window.innerWidth = 800;
     renderPage();
     const summary = await wait();
     const button = screen.getByRole('button', { name: '原価から売値を設定' });
     expect(summary.contains(button)).toBe(false);
     const band = screen.getByTestId('line-item-sticky');
-    expect(band.contains(button)).toBe(true);
+    expect(band.contains(button)).toBe(false);
+    expect(screen.getByTestId('ops-side').contains(button)).toBe(true);
     expect(band.contains(screen.getByTestId('line-item-heading'))).toBe(true);
   });
 });
 
 describe('R-0260 明細の見出しはついてくる', () => {
-  it('見出しは横スクロールの箱の外の、上にくっつく帯にあり、横スクロールに合わせて動く', async () => {
+  it('見出しは明細の箱の外の、上にくっつく帯にある（R-0267 で横スクロールを禁止したため、横スクロール連動は廃止）', async () => {
     renderPage();
     await wait();
     const band = screen.getByTestId('line-item-sticky');
@@ -141,10 +141,7 @@ describe('R-0260 明細の見出しはついてくる', () => {
     expect(scroller.contains(heading)).toBe(false);
     expect(scroller.contains(band)).toBe(false);
     expect(scroller.contains(screen.getByTestId('line-item-0'))).toBe(true);
-
-    scroller.scrollLeft = 120;
-    fireEvent.scroll(scroller);
-    expect(screen.getByTestId('line-item-heading-slide').style.transform).toBe('translateX(-120px)');
+    expect(scroller.style.overflowX).not.toBe('auto');
   });
 });
 
@@ -153,90 +150,78 @@ describe('R-0259 行の操作のボタンもサマリーの中', () => {
   afterEach(() => { window.innerWidth = originalWidth; });
   const names = ['製品複製', '行を挿入', '行を削除', '▲', '▼'];
 
-  it('広い画面ではサマリーの中にあり、明細の上には無い', async () => {
+  it('広い画面では操作の列にあり、明細の上には無い（R-0267）', async () => {
     window.innerWidth = 4000;
     renderPage();
-    const summary = await wait();
+    await wait();
+    const ops = screen.getByTestId('ops-side');
     for (const name of names) {
       const buttons = screen.getAllByRole('button', { name });
       expect(buttons).toHaveLength(1);
-      expect(summary.contains(buttons[0])).toBe(true);
+      expect(ops.contains(buttons[0])).toBe(true);
       expect(buttons[0].getAttribute('type')).toBe('button');
     }
   });
 
-  it('狭い画面ではサマリーの外で、見出しと同じ上にくっつく帯の中', async () => {
+  it('狭い画面でもサマリーの外の操作の列にあり、見出しの帯には含まれない（R-0267）', async () => {
     window.innerWidth = 800;
     renderPage();
     const summary = await wait();
     const band = screen.getByTestId('line-item-sticky');
+    const ops = screen.getByTestId('ops-side');
     for (const name of names) {
       const button = screen.getByRole('button', { name });
       expect(summary.contains(button)).toBe(false);
-      expect(band.contains(button)).toBe(true);
+      expect(band.contains(button)).toBe(false);
+      expect(ops.contains(button)).toBe(true);
     }
   });
 });
 
-describe('R-0265 まとめと操作は1024px 以上ならいつも右の列', () => {
+describe('R-0265 → R-0267 操作は1024px 以上でもいつも右の列、サマリーは幅に余裕があるときだけ右', () => {
   const originalWidth = window.innerWidth;
   afterEach(() => { window.innerWidth = originalWidth; });
   const names = ['製品複製', '行を挿入', '行を削除', '▲', '▼', '原価から売値を設定'];
 
   for (const width of [1024, 1280, 1440, 1920]) {
-    it(`${width}px: 右の列にまとめとボタンがあり、明細の上には無い`, async () => {
+    it(`${width}px: 操作の列にボタンがあり、明細の上には無い`, async () => {
       window.innerWidth = width;
       renderPage();
-      const summary = await wait();
-      const side = screen.getByTestId('summary-side');
+      await wait();
+      const ops = screen.getByTestId('ops-side');
       const band = screen.getByTestId('line-item-sticky');
-      expect(side.contains(summary)).toBe(true);
       for (const name of names) {
         const button = screen.getByRole('button', { name });
-        expect(side.contains(button)).toBe(true);
+        expect(ops.contains(button)).toBe(true);
         expect(band.contains(button)).toBe(false);
       }
       expect(band.contains(screen.getByTestId('line-item-heading'))).toBe(true);
     });
   }
 
-  it('列は縦スクロールについてきて、画面より長いときは列の中だけスクロールする', async () => {
-    window.innerWidth = 1280;
+  it('1920px: サマリーは右の列で、画面より長いときは列の中だけスクロールする', async () => {
+    window.innerWidth = 1920;
     renderPage();
-    await wait();
+    const summary = await wait();
     const side = screen.getByTestId('summary-side');
+    expect(side.contains(summary)).toBe(true);
     expect(side.style.position).toBe('sticky');
     expect(side.style.maxHeight).toContain('100vh');
     expect(side.style.overflowY).toBe('auto');
+    expect(side.style.width).toBe('300px');
+    expect(side.style.flex).toBe('0 0 300px');
   });
 
-  it('1023px 以下は今の、明細の上に置く形', async () => {
-    window.innerWidth = 1023;
+  it('操作の列も縦スクロールについてきて、ボタンは列の中で折り返す', async () => {
+    window.innerWidth = 1280;
     renderPage();
     await wait();
-    expect(screen.queryByTestId('summary-side')).toBeNull();
-    expect(screen.getByTestId('line-item-sticky').contains(screen.getByRole('button', { name: '製品複製' }))).toBe(true);
+    const ops = screen.getByTestId('ops-side');
+    expect(ops.style.position).toBe('sticky');
+    expect(ops.style.maxHeight).toContain('100vh');
+    expect(ops.style.overflowY).toBe('auto');
+    const apply = screen.getByRole('button', { name: '原価から売値を設定' });
+    expect(apply.style.flexBasis).toBe('100%');
+    expect(apply.parentElement!.style.flexWrap).toBe('wrap');
   });
-});
-
-describe('R-0265 右の列の幅は300px', () => {
-  const originalWidth = window.innerWidth;
-  afterEach(() => { window.innerWidth = originalWidth; });
-
-  for (const width of [1024, 1280, 1440]) {
-    it(`${width}px: 列は幅300px固定で、ボタンは列の中で折り返す`, async () => {
-      window.innerWidth = width;
-      renderPage();
-      await wait();
-      const side = screen.getByTestId('summary-side');
-      expect(side.style.width).toBe('300px');
-      expect(side.style.flex).toBe('0 0 300px');
-      const dup = screen.getByRole('button', { name: '製品複製' });
-      expect(side.contains(dup)).toBe(true);
-      expect(dup.parentElement!.style.flexWrap).toBe('wrap');
-      const apply = screen.getByRole('button', { name: '原価から売値を設定' });
-      expect(apply.style.flexBasis).toBe('100%');
-      expect(apply.parentElement!.style.flexWrap).toBe('wrap');
-    });
-  }
 });
