@@ -13,7 +13,6 @@ import { calcLineProfitSummary, calcLineSellTotal } from '../../lib/voucherCalc'
 import {
   createCategoryGridTemplate,
   getLineItemRightWidth,
-  getLineItemWidth,
   LINE_ITEM_LEFT_WIDTH,
   LINE_ITEM_NAME_WIDTH,
   LINE_ITEM_NO_WIDTH,
@@ -272,8 +271,7 @@ export default function LineItemRow({
       style={{
         display: 'flex',
         alignItems: 'stretch',
-        width: 'fit-content',
-        minWidth: getLineItemWidth(moneyCategories.length, timeCategories.length),
+        flexWrap: 'wrap',
         padding: '3px 0',
         borderBottom: '1px solid #d0d7de',
         background: rowBackground,

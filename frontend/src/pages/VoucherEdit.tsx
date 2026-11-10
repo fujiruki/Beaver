@@ -15,7 +15,9 @@ import VoucherHeader from '../components/voucher/VoucherHeader';
 import LineItemRow from '../components/voucher/LineItemRow';
 import {
   createCategoryGridTemplate,
+  getLineItemRightWidth,
   getLineItemWidth,
+  LINE_ITEM_PROFIT_WIDTH,
   LINE_ITEM_LEFT_WIDTH,
   LINE_ITEM_NO_WIDTH,
 } from '../components/voucher/lineItemLayout';
@@ -332,7 +334,6 @@ export default function VoucherEdit() {
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [saveError, setSaveError] = useState<unknown>(null);
   const [staleVoucher, setStaleVoucher] = useState<Voucher | null>(null);
-  const headingSlideRef = useRef<HTMLDivElement>(null);
   const [overwriting, setOverwriting] = useState(false);
   const [overwriteMessages, setOverwriteMessages] = useState<string[]>([]);
   const [formInitialized, setFormInitialized] = useState(isNew);
@@ -884,10 +885,13 @@ export default function VoucherEdit() {
 
   const moneyCategories = categories.filter(c => c.measure_type === 'money');
   const timeCategories  = categories.filter(c => c.measure_type === 'time');
-  const wideSummary = viewportWidth >= 1024;
+  // 明細が横スクロールなしで全部の列を出せる幅 + 操作の列 + サマリーが取れるときだけサマリーを右に置く
+  const pageGutter = 64;
+  const summaryRight = viewportWidth - pageGutter
+    >= getLineItemWidth(moneyCategories.length, timeCategories.length) + 16 + OPS_SIDE_WIDTH + 16 + SUMMARY_SIDE_WIDTH;
   const rowOps = (
     !isReadOnly && (
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
         <button type="button" onClick={handleDuplicateLine}
           disabled={selectedIdx === null} style={rowOpBtnStyle}>製品複製</button>
         <button type="button" onClick={handleInsertLine} style={rowOpBtnStyle}>行を挿入</button>
@@ -900,11 +904,9 @@ export default function VoucherEdit() {
       </div>
     )
   );
-  const profitRateBar = <ProfitRateBar stacked={wideSummary} categories={categories} selectedIdx={selectedIdx} setSelectedIdx={setSelectedIdx} isNew={isNew} onSaveLine={saveLine} />;
+  const profitRateBar = <ProfitRateBar stacked categories={categories} selectedIdx={selectedIdx} setSelectedIdx={setSelectedIdx} isNew={isNew} onSaveLine={saveLine} />;
   const topSummary = (
-    <TopSummary lines={linesForCalc} taxInputType={watchedTaxInputType} taxRate={0.10} costLines={costLinesForCalc}>
-      {wideSummary && <div style={{ paddingTop: 8 }}>{profitRateBar}{rowOps}</div>}
-    </TopSummary>
+    <TopSummary lines={linesForCalc} taxInputType={watchedTaxInputType} taxRate={0.10} costLines={costLinesForCalc} />
   );
 
   return (
@@ -1109,19 +1111,16 @@ export default function VoucherEdit() {
             onTaxInputTypeChange={() => queueMicrotask(() => void queueHeaderSave())}
           />
 
-          {!wideSummary && topSummary}
+          {!summaryRight && topSummary}
 
-          <div style={wideSummary ? { display: 'flex', gap: 16, alignItems: 'flex-start', marginBottom: 16 } : undefined}>
-          <div style={{ background: '#fff', marginBottom: wideSummary ? 0 : 16, flex: wideSummary ? '1 1 0' : undefined, minWidth: 0 }}>
+          <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', marginBottom: 16 }}>
+          <div style={{ background: '#fff', flex: '1 1 0', minWidth: 0 }}>
             {formReady && categories.length > 0 && (
               <div data-testid="line-item-sticky" className="top-11 md:top-0" style={{ position: 'sticky', zIndex: 5, background: '#fff' }}>
-                {!wideSummary && <>{profitRateBar}{rowOps}</>}
-                <div style={{ overflow: 'hidden' }}>
-                  <div ref={headingSlideRef} data-testid="line-item-heading-slide" style={{ width: 'fit-content', minWidth: getLineItemWidth(moneyCategories.length, timeCategories.length) }}>
                   <div data-testid="line-item-heading" style={lineHeadingStyle}>
                     <span style={{ width: LINE_ITEM_NO_WIDTH }}>No</span>
                     <span style={{ width: LINE_ITEM_LEFT_WIDTH }}>取付場所・品名／数量・備考</span>
-                    <span data-testid="category-grid-heading" style={{ display: 'grid', gridTemplateColumns: createCategoryGridTemplate(moneyCategories.length, timeCategories.length) }}>
+                    <span data-testid="category-grid-heading" style={{ width: getLineItemRightWidth(moneyCategories.length, timeCategories.length), display: 'grid', gridTemplateColumns: createCategoryGridTemplate(moneyCategories.length, timeCategories.length) }}>
                       <span />
                       {moneyCategories.map(category => (
                         <span key={category.code} style={{ textAlign: 'right' }}>{category.name}</span>
@@ -1132,20 +1131,18 @@ export default function VoucherEdit() {
                       <span style={{ textAlign: 'right' }}>労務単価</span>
                       <span />
                     </span>
-          </div>
+                    <span style={{ width: LINE_ITEM_PROFIT_WIDTH }} />
                   </div>
-                </div>
               </div>
             )}
-            <div data-testid="line-item-scroll" style={{ overflowX: 'auto' }}
-              onScroll={e => { if (headingSlideRef.current) headingSlideRef.current.style.transform = `translateX(-${e.currentTarget.scrollLeft}px)`; }}>
+            <div data-testid="line-item-scroll">
             {!formReady ? (
               <div style={{ padding: 16, color: '#64748b' }}>明細を読み込んでいます…</div>
             ) : categories.length === 0 ? (
               <div role="alert" style={{ padding: 16, color: '#b45309', background: '#fffbeb' }}>
                 集計区分が未同期のため明細を編集できません。設定画面から同期してください
               </div>
-            ) : <div style={{ width: 'fit-content', minWidth: getLineItemWidth(moneyCategories.length, timeCategories.length) }}>
+            ) : <div>
               {fields.map((field, index) => (
                 <LineItemRow
                   key={field.id}
@@ -1169,7 +1166,10 @@ export default function VoucherEdit() {
               </div>
             )}
           </div>
-          {wideSummary && <div data-testid="summary-side" style={{ position: 'sticky', top: 8, flex: '0 0 300px', width: 300, boxSizing: 'border-box', maxHeight: 'calc(100vh - 16px)', overflowY: 'auto' }}>{topSummary}</div>}
+          {!isReadOnly && (
+            <div data-testid="ops-side" style={{ position: 'sticky', top: 8, flex: `0 0 ${OPS_SIDE_WIDTH}px`, width: OPS_SIDE_WIDTH, boxSizing: 'border-box', maxHeight: 'calc(100vh - 16px)', overflowY: 'auto' }}>{profitRateBar}{rowOps}</div>
+          )}
+          {summaryRight && <div data-testid="summary-side" style={{ position: 'sticky', top: 8, flex: `0 0 ${SUMMARY_SIDE_WIDTH}px`, width: SUMMARY_SIDE_WIDTH, boxSizing: 'border-box', maxHeight: 'calc(100vh - 16px)', overflowY: 'auto' }}>{topSummary}</div>}
           </div>
 
           {/* 合計 + ボタン */}
@@ -1197,6 +1197,9 @@ export default function VoucherEdit() {
     </FormProvider>
   );
 }
+
+const OPS_SIDE_WIDTH = 120;
+const SUMMARY_SIDE_WIDTH = 300;
 
 const cancelBtnStyle: React.CSSProperties = {
   padding: '8px 20px', background: '#f1f5f9', color: '#475569',
@@ -1238,7 +1241,7 @@ const rowOpBtnStyle: React.CSSProperties = {
   borderRadius: 6, cursor: 'pointer', fontSize: 12, color: '#475569',
 };
 const lineHeadingStyle: React.CSSProperties = {
-  display: 'flex', alignItems: 'center', height: 24, padding: 0, boxSizing: 'border-box',
+  display: 'flex', flexWrap: 'wrap', alignItems: 'center', minHeight: 24, padding: 0, boxSizing: 'border-box',
   borderBottom: '1px solid #d0d7de', background: '#f6f8fa', color: '#57606a',
   fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap',
 };
