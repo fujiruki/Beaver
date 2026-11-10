@@ -127,7 +127,7 @@ export default function ProfitRateBar({ categories, selectedIdx, setSelectedIdx,
   }
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px',
+    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12, padding: '10px 16px',
       background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, marginBottom: 12 }}>
       <span style={{ fontSize: 13, color: '#475569', fontWeight: 'bold' }}>利益率：</span>
       <div style={{ display: 'flex', gap: 4 }}>

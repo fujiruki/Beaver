@@ -332,6 +332,7 @@ export default function VoucherEdit() {
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [saveError, setSaveError] = useState<unknown>(null);
   const [staleVoucher, setStaleVoucher] = useState<Voucher | null>(null);
+  const headingSlideRef = useRef<HTMLDivElement>(null);
   const [overwriting, setOverwriting] = useState(false);
   const [overwriteMessages, setOverwriteMessages] = useState<string[]>([]);
   const [formInitialized, setFormInitialized] = useState(isNew);
@@ -884,8 +885,11 @@ export default function VoucherEdit() {
   const moneyCategories = categories.filter(c => c.measure_type === 'money');
   const timeCategories  = categories.filter(c => c.measure_type === 'time');
   const wideSummary = viewportWidth >= getLineItemWidth(moneyCategories.length, timeCategories.length) + 280 + 16 + 64;
+  const profitRateBar = <ProfitRateBar categories={categories} selectedIdx={selectedIdx} setSelectedIdx={setSelectedIdx} isNew={isNew} onSaveLine={saveLine} />;
   const topSummary = (
-    <TopSummary lines={linesForCalc} taxInputType={watchedTaxInputType} taxRate={0.10} costLines={costLinesForCalc} />
+    <TopSummary lines={linesForCalc} taxInputType={watchedTaxInputType} taxRate={0.10} costLines={costLinesForCalc}>
+      {wideSummary && <div style={{ paddingTop: 8 }}>{profitRateBar}</div>}
+    </TopSummary>
   );
 
   return (
@@ -1092,8 +1096,6 @@ export default function VoucherEdit() {
 
           {!wideSummary && topSummary}
 
-          <ProfitRateBar categories={categories} selectedIdx={selectedIdx} setSelectedIdx={setSelectedIdx} isNew={isNew} onSaveLine={saveLine} />
-
           {/* 明細行 */}
           {!isReadOnly && (
             <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
@@ -1109,7 +1111,33 @@ export default function VoucherEdit() {
             </div>
           )}
           <div style={wideSummary ? { display: 'flex', gap: 16, alignItems: 'flex-start', marginBottom: 16 } : undefined}>
-          <div style={{ background: '#fff', marginBottom: wideSummary ? 0 : 16, overflowX: 'auto', flex: wideSummary ? '1 1 0' : undefined, minWidth: 0 }}>
+          <div style={{ background: '#fff', marginBottom: wideSummary ? 0 : 16, flex: wideSummary ? '1 1 0' : undefined, minWidth: 0 }}>
+            {formReady && categories.length > 0 && (
+              <div data-testid="line-item-sticky" className="top-11 md:top-0" style={{ position: 'sticky', zIndex: 5, background: '#fff' }}>
+                {!wideSummary && profitRateBar}
+                <div style={{ overflow: 'hidden' }}>
+                  <div ref={headingSlideRef} data-testid="line-item-heading-slide" style={{ width: 'fit-content', minWidth: getLineItemWidth(moneyCategories.length, timeCategories.length) }}>
+                  <div data-testid="line-item-heading" style={lineHeadingStyle}>
+                    <span style={{ width: LINE_ITEM_NO_WIDTH }}>No</span>
+                    <span style={{ width: LINE_ITEM_LEFT_WIDTH }}>取付場所・品名／数量・備考</span>
+                    <span data-testid="category-grid-heading" style={{ display: 'grid', gridTemplateColumns: createCategoryGridTemplate(moneyCategories.length, timeCategories.length) }}>
+                      <span />
+                      {moneyCategories.map(category => (
+                        <span key={category.code} style={{ textAlign: 'right' }}>{category.name}</span>
+                      ))}
+                      {timeCategories.map(category => (
+                        <span key={category.code} style={{ textAlign: 'right' }}>{category.name.replace(/時間$/, 'h')}</span>
+                      ))}
+                      <span style={{ textAlign: 'right' }}>労務単価</span>
+                      <span />
+                    </span>
+          </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            <div data-testid="line-item-scroll" style={{ overflowX: 'auto' }}
+              onScroll={e => { if (headingSlideRef.current) headingSlideRef.current.style.transform = `translateX(-${e.currentTarget.scrollLeft}px)`; }}>
             {!formReady ? (
               <div style={{ padding: 16, color: '#64748b' }}>明細を読み込んでいます…</div>
             ) : categories.length === 0 ? (
@@ -1117,21 +1145,6 @@ export default function VoucherEdit() {
                 集計区分が未同期のため明細を編集できません。設定画面から同期してください
               </div>
             ) : <div style={{ width: 'fit-content', minWidth: getLineItemWidth(moneyCategories.length, timeCategories.length) }}>
-              <div data-testid="line-item-heading" style={lineHeadingStyle}>
-                <span style={{ width: LINE_ITEM_NO_WIDTH }}>No</span>
-                <span style={{ width: LINE_ITEM_LEFT_WIDTH }}>取付場所・品名／数量・備考</span>
-                <span data-testid="category-grid-heading" style={{ display: 'grid', gridTemplateColumns: createCategoryGridTemplate(moneyCategories.length, timeCategories.length) }}>
-                  <span />
-                  {moneyCategories.map(category => (
-                    <span key={category.code} style={{ textAlign: 'right' }}>{category.name}</span>
-                  ))}
-                  {timeCategories.map(category => (
-                    <span key={category.code} style={{ textAlign: 'right' }}>{category.name.replace(/時間$/, 'h')}</span>
-                  ))}
-                  <span style={{ textAlign: 'right' }}>労務単価</span>
-                  <span />
-                </span>
-              </div>
               {fields.map((field, index) => (
                 <LineItemRow
                   key={field.id}
@@ -1146,6 +1159,7 @@ export default function VoucherEdit() {
                 />
               ))}
             </div>}
+            </div>
             {!isReadOnly && categories.length > 0 && (
               <div style={{ padding: '8px 12px', borderTop: '1px solid #f1f5f9' }}>
                 <button type="button" onClick={handleAddLine} disabled={!formReady} style={addLineBtnStyle}>

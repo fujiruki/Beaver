@@ -83,7 +83,7 @@ const containerStyle: React.CSSProperties = {
   minWidth: 280,
 };
 
-export function TopSummary({ lines, taxInputType, taxRate, costLines }: Props) {
+export function TopSummary({ lines, taxInputType, taxRate, costLines, children }: Props & { children?: React.ReactNode }) {
   const { tax_amount, total } = useTotalCalc(lines, taxInputType, taxRate);
   const { settings } = useAppSettings();
   const sales = total - tax_amount;
@@ -117,6 +117,7 @@ export function TopSummary({ lines, taxInputType, taxRate, costLines }: Props) {
           材料原価　{[...material].map(([name, value]) => `${name} ¥${Math.round(value).toLocaleString()}`).join('　')}
         </div>
       )}
+      {children}
     </div>
   );
 }

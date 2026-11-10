@@ -229,7 +229,6 @@ export default function LineItemRow({
   const lineType = line?.line_type ?? 'normal';
   const unitPrice = prices.reduce((sum, price) => sum + (price.value || 0), 0);
   const lineTotal = unitPrice * quantity;
-  const manufactureCostTotal = manufactureCost * quantity;
   const materialCostTotal = materialCost * quantity;
   const laborCostTotal = laborCost * quantity;
   const totalTimeHours = costs
@@ -434,9 +433,9 @@ export default function LineItemRow({
                 </span>
               </div>
               <div style={{ ...resultStyle, gridColumn: moneyCategories.length + timeCategories.length + 3 }}>
-                <span style={mutedResultStyle}>材料原価 ¥{formatNumber(Math.round(materialCostTotal))}</span>
-                <span style={mutedResultStyle}>労務費 ¥{formatNumber(Math.round(laborCostTotal))}</span>
-                <strong>製造原価 ¥{formatNumber(Math.round(manufactureCostTotal))}</strong>
+                <span style={mutedResultStyle}>材料原価 ¥{formatNumber(Math.round(materialCost))}</span>
+                <span style={mutedResultStyle}>労務費 ¥{formatNumber(Math.round(laborCost))}</span>
+                <strong>製造原価 ¥{formatNumber(Math.round(manufactureCost))}</strong>
               </div>
             </div>
             <div data-testid={`category-grid-row-${index}`} style={{ ...bandStyle, gridTemplateColumns: categoryGridTemplate, background: '#eef6ee' }}>
