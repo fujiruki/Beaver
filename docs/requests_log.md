@@ -639,6 +639,7 @@
 
 - 晴樹さん、会話で直接（台帳の工数が「4.7000000029802」と出る件への答え）
 - 状態: 本番反映済み（2026-11-10）
+- 2026-11-10 DB の誤差の直し（dodai-back の依頼、晴樹さん「(a) 小数第4位で丸めて直す」、本番は「なおしてもいいが売上伝票に変化が起こらないように」）: beta・本番とも、tategu_item_labor_lines.work_hours（本番111行）と tategu_items.cost_factory_hours（本番82件）を小数第4位に四捨五入。updated_at・金額は不変。売上伝票（3,949件・明細15,056行）の件数・合計・税・最新 updated_at は前後で同じ。本番の退避: database_Beaver_20261110_0902_pre_round4.sqlite
 - 仕様: `docs/spec/R-0254_two_decimal_hours_quantity.md`（R-0245 の決まりを更新）
 
 #### 原文
