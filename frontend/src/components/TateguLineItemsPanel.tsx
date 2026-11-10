@@ -150,6 +150,8 @@ const focusAndReveal = (target: HTMLElement | null | undefined) => {
   });
 };
 
+const isImeEnter = (event: React.KeyboardEvent) => event.nativeEvent.isComposing || event.keyCode === 229;
+
 const leavesRow =(event: React.FocusEvent<HTMLTableRowElement>) => !event.currentTarget.contains(event.relatedTarget);
 
 function CostBlankRow({ categoryName, onCommit }: { categoryName: string; onCommit: (patch: Partial<CostLineDraft>) => void }) {
@@ -161,6 +163,16 @@ function CostBlankRow({ categoryName, onCommit }: { categoryName: string; onComm
     setDraft(empty);
   };
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTableRowElement>) => {
+    if (event.key === 'Enter' && !isImeEnter(event)) {
+      event.preventDefault();
+      if (draft.name || draft.quantity !== 1 || draft.unit_cost !== 0) {
+        onCommit(draft);
+        setDraft(empty);
+        const row = event.currentTarget;
+        focusAndReveal(row.closest('tbody')?.querySelector<HTMLInputElement>(`tr[data-blank-row="true"][data-category="${row.dataset.category}"] [aria-label="材料名"]`));
+      }
+      return;
+    }
     if (event.key !== 'Tab' || event.nativeEvent.isComposing) return;
     const target = event.target as HTMLInputElement;
     const row = event.currentTarget;
@@ -255,6 +267,14 @@ function LaborBlankRow({ onCommit }: { onCommit: (row: LaborRow) => void }) {
     setDraft(emptyLaborRow);
   };
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTableRowElement>) => {
+    if (event.key === 'Enter' && !isImeEnter(event)) {
+      event.preventDefault();
+      if (!isEmptyLaborRow(draft)) {
+        commit();
+        focusAndReveal(event.currentTarget.querySelector<HTMLInputElement>('[aria-label="工程名"]'));
+      }
+      return;
+    }
     if (event.key !== 'Tab' || event.shiftKey || event.nativeEvent.isComposing) return;
     const target = event.target as HTMLInputElement;
     if (target.getAttribute('aria-label') !== '労務単価') return;
