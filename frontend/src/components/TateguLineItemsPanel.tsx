@@ -142,7 +142,15 @@ function CategorySelect({
   );
 }
 
-const leavesRow = (event: React.FocusEvent<HTMLTableRowElement>) => !event.currentTarget.contains(event.relatedTarget);
+const focusAndReveal = (target: HTMLElement | null | undefined) => {
+  if (!target) return;
+  target.focus();
+  requestAnimationFrame(() => {
+    (document.activeElement as HTMLElement | null)?.closest('tr')?.scrollIntoView?.({ block: 'nearest' });
+  });
+};
+
+const leavesRow =(event: React.FocusEvent<HTMLTableRowElement>) => !event.currentTarget.contains(event.relatedTarget);
 
 function CostBlankRow({ categoryName, onCommit }: { categoryName: string; onCommit: (patch: Partial<CostLineDraft>) => void }) {
   const empty = { name: '', quantity: 1, unit_cost: 0 };
@@ -162,7 +170,7 @@ function CostBlankRow({ categoryName, onCommit }: { categoryName: string; onComm
       const destination = blankRows[rowIndex + (event.shiftKey ? -1 : 1)]?.querySelector<HTMLInputElement>('[aria-label="材料名"]');
       if (destination && (event.shiftKey || (!draft.name && draft.quantity === 1 && draft.unit_cost === 0))) {
         event.preventDefault();
-        destination.focus();
+        focusAndReveal(destination);
       }
       return;
     }
@@ -172,7 +180,7 @@ function CostBlankRow({ categoryName, onCommit }: { categoryName: string; onComm
       const category = row.dataset.category;
       if (draft.name || draft.quantity !== 1 || draft.unit_cost !== 0) onCommit(draft);
       setDraft(empty);
-      tbody?.querySelector<HTMLInputElement>(`tr[data-blank-row="true"][data-category="${category}"] [aria-label="材料名"]`)?.focus();
+      focusAndReveal(tbody?.querySelector<HTMLInputElement>(`tr[data-blank-row="true"][data-category="${category}"] [aria-label="材料名"]`));
     }
   };
   return (
@@ -253,7 +261,7 @@ function LaborBlankRow({ onCommit }: { onCommit: (row: LaborRow) => void }) {
     event.preventDefault();
     const row = event.currentTarget;
     commit();
-    row.querySelector<HTMLInputElement>('[aria-label="工程名"]')?.focus();
+    focusAndReveal(row.querySelector<HTMLInputElement>('[aria-label="工程名"]'));
   };
   return (
     <tr className="bv-placeholder-row" data-blank-row="true" onBlur={(event) => leavesRow(event) && commit()} onKeyDown={handleKeyDown}>
