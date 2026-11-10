@@ -184,6 +184,35 @@ try {
         assertEq('編集後', $row['item_name'], 'DB: item_name が更新されている');
     });
 
+    echo "\n=== R-0264 PATCH /vouchers/{id}/access-link は updated_at を進めない ===\n";
+
+    runTest('access-link後も updated_at は不変・last_synced_at は進み・応答に last_synced_at があり・旧 updated_at での明細PUTが200', function () use (&$pdo, $port, $customerId) {
+        $voucherId = createVoucher($pdo, $customerId, 'E-R0264-001');
+        $lineId    = createLine($pdo, $voucherId, 1);
+        $pdo->exec("UPDATE vouchers SET updated_at = '2026-01-01 00:00:00', last_synced_at = '2026-01-01 00:00:00' WHERE id = $voucherId");
+
+        $ctx = stream_context_create(['http' => [
+            'method'  => 'PATCH',
+            'header'  => "Content-Type: application/json\r\nConnection: close\r\n",
+            'content' => json_encode(['access_voucher_id' => 264001, 'access_voucher_no' => 'A-264001']),
+            'ignore_errors' => true,
+            'timeout' => 5,
+        ]]);
+        $raw = file_get_contents("http://127.0.0.1:$port/contents/Beaver/api/vouchers/$voucherId/access-link", false, $ctx);
+        $res = json_decode((string)$raw, true);
+        assertTrue(str_contains($http_response_header[0] ?? '', '200'), 'access-link HTTP 200: ' . ($http_response_header[0] ?? ''));
+        assertTrue(!empty($res['last_synced_at']), '応答に last_synced_at がある');
+
+        $row = $pdo->query("SELECT updated_at, last_synced_at, access_voucher_id, access_voucher_no FROM vouchers WHERE id = $voucherId")->fetch();
+        assertEq('2026-01-01 00:00:00', $row['updated_at'], 'updated_at は変わらない');
+        assertTrue($row['last_synced_at'] > '2026-01-01 00:00:00', 'last_synced_at は進む');
+        assertEq(264001, (int)$row['access_voucher_id'], 'access_voucher_id が書かれる');
+        assertEq('A-264001', $row['access_voucher_no'], 'access_voucher_no が書かれる');
+
+        $r = putJson($port, "/vouchers/$voucherId/lines/$lineId", ['item_name' => '編集後', 'expected_updated_at' => '2026-01-01 09:00:00']);
+        assertTrue(str_contains($r['status'], '200'), 'expected_updated_at 付き明細PUTが200: ' . $r['status']);
+    });
+
     runTest('quantity のみの更新でも edited_in_beaver=1 になる', function () use (&$pdo, $port, $customerId) {
         $voucherId = createVoucher($pdo, $customerId, 'E-TEST-002');
         $lineId    = createLine($pdo, $voucherId, 1);
