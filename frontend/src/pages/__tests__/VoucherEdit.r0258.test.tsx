@@ -147,3 +147,33 @@ describe('R-0260 明細の見出しはついてくる', () => {
     expect(screen.getByTestId('line-item-heading-slide').style.transform).toBe('translateX(-120px)');
   });
 });
+
+describe('R-0259 行の操作のボタンもサマリーの中', () => {
+  const originalWidth = window.innerWidth;
+  afterEach(() => { window.innerWidth = originalWidth; });
+  const names = ['製品複製', '行を挿入', '行を削除', '▲', '▼'];
+
+  it('広い画面ではサマリーの中にあり、明細の上には無い', async () => {
+    window.innerWidth = 4000;
+    renderPage();
+    const summary = await wait();
+    for (const name of names) {
+      const buttons = screen.getAllByRole('button', { name });
+      expect(buttons).toHaveLength(1);
+      expect(summary.contains(buttons[0])).toBe(true);
+      expect(buttons[0].getAttribute('type')).toBe('button');
+    }
+  });
+
+  it('狭い画面ではサマリーの外で、見出しと同じ上にくっつく帯の中', async () => {
+    window.innerWidth = 800;
+    renderPage();
+    const summary = await wait();
+    const band = screen.getByTestId('line-item-sticky');
+    for (const name of names) {
+      const button = screen.getByRole('button', { name });
+      expect(summary.contains(button)).toBe(false);
+      expect(band.contains(button)).toBe(true);
+    }
+  });
+});
