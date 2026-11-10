@@ -105,9 +105,9 @@ export function TopSummary({ lines, taxInputType, taxRate, costLines, children }
       <Row label="売上" value={sales} bold />
       <Row label="原価" value={Math.round(sales - profit.grossProfit)} bold />
       <Row label="利益" value={Math.round(profit.grossProfit)} bold colored={profit.grossProfit >= 0} />
-      <HoursRow label="工場時間" hours={hoursOf('FACTORY_TIME')} />
-      <HoursRow label="現場時間" hours={hoursOf('SITE_TIME')} />
-      <HoursRow label="合計時間" hours={profit.totalWorkHours} />
+      <HoursRow label="工場時間" hours={hoursOf('FACTORY_TIME')} hoursPerDay={settings.hoursPerDay} />
+      <HoursRow label="現場時間" hours={hoursOf('SITE_TIME')} hoursPerDay={settings.hoursPerDay} />
+      <HoursRow label="合計時間" hours={profit.totalWorkHours} hoursPerDay={settings.hoursPerDay} />
       <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderTop: '1px solid #e2e8f0' }}>
         <span style={{ fontSize: 13, color: '#64748b' }}>利益率</span>
         <span style={{ fontSize: 14, color: '#475569' }}>{rate !== null ? `${(rate * 100).toFixed(1)}%` : '—'}</span>
@@ -122,12 +122,16 @@ export function TopSummary({ lines, taxInputType, taxRate, costLines, children }
   );
 }
 
-function HoursRow({ label, hours }: { label: string; hours: number }) {
+function HoursRow({ label, hours, hoursPerDay }: { label: string; hours: number; hoursPerDay: number }) {
+  const days = hoursPerDay > 0 ? Math.round(hours / hoursPerDay * 10) / 10 : null;
   return (
     <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0',
       borderTop: '1px solid #e2e8f0', fontWeight: 'bold' }}>
       <span style={{ fontSize: 13, color: '#1e293b' }}>{label}</span>
-      <span style={{ fontSize: 16, color: '#1e293b' }}>{formatDecimal(hours)} h</span>
+      <span style={{ fontSize: 16, color: '#1e293b' }}>
+        {formatDecimal(hours)} h
+        {days !== null && <span style={{ fontSize: 14, fontWeight: 'normal', color: '#64748b' }}>（{days.toFixed(1)}日）</span>}
+      </span>
     </div>
   );
 }
