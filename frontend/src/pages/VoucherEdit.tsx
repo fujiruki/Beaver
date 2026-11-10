@@ -885,10 +885,25 @@ export default function VoucherEdit() {
   const moneyCategories = categories.filter(c => c.measure_type === 'money');
   const timeCategories  = categories.filter(c => c.measure_type === 'time');
   const wideSummary = viewportWidth >= getLineItemWidth(moneyCategories.length, timeCategories.length) + 280 + 16 + 64;
+  const rowOps = (
+    !isReadOnly && (
+      <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+        <button type="button" onClick={handleDuplicateLine}
+          disabled={selectedIdx === null} style={rowOpBtnStyle}>製品複製</button>
+        <button type="button" onClick={handleInsertLine} style={rowOpBtnStyle}>行を挿入</button>
+        <button type="button" onClick={() => selectedIdx !== null && handleRemoveLine(selectedIdx)}
+          disabled={selectedIdx === null} style={{ ...rowOpBtnStyle, color: '#ef4444', borderColor: '#fca5a5' }}>行を削除</button>
+        <button type="button" onClick={handleMoveUp}
+          disabled={selectedIdx === null || selectedIdx === 0} style={rowOpBtnStyle}>▲</button>
+        <button type="button" onClick={handleMoveDown}
+          disabled={selectedIdx === null || (watchedLines?.length ?? 0) - 1 === selectedIdx} style={rowOpBtnStyle}>▼</button>
+      </div>
+    )
+  );
   const profitRateBar = <ProfitRateBar categories={categories} selectedIdx={selectedIdx} setSelectedIdx={setSelectedIdx} isNew={isNew} onSaveLine={saveLine} />;
   const topSummary = (
     <TopSummary lines={linesForCalc} taxInputType={watchedTaxInputType} taxRate={0.10} costLines={costLinesForCalc}>
-      {wideSummary && <div style={{ paddingTop: 8 }}>{profitRateBar}</div>}
+      {wideSummary && <div style={{ paddingTop: 8 }}>{profitRateBar}{rowOps}</div>}
     </TopSummary>
   );
 
@@ -1096,25 +1111,11 @@ export default function VoucherEdit() {
 
           {!wideSummary && topSummary}
 
-          {/* 明細行 */}
-          {!isReadOnly && (
-            <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-              <button type="button" onClick={handleDuplicateLine}
-                disabled={selectedIdx === null} style={rowOpBtnStyle}>製品複製</button>
-              <button type="button" onClick={handleInsertLine} style={rowOpBtnStyle}>行を挿入</button>
-              <button type="button" onClick={() => selectedIdx !== null && handleRemoveLine(selectedIdx)}
-                disabled={selectedIdx === null} style={{ ...rowOpBtnStyle, color: '#ef4444', borderColor: '#fca5a5' }}>行を削除</button>
-              <button type="button" onClick={handleMoveUp}
-                disabled={selectedIdx === null || selectedIdx === 0} style={rowOpBtnStyle}>▲</button>
-              <button type="button" onClick={handleMoveDown}
-                disabled={selectedIdx === null || (watchedLines?.length ?? 0) - 1 === selectedIdx} style={rowOpBtnStyle}>▼</button>
-            </div>
-          )}
           <div style={wideSummary ? { display: 'flex', gap: 16, alignItems: 'flex-start', marginBottom: 16 } : undefined}>
           <div style={{ background: '#fff', marginBottom: wideSummary ? 0 : 16, flex: wideSummary ? '1 1 0' : undefined, minWidth: 0 }}>
             {formReady && categories.length > 0 && (
               <div data-testid="line-item-sticky" className="top-11 md:top-0" style={{ position: 'sticky', zIndex: 5, background: '#fff' }}>
-                {!wideSummary && profitRateBar}
+                {!wideSummary && <>{profitRateBar}{rowOps}</>}
                 <div style={{ overflow: 'hidden' }}>
                   <div ref={headingSlideRef} data-testid="line-item-heading-slide" style={{ width: 'fit-content', minWidth: getLineItemWidth(moneyCategories.length, timeCategories.length) }}>
                   <div data-testid="line-item-heading" style={lineHeadingStyle}>
