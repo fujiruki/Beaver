@@ -177,3 +177,44 @@ describe('R-0259 行の操作のボタンもサマリーの中', () => {
     }
   });
 });
+
+describe('R-0265 まとめと操作は1024px 以上ならいつも右の列', () => {
+  const originalWidth = window.innerWidth;
+  afterEach(() => { window.innerWidth = originalWidth; });
+  const names = ['製品複製', '行を挿入', '行を削除', '▲', '▼', '原価から売値を設定'];
+
+  for (const width of [1024, 1280, 1440, 1920]) {
+    it(`${width}px: 右の列にまとめとボタンがあり、明細の上には無い`, async () => {
+      window.innerWidth = width;
+      renderPage();
+      const summary = await wait();
+      const side = screen.getByTestId('summary-side');
+      const band = screen.getByTestId('line-item-sticky');
+      expect(side.contains(summary)).toBe(true);
+      for (const name of names) {
+        const button = screen.getByRole('button', { name });
+        expect(side.contains(button)).toBe(true);
+        expect(band.contains(button)).toBe(false);
+      }
+      expect(band.contains(screen.getByTestId('line-item-heading'))).toBe(true);
+    });
+  }
+
+  it('列は縦スクロールについてきて、画面より長いときは列の中だけスクロールする', async () => {
+    window.innerWidth = 1280;
+    renderPage();
+    await wait();
+    const side = screen.getByTestId('summary-side');
+    expect(side.style.position).toBe('sticky');
+    expect(side.style.maxHeight).toContain('100vh');
+    expect(side.style.overflowY).toBe('auto');
+  });
+
+  it('1023px 以下は今の、明細の上に置く形', async () => {
+    window.innerWidth = 1023;
+    renderPage();
+    await wait();
+    expect(screen.queryByTestId('summary-side')).toBeNull();
+    expect(screen.getByTestId('line-item-sticky').contains(screen.getByRole('button', { name: '製品複製' }))).toBe(true);
+  });
+});
