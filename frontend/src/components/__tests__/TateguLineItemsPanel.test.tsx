@@ -496,3 +496,55 @@ describe('R-0231 表のマスの見た目', () => {
     expect(screen.queryByText(/16\.69999/)).toBeNull();
   });
 });
+
+describe('R-0266 空の行の Enter', () => {
+  it('材料費: 入力があって Enter なら Tab と同じく行を加え、新しい空の行の材料名へ移る', () => {
+    render(<CostLinesHarness />);
+    const row = materialRows()[0] as HTMLElement;
+    const name = within(row).getByLabelText('材料名');
+    fireEvent.change(name, { target: { value: 'オーデ' } });
+    expect(fireEvent.keyDown(name, { key: 'Enter', keyCode: 13 })).toBe(false);
+
+    expect(materialRows()).toHaveLength(4);
+    expect(document.activeElement).toBe(within(materialRows()[1] as HTMLElement).getByLabelText('材料名'));
+  });
+
+  it('材料費: 空のまま Enter なら何もせず、送信も起こさない', () => {
+    render(<CostLinesHarness />);
+    const before = materialRows().length;
+    const name = within(materialRows()[0] as HTMLElement).getByLabelText('材料名');
+    expect(fireEvent.keyDown(name, { key: 'Enter', keyCode: 13 })).toBe(false);
+    expect(materialRows()).toHaveLength(before);
+  });
+
+  it('労務費: 入力があって Enter なら行を加え、新しい空の行の工程名へ移る', () => {
+    render(<LaborHarness />);
+    const row = laborRows()[0] as HTMLElement;
+    const factory = within(row).getByLabelText('工場時間');
+    fireEvent.change(within(row).getByLabelText('工程名'), { target: { value: '組立' } });
+    expect(fireEvent.keyDown(factory, { key: 'Enter', keyCode: 13 })).toBe(false);
+
+    expect(laborRows()).toHaveLength(2);
+    expect(rowValues(laborRows()[0], '工程名')).toBe('組立');
+    expect(document.activeElement).toBe(within(laborRows()[1] as HTMLElement).getByLabelText('工程名'));
+  });
+
+  it('労務費: 空のまま Enter なら何もせず、送信も起こさない', () => {
+    render(<LaborHarness />);
+    const before = laborRows().length;
+    const name = within(laborRows()[0] as HTMLElement).getByLabelText('工程名');
+    expect(fireEvent.keyDown(name, { key: 'Enter', keyCode: 13 })).toBe(false);
+    expect(laborRows()).toHaveLength(before);
+  });
+
+  it('日本語変換中（isComposing・keyCode 229）の Enter は横取りしない', () => {
+    render(<LaborHarness />);
+    const name = within(laborRows()[0] as HTMLElement).getByLabelText('工程名');
+    fireEvent.change(name, { target: { value: '組立' } });
+    expect(fireEvent.keyDown(name, { key: 'Enter', keyCode: 229 })).toBe(true);
+    const composing = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true, isComposing: true });
+    name.dispatchEvent(composing);
+    expect(composing.defaultPrevented).toBe(false);
+    expect(laborRows()).toHaveLength(1);
+  });
+});
