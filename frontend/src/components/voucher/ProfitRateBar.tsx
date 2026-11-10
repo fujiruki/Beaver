@@ -12,6 +12,7 @@ type Props = {
   setSelectedIdx: (idx: number | null) => void;
   isNew?: boolean;
   onSaveLine?: (lineId: number, data: Record<string, unknown>) => Promise<void>;
+  stacked?: boolean;
 };
 
 /**
@@ -58,7 +59,7 @@ export function calcCategorySellPrices(
   return newPrices;
 }
 
-export default function ProfitRateBar({ categories, selectedIdx, setSelectedIdx, isNew = false, onSaveLine }: Props) {
+export default function ProfitRateBar({ categories, selectedIdx, setSelectedIdx, isNew = false, onSaveLine, stacked = false }: Props) {
   const { profitRate, setProfitRate } = useVoucherStore();
   const { getValues, setValue } = useFormContext<VoucherFormValues>();
   const { settings } = useAppSettings();
@@ -130,7 +131,7 @@ export default function ProfitRateBar({ categories, selectedIdx, setSelectedIdx,
     <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 12, padding: '10px 16px',
       background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8, marginBottom: 12 }}>
       <span style={{ fontSize: 13, color: '#475569', fontWeight: 'bold' }}>利益率：</span>
-      <div style={{ display: 'flex', gap: 4 }}>
+      <div style={{ display: 'flex', flexWrap: stacked ? 'wrap' : undefined, gap: 4 }}>
         {settings.profitRatePresets.map(rate => (
           <button
             key={rate}
@@ -147,7 +148,7 @@ export default function ProfitRateBar({ categories, selectedIdx, setSelectedIdx,
           </button>
         ))}
       </div>
-      <button type="button" onClick={applyProfitRate} style={applyBtnStyle}>
+      <button type="button" onClick={applyProfitRate} style={stacked ? { ...applyBtnStyle, flexBasis: '100%' } : applyBtnStyle}>
         原価から売値を設定
       </button>
     </div>

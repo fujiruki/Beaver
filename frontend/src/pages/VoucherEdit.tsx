@@ -887,7 +887,7 @@ export default function VoucherEdit() {
   const wideSummary = viewportWidth >= 1024;
   const rowOps = (
     !isReadOnly && (
-      <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
         <button type="button" onClick={handleDuplicateLine}
           disabled={selectedIdx === null} style={rowOpBtnStyle}>製品複製</button>
         <button type="button" onClick={handleInsertLine} style={rowOpBtnStyle}>行を挿入</button>
@@ -900,7 +900,7 @@ export default function VoucherEdit() {
       </div>
     )
   );
-  const profitRateBar = <ProfitRateBar categories={categories} selectedIdx={selectedIdx} setSelectedIdx={setSelectedIdx} isNew={isNew} onSaveLine={saveLine} />;
+  const profitRateBar = <ProfitRateBar stacked={wideSummary} categories={categories} selectedIdx={selectedIdx} setSelectedIdx={setSelectedIdx} isNew={isNew} onSaveLine={saveLine} />;
   const topSummary = (
     <TopSummary lines={linesForCalc} taxInputType={watchedTaxInputType} taxRate={0.10} costLines={costLinesForCalc}>
       {wideSummary && <div style={{ paddingTop: 8 }}>{profitRateBar}{rowOps}</div>}
@@ -1169,7 +1169,7 @@ export default function VoucherEdit() {
               </div>
             )}
           </div>
-          {wideSummary && <div data-testid="summary-side" style={{ position: 'sticky', top: 8, flex: '0 0 auto', maxHeight: 'calc(100vh - 16px)', overflowY: 'auto' }}>{topSummary}</div>}
+          {wideSummary && <div data-testid="summary-side" style={{ position: 'sticky', top: 8, flex: '0 0 300px', width: 300, boxSizing: 'border-box', maxHeight: 'calc(100vh - 16px)', overflowY: 'auto' }}>{topSummary}</div>}
           </div>
 
           {/* 合計 + ボタン */}
