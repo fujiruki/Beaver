@@ -727,3 +727,15 @@
 #### 原文
 
 > この画面に　リストを再読み込みボタンをつくってほしい、あと、検索した文字列を削除できるバツボタンを入力欄の右に設定して
+
+### R-0264 Access が伝票の番号を書き戻しても、作業中の画面を「ほかで更新されています」で止めない（2026-11-10）
+
+- 晴樹さん、会話で直接（「またこれがでた。どういうこと？」、E03991 の画面写真）
+- 状態: 仕様化済み（dodai-back に確認中）
+- 原因: 2026-11-10 10:20:56、Access の同期が PATCH /vouchers/11736/access-link（Access の伝票番号の書き戻し）を送り、`syncVoucherAccessLink`（api/routes/sync_helpers.php）が vouchers.updated_at を進めた。中身は変わっていないのに、開いていた画面の楽観ロックが古くなり、10:27:39 の明細の保存が 409 stale_voucher になった。
+- 直し方: vouchers の access-link では updated_at を進めない（access_voucher_id・access_voucher_no と last_synced_at だけ書く）。明細の access_line_id の書き戻しは元から updated_at を進めていない。得意先・製品台帳の access-link は画面に出る番号（code）そのものを書き換えるので今のまま。
+- 受け入れ条件（PHP、本物の SQLite）: access-link のあと vouchers.updated_at が前と同じ、last_synced_at は進む。access-link の前に取った updated_at を expected_updated_at に使った明細の PUT が 200 になる。
+
+#### 原文
+
+> またこれがでた。どういうこと？
