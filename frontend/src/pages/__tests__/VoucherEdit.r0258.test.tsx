@@ -218,3 +218,25 @@ describe('R-0265 まとめと操作は1024px 以上ならいつも右の列', ()
     expect(screen.getByTestId('line-item-sticky').contains(screen.getByRole('button', { name: '製品複製' }))).toBe(true);
   });
 });
+
+describe('R-0265 右の列の幅は300px', () => {
+  const originalWidth = window.innerWidth;
+  afterEach(() => { window.innerWidth = originalWidth; });
+
+  for (const width of [1024, 1280, 1440]) {
+    it(`${width}px: 列は幅300px固定で、ボタンは列の中で折り返す`, async () => {
+      window.innerWidth = width;
+      renderPage();
+      await wait();
+      const side = screen.getByTestId('summary-side');
+      expect(side.style.width).toBe('300px');
+      expect(side.style.flex).toBe('0 0 300px');
+      const dup = screen.getByRole('button', { name: '製品複製' });
+      expect(side.contains(dup)).toBe(true);
+      expect(dup.parentElement!.style.flexWrap).toBe('wrap');
+      const apply = screen.getByRole('button', { name: '原価から売値を設定' });
+      expect(apply.style.flexBasis).toBe('100%');
+      expect(apply.parentElement!.style.flexWrap).toBe('wrap');
+    });
+  }
+});
