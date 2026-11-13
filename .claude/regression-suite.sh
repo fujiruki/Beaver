@@ -59,6 +59,7 @@ php "$root/api/tests/test_r0241_hidden_note.php" >/tmp/bv_r0241_hidden_note.log 
 php "$root/api/tests/test_r0252_ledger_favorites_catalogs.php" >/tmp/bv_r0252.log 2>&1 || fail "[test_r0252_ledger_favorites_catalogs] $(tail -n 8 /tmp/bv_r0252.log)"
 php "$root/api/tests/test_r0251_ledger_line_reorder.php" >/tmp/bv_r0251.log 2>&1 || fail "[test_r0251_ledger_line_reorder] $(tail -n 8 /tmp/bv_r0251.log)"
 php "$root/api/tests/test_r0253_ledger_list_catalog_names.php" >/tmp/bv_r0253.log 2>&1 || fail "[test_r0253_ledger_list_catalog_names] $(tail -n 8 /tmp/bv_r0253.log)"
+php "$root/api/tests/test_r0268_wood_sync.php" >/tmp/bv_r0268.log 2>&1 || fail "[test_r0268_wood_sync] $(tail -n 8 /tmp/bv_r0268.log)"
 
 rm -f "$root"/api/tests/*.sqlite 2>/dev/null
 exit 0
