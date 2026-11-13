@@ -39,8 +39,98 @@ function tateguSyncRow(PDO $pdo, int $id): ?array {
     $stmt->execute([$id]);
     $row['labor_lines'] = $stmt->fetchAll();
     $row['updated_at'] = utcToJst($row['updated_at']);
-    unset($row['is_favorite']);
+    unset($row['is_favorite'], $row['tateds_design_json']);
+    $row['wood_sets'] = tateguWoodSets($pdo, $id);
     return $row;
+}
+
+function tateguWoodSets(PDO $pdo, int $id): array {
+    $stmt = $pdo->prepare('SELECT id, uid, part_name, species_access_id, species_name, unit_price_man, length_allowance_mm,
+        amount, sort_order, tateds_design_id, tateds_revision, tateds_imported_lines
+        FROM tategu_wood_sets WHERE tategu_item_id = ? ORDER BY sort_order, id');
+    $stmt->execute([$id]);
+    $sets = $stmt->fetchAll();
+    $lineStmt = $pdo->prepare('SELECT usage, mitsuke_mm, mikomi_mm, length_mm, qty, margin_mm, tateds_part_key, sort_order
+        FROM tategu_wood_lines WHERE wood_set_id = ? ORDER BY sort_order, id');
+    foreach ($sets as &$set) {
+        $lineStmt->execute([$set['id']]);
+        $set['lines'] = $lineStmt->fetchAll();
+        unset($set['id']);
+    }
+    return $sets;
+}
+
+class WoodSyncException extends Exception {
+    public function __construct(public int $status, public array $body) { parent::__construct($body['error']); }
+}
+
+const WOOD_TEXT_MAX = 30;
+
+function woodTextTooLong(string $field, $value): void {
+    if (is_string($value) && mb_strlen($value) > WOOD_TEXT_MAX) throw new WoodSyncException(400, ['error' => 'text_too_long', 'field' => $field]);
+}
+
+// 何も書く前に検証する。呼び出し側のトランザクションで戻す。
+function validateWoodSync(PDO $pdo, ?int $id, array $data): void {
+    $uids = [];
+    if (array_key_exists('wood_sets', $data)) {
+        if (!is_array($data['wood_sets'])) throw new WoodSyncException(400, ['error' => 'invalid_wood_sets']);
+        $stmt = $pdo->prepare('SELECT tategu_item_id FROM tategu_wood_sets WHERE uid = ?');
+        foreach ($data['wood_sets'] as $set) {
+            $uid = strtolower((string)($set['uid'] ?? ''));
+            if ($uid === '') throw new WoodSyncException(400, ['error' => 'wood_set_uid_required']);
+            $stmt->execute([$uid]);
+            $owner = $stmt->fetchColumn();
+            if ($owner !== false && ($id === null || (int)$owner !== $id)) throw new WoodSyncException(409, ['error' => 'wood_set_uid_conflict', 'uid' => $uid]);
+            woodTextTooLong('part_name', $set['part_name'] ?? null);
+            woodTextTooLong('species_name', $set['species_name'] ?? null);
+            foreach ($set['lines'] ?? [] as $line) woodTextTooLong('usage', $line['usage'] ?? null);
+            $uids[$uid] = true;
+        }
+    } elseif ($id !== null) {
+        $stmt = $pdo->prepare('SELECT uid FROM tategu_wood_sets WHERE tategu_item_id = ?');
+        $stmt->execute([$id]);
+        foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $uid) $uids[$uid] = true;
+    }
+    foreach ($data['cost_lines'] ?? [] as $line) {
+        $uid = $line['wood_set_uid'] ?? null;
+        if ($uid !== null && $uid !== '' && !isset($uids[strtolower((string)$uid)])) throw new WoodSyncException(400, ['error' => 'wood_set_missing', 'uid' => $uid]);
+    }
+}
+
+function replaceWoodSets(PDO $pdo, int $id, array $sets): void {
+    $keep = [];
+    $find = $pdo->prepare('SELECT id FROM tategu_wood_sets WHERE uid = ?');
+    foreach ($sets as $i => $set) {
+        $uid = strtolower((string)$set['uid']);
+        $keep[] = $uid;
+        $pdo->prepare('INSERT INTO tategu_wood_sets (uid, tategu_item_id, part_name, species_access_id, species_name, unit_price_man,
+                length_allowance_mm, amount, sort_order, tateds_design_id, tateds_revision, tateds_imported_lines)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(uid) DO UPDATE SET part_name = excluded.part_name, species_access_id = excluded.species_access_id,
+                species_name = excluded.species_name, unit_price_man = excluded.unit_price_man,
+                length_allowance_mm = excluded.length_allowance_mm, amount = excluded.amount, sort_order = excluded.sort_order,
+                tateds_design_id = excluded.tateds_design_id, tateds_revision = excluded.tateds_revision,
+                tateds_imported_lines = excluded.tateds_imported_lines, updated_at = CURRENT_TIMESTAMP')
+            ->execute([$uid, $id, $set['part_name'] ?? '', $set['species_access_id'] ?? null, $set['species_name'] ?? '',
+                (float)($set['unit_price_man'] ?? 0), (float)($set['length_allowance_mm'] ?? 100), (int)($set['amount'] ?? 0),
+                $set['sort_order'] ?? $i, $set['tateds_design_id'] ?? null, $set['tateds_revision'] ?? null, $set['tateds_imported_lines'] ?? null]);
+        $find->execute([$uid]);
+        $setId = (int)$find->fetchColumn();
+        $pdo->prepare('DELETE FROM tategu_wood_lines WHERE wood_set_id = ?')->execute([$setId]);
+        $ins = $pdo->prepare('INSERT INTO tategu_wood_lines (wood_set_id, usage, mitsuke_mm, mikomi_mm, length_mm, qty, margin_mm, tateds_part_key, sort_order)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
+        foreach ($set['lines'] ?? [] as $j => $line) {
+            $ins->execute([$setId, $line['usage'] ?? '', (float)($line['mitsuke_mm'] ?? 0), (float)($line['mikomi_mm'] ?? 0),
+                (float)($line['length_mm'] ?? 0), (float)($line['qty'] ?? 0), (float)($line['margin_mm'] ?? 0),
+                $line['tateds_part_key'] ?? null, $line['sort_order'] ?? $j]);
+        }
+    }
+    $stmt = $pdo->prepare('SELECT id, uid FROM tategu_wood_sets WHERE tategu_item_id = ?');
+    $stmt->execute([$id]);
+    foreach ($stmt->fetchAll() as $row) {
+        if (!in_array($row['uid'], $keep, true)) $pdo->prepare('DELETE FROM tategu_wood_sets WHERE id = ?')->execute([$row['id']]);
+    }
 }
 
 function attachCatalogNames(PDO $pdo, array &$rows): void {
@@ -74,16 +164,18 @@ function replaceTateguSyncLines(PDO $pdo, int $id, array $data): void {
     if (array_key_exists('cost_lines', $data)) {
         $pdo->prepare('DELETE FROM tategu_item_cost_lines WHERE tategu_item_id = ?')->execute([$id]);
         $ins = $pdo->prepare('INSERT INTO tategu_item_cost_lines
-            (tategu_item_id, category_code, name, quantity, unit_cost, amount, source, sort_order)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+            (tategu_item_id, category_code, name, quantity, unit_cost, amount, source, sort_order, wood_set_uid)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
         foreach ($data['cost_lines'] as $i => $line) {
             $quantity = (float)($line['quantity'] ?? 0);
             $unitCost = (int)($line['unit_cost'] ?? 0);
             $ins->execute([$id, $line['category_code'] ?? '', $line['name'] ?? '', $quantity, $unitCost,
                 array_key_exists('amount', $line) ? (float)$line['amount'] : $quantity * $unitCost,
-                $line['source'] ?? 'manual', $line['sort_order'] ?? $i]);
+                $line['source'] ?? 'manual', $line['sort_order'] ?? $i,
+                isset($line['wood_set_uid']) && $line['wood_set_uid'] !== '' ? strtolower((string)$line['wood_set_uid']) : null]);
         }
     }
+    if (array_key_exists('wood_sets', $data)) replaceWoodSets($pdo, $id, $data['wood_sets']);
     if (array_key_exists('labor_lines', $data)) {
         $pdo->prepare('DELETE FROM tategu_item_labor_lines WHERE tategu_item_id = ?')->execute([$id]);
         $ins = $pdo->prepare('INSERT INTO tategu_item_labor_lines
@@ -100,6 +192,7 @@ function replaceTateguSyncLines(PDO $pdo, int $id, array $data): void {
 }
 
 function writeTateguSync(PDO $pdo, array $data, ?int $id = null): int {
+    validateWoodSync($pdo, $id, $data);
     $code = normalizeTateguCode($data['code'] ?? null);
     if ($id === null) {
         $stmt = $pdo->prepare('INSERT INTO tategu_items (code, name, description, status, building_image_path)
@@ -134,10 +227,15 @@ if (($segments[1] ?? null) === 'sync' && $method === 'GET') {
     if ($since === null) { respond(400, ['error' => 'Invalid since']); exit; }
     $limit = min(500, max(1, (int)($_GET['limit'] ?? 100)));
     $offset = max(0, (int)($_GET['offset'] ?? 0));
-    $stmt = $pdo->prepare('SELECT id FROM tategu_items WHERE updated_at > ? ORDER BY updated_at, id LIMIT ? OFFSET ?');
-    $stmt->bindValue(1, $since); $stmt->bindValue(2, $limit, PDO::PARAM_INT); $stmt->bindValue(3, $offset, PDO::PARAM_INT);
+    $afterId = isset($_GET['after_id']) ? (int)$_GET['after_id'] : null;
+    $readAt = utcToJst(gmdate('Y-m-d H:i:s'));
+    $cond = $afterId === null ? 'updated_at > ?' : '(updated_at > ? OR (updated_at = ? AND id > ?))';
+    $params = $afterId === null ? [$since] : [$since, $since, $afterId];
+    $stmt = $pdo->prepare("SELECT id FROM tategu_items WHERE $cond ORDER BY updated_at, id LIMIT ? OFFSET ?");
+    foreach ($params as $i => $p) $stmt->bindValue($i + 1, $p);
+    $stmt->bindValue(count($params) + 1, $limit, PDO::PARAM_INT); $stmt->bindValue(count($params) + 2, $offset, PDO::PARAM_INT);
     $stmt->execute();
-    respond(200, ['data' => array_map(fn($r) => tateguSyncRow($pdo, (int)$r['id']), $stmt->fetchAll())]);
+    respond(200, ['data' => array_map(fn($r) => tateguSyncRow($pdo, (int)$r['id']), $stmt->fetchAll()), 'read_at' => $readAt]);
     exit;
 }
 if (($segments[1] ?? null) === 'sync' && ($segments[2] ?? null) === 'bulk' && $method === 'POST') {
@@ -156,6 +254,7 @@ if (($segments[1] ?? null) === 'sync' && ($segments[2] ?? null) === 'bulk' && $m
         }
         $pdo->commit(); respond(200, ['data' => $result]);
     } catch (InvalidArgumentException $e) { $pdo->rollBack(); respond(400, ['error' => $e->getMessage()]); }
+    catch (WoodSyncException $e) { $pdo->rollBack(); respond($e->status, $e->body); }
     exit;
 }
 if (($segments[1] ?? null) === 'sync' && $method === 'POST') {
@@ -166,6 +265,7 @@ if (($segments[1] ?? null) === 'sync' && $method === 'POST') {
     if ($id = $stmt->fetchColumn()) { respond(200, tateguSyncRow($pdo, (int)$id)); exit; }
     $pdo->beginTransaction();
     try { $id = writeTateguSync($pdo, $data); $pdo->commit(); respond(201, tateguSyncRow($pdo, $id)); }
+    catch (WoodSyncException $e) { $pdo->rollBack(); respond($e->status, $e->body); }
     catch (Throwable $e) { $pdo->rollBack(); throw $e; }
     exit;
 }
@@ -179,6 +279,7 @@ if ($resourceId && $subAction === 'sync' && $method === 'PUT') {
     if ($error = validateTateguUnitCosts($data['cost_lines'] ?? [])) { respond(400, $error); exit; }
     $pdo->beginTransaction();
     try { writeTateguSync($pdo, $data, $resourceId); $pdo->commit(); respond(200, tateguSyncRow($pdo, $resourceId)); }
+    catch (WoodSyncException $e) { $pdo->rollBack(); respond($e->status, $e->body); }
     catch (Throwable $e) { $pdo->rollBack(); throw $e; }
     exit;
 }
@@ -225,6 +326,32 @@ if ($resourceId && $subAction === 'drawing') {
     if ($method === 'DELETE') {
         foreach (glob($dir . '/*') ?: [] as $old) { if (is_file($old)) unlink($old); }
         $pdo->prepare('UPDATE tategu_items SET building_image_path = NULL, drawing_sha256 = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+            ->execute([$resourceId]);
+        respond(200, ['deleted' => true]); exit;
+    }
+}
+
+if ($resourceId && $subAction === 'design') {
+    $stmt = $pdo->prepare('SELECT tateds_design_json FROM tategu_items WHERE id = ?');
+    $stmt->execute([$resourceId]); $json = $stmt->fetchColumn();
+    if ($json === false) { respond(404, ['error' => 'not_found']); exit; }
+    if ($method === 'GET') {
+        if ($json === null) { respond(404, ['error' => 'design_not_found']); exit; }
+        header('Content-Type: application/json; charset=utf-8'); header('Content-Length: ' . strlen($json)); echo $json; exit;
+    }
+    if ($method === 'POST') {
+        $upload = $_FILES['file'] ?? null;
+        if (!$upload || ($upload['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) { respond(400, ['error' => 'file_required']); exit; }
+        if ((int)$upload['size'] > 5 * 1024 * 1024) { respond(400, ['error' => 'file_too_large']); exit; }
+        $body = (string)file_get_contents($upload['tmp_name']);
+        json_decode($body);
+        if (json_last_error() !== JSON_ERROR_NONE) { respond(400, ['error' => 'invalid_json']); exit; }
+        $pdo->prepare('UPDATE tategu_items SET tateds_design_json = ?, design_sha256 = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+            ->execute([$body, hash('sha256', $body), $resourceId]);
+        respond(200, tateguSyncRow($pdo, $resourceId)); exit;
+    }
+    if ($method === 'DELETE') {
+        $pdo->prepare('UPDATE tategu_items SET tateds_design_json = NULL, design_sha256 = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
             ->execute([$resourceId]);
         respond(200, ['deleted' => true]); exit;
     }
@@ -317,6 +444,7 @@ switch ($method) {
             // 追加工程
             $stmt2 = $pdo->prepare('SELECT * FROM tategu_item_additions WHERE tategu_item_id = ? ORDER BY line_no');
             $stmt2->execute([$resourceId]);
+            unset($row['tateds_design_json']);
             $row['additions'] = $stmt2->fetchAll();
 
             // 原価合計（本体 + additions）
@@ -400,6 +528,7 @@ switch ($method) {
                 $stmt->execute($params);
                 $rows = $stmt->fetchAll();
                 foreach ($rows as &$row) {
+                    unset($row['tateds_design_json']);
                     $row['total_cost'] = (float)$row['cost_body'] + (float)$row['cost_hardware'] + (float)$row['cost_glass']
                         + ((float)$row['cost_factory_hours'] + (float)$row['cost_site_hours']) * (float)$row['cost_labor_rate'];
                 }
@@ -414,6 +543,7 @@ switch ($method) {
                 $stmt->execute($params);
                 $rows = $stmt->fetchAll();
                 foreach ($rows as &$row) {
+                    unset($row['tateds_design_json']);
                     $row['total_cost'] = (float)$row['cost_body'] + (float)$row['cost_hardware'] + (float)$row['cost_glass']
                         + ((float)$row['cost_factory_hours'] + (float)$row['cost_site_hours']) * (float)$row['cost_labor_rate'];
                 }

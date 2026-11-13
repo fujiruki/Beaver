@@ -107,6 +107,7 @@ try {
         'projects'      => __DIR__ . '/routes/projects.php',
         'project-schedules' => __DIR__ . '/routes/project_schedules.php',
         'tategu-items'  => __DIR__ . '/routes/tategu_items.php',
+        'wood-species'  => __DIR__ . '/routes/wood_species.php',
         'ledger-catalogs' => __DIR__ . '/routes/ledger_catalogs.php',
         'vouchers'      => __DIR__ . '/routes/vouchers.php',
         'invoices'      => __DIR__ . '/routes/invoices.php',
