@@ -812,3 +812,4 @@
 - 原因: `frontend/src/lib/voucherCalc.ts` の内税 `Math.floor(taxableInclusive * taxRate / (1 + taxRate))` が浮動小数の誤差で切り捨てを1つ下に落とす。サーバー（`api/routes/sync_helpers.php`）は `round($x, 6)` のあと切り捨てなので保存値は正しく、画面（useTaxCalc・voucherMarkdown）の表示だけがずれる
 - 直し方: 切り捨ての前に小数第6位で丸める（`calcLineSellTotal` と同じ `Math.floor(Number((x).toFixed(6)))`、R-0245・Access の ADR-010 と同じ順）。外税の `Math.floor(taxable * taxRate)` も同じ形にそろえる。`calcPriceFromProfit` の `Math.ceil` も同じ誤差で1円多くなる（原価100・利益率0.9 → 1001）ので、切り上げの前に小数第6位で丸める
 - 受け入れ条件（vitest）: 内税 10%・8% で税込 1〜1,000,000 円の全額が、サーバーと同じ式（`floor(round(x,6))`）と一致する。例 165→15、11000→1000。外税も同じく全額一致。`calcPriceFromProfit` で原価100・利益率0.9 → 1000
+- 2026-11-13 R-0269 を本番と beta に反映（baf3333。DB 変更なし。回帰スイート🔵青を指揮役が流し直して確認、本番の VoucherEdit の chunk に修正が入っていることを確認）。
