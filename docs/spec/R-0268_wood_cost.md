@@ -1,6 +1,6 @@
 # R-0268: 製品台帳の木材原価（部位と明細）／Access と同じ表で同期／TateDS とリンク
 
-- 状態: 仕様化済み（Access 側・TateDS 側との相談待ち）
+- 状態: 仕様化済み（Access と合意。TateDS への依頼は未送付）
 - 設計判断: `docs/adr/ADR-0001-木材原価をAccessと同じ表で同期する.md`
 - 調査: `docs/wiki/knowledge/R-0268_access_wood_cost_survey.md`、`docs/wiki/knowledge/R-0268_design_studio_material_list.md`
 - R-0200 の「木材設定・木材明細は Access だけ」「wood_calc の行は Beaver で直せない」を置き換える
@@ -146,3 +146,25 @@
 - 木材の明細の印刷は今回作らない
 - TateDS から入れる長さは「ほぞ込みの仕上がり長さ」。余裕と +100mm は Beaver・Access 側で足す
 - ひな形は Access のテンプレート（12項目）を框戸として1つ。格子・枠は使ってから足す
+
+## Access（dodai-back）の返事を受けて決めたこと（2026-11-13）
+
+方針（同じ形の表で両方向）と入れ替えの順は合意。Access 側は migration 060・木材の計算と画面・製品台帳の同期・複製・フォームの patch を受け持ち、ADR-012・F-22・F-27 を書き直す。
+
+- **丸め**: 部位の amount = 十進で小数第6位に丸めてから四捨五入（Access は `Int(Round(CDec(x),6)+0.5)`、Access の ADR-010 と同じ順）。Beaver も同じ順にする（PHP は `round($x, 6)` のあと `floor(+0.5)`、境目の値 2677.5・220.5 をテストに入れる）。原価行の金額は今どおり 単価×数量 の端数処理（Access の `Hasuu(単価×数量,1)`）
+- **建具データの列**: 製品台帳（tategu_items ⇔ tbl建具台帳）に `tateds_design_json`（MEMO）と `design_sha256` を持つ。部位の `tateds_design_json` はやめ、部位には建具 ID と版だけ
+- **同期の JSON の並び**: Beaver は台帳の JSON で `wood_sets` を `cost_lines`・`labor_lines` より後ろに置く（Access の TopLevelJson が台帳の id・updated_at を取り違えないため）。Access も `wood_sets` で切るよう直す
+- **wood_sets のキーが無いときは木材を消さない**: Beaver・Access の両方
+- **Access の修正日**: Access は明細の入力・行の削除・テンプレート・貼り付けでも修正日を進めるよう直し、木材の画面を開いている台帳は取り込みを飛ばす
+- **Access の既存のバグ**（Access 側で直す）: 木材の反映が本体金額＝単価で数量を掛けていない。貼り付けが設定ID 0 で入り既存の部位の明細が見えなくなる。複製にトランザクションが無い
+- **承認画面**: フォームは変えず、差の文の先頭に【木材】で部位ごとの要約を出す
+- **クリップボード（Access）**: 長い JSON は SetClipboardData（CF_UNICODETEXT）で書く
+- **「（未反映）」の部位**: Access 側に開く入口を足す
+
+### 既存データの数（Access で確かめた値に直す）
+
+- 複製で共有されている木材設定: 9個
+- 計算し直すと合わない行: 19行（四捨五入で数えた場合。今の Access の丸めでは18行。5686 は丸めだけの差）
+- 本体数量が1でない木材の原価行: 14行（2・3 のほか、4 が1行、0 が7行）
+- 金額が 単価×数量 になっていない行: 2行（5671・5673）
+- 初回の前に晴樹さんに見せる対照表には、共有9個・数量≠1 の14行・金額≠単価×数量の2行も載せる
