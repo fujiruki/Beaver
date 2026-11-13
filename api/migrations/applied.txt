@@ -91,3 +91,5 @@
 043_vouchers_hidden_note  2026-11-04  prod (R-0241。晴樹さん「入れて良い」。伝票5,910件そのまま・integrity ok。backup: database_beaver_20261104_1554_pre_043_r0241.sqlite)
 044_ledger_favorites_catalogs  2026-11-09  beta (R-0252。台帳5,705件そのまま・integrity ok。backup: database_Beaver_beta_20261109_2050_pre_044_r0252.sqlite)
 044_ledger_favorites_catalogs  2026-11-10  prod (R-0252・R-0250。晴樹さん「本番にいれてよい」。台帳5,704件そのまま・integrity ok。backup: database_Beaver_20261110_0447_pre_044_r0252.sqlite)
+045_wood_cost  2026-11-13  beta (R-0268 第1段階。台帳5,705件・原価行35,553行そのまま・integrity ok。backup: database_Beaver_beta_20261113_1317_pre_045_r0268.sqlite)
+045_wood_cost  2026-11-13  prod (R-0268 第1段階。晴樹さん「本番反映まで進めてください」。台帳5,714件・原価行35,600行そのまま・integrity ok。backup: database_Beaver_20261113_1319_pre_045_r0268.sqlite)
