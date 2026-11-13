@@ -1,6 +1,7 @@
 # R-0268: 製品台帳の木材原価（部位と明細）／Access と同じ表で同期／TateDS とリンク
 
 - 状態: 仕様化済み（Access 側・TateDS 側との相談待ち）
+- 設計判断: `docs/adr/ADR-0001-木材原価をAccessと同じ表で同期する.md`
 - 調査: `docs/wiki/knowledge/R-0268_access_wood_cost_survey.md`、`docs/wiki/knowledge/R-0268_design_studio_material_list.md`
 - R-0200 の「木材設定・木材明細は Access だけ」「wood_calc の行は Beaver で直せない」を置き換える
 
