@@ -258,3 +258,12 @@
 1. **Beaver 第1段階**: 上の 1〜5 を受け取れるようにする。画面は今のまま（wood_calc の行は読み取りだけ）
 2. **Access**: migration 060、バグの直し、送る・受け取る、承認画面、複製、TateDS で開く
 3. **Beaver 第2段階**: 製品台帳の画面の木材の欄、楽観ロック（409 `stale_product`）、台帳の access-link で updated_at を進めない、複製（ledgerClone）
+
+### 7. Access と見比べて足した決まり（2026-11-13、Access 了承済み）
+
+- **文字の長さ**: `part_name`・`lines[].usage`・`species_name` は30字まで（Access は TEXT(30) で、黙って切り詰めない）。Beaver は受け取りで30字を超えたら何も書かず 400 `text_too_long`（`field` に項目名）。第2段階の画面も30字までしか入らないようにする。文字数は UTF-8 の1文字を1字と数える（`mb_strlen`）
+- **明細に樹種は持たない**: Beaver の明細には樹種の列を作らない（上の「表」の `tategu_wood_lines.species_id` はやめる）。Access は受け取ったとき、明細の樹種ID に部位の `species_access_id` を入れる
+- **樹種表の `tateds_species_key` は null 可**（Access の tbl木材樹種M には今この列が無い）。`disabled`＝使用不可、`sort_order`＝表示順、`unit_price_man`＝立米単価万円
+- **エラーのとき**: Access は 409 `wood_set_uid_conflict`・400 `wood_set_missing`・400 `text_too_long` を受けたら、その台帳の送信を止めて同期の結果の画面に出す（繰り返さない）。Access は部位と `cost_lines` を必ず同じ PUT で送る
+- `read_at`・`after_id` は Access も次の取り込みから使う
+- 第1段階ができたら、beta の URL と確かめに使える台帳の例を1件 Access に知らせる
