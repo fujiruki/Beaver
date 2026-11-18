@@ -1,5 +1,17 @@
 # 要望・リクエスト
 
+## 57. R-0271: ログインすると画面ではなく API の URL に飛ばされる（2026-11-18 10:04、藤田晴樹さん、番頭経由）
+
+### 原文（番頭）
+> Beaverにログインすると、画面ではなくAPIのURLに飛ばされるという報告が晴樹さんからありました
+
+### 原因（指揮役の調査）
+- 未ログインで画面を開くと、画面が最初に呼ぶ API が 401 を返す。そのとき API が返す `loginUrl` の戻り先（redirect）は、API 自身の URL（`api/auth_client.php:113` が `REQUEST_URI` を使う）。
+- 画面は GET の 401 でその `loginUrl` へそのまま移る（`frontend/src/api/client.ts:28-29`）。ログインし終わると、auth-hub は戻り先の API の URL を開くので、JSON が出る。
+- 本番で確認：ログアウト状態で `/contents/Beaver/` を開くと、`/contents/auth/login?redirect=/contents/Beaver/api/invoices?year=2026&month=11` に移った。
+
+状態: 原因特定。直し方を晴樹さんに確認中
+
 ## 56. R-0270: 入力のあるモーダルを、背景のクリックでうっかり閉じないようにする（2026-11-07 本番の改善要望 id 61、/contents/Beaver/vouchers/11736）
 
 ### 原文
