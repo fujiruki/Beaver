@@ -16,6 +16,7 @@
 - 受け入れ条件（vitest）: 画面 `/contents/Beaver/vouchers/5?tab=a` で GET が `loginUrl=…/login?redirect=%2Fcontents%2FBeaver%2Fapi%2Finvoices` の 401 を受けると、`…/login?redirect=` の値が `/contents/Beaver/vouchers/5?tab=a` になる。書き込みの 401 のイベントの loginUrl も同じ。本番でログアウト状態から `/contents/Beaver/` を開き、ログイン画面の URL の redirect が画面のパスであることを確かめる。
 
 状態: 仕様化済み
+- 2026-11-21 本番と beta に反映（107c70e。DB・API 変更なし）。本番の client チャンクに redirect の差し替えが入っていることと、API の 401 が従来どおり loginUrl を返すことを確認。ログアウトしての実地確認は晴樹さんのログインを切るので未実施。
 
 ## 56. R-0270: 入力のあるモーダルを、背景のクリックでうっかり閉じないようにする（2026-11-07 本番の改善要望 id 61、/contents/Beaver/vouchers/11736）
 
