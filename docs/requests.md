@@ -10,7 +10,12 @@
 - 画面は GET の 401 でその `loginUrl` へそのまま移る（`frontend/src/api/client.ts:28-29`）。ログインし終わると、auth-hub は戻り先の API の URL を開くので、JSON が出る。
 - 本番で確認：ログアウト状態で `/contents/Beaver/` を開くと、`/contents/auth/login?redirect=/contents/Beaver/api/invoices?year=2026&month=11` に移った。
 
-状態: 原因特定。直し方を晴樹さんに確認中
+### 直し方（2026-11-21 指揮役が確定。番頭の「本番の改善を1つ進めて」を受けて。戻り先は開いていた画面の一択のため）
+- `frontend/src/api/client.ts` の 401 処理で、API が返した `loginUrl` の `redirect` を、いま開いている画面のパス（`location.pathname + search + hash`）に差し替えてから使う。GET の遷移と、書き込み時の `AUTH_REQUIRED_EVENT` の両方。ログイン先の土台（`/contents/auth/login`）は API の値のまま。
+- API（`auth_client.php`）は変えない（HTML の直アクセスでは `REQUEST_URI` が正しい戻り先のため）。
+- 受け入れ条件（vitest）: 画面 `/contents/Beaver/vouchers/5?tab=a` で GET が `loginUrl=…/login?redirect=%2Fcontents%2FBeaver%2Fapi%2Finvoices` の 401 を受けると、`…/login?redirect=` の値が `/contents/Beaver/vouchers/5?tab=a` になる。書き込みの 401 のイベントの loginUrl も同じ。本番でログアウト状態から `/contents/Beaver/` を開き、ログイン画面の URL の redirect が画面のパスであることを確かめる。
+
+状態: 仕様化済み
 
 ## 56. R-0270: 入力のあるモーダルを、背景のクリックでうっかり閉じないようにする（2026-11-07 本番の改善要望 id 61、/contents/Beaver/vouchers/11736）
 
