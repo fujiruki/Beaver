@@ -19,6 +19,13 @@ export class ApiError extends Error {
   }
 }
 
+function withScreenRedirect(loginUrl: string): string {
+  const [base, query = ''] = loginUrl.split('?');
+  const params = new URLSearchParams(query);
+  params.set('redirect', window.location.pathname + window.location.search + window.location.hash);
+  return `${base}?${params}`;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(BASE + path, init);
   const method = (init?.method ?? 'GET').toUpperCase();
@@ -26,12 +33,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (res.status === 401) {
     const body: { loginUrl?: string } | null = await res.clone().json().catch(() => null);
     if (!isWrite && body?.loginUrl) {
-      window.location.href = body.loginUrl;
+      window.location.href = withScreenRedirect(body.loginUrl);
       return new Promise<T>(() => {}); // 遷移するまで呼び出し元を待たせる
     }
     if (isWrite) {
       const loginUrl = body?.loginUrl
-        ?? `/contents/auth/login?redirect=${encodeURIComponent(window.location.href)}`;
+        ? withScreenRedirect(body.loginUrl)
+        : `/contents/auth/login?redirect=${encodeURIComponent(window.location.href)}`;
       window.dispatchEvent(new CustomEvent(AUTH_REQUIRED_EVENT, { detail: { loginUrl } }));
     }
   }
