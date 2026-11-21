@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useCreateProjectSchedule } from '../../api/projectSchedules';
+import { useModalGuard } from '../../hooks/useModalGuard';
 import { SCHEDULE_KINDS } from '../../types/projectSchedule';
 import type { ScheduleKind } from '../../types/projectSchedule';
 
@@ -22,6 +23,23 @@ export default function ScheduleAddModal({ projectId, projectName, defaultDate, 
   const [memo, setMemo] = useState('');
   const [error, setError] = useState<string | null>(null);
 
+  const { guard, requestClose, clearDraft } = useModalGuard({
+    kind: 'schedule',
+    id: projectId,
+    value: { kind, name, startDate, endDate, hours, memo },
+    ready: true,
+    resetKey: String(projectId),
+    onClose,
+    onRestore: v => {
+      setKind(v.kind);
+      setName(v.name);
+      setStartDate(v.startDate);
+      setEndDate(v.endDate);
+      setHours(v.hours);
+      setMemo(v.memo);
+    },
+  });
+
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
     const hoursValue = hours === '' ? null : Number(hours);
@@ -31,7 +49,7 @@ export default function ScheduleAddModal({ projectId, projectName, defaultDate, 
     }
     createMutation.mutate(
       { kind, name, start_date: startDate || null, end_date: endDate || null, hours: hoursValue, memo },
-      { onSuccess: onClose, onError: () => setError('保存に失敗しました') },
+      { onSuccess: () => { clearDraft(); onClose(); }, onError: () => setError('保存に失敗しました') },
     );
   }
 
@@ -40,14 +58,14 @@ export default function ScheduleAddModal({ projectId, projectName, defaultDate, 
       role="dialog"
       aria-label="予定を追加"
       style={{ position: 'fixed', inset: 0, zIndex: 1100, background: 'rgba(0,0,0,0.35)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-      onMouseDown={onClose}
+      onClick={event => { if (event.target === event.currentTarget) requestClose(event); }}
     >
       <form
         onSubmit={handleSubmit}
-        onMouseDown={event => event.stopPropagation()}
         style={{ background: '#fff', borderRadius: 8, padding: 20, width: 340, display: 'grid', gap: 10 }}
       >
         <h2 style={{ fontWeight: 700 }}>予定を追加（{projectName}）</h2>
+        {guard}
         <label>
           種類
           <select value={kind} onChange={e => setKind(e.target.value as ScheduleKind)} style={fieldStyle}>
@@ -85,7 +103,7 @@ export default function ScheduleAddModal({ projectId, projectName, defaultDate, 
         </label>
         {error && <div style={{ color: '#c2453a', fontSize: 13 }}>{error}</div>}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-          <button type="button" onClick={onClose}>キャンセル</button>
+          <button type="button" onClick={requestClose}>キャンセル</button>
           <button type="submit" disabled={createMutation.isPending}>追加</button>
         </div>
       </form>

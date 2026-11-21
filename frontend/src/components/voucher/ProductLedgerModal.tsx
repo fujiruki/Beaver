@@ -6,6 +6,7 @@ import { useTateguItem } from '../../api/tateguItems';
 import type { AggregationCategoryMaster } from '../../api/aggregationCategories';
 import type { TateguItem } from '../../types/tateguItem';
 import { buildLedgerCloneDraft } from '../../lib/ledgerClone';
+import { useModalGuard } from '../../hooks/useModalGuard';
 import TateguSelector from './TateguSelector';
 import {
   TateguCostLinesPanel,
@@ -163,6 +164,20 @@ export default function ProductLedgerModal({
   }, [costLines, laborLines, form]);
   const total = totals.body + totals.hardware + totals.glass + totals.laborAmount;
 
+  const { guard, requestClose, clearDraft } = useModalGuard({
+    kind: 'ledger',
+    id: mode === 'edit' ? itemId : null,
+    value: { form, costLines, laborLines },
+    ready: isOpen && (mode === 'create' || !!loaded),
+    resetKey: `${isOpen}:${mode}:${itemId}:${loaded?.id ?? ''}`,
+    onClose,
+    onRestore: v => {
+      setForm(v.form);
+      setCostLines(v.costLines);
+      setLaborLines(v.laborLines);
+    },
+  });
+
   if (!isOpen) return null;
 
   async function save() {
@@ -225,6 +240,7 @@ export default function ProductLedgerModal({
       };
       queryClient.invalidateQueries({ queryKey: ['tateguItems'] });
       onApplied(applied);
+      clearDraft();
       onClose();
     } catch (e) {
       setError(`保存に失敗しました: ${String(e)}`);
@@ -234,7 +250,7 @@ export default function ProductLedgerModal({
   }
 
   return (
-    <div role="dialog" aria-modal="true" style={overlayStyle} onClick={onClose}>
+    <div role="dialog" aria-modal="true" style={overlayStyle} onClick={requestClose}>
       <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
           <div>
@@ -252,11 +268,12 @@ export default function ProductLedgerModal({
                 既存の台帳から引用
               </button>
             )}
-            <button type="button" onClick={onClose}>
+            <button type="button" onClick={requestClose}>
               ✕
             </button>
           </div>
         </header>
+        {guard}
         <TateguSelector isOpen={selectorOpen} onClose={() => setSelectorOpen(false)} onSelect={cloneFrom} />
         <div style={{ padding: '8px 12px', background: '#eff6ff', color: '#1e40af', fontSize: 13, marginBottom: 12 }}>
           この保存は製品台帳を更新し、この伝票の明細{lineNo}だけに原価を反映します。他の伝票は変わりません。
@@ -330,7 +347,7 @@ export default function ProductLedgerModal({
           </div>
         )}
         <footer style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, paddingTop: 12 }}>
-          <button type="button" onClick={onClose}>
+          <button type="button" onClick={requestClose}>
             キャンセル
           </button>
           <button
