@@ -97,7 +97,7 @@ describe('R-0258 明細の原価は1個あたり', () => {
   it('単価・金額・利益は行全体の今の値のまま', async () => {
     renderPage();
     const row = await screen.findByTestId('line-item-0');
-    expect(within(row).getByText(/^単価/).textContent).toContain('26,600');
+    expect(within(row).getByTestId('unit-price').textContent).toContain('26,600');
     expect(within(row).getByText(/^金額/).textContent).toContain('79,800');
     expect(within(row).getByText('利益').nextSibling?.textContent).toContain('58,200');
   });

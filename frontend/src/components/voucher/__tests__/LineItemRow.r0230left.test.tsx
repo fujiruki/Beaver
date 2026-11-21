@@ -42,7 +42,7 @@ const els = () => ({
   ledger: screen.queryByRole('button', { name: '製品台帳' }),
   name: screen.getByRole('textbox', { name: '取付製品' }) as HTMLTextAreaElement,
   quantity: screen.getByRole('textbox', { name: '数量' }),
-  memo: screen.getByRole('button', { name: /^備考/ }),
+  memo: screen.getByRole('textbox', { name: '備考' }),
 });
 
 const rowOf = (el: HTMLElement) => el.style.gridRow || el.parentElement?.style.gridRow;

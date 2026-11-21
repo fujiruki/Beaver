@@ -906,7 +906,7 @@ export default function VoucherEdit() {
   );
   const profitRateBar = <ProfitRateBar stacked categories={categories} selectedIdx={selectedIdx} setSelectedIdx={setSelectedIdx} isNew={isNew} onSaveLine={saveLine} />;
   const topSummary = (
-    <TopSummary lines={linesForCalc} taxInputType={watchedTaxInputType} taxRate={0.10} costLines={costLinesForCalc} />
+    <TopSummary lines={linesForCalc} taxInputType={watchedTaxInputType} taxRate={0.10} costLines={costLinesForCalc} horizontal={!summaryRight} />
   );
 
   return (

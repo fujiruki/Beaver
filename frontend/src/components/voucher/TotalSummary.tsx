@@ -83,7 +83,7 @@ const containerStyle: React.CSSProperties = {
   minWidth: 280,
 };
 
-export function TopSummary({ lines, taxInputType, taxRate, costLines, children }: Props & { children?: React.ReactNode }) {
+export function TopSummary({ lines, taxInputType, taxRate, costLines, children, horizontal }: Props & { children?: React.ReactNode; horizontal?: boolean }) {
   const { tax_amount, total } = useTotalCalc(lines, taxInputType, taxRate);
   const { settings } = useAppSettings();
   const sales = total - tax_amount;
@@ -99,10 +99,44 @@ export function TopSummary({ lines, taxInputType, taxRate, costLines, children }
     }
   }
   const rate = profit.grossProfitRate;
+  const days = (hours: number) => settings.hoursPerDay > 0 ? Math.round(hours / settings.hoursPerDay * 10) / 10 : null;
+
+  if (horizontal) {
+    const money = (v: number) => `¥${v.toLocaleString()}`;
+    const hoursText = (hours: number) => {
+      const d = days(hours);
+      return `${formatDecimal(hours)} h${d !== null ? `（${d.toFixed(1)}日）` : ''}`;
+    };
+    const items: [string, React.ReactNode, string?][] = [
+      ['売上（税抜）', money(sales)],
+      ['売上（税込）', money(total)],
+      ['原価', money(Math.round(sales - profit.grossProfit))],
+      ['利益', money(Math.round(profit.grossProfit)), profit.grossProfit >= 0 ? '#16a34a' : '#dc2626'],
+      ['工場時間', hoursText(hoursOf('FACTORY_TIME'))],
+      ['現場時間', hoursText(hoursOf('SITE_TIME'))],
+      ['合計時間', hoursText(profit.totalWorkHours)],
+      ['利益率', rate !== null ? `${(rate * 100).toFixed(1)}%` : '—'],
+    ];
+    if (material.size > 0) {
+      items.push(['材料原価', [...material].map(([name, value]) => `${name} ¥${Math.round(value).toLocaleString()}`).join('　')]);
+    }
+    return (
+      <div data-testid="top-summary" style={{ ...containerStyle, minWidth: 0, display: 'flex', flexWrap: 'wrap', gap: '8px 24px', alignItems: 'flex-start' }}>
+        {items.map(([label, value, color]) => (
+          <div key={label} data-testid={label === '材料原価' ? 'top-summary-material' : 'top-summary-item'} style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <span style={{ fontSize: 13, color: '#64748b' }}>{label}</span>
+            <span style={{ fontSize: 16, fontWeight: 'bold', color: color ?? '#1e293b' }}>{value}</span>
+          </div>
+        ))}
+        {children}
+      </div>
+    );
+  }
 
   return (
     <div data-testid="top-summary" style={containerStyle}>
-      <Row label="売上" value={sales} bold />
+      <Row label="売上（税抜）" value={sales} bold />
+      <Row label="売上（税込）" value={total} bold />
       <Row label="原価" value={Math.round(sales - profit.grossProfit)} bold />
       <Row label="利益" value={Math.round(profit.grossProfit)} bold colored={profit.grossProfit >= 0} />
       <HoursRow label="工場時間" hours={hoursOf('FACTORY_TIME')} hoursPerDay={settings.hoursPerDay} />
