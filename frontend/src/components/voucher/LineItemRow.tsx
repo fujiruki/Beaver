@@ -12,8 +12,8 @@ import { formatDecimal, round2 } from '../../lib/decimal';
 import { calcLineProfitSummary, calcLineSellTotal } from '../../lib/voucherCalc';
 import {
   createCategoryGridTemplate,
+  createRowColumns,
   getLineItemRightWidth,
-  LINE_ITEM_LEFT_WIDTH,
   LINE_ITEM_NAME_WIDTH,
   LINE_ITEM_NO_WIDTH,
   LINE_ITEM_PROFIT_WIDTH,
@@ -29,6 +29,7 @@ type Props = {
   isNew: boolean;
   onSaveLine: (lineId: number, data: Record<string, unknown>) => Promise<void>;
   voucherLabel?: string;
+  wide?: boolean;
 };
 
 const formatNumber = (value: number | null | undefined) =>
@@ -90,6 +91,7 @@ export default function LineItemRow({
   isNew,
   onSaveLine,
   voucherLabel = '伝票',
+  wide = true,
 }: Props) {
   const [selectorOpen, setSelectorOpen] = useState(false);
   const [ledgerMode, setLedgerMode] = useState<'create' | 'edit' | null>(null);
@@ -259,14 +261,37 @@ export default function LineItemRow({
     />
   );
 
+  const pos = wide ? {
+    no: { gridRow: '1 / 4', gridColumn: 1 },
+    loc: { gridRow: 1, gridColumn: 2 },
+    type: { gridRow: 1, gridColumn: 3 },
+    ledger: { gridRow: 1, gridColumn: 4 },
+    name: { gridRow: 2, gridColumn: '2 / 5' },
+    third: { gridRow: 3, gridColumn: '2 / 6' },
+    right: { gridRow: '1 / 3', gridColumn: 5 },
+    profit: { gridRow: '1 / 4', gridColumn: 6 },
+  } : {
+    no: { gridRow: '1 / 3', gridColumn: 1 },
+    loc: { gridRow: 1, gridColumn: 2 },
+    type: { gridRow: 1, gridColumn: 3 },
+    ledger: { gridRow: 1, gridColumn: 4 },
+    name: { gridRow: 2, gridColumn: '2 / 5' },
+    third: { gridRow: 4, gridColumn: '2 / 5' },
+    right: { gridRow: 3, gridColumn: '1 / 5' },
+    profit: { gridRow: 5, gridColumn: '1 / 5' },
+  };
+  const rowColumnsWide = createRowColumns(rightWidth);
+  const rowColumnsNarrow = createRowColumns(null);
+
   return (
     <div
       data-testid={`line-item-${index}`}
       onClick={onSelect}
       style={{
-        display: 'flex',
+        display: 'grid',
+        gridTemplateColumns: wide ? rowColumnsWide : rowColumnsNarrow,
         alignItems: 'stretch',
-        flexWrap: 'wrap',
+        rowGap: 2,
         padding: '3px 0',
         borderBottom: '1px solid #d0d7de',
         background: rowBackground,
@@ -275,7 +300,7 @@ export default function LineItemRow({
         fontVariantNumeric: 'tabular-nums',
       }}
     >
-      <div style={{ width: LINE_ITEM_NO_WIDTH, padding: '2px 4px', boxSizing: 'border-box', textAlign: 'center' }}>
+      <div style={{ ...pos.no, width: LINE_ITEM_NO_WIDTH, padding: '2px 4px', boxSizing: 'border-box', textAlign: 'center' }}>
         <div style={{ color: '#64748b', fontSize: 11 }}>{line?.line_no ?? index + 1}</div>
         <input
           aria-label={`${line?.line_no ?? index + 1}行目を選択`}
@@ -286,8 +311,6 @@ export default function LineItemRow({
         />
       </div>
 
-      <div data-testid="line-item-left" style={{ width: LINE_ITEM_LEFT_WIDTH, paddingRight: 6, boxSizing: 'border-box' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto', alignItems: 'start', columnGap: 3, rowGap: 2 }}>
           <input
             aria-label="取付場所"
             placeholder="取付場所"
@@ -295,7 +318,7 @@ export default function LineItemRow({
             maxLength={255}
             disabled={readOnly || lineType !== 'normal'}
             onBlur={saveLineToDb}
-            style={{ ...inputStyle, gridRow: 1, gridColumn: 1, minWidth: 0 }}
+            style={{ ...inputStyle, ...pos.loc, minWidth: 0, justifySelf: 'stretch', marginRight: 3 }}
           />
           <textarea
             aria-label="取付製品"
@@ -306,9 +329,9 @@ export default function LineItemRow({
             disabled={readOnly}
             onBlur={saveLineToDb}
             rows={1}
-            style={{ ...inputStyle, gridRow: 2, gridColumn: '1 / -1', width: LINE_ITEM_NAME_WIDTH, height: 20, lineHeight: '15px', padding: '2px 6px', resize: 'none', overflowY: 'hidden' }}
+            style={{ ...inputStyle, ...pos.name, width: LINE_ITEM_NAME_WIDTH, height: 20, lineHeight: '15px', padding: '2px 6px', resize: 'none', overflowY: 'hidden' }}
             />
-          <div data-testid="line-item-third" style={{ display: 'flex', alignItems: 'center', gap: 4, gridRow: 3, gridColumn: '1 / -1' }}>
+          <div data-testid="line-item-third" style={{ ...pos.third, display: 'flex', alignItems: 'center', gap: 4, paddingRight: 6, boxSizing: 'border-box' }}>
             <span style={thirdLabelStyle}>数量</span>
             <div data-testid="quantity-group" style={joinedGroupStyle}>
               <span style={joinedCellStyle}>
@@ -332,13 +355,13 @@ export default function LineItemRow({
             {...register(`lines.${index}.line_type`)}
             disabled={readOnly}
             onBlur={saveLineToDb}
-            style={{ ...inputStyle, gridRow: 1, gridColumn: 2, width: LINE_TYPE_SELECT_WIDTH }}
+            style={{ ...inputStyle, ...pos.type, width: LINE_TYPE_SELECT_WIDTH }}
           >
             <option value="normal">通常</option>
             <option value="discount">値引</option>
             <option value="subtotal">小計</option>
           </select>
-          {!readOnly && lineType === 'normal' && <div style={{ position: 'relative', display: 'flex', gridRow: 1, gridColumn: 3 }}>
+          {!readOnly && lineType === 'normal' && <div style={{ ...pos.ledger, position: 'relative', display: 'flex', justifySelf: 'start' }}>
             <button
               type="button"
               onClick={event => {
@@ -393,7 +416,7 @@ export default function LineItemRow({
               </div>
             )}
           </div>}
-        </div>
+      <div style={{ display: 'contents' }}>
         {!readOnly && <TateguSelector isOpen={selectorOpen} onClose={() => setSelectorOpen(false)} onSelect={handleTateguSelect} />}
         {!readOnly && ledgerMode && (
           <ProductLedgerModal
@@ -410,7 +433,7 @@ export default function LineItemRow({
         )}
       </div>
 
-      <div data-testid="line-item-right" style={{ width: rightWidth }}>
+      <div data-testid="line-item-right" style={{ ...pos.right, width: rightWidth }}>
         {lineType === 'normal' ? (
           <>
             <div style={{ ...bandStyle, gridTemplateColumns: categoryGridTemplate, background: '#fdf3e7' }}>
@@ -471,7 +494,7 @@ export default function LineItemRow({
         )}
       </div>
 
-      <div style={{ ...profitStyle, width: LINE_ITEM_PROFIT_WIDTH }}>
+      <div style={{ ...profitStyle, ...pos.profit, width: LINE_ITEM_PROFIT_WIDTH }}>
         {lineType === 'normal' && (
           <>
             <span style={{ color: '#64748b' }}>利益</span>

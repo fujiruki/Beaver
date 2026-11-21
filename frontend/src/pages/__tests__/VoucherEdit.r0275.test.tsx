@@ -52,7 +52,7 @@ function renderPage() {
   );
 }
 
-beforeEach(() => { localStorage.clear(); stubFetch(); });
+beforeEach(() => { localStorage.clear(); window.innerWidth = 1024; stubFetch(); });
 
 describe('R-0275 明細の3段目は 数量・単価・備考', () => {
   it('数量と単価のラベル、単価の表示、常に出ている備考の欄がある', async () => {
@@ -60,13 +60,52 @@ describe('R-0275 明細の3段目は 数量・単価・備考', () => {
     const row = await screen.findByTestId('line-item-0');
     const third = within(row).getByRole('textbox', { name: '数量' }).closest('[data-testid="line-item-third"]') as HTMLElement;
     expect(third).not.toBeNull();
-    expect(third.style.gridRow).toBe('3');
     const text = third.textContent ?? '';
     expect(text).toContain('数量');
     expect(text).toContain('単価');
     expect(within(third).getByTestId('unit-price').textContent).toBe('¥26,000');
     expect(within(third).getByRole('textbox', { name: '備考' })).not.toBeNull();
     expect(within(row).queryByRole('button', { name: /^備考/ })).toBeNull();
+  });
+
+  it('広いとき3段目は左の欄の下から原価・売値の帯の下まで（利益の手前まで）にまたがる', async () => {
+    window.innerWidth = 4000;
+    renderPage();
+    const row = await screen.findByTestId('line-item-0');
+    const third = within(row).getByTestId('line-item-third');
+    const right = within(row).getByTestId('line-item-right');
+    expect(third.style.gridRow).toBe('3');
+    expect(third.style.gridColumn).toBe('2 / 6');
+    expect(right.style.gridColumn).toBe('5');
+    expect(right.style.gridRow).toBe('1 / 3');
+    expect(row.style.gridTemplateColumns.split(' ')).toHaveLength(6);
+  });
+
+  it('狭いとき帯は左の欄の下へ回り、3段目はその下に来る', async () => {
+    window.innerWidth = 1024;
+    renderPage();
+    const row = await screen.findByTestId('line-item-0');
+    const third = within(row).getByTestId('line-item-third');
+    const right = within(row).getByTestId('line-item-right');
+    expect(row.style.gridTemplateColumns.split(' ')).toHaveLength(4);
+    expect(Number(right.style.gridRow)).toBeLessThan(Number(third.style.gridRow));
+    expect(right.style.gridColumn).toBe('1 / 5');
+  });
+
+  it('DOM の順は 数量・備考 → 種別・台帳 → 帯 → 利益', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    const row = await screen.findByTestId('line-item-0');
+    const follows = (a: Element, b: Element) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+    const memo = within(row).getByRole('textbox', { name: '備考' });
+    const type = within(row).getByRole('combobox', { name: '行種別' });
+    const ledger = within(row).getByRole('button', { name: '製品台帳' });
+    const right = within(row).getByTestId('line-item-right');
+    expect(follows(memo, type)).toBe(true);
+    expect(follows(type, ledger)).toBe(true);
+    expect(follows(ledger, right)).toBe(true);
+    await user.click(memo);
+    expect(document.activeElement).toBe(memo);
   });
 
   it('売値の行には「単価 ¥」を重ねて出さない', async () => {

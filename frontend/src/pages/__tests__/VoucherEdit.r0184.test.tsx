@@ -160,7 +160,7 @@ describe('R-0184 明細入力レイアウト F3 詰め版', () => {
 
     const memo = within(row).getByRole('textbox', { name: '備考' });
     expect(memo.style.height).toBe('20px');
-    expect(within(row).getByTestId('line-item-left').contains(memo)).toBe(true);
+    expect(within(row).getByTestId('line-item-third').contains(memo)).toBe(true);
     expect(within(row).queryByRole('button', { name: /^備考/ })).toBeNull();
   });
 

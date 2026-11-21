@@ -140,18 +140,25 @@ describe('R-0267 明細は横スクロール禁止で、折り返す', () => {
     expect(['', 'visible']).toContain(scroller.style.overflow);
     const row = screen.getByTestId('line-item-0');
     const heading = screen.getByTestId('line-item-heading');
-    expect(row.style.flexWrap).toBe('wrap');
+    expect(row.style.display).toBe('grid');
     expect(heading.style.flexWrap).toBe('wrap');
     expect(row.style.minWidth).toBe('');
     expect(within(scroller).queryByTestId('line-item-heading')).toBeNull();
   });
 
-  it('見出しと行は同じ幅の部品を同じ順に並べる（折り返しがそろう）', async () => {
+  it('見出しと行は同じ幅の列を同じ順に並べる（広いときの行は grid の列で見出しの幅にそろう）', async () => {
+    window.innerWidth = 4000;
     renderPage();
     await ready();
     const row = screen.getByTestId('line-item-0');
     const heading = screen.getByTestId('line-item-heading');
-    const widths = (el: HTMLElement) => Array.from(el.children).map(c => (c as HTMLElement).style.width);
-    expect(widths(heading)).toEqual(widths(row));
+    const widths = (el: HTMLElement) => Array.from(el.children).map(c => parseFloat((c as HTMLElement).style.width));
+    const cols = row.style.gridTemplateColumns.split(' ').map(parseFloat);
+    const [no, left, right, profit] = widths(heading);
+    expect(cols).toHaveLength(6);
+    expect(cols[0]).toBe(no);
+    expect(cols[1] + cols[2] + cols[3]).toBe(left);
+    expect(cols[4]).toBe(right);
+    expect(cols[5]).toBe(profit);
   });
 });
