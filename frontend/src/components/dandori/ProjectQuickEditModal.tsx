@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form';
 import { useProject, useUpdateProject } from '../../api/projects';
 import { useCustomers } from '../../api/customers';
 import { useProjectStatuses } from '../../api/projectStatuses';
+import { useModalGuard } from '../../hooks/useModalGuard';
 import type { ProjectInput } from '../../types/project';
 
 interface Props {
@@ -23,7 +24,7 @@ export default function ProjectQuickEditModal({ projectId, onClose, onSaved }: P
   const { data: statuses = [], isLoading: statusesLoading } = useProjectStatuses();
   const update = useUpdateProject(projectId);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<FormValues>();
+  const { register, handleSubmit, reset, watch, formState: { errors } } = useForm<FormValues>();
 
   useEffect(() => {
     if (!project || customersLoading || statusesLoading) return;
@@ -39,6 +40,17 @@ export default function ProjectQuickEditModal({ projectId, onClose, onSaved }: P
     });
   }, [project, customersLoading, statusesLoading, reset]);
 
+  const loaded = !!project && !customersLoading && !statusesLoading;
+  const { guard, requestClose, clearDraft } = useModalGuard({
+    kind: 'project',
+    id: projectId,
+    value: watch(),
+    ready: loaded,
+    resetKey: `${projectId}:${loaded}`,
+    onClose,
+    onRestore: values => reset(values),
+  });
+
   async function save(data: FormValues) {
     setSaveError(null);
     try {
@@ -47,6 +59,7 @@ export default function ProjectQuickEditModal({ projectId, onClose, onSaved }: P
         customer_id: Number(data.customer_id),
         manual_estimated_hours: Number.isNaN(data.manual_estimated_hours) ? null : data.manual_estimated_hours,
       });
+      clearDraft();
       onSaved();
     } catch (error) {
       setSaveError(String(error));
@@ -54,7 +67,7 @@ export default function ProjectQuickEditModal({ projectId, onClose, onSaved }: P
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={e => { if (e.target === e.currentTarget) requestClose(e); }}>
       <div role="dialog" aria-modal="true" aria-label="案件クイック編集" className="w-full max-w-2xl rounded-lg bg-white p-5 shadow-xl">
         <div className="mb-4 flex items-center gap-3">
           <h2 className="flex-1 text-lg font-bold">案件クイック編集</h2>
@@ -62,6 +75,7 @@ export default function ProjectQuickEditModal({ projectId, onClose, onSaved }: P
         </div>
         {isLoading || !project ? <div>読み込み中...</div> : (
           <form onSubmit={handleSubmit(save)} noValidate className="space-y-4">
+            {guard}
             <div className="grid grid-cols-2 gap-4">
               <label className="text-sm">案件コード<input aria-label="案件コード" {...register('project_code')} className={inputClass} /></label>
               <label className="text-sm">案件名<input aria-label="案件名" {...register('name', { required: true })} className={inputClass} /></label>
@@ -74,7 +88,7 @@ export default function ProjectQuickEditModal({ projectId, onClose, onSaved }: P
             <label className="block text-sm">備考<textarea aria-label="備考" {...register('memo')} rows={3} className={inputClass} /></label>
             {(errors.name || saveError) && <div className="text-sm text-red-600">{saveError ?? '案件名は必須です'}</div>}
             <div className="flex justify-end gap-2">
-              <button type="button" onClick={onClose} className="rounded border px-4 py-2 text-sm">キャンセル</button>
+              <button type="button" onClick={requestClose} className="rounded border px-4 py-2 text-sm">キャンセル</button>
               <button type="submit" disabled={update.isPending} className="rounded bg-blue-600 px-4 py-2 text-sm text-white disabled:opacity-50">{update.isPending ? '保存中...' : '保存'}</button>
             </div>
           </form>
