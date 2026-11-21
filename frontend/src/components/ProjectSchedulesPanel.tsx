@@ -80,6 +80,7 @@ export default function ProjectSchedulesPanel({ projectId, onCreated, onUpdated,
       memo: draft.memo,
     }, {
       onSuccess: created => {
+        setVisibleSchedules(prev => prev.some(s => s.id === created.id) ? prev : [...prev, created]);
         onSaved();
         onCreated?.(created);
       },

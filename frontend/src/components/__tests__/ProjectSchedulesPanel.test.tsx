@@ -258,4 +258,29 @@ describe('ProjectSchedulesPanel（R-0222）', () => {
     });
     expect(labels).toEqual(['現調', '見積済み', '製作', '取付済み', 'その他', '空の行']);
   });
+
+  it('R-0276 行1の時間に入れて行2へフォーカスを移しても、応答前も応答後も行1の数字が出ている', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    current = [];
+    vi.stubGlobal('fetch', vi.fn(async (_url: string, init?: RequestInit) => {
+      const method = init?.method ?? 'GET';
+      if (method === 'GET') return new Response(JSON.stringify(current), { status: 200 });
+      await gate;
+      current = [schedule({ id: 99, kind: '現調', hours: 3, end_date: null })];
+      return new Response(JSON.stringify(current[0]), { status: 200 });
+    }));
+    renderPanel();
+    const rows = await screen.findAllByTestId('fixed-schedule-row');
+    const hours1 = within(rows[0]).getByLabelText('現調の時間') as HTMLInputElement;
+    const hours2 = within(rows[1]).getByLabelText('見積の時間') as HTMLInputElement;
+    fireEvent.focus(hours1);
+    fireEvent.change(hours1, { target: { value: '3' } });
+    fireEvent.blur(hours1, { relatedTarget: hours2 });
+    fireEvent.focus(hours2);
+    expect(screen.getByDisplayValue('3')).toBeTruthy();
+    release();
+    await new Promise(r => setTimeout(r, 50));
+    expect(screen.getByDisplayValue('3')).toBeTruthy();
+  });
 });
