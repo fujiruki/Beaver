@@ -269,7 +269,7 @@ describe('ProjectSchedulesPanel（R-0222）', () => {
     const name = (await screen.findByLabelText('予定の工程名')) as HTMLInputElement;
     expect(document.activeElement).toBe(name);
     expect(writes).toHaveLength(0);
-    const start = screen.getAllByLabelText('予定の開始').slice(-1)[0] as HTMLInputElement;
+    const start = within(name.closest('tr')!).getByLabelText('予定の開始') as HTMLInputElement;
     expect(start.className).toMatch(/pd-invalid/);
     expect(start.title).toMatch(/どれかを入れると保存/);
     expect(screen.getAllByText('＋ 予定を追加（種類を選ぶ）')).toHaveLength(1);
@@ -282,7 +282,7 @@ describe('ProjectSchedulesPanel（R-0222）', () => {
     fireEvent.change(screen.getAllByLabelText('予定の種類').slice(-1)[0], { target: { value: 'その他' } });
     const name = (await screen.findByLabelText('予定の工程名')) as HTMLInputElement;
     fireEvent.change(name, { target: { value: '塗装' } });
-    const start = screen.getAllByLabelText('予定の開始').slice(-1)[0] as HTMLInputElement;
+    const start = within(name.closest('tr')!).getByLabelText('予定の開始') as HTMLInputElement;
     fireEvent.change(start, { target: { value: '2026-12-01' } });
     fireEvent.blur(start, { relatedTarget: document.body });
     await waitFor(() => expect(writes).toHaveLength(1));

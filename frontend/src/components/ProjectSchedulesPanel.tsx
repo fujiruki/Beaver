@@ -18,10 +18,14 @@ interface Draft {
   start_date: string;
   end_date: string;
   hours: string;
+  name: string;
   memo: string;
 }
 
-const EMPTY_DRAFT: Draft = { kind: '', start_date: '', end_date: '', hours: '', memo: '' };
+type BlankDraft = Draft & { id: number };
+
+const MISSING_TITLE = '開始・終了・時間のどれかを入れると保存';
+const EMPTY_DRAFT: Draft ={ kind: '', name: '', start_date: '', end_date: '', hours: '', memo: '' };
 
 function parseHours(value: string): number | null {
   const n = value === '' ? NaN : Number(value);
@@ -55,8 +59,9 @@ export default function ProjectSchedulesPanel({ projectId, onCreated, onUpdated,
   const createMutation = useCreateProjectSchedule(projectId);
   const updateMutation = useUpdateProjectSchedule();
   const deleteMutation = useDeleteProjectSchedule();
-  const [blank, setBlank] = useState<Draft>(EMPTY_DRAFT);
-  const [blankKindRequired, setBlankKindRequired] = useState(false);
+  const nextBlankId = useRef(1);
+  const [blanks, setBlanks] = useState<BlankDraft[]>([{ ...EMPTY_DRAFT, id: 0 }]);
+  const [requiredId, setRequiredId] = useState<number | null>(null);
   const [fixedDrafts, setFixedDrafts] = useState<Partial<Record<ScheduleKind, Draft>>>({});
   const [visibleSchedules, setVisibleSchedules] = useState<ProjectSchedule[]>([]);
   const tableHasFocus = useRef(false);
@@ -77,6 +82,7 @@ export default function ProjectSchedulesPanel({ projectId, onCreated, onUpdated,
       start_date: draft.start_date || null,
       end_date: draft.end_date || null,
       hours: parseHours(draft.hours),
+      ...(draft.name ? { name: draft.name } : {}),
       memo: draft.memo,
     }, {
       onSuccess: created => {
@@ -93,10 +99,15 @@ export default function ProjectSchedulesPanel({ projectId, onCreated, onUpdated,
     setFixedDrafts(prev => ({ ...prev, [kind]: next }));
   }
 
-  function changeBlank(patch: Partial<Draft>) {
-    const next = { ...blank, ...patch };
-    setBlank(next);
-    if (next.kind) setBlankKindRequired(false);
+  function withTrailingEmpty(list: BlankDraft[]): BlankDraft[] {
+    return !list.length || list[list.length - 1].kind
+      ? [...list, { ...EMPTY_DRAFT, id: nextBlankId.current++ }]
+      : list;
+  }
+
+  function changeBlank(id: number, patch: Partial<Draft>) {
+    setBlanks(prev => withTrailingEmpty(prev.map(b => (b.id === id ? { ...b, ...patch } : b))));
+    if (patch.kind) setRequiredId(null);
   }
 
   function commitFixed(kind: ScheduleKind) {
@@ -105,16 +116,16 @@ export default function ProjectSchedulesPanel({ projectId, onCreated, onUpdated,
     create(`fixed-${kind}`, kind, draft, () => setFixedDrafts(prev => ({ ...prev, [kind]: EMPTY_DRAFT })));
   }
 
-  function commitBlank() {
-    if (!hasContent(blank)) return;
-    if (!blank.kind) {
-      setBlankKindRequired(true);
+  function commitBlank(id: number) {
+    const draft = blanks.find(b => b.id === id);
+    if (!draft || !hasContent(draft)) return;
+    if (!draft.kind) {
+      setRequiredId(id);
       return;
     }
-    const kind = blank.kind;
-    const draft = blank;
-    setBlankKindRequired(false);
-    create('blank', kind, draft, () => setBlank(EMPTY_DRAFT));
+    const kind = draft.kind;
+    setRequiredId(null);
+    create(`blank-${id}`, kind, draft, () => setBlanks(prev => withTrailingEmpty(prev.filter(b => b.id !== id))));
   }
 
   function update(schedule: ProjectSchedule, patch: Partial<ProjectSchedule>) {
@@ -210,28 +221,61 @@ export default function ProjectSchedulesPanel({ projectId, onCreated, onUpdated,
           {orderedSchedules
             .filter(schedule => !FIXED_SCHEDULE_KINDS.includes(schedule.kind))
             .map(schedule => renderScheduleRow(schedule))}
-          <tr
+          {blanks.map(blank => renderBlankRow(blank))}
+        </tbody>
+      </table>
+      {updateMutation.isError && (
+        <p className="text-xs text-red-600 mt-2">予定を保存できませんでした。日付か時間のどれかは必要です。</p>
+      )}
+    </section>
+  );
+
+  function renderBlankRow(blank: BlankDraft) {
+    return (
+          <tr key={blank.id}
             className={blank.kind || hasContent(blank) ? 'bv-placeholder-row' : 'bv-add-row'}
             onBlur={event => {
-              if (!event.currentTarget.contains(event.relatedTarget)) commitBlank();
+              if (!event.currentTarget.contains(event.relatedTarget)) commitBlank(blank.id);
             }}
           >
             <td className="pd-col-done" />
             <td className="bv-edit-cell" colSpan={blank.kind || hasContent(blank) ? 1 : 6}>
-              <select
-                aria-label="予定の種類"
-                value={blank.kind}
-                onChange={e => changeBlank({ kind: e.target.value as ScheduleKind })}
-                className={`${ghostInputCls} ${blankKindRequired ? 'pd-invalid' : ''}`}
-              >
-                <option value="">＋ 予定を追加（種類を選ぶ）</option>
-                {SCHEDULE_KINDS.map(k => <option key={k} value={k}>{k}</option>)}
-              </select>
+              {blank.kind === 'その他' ? (
+                <div className="pd-other">
+                  <input
+                    aria-label="予定の工程名"
+                    placeholder="工程名"
+                    autoFocus
+                    value={blank.name}
+                    onChange={e => changeBlank(blank.id, { name: e.target.value })}
+                    className={inputCls}
+                  />
+                  <select
+                    aria-label="予定の種類"
+                    value=""
+                    onChange={e => changeBlank(blank.id, { kind: e.target.value as ScheduleKind })}
+                    className="pd-kind-arrow"
+                  >
+                    <option value="">▼</option>
+                    {SCHEDULE_KINDS.filter(k => k !== 'その他').map(k => <option key={k} value={k}>{k}</option>)}
+                  </select>
+                </div>
+              ) : (
+                <select
+                  aria-label="予定の種類"
+                  value={blank.kind}
+                  onChange={e => changeBlank(blank.id, { kind: e.target.value as ScheduleKind })}
+                  className={`${ghostInputCls} ${requiredId === blank.id ? 'pd-invalid' : ''}`}
+                >
+                  <option value="">＋ 予定を追加（種類を選ぶ）</option>
+                  {SCHEDULE_KINDS.map(k => <option key={k} value={k}>{k}</option>)}
+                </select>
+              )}
               {!blank.kind && !hasContent(blank) && <span className="pd-visually-hidden">
-                <input type="date" aria-label="予定の開始" value={blank.start_date} onChange={e => changeBlank({ start_date: e.target.value })} />
-                <input type="date" aria-label="予定の終了または期限" value={blank.end_date} onChange={e => changeBlank({ end_date: e.target.value })} />
-                <input type="number" aria-label="予定の時間" value={blank.hours} onChange={e => changeBlank({ hours: e.target.value })} />
-                <input aria-label="予定のメモ" value={blank.memo} onChange={e => changeBlank({ memo: e.target.value })} />
+                <input type="date" aria-label="予定の開始" value={blank.start_date} onChange={e => changeBlank(blank.id, { start_date: e.target.value })} />
+                <input type="date" aria-label="予定の終了または期限" value={blank.end_date} onChange={e => changeBlank(blank.id, { end_date: e.target.value })} />
+                <input type="number" aria-label="予定の時間" value={blank.hours} onChange={e => changeBlank(blank.id, { hours: e.target.value })} />
+                <input aria-label="予定のメモ" value={blank.memo} onChange={e => changeBlank(blank.id, { memo: e.target.value })} />
               </span>}
             </td>
             {(blank.kind || hasContent(blank)) && <><td className="bv-edit-cell">
@@ -239,8 +283,9 @@ export default function ProjectSchedulesPanel({ projectId, onCreated, onUpdated,
                 type="date"
                 aria-label="予定の開始"
                 value={blank.start_date}
-                onChange={e => changeBlank({ start_date: e.target.value })}
-                className={`${ghostInputCls} bv-mono ${blank.start_date ? '' : 'bv-empty-date'}`}
+                onChange={e => changeBlank(blank.id, { start_date: e.target.value })}
+                className={`${ghostInputCls} bv-mono ${blank.start_date ? '' : 'bv-empty-date'} ${blank.kind && !hasContent(blank) ? 'pd-invalid' : ''}`}
+                title={blank.kind && !hasContent(blank) ? MISSING_TITLE : undefined}
                 max="9999-12-31"
               />
             </td><td className="bv-edit-cell">
@@ -248,7 +293,7 @@ export default function ProjectSchedulesPanel({ projectId, onCreated, onUpdated,
                 type="date"
                 aria-label="予定の終了または期限"
                 value={blank.end_date}
-                onChange={e => changeBlank({ end_date: e.target.value })}
+                onChange={e => changeBlank(blank.id, { end_date: e.target.value })}
                 className={`${ghostInputCls} bv-mono ${blank.end_date ? '' : 'bv-empty-date'}`}
                 max="9999-12-31"
               />
@@ -259,7 +304,7 @@ export default function ProjectSchedulesPanel({ projectId, onCreated, onUpdated,
                 step={0.5}
                 aria-label="予定の時間"
                 value={blank.hours}
-                onChange={e => changeBlank({ hours: e.target.value })}
+                onChange={e => changeBlank(blank.id, { hours: e.target.value })}
                 className={`${ghostInputCls} bv-number`}
               />
             </td><td className="bv-edit-cell">
@@ -267,18 +312,13 @@ export default function ProjectSchedulesPanel({ projectId, onCreated, onUpdated,
                 aria-label="予定のメモ"
                 value={blank.memo}
                 placeholder="メモ"
-                onChange={e => changeBlank({ memo: e.target.value })}
+                onChange={e => changeBlank(blank.id, { memo: e.target.value })}
                 className={ghostInputCls}
               />
             </td><td className="pd-col-delete" /></>}
           </tr>
-        </tbody>
-      </table>
-      {updateMutation.isError && (
-        <p className="text-xs text-red-600 mt-2">予定を保存できませんでした。日付か時間のどれかは必要です。</p>
-      )}
-    </section>
-  );
+    );
+  }
 
   function renderScheduleRow(s: ProjectSchedule) {
     return (
