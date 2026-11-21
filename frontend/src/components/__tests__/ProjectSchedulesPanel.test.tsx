@@ -259,6 +259,38 @@ describe('ProjectSchedulesPanel（R-0222）', () => {
     expect(labels).toEqual(['現調', '見積済み', '製作', '取付済み', 'その他', '空の行']);
   });
 
+  it('R-0277 追加の行で「その他」を選ぶと工程名の欄にフォーカスが移り、開始が赤枠で、下に追加の行がもう1つ出る。保存前は作成しない', async () => {
+    stubFetch();
+    renderPanel();
+    await screen.findAllByTestId('fixed-schedule-row');
+    const kind = screen.getAllByLabelText('予定の種類').slice(-1)[0];
+    fireEvent.focus(kind);
+    fireEvent.change(kind, { target: { value: 'その他' } });
+    const name = (await screen.findByLabelText('予定の工程名')) as HTMLInputElement;
+    expect(document.activeElement).toBe(name);
+    expect(writes).toHaveLength(0);
+    const start = screen.getAllByLabelText('予定の開始').slice(-1)[0] as HTMLInputElement;
+    expect(start.className).toMatch(/pd-invalid/);
+    expect(start.title).toMatch(/どれかを入れると保存/);
+    expect(screen.getAllByText('＋ 予定を追加（種類を選ぶ）')).toHaveLength(1);
+  });
+
+  it('R-0277 工程名と開始日を入れて行を出ると、name 付きで作成が1回呼ばれ、追加の行は1つに戻る', async () => {
+    stubFetch();
+    renderPanel();
+    await screen.findAllByTestId('fixed-schedule-row');
+    fireEvent.change(screen.getAllByLabelText('予定の種類').slice(-1)[0], { target: { value: 'その他' } });
+    const name = (await screen.findByLabelText('予定の工程名')) as HTMLInputElement;
+    fireEvent.change(name, { target: { value: '塗装' } });
+    const start = screen.getAllByLabelText('予定の開始').slice(-1)[0] as HTMLInputElement;
+    fireEvent.change(start, { target: { value: '2026-12-01' } });
+    fireEvent.blur(start, { relatedTarget: document.body });
+    await waitFor(() => expect(writes).toHaveLength(1));
+    expect(writes[0].body).toMatchObject({ kind: 'その他', name: '塗装', start_date: '2026-12-01' });
+    await waitFor(() => expect(screen.getAllByText('＋ 予定を追加（種類を選ぶ）')).toHaveLength(1));
+    expect(screen.queryByLabelText('予定の工程名')).toBeNull();
+  });
+
   it('R-0276 行1の時間に入れて行2へフォーカスを移しても、応答前も応答後も行1の数字が出ている', async () => {
     let release!: () => void;
     const gate = new Promise<void>(resolve => { release = resolve; });
