@@ -90,7 +90,7 @@ describe('R-0230 サマリーの置き場所と中身', () => {
     window.innerWidth = 800;
     renderPage();
     const summary = await screen.findByTestId('top-summary');
-    await waitFor(() => expect(within(summary).getByText('売上').nextSibling?.textContent).toBe(numberText(159600)));
+    await waitFor(() => expect(within(summary).getByText('売上（税抜）').nextSibling?.textContent).toBe(numberText(159600)));
 
     const pair = (label: string) => within(summary).getByText(label).nextSibling?.textContent;
     expect(pair('原価')).toBe(numberText(276000));
@@ -141,7 +141,7 @@ describe('R-0230 明細の入力順', () => {
       within(row).getByRole('textbox', { name: '取付場所' }),
       within(row).getByRole('textbox', { name: '取付製品' }),
       within(row).getByRole('textbox', { name: '数量' }),
-      within(row).getByRole('button', { name: /^備考/ }),
+      within(row).getByRole('textbox', { name: '備考' }),
       within(row).getByRole('textbox', { name: '原価 本体' }),
       within(row).getByRole('textbox', { name: '売値 本体' }),
     ];
@@ -176,7 +176,7 @@ describe('R-0230 明細の入力順', () => {
     renderPage();
     const row = await screen.findByTestId('line-item-0');
     const location = within(row).getByRole('textbox', { name: '取付場所' });
-    const targets = ['取付場所', '取付製品', '数量', '備考 ＋', '原価 本体', '売値 本体'];
+    const targets = ['取付場所', '取付製品', '数量', '備考', '原価 本体', '売値 本体'];
     location.focus();
     const seen: string[] = [];
     for (let i = 0; i < 20; i++) {

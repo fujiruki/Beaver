@@ -889,6 +889,8 @@ export default function VoucherEdit() {
   const pageGutter = 64;
   const summaryRight = viewportWidth - pageGutter
     >= getLineItemWidth(moneyCategories.length, timeCategories.length) + 16 + OPS_SIDE_WIDTH + 16 + SUMMARY_SIDE_WIDTH;
+  const lineWide = viewportWidth - pageGutter - (isReadOnly ? 0 : OPS_SIDE_WIDTH + 16) - (summaryRight ? SUMMARY_SIDE_WIDTH + 16 : 0)
+    >= getLineItemWidth(moneyCategories.length, timeCategories.length);
   const rowOps = (
     !isReadOnly && (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8 }}>
@@ -906,7 +908,7 @@ export default function VoucherEdit() {
   );
   const profitRateBar = <ProfitRateBar stacked categories={categories} selectedIdx={selectedIdx} setSelectedIdx={setSelectedIdx} isNew={isNew} onSaveLine={saveLine} />;
   const topSummary = (
-    <TopSummary lines={linesForCalc} taxInputType={watchedTaxInputType} taxRate={0.10} costLines={costLinesForCalc} />
+    <TopSummary lines={linesForCalc} taxInputType={watchedTaxInputType} taxRate={0.10} costLines={costLinesForCalc} horizontal={!summaryRight} />
   );
 
   return (
@@ -1151,6 +1153,7 @@ export default function VoucherEdit() {
                   selected={selectedIdx === index}
                   onSelect={() => setSelectedIdx(index)}
                   categories={categories}
+                  wide={lineWide}
                   isNew={isNew}
                   onSaveLine={saveLine}
                   voucherLabel={`${voucherTypeLabel} ${voucher?.voucher_no ?? '新規'}`}

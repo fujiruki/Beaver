@@ -154,18 +154,14 @@ describe('R-0184 明細入力レイアウト F3 詰め版', () => {
     expect(Number.parseFloat(lineType.style.width)).toBeGreaterThanOrEqual(72);
   });
 
-  it('備考を開くと右のまとまりの下に幅いっぱいの入力欄を表示する', async () => {
-    const user = userEvent.setup();
+  it('備考の入力欄は常に3段目に出ている（R-0275 で開閉をやめ、右の下から3段目へ移した）', async () => {
     renderPage();
     const row = await screen.findByTestId('line-item-0');
 
-    await user.click(within(row).getByRole('button', { name: '備考 ＋' }));
-
-    const rightGroup = within(row).getByTestId('line-item-right');
-    const memo = within(rightGroup).getByRole('textbox', { name: '備考' });
-    expect(memo.style.width).toBe('100%');
+    const memo = within(row).getByRole('textbox', { name: '備考' });
     expect(memo.style.height).toBe('20px');
-    expect(within(row).getByTestId('line-item-left').contains(memo)).toBe(false);
+    expect(within(row).getByTestId('line-item-third').contains(memo)).toBe(true);
+    expect(within(row).queryByRole('button', { name: /^備考/ })).toBeNull();
   });
 
   it('意味のまとまりごとに外枠を共有し、内側の入力欄に個別の枠線を持たない', async () => {
