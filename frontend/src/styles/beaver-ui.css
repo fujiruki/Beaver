@@ -87,7 +87,7 @@
 .bv-save-error { color: var(--bv-red); }
 .bv-number, .bv-amount { text-align: right; }
 .bv-number, .bv-amount, .bv-mono { font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace; font-variant-numeric: tabular-nums; }
-.bv-empty-date::-webkit-datetime-edit { color: var(--bv-empty-placeholder); }
+input[type="date"][data-empty]:not(:focus)::-webkit-datetime-edit { color: transparent; }
 .bv-due-soon { color: #c2410c; font-size: 11px; font-weight: 700; white-space: nowrap; }
 .bv-due-over { color: var(--bv-red); font-weight: 700; white-space: nowrap; }
 

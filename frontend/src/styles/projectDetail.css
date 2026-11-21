@@ -28,9 +28,8 @@
 .pd-sched .pd-col-date { width: 126px; }
 .pd-sched .pd-col-hours { width: 67px; text-align: right; }
 .pd-sched .pd-col-delete { width: 48px; text-align: center; }
-.pd-sched .bv-edit-cell .bv-control::placeholder, .pd-sched .bv-empty-date::-webkit-datetime-edit { color: var(--bv-empty-placeholder); }
-.pd-sched .bv-edit-cell:hover .bv-control::placeholder, .pd-sched .bv-edit-cell:focus-within .bv-control::placeholder,
-.pd-sched .bv-edit-cell:hover .bv-empty-date::-webkit-datetime-edit, .pd-sched .bv-edit-cell:focus-within .bv-empty-date::-webkit-datetime-edit { color: #334155; }
+.pd-sched .bv-edit-cell .bv-control::placeholder { color: var(--bv-empty-placeholder); }
+.pd-sched .bv-edit-cell:hover .bv-control::placeholder, .pd-sched .bv-edit-cell:focus-within .bv-control::placeholder { color: #334155; }
 .pd-sched input[type="checkbox"] { width: 15px; height: 15px; accent-color: var(--bv-blue); }
 .pd-sched input[type="checkbox"]:hover, .pd-sched input[type="checkbox"]:focus-visible { outline: 2px solid var(--bv-blue); outline-offset: 2px; }
 .pd-other { display: grid; grid-template-columns: minmax(0, 1fr) 28px; align-items: center; }
