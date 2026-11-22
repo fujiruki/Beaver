@@ -12,15 +12,15 @@ export const LINE_TYPE_SELECT_WIDTH = 72;
 export const LINE_ITEM_LEDGER_WIDTH = 92;
 
 // 行は 番号｜取付場所｜種別｜台帳｜（右の帯｜利益）。取付場所〜台帳の合計が LINE_ITEM_LEFT_WIDTH
-export function createRowColumns(rightWidth: number | null) {
+// 狭いときも帯の幅は同じで、帯は左の欄の下（No の右）から始まるので、帯の列を左の欄の分だけ減らして合計をそろえる
+export function createRowColumns(rightWidth: number, wide: boolean) {
   const left = [
     LINE_ITEM_LEFT_WIDTH - LINE_TYPE_SELECT_WIDTH - 3 - LINE_ITEM_LEDGER_WIDTH - 3,
     LINE_TYPE_SELECT_WIDTH + 3,
     LINE_ITEM_LEDGER_WIDTH + 3,
   ];
-  const cols = [LINE_ITEM_NO_WIDTH, ...left];
-  if (rightWidth !== null) cols.push(rightWidth, LINE_ITEM_PROFIT_WIDTH);
-  return cols.map(w => `${w}px`).join(' ');
+  const band = wide ? rightWidth : Math.max(0, rightWidth - LINE_ITEM_LEFT_WIDTH);
+  return [LINE_ITEM_NO_WIDTH, ...left, band, LINE_ITEM_PROFIT_WIDTH].map(w => `${w}px`).join(' ');
 }
 
 export function createCategoryGridTemplate(moneyCategoryCount: number, timeCategoryCount: number) {

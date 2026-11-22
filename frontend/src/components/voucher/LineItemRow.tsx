@@ -276,12 +276,10 @@ export default function LineItemRow({
     type: { gridRow: 1, gridColumn: 3 },
     ledger: { gridRow: 1, gridColumn: 4 },
     name: { gridRow: 2, gridColumn: '2 / 5' },
-    third: { gridRow: 4, gridColumn: '2 / 5' },
-    right: { gridRow: 3, gridColumn: '1 / 5' },
-    profit: { gridRow: 5, gridColumn: '1 / 5' },
+    third: { gridRow: 4, gridColumn: '2 / 6' },
+    right: { gridRow: 3, gridColumn: '2 / 6' },
+    profit: { gridRow: '3 / 5', gridColumn: 6 },
   };
-  const rowColumnsWide = createRowColumns(rightWidth);
-  const rowColumnsNarrow = createRowColumns(null);
 
   return (
     <div
@@ -289,7 +287,7 @@ export default function LineItemRow({
       onClick={onSelect}
       style={{
         display: 'grid',
-        gridTemplateColumns: wide ? rowColumnsWide : rowColumnsNarrow,
+        gridTemplateColumns: createRowColumns(rightWidth, wide),
         alignItems: 'stretch',
         rowGap: 2,
         padding: '3px 0',

@@ -1122,7 +1122,7 @@ export default function VoucherEdit() {
                   <div data-testid="line-item-heading" style={lineHeadingStyle}>
                     <span style={{ width: LINE_ITEM_NO_WIDTH }}>No</span>
                     <span style={{ width: LINE_ITEM_LEFT_WIDTH }}>取付場所・品名／数量・備考</span>
-                    <span data-testid="category-grid-heading" style={{ width: getLineItemRightWidth(moneyCategories.length, timeCategories.length), display: 'grid', gridTemplateColumns: createCategoryGridTemplate(moneyCategories.length, timeCategories.length) }}>
+                    <span data-testid="category-grid-heading" style={{ width: getLineItemRightWidth(moneyCategories.length, timeCategories.length), marginLeft: lineWide ? 0 : LINE_ITEM_NO_WIDTH, display: 'grid', gridTemplateColumns: createCategoryGridTemplate(moneyCategories.length, timeCategories.length) }}>
                       <span />
                       {moneyCategories.map(category => (
                         <span key={category.code} style={{ textAlign: 'right' }}>{category.name}</span>
