@@ -87,9 +87,36 @@ describe('R-0275 明細の3段目は 数量・単価・備考', () => {
     const row = await screen.findByTestId('line-item-0');
     const third = within(row).getByTestId('line-item-third');
     const right = within(row).getByTestId('line-item-right');
-    expect(row.style.gridTemplateColumns.split(' ')).toHaveLength(4);
     expect(Number(right.style.gridRow)).toBeLessThan(Number(third.style.gridRow));
-    expect(right.style.gridColumn).toBe('1 / 5');
+  });
+
+  it('狭いとき 備考の欄（3段目）が帯と同じ列範囲で、帯の右端まで伸びる', async () => {
+    window.innerWidth = 1024;
+    renderPage();
+    const row = await screen.findByTestId('line-item-0');
+    const third = within(row).getByTestId('line-item-third');
+    const right = within(row).getByTestId('line-item-right');
+    expect(third.style.gridColumn).toBe(right.style.gridColumn);
+    const cols = row.style.gridTemplateColumns.split(' ').map(parseFloat);
+    const [from, to] = right.style.gridColumn.split('/').map(s => parseInt(s));
+    const spanned = cols.slice(from - 1, to - 1).reduce((a, b) => a + b, 0);
+    expect(spanned).toBe(parseFloat(right.style.width));
+  });
+
+  it('狭いとき 利益が帯と同じ段にあり、帯の右に置かれる', async () => {
+    window.innerWidth = 1024;
+    renderPage();
+    const row = await screen.findByTestId('line-item-0');
+    const third = within(row).getByTestId('line-item-third');
+    const right = within(row).getByTestId('line-item-right');
+    const profit = within(row).getByText('利益').parentElement as HTMLElement;
+    const bandRow = Number(right.style.gridRow);
+    const [pFrom, pTo] = profit.style.gridRow.split('/').map(s => parseInt(s));
+    expect(pFrom).toBe(bandRow);
+    expect(pTo).toBeGreaterThan(Number(third.style.gridRow));
+    const cols = row.style.gridTemplateColumns.split(' ');
+    expect(Number(profit.style.gridColumn)).toBe(cols.length);
+    expect(Number(right.style.gridColumn.split('/')[1])).toBeLessThanOrEqual(cols.length);
   });
 
   it('DOM の順は 数量・備考 → 種別・台帳 → 帯 → 利益', async () => {
